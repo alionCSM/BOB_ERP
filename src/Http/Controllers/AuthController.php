@@ -70,10 +70,6 @@ final class AuthController
             $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
             $username = (string)($_POST['username'] ?? '');
 
-            // Ensure username column exists for per-account lockout (one-shot,
-            // mirrors the runtime schema-detection pattern used elsewhere)
-            $this->ensureLoginAttemptsUsernameColumn();
-
             // Rate limiting: max 5 failed attempts per IP per 15 minutes
             $countStmt = $this->conn->prepare("
                 SELECT COUNT(*) AS cnt, MAX(attempted_at) AS last_at
@@ -414,19 +410,5 @@ final class AuthController
         }
 
         Response::view('auth/confirm_email.html.twig', $request, compact('pageTitle', 'success', 'error'));
-    }
-
-    /**
-     * Add a `username` column to bb_login_attempts on first use, idempotently.
-     * Catches the duplicate-column error so subsequent calls are no-ops.
-     */
-    private function ensureLoginAttemptsUsernameColumn(): void
-    {
-        try {
-            $this->conn->exec("ALTER TABLE bb_login_attempts ADD COLUMN username VARCHAR(150) DEFAULT NULL");
-            $this->conn->exec("ALTER TABLE bb_login_attempts ADD INDEX idx_username_time (username, attempted_at)");
-        } catch (\PDOException $e) {
-            // Column or index already exists — ignore
-        }
     }
 }
