@@ -13,6 +13,11 @@ class AiSqlController
 {
     public const USERS_WITH_PRICE_ACCESS = ['alion', 'laura', 'osman', 'elena', 'ermal'];
 
+    // Only these users (plus user id 1) may use the AI module. The feature
+    // executes LLM-generated SQL; access must stay narrow until that surface
+    // is properly hardened.
+    private const USERS_WITH_AI_ACCESS = ['alion', 'laura', 'osman', 'elena', 'ermal'];
+
     private \PDO $conn;
     private \App\Service\OllamaClient $client;
 
@@ -22,13 +27,31 @@ class AiSqlController
         $this->client = $client;
     }
 
+    private function assertAiAccess(Request $request): void
+    {
+        $user     = $request->user();
+        $userId   = (int)($user->id ?? 0);
+        $username = (string)($user->username ?? '');
+
+        if ($userId === 1) {
+            return;
+        }
+        if ($username !== '' && in_array($username, self::USERS_WITH_AI_ACCESS, true)) {
+            return;
+        }
+
+        Response::error('Accesso negato.', 403);
+    }
+
     public function chatPage(Request $request): never
     {
+        $this->assertAiAccess($request);
         Response::view('ai/chat.html.twig', $request);
     }
 
     public function exportTable(Request $request): never
     {
+        $this->assertAiAccess($request);
         $rawHeaders = $_POST['headers'] ?? '[]';
         $rawRows    = $_POST['rows']    ?? '[]';
         $filename   = $_POST['filename'] ?? ('bob_ai_' . date('Y-m-d') . '.xlsx');
@@ -56,6 +79,7 @@ class AiSqlController
 
     public function chat(Request $request): never
     {
+        $this->assertAiAccess($request);
         header('Content-Type: application/json');
 
         $rateLimiter = new RateLimiter($this->conn, 30, 5);

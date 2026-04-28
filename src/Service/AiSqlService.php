@@ -220,9 +220,19 @@ PROMPT;
         }
 
         $upper = strtoupper($sql);
-        foreach (['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'EXEC', 'TRUNCATE'] as $kw) {
-            if (preg_match('/\b' . $kw . '\b/', $upper)) {
-                return ['ok' => false, 'error' => "Query non permessa: $kw"];
+        $banned = [
+            // Mutating statements
+            'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'EXEC', 'TRUNCATE',
+            'REPLACE', 'RENAME', 'GRANT', 'REVOKE', 'CALL', 'HANDLER',
+            // Filesystem / DB-engine escape hatches
+            'OUTFILE', 'DUMPFILE', 'LOAD_FILE', 'INTO OUTFILE', 'INTO DUMPFILE',
+            // Error-based / time-based exfiltration vectors
+            'EXTRACTVALUE', 'UPDATEXML', 'BENCHMARK', 'SLEEP',
+        ];
+        foreach ($banned as $kw) {
+            $pattern = '/\b' . preg_quote($kw, '/') . '\b/';
+            if (preg_match($pattern, $upper)) {
+                return ['ok' => false, 'error' => 'Query non permessa.'];
             }
         }
 
@@ -235,12 +245,30 @@ PROMPT;
 
     // Internal/security tables that are never queryable regardless of role
     private const ALWAYS_BLOCKED_TABLES = [
+        'bb_users',
         'bb_user_permissions',
         'bb_user_activity',
+        'bb_user_sessions',
+        'bb_login_attempts',
         'bb_login_verifications',
         'bb_user_remember_tokens',
         'bb_user_login_history',
         'bb_ai_sql_logs',
+        'bb_audit_log',
+        'bb_settings',
+        'bb_user_company_access',
+        'mysql',
+        'information_schema',
+        'performance_schema',
+        'sys',
+    ];
+
+    // Sensitive column names that must never appear in any SQL — caught even
+    // when aliased (`SELECT password AS p`) because the source name still
+    // appears textually in the query.
+    private const ALWAYS_BLOCKED_COLUMNS = [
+        'password', 'password_hash', 'token', 'remember_token', 'secret',
+        'api_key', 'private_key', 'pwd', 'auth_token',
     ];
 
     /**
@@ -249,12 +277,23 @@ PROMPT;
      */
     private function checkPermissions(string $sql, array $userContext): ?string
     {
-        $sqlLower = strtolower($sql);
+        // Strip backticks so identifiers like `bb_users` don't slip past the
+        // word-boundary regex below.
+        $sqlLower = strtolower(str_replace('`', '', $sql));
 
         // Always-blocked tables (security/internals) — applies to everyone including superadmin
         foreach (self::ALWAYS_BLOCKED_TABLES as $table) {
             if (preg_match('/\b' . preg_quote($table, '/') . '\b/', $sqlLower)) {
                 return "Questa tabella non è accessibile tramite BOB AI.";
+            }
+        }
+
+        // Always-blocked columns (credentials/tokens) — applies to everyone
+        // including superadmin. Catches aliases because the source name must
+        // still appear in the SQL text.
+        foreach (self::ALWAYS_BLOCKED_COLUMNS as $col) {
+            if (preg_match('/\b' . preg_quote($col, '/') . '\b/', $sqlLower)) {
+                return "Questa colonna non è accessibile tramite BOB AI.";
             }
         }
 
@@ -325,7 +364,7 @@ PROMPT;
             return ['ok' => true, 'rows' => $rows, 'columns' => $columns];
         } catch (\PDOException $e) {
             error_log('[AI_SQL] query=' . $sql . ' error=' . $e->getMessage());
-            return ['ok' => false, 'error' => 'Errore query: ' . $e->getMessage()];
+            return ['ok' => false, 'error' => 'Errore durante l\'esecuzione della query.'];
         }
     }
 
