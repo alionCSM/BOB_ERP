@@ -288,6 +288,23 @@ final class AuthController
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($pageError)) {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+            // Rate limiting: max 5 failed verify attempts per IP per 15 minutes
+            $countStmt = $this->conn->prepare("
+                SELECT COUNT(*) AS cnt
+                FROM bb_login_attempts
+                WHERE ip_address = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+            ");
+            $countStmt->execute([$ip]);
+            $failCount = (int)$countStmt->fetch(\PDO::FETCH_ASSOC)['cnt'];
+
+            if ($failCount >= 5) {
+                http_response_code(429);
+                $error = 'Troppi tentativi. Riprova tra 15 minuti.';
+                Response::view('auth/verify_login.html.twig', $request, compact('pageError', 'error', 'maskedEmail', 'appUrl'));
+            }
+
             $code = trim($_POST['code'] ?? '');
 
             if ($user->verifyLoginCode($token, $code)) {
@@ -310,6 +327,11 @@ final class AuthController
 
                 Response::redirect('/');
             }
+
+            // Log failed attempt for rate limiting
+            $this->conn->prepare(
+                "INSERT INTO bb_login_attempts (ip_address, attempted_at) VALUES (?, NOW())"
+            )->execute([$ip]);
 
             $error = 'Codice non valido o scaduto.';
         }

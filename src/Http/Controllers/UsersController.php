@@ -577,12 +577,21 @@ final class UsersController
             Response::error('Utente non specificato.', 400);
         }
 
-        $stmt = $this->conn->prepare('SELECT photo FROM bb_users WHERE id = :id LIMIT 1');
+        $stmt = $this->conn->prepare('SELECT photo, company_id FROM bb_users WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $targetId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row || empty($row['photo'])) {
             Response::error('Foto non trovata.', 404);
+        }
+
+        // Company-scoped users may only view photos of users in their allowed companies
+        if (isCompanyScopedUserByContext($this->conn, $request->user())) {
+            $allowedIds = getCompanyScopeAllowedIds($this->conn, $request->user());
+            $targetCompanyId = (int)($row['company_id'] ?? 0);
+            if ($targetCompanyId <= 0 || !in_array($targetCompanyId, $allowedIds, true)) {
+                Response::error('Accesso negato.', 403);
+            }
         }
 
         $cloudRoot = $_ENV['CLOUD_ROOT'] ?? getenv('CLOUD_ROOT');
