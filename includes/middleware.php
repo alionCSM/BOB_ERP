@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/helpers/csrf.php';
+require_once __DIR__ . '/helpers/not_found.php';
 
 use App\Http\Middleware\AuthMiddleware;
 use App\Http\Middleware\CsrfMiddleware;
@@ -68,8 +69,7 @@ if ($isCompanyScopedUser) {
     $allowedCompanyIds = $authorization->allowedCompanyIds($user, $companyScopedIds);
 
     if (!$routePolicyMap->isCompanyScopedRouteAllowed($uri)) {
-        http_response_code(403);
-        exit('Access denied');
+        render_not_found_and_exit();
     }
 
     $isCompanyScopedPageRequest = preg_match('#^/(company_details\.php|views/companies/company_details\.php|companies/\d+)#', $uri)
@@ -81,8 +81,7 @@ if ($isCompanyScopedUser) {
     }
     if ($isCompanyScopedPageRequest && $requestedCompanyId !== null) {
         if (!$authorization->canAccessCompany($user, (int) $requestedCompanyId, $companyScopedIds)) {
-            http_response_code(403);
-            exit('Access denied to this company');
+            render_not_found_and_exit();
         }
     }
 
@@ -200,6 +199,9 @@ $requestedWorksiteId =
 if ($requestedWorksiteId !== null) {
     $requestedWorksiteId = (int) $requestedWorksiteId;
     if (!$scopeService->canAccessWorksite($allowedWorksites, $requestedWorksiteId)) {
+        if ($isCompanyScopedUser) {
+            render_not_found_and_exit();
+        }
         http_response_code(403);
         exit('Access denied to this worksite');
     }

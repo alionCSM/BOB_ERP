@@ -72,16 +72,16 @@ function assertCompanyScopeWorkerAccess(PDO $conn, $user, int $workerId): void
 
     $allowedIds = getCompanyScopeAllowedIds($conn, $user);
     if (empty($allowedIds)) {
-        http_response_code(403);
-        exit('Access denied to this worker');
+        require_once __DIR__ . '/helpers/not_found.php';
+        render_not_found_and_exit();
     }
 
     $stmt = $conn->prepare('SELECT company FROM bb_workers WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $workerId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
-        http_response_code(403);
-        exit('Access denied to this worker');
+        require_once __DIR__ . '/helpers/not_found.php';
+        render_not_found_and_exit();
     }
 
     // Name-based check: resolve worker's company text to a company id
@@ -94,8 +94,8 @@ function assertCompanyScopeWorkerAccess(PDO $conn, $user, int $workerId): void
         }
     }
 
-    http_response_code(403);
-    exit('Access denied to this worker');
+    require_once __DIR__ . '/helpers/not_found.php';
+    render_not_found_and_exit();
 }
 
 function assertCompanyScopeCompanyDocAccess(PDO $conn, $user, int $companyId): void
@@ -106,8 +106,8 @@ function assertCompanyScopeCompanyDocAccess(PDO $conn, $user, int $companyId): v
 
     $allowedIds = getCompanyScopeAllowedIds($conn, $user);
     if (empty($allowedIds) || !in_array($companyId, $allowedIds, true)) {
-        http_response_code(403);
-        exit('Access denied to this company');
+        require_once __DIR__ . '/helpers/not_found.php';
+        render_not_found_and_exit();
     }
 }
 
