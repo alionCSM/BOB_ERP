@@ -67,7 +67,12 @@ final class AuthController
 
         // 3) POST handler
         if (!$autoRedirect && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $username = (string)($_POST['username'] ?? '');
+
+            // Ensure username column exists for per-account lockout (one-shot,
+            // mirrors the runtime schema-detection pattern used elsewhere)
+            $this->ensureLoginAttemptsUsernameColumn();
 
             // Rate limiting: max 5 failed attempts per IP per 15 minutes
             $countStmt = $this->conn->prepare("
@@ -80,7 +85,21 @@ final class AuthController
             $failCount = (int)$rateRow['cnt'];
             $lastAt    = $rateRow['last_at'];
 
-            if ($failCount >= 5) {
+            // Per-account lockout: 10 failed attempts on the same username
+            // across any IP within 15 minutes. Defends against distributed
+            // brute-force where the IP-only limit is trivially bypassed.
+            $userFailCount = 0;
+            if ($username !== '') {
+                $userStmt = $this->conn->prepare("
+                    SELECT COUNT(*) AS cnt
+                    FROM bb_login_attempts
+                    WHERE username = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+                ");
+                $userStmt->execute([$username]);
+                $userFailCount = (int)$userStmt->fetch(\PDO::FETCH_ASSOC)['cnt'];
+            }
+
+            if ($failCount >= 5 || $userFailCount >= 10) {
                 http_response_code(429);
                 $error = 'Troppi tentativi di accesso. Riprova tra 15 minuti.';
             } elseif ($failCount > 0 && $lastAt !== null) {
@@ -196,8 +215,8 @@ final class AuthController
 
                 } else {
                     $this->conn->prepare(
-                        "INSERT INTO bb_login_attempts (ip_address, attempted_at) VALUES (?, NOW())"
-                    )->execute([$ip]);
+                        "INSERT INTO bb_login_attempts (ip_address, username, attempted_at) VALUES (?, ?, NOW())"
+                    )->execute([$ip, $username !== '' ? $username : null]);
                     $error = 'Nome utente o password non corretti.';
                 }
             }
@@ -330,8 +349,8 @@ final class AuthController
 
             // Log failed attempt for rate limiting
             $this->conn->prepare(
-                "INSERT INTO bb_login_attempts (ip_address, attempted_at) VALUES (?, NOW())"
-            )->execute([$ip]);
+                "INSERT INTO bb_login_attempts (ip_address, username, attempted_at) VALUES (?, ?, NOW())"
+            )->execute([$ip, !empty($user->username) ? $user->username : null]);
 
             $error = 'Codice non valido o scaduto.';
         }
@@ -395,5 +414,19 @@ final class AuthController
         }
 
         Response::view('auth/confirm_email.html.twig', $request, compact('pageTitle', 'success', 'error'));
+    }
+
+    /**
+     * Add a `username` column to bb_login_attempts on first use, idempotently.
+     * Catches the duplicate-column error so subsequent calls are no-ops.
+     */
+    private function ensureLoginAttemptsUsernameColumn(): void
+    {
+        try {
+            $this->conn->exec("ALTER TABLE bb_login_attempts ADD COLUMN username VARCHAR(150) DEFAULT NULL");
+            $this->conn->exec("ALTER TABLE bb_login_attempts ADD INDEX idx_username_time (username, attempted_at)");
+        } catch (\PDOException $e) {
+            // Column or index already exists — ignore
+        }
     }
 }

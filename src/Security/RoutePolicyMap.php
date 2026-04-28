@@ -53,7 +53,9 @@ class RoutePolicyMap
         '#^/change-password$#',
         // Notifications
         '#^/notifications/unread$#',
-        '#^/api/analytics/#',
+        // Analytics: heartbeat only — user-activity exposes staff data and
+        // must not be reachable by company-scoped users
+        '#^/api/analytics/heartbeat$#',
         '#^/$#',
         '#^/dashboard#',
     ];
@@ -105,7 +107,7 @@ class RoutePolicyMap
         '#^/change-password$#',
         // Notifications
         '#^/notifications/unread$#',
-        '#^/api/analytics/#',
+        '#^/api/analytics/heartbeat$#',
     ];
 
     /** @var string[] */

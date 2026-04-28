@@ -180,6 +180,11 @@ final class ApiController
 
     public function userAnalytics(Request $request): never
     {
+        // Staff activity must not be exposed to company-scoped users
+        if (isCompanyScopedUserByContext($this->conn, $request->user())) {
+            Response::error('Accesso negato.', 403);
+        }
+
         $analytics = new \UserAnalytics($this->conn);
         Response::json([
             'onlineCount' => $analytics->countOnlineUsers(),
