@@ -400,6 +400,25 @@ if ($uri === '/dashboard') {
     $router->dispatch($request, $container);
 }
 
+if ($uri === '/ai' || str_starts_with($uri, '/ai/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $ollamaClient = new \App\Service\OllamaClient(
+        $_ENV['OLLAMA_URL'] ?? 'http://192.168.1.10:8000/v1/chat/completions',
+        $_ENV['MODEL'] ?? 'Qwen3-30B-A3B-Q4_K_M.gguf'
+    );
+    $controller = new \App\Http\Controllers\AiSqlController($connection, $ollamaClient);
+    $container->set(\App\Http\Controllers\AiSqlController::class, fn() => $controller);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+    $router->get('/ai/chat',         [\App\Http\Controllers\AiSqlController::class, 'chatPage'])
+           ->post('/ai/chat',        [\App\Http\Controllers\AiSqlController::class, 'chat'])
+           ->post('/ai/export-table',[\App\Http\Controllers\AiSqlController::class, 'exportTable']);
+    $router->dispatch($request, $container);
+}
+
 if (str_starts_with($uri, '/notifications/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

@@ -1,0 +1,96 @@
+{% extends 'layout/base.html.twig' %}
+
+{% set pageTitle = 'BOB AI' %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ asset('/assets/css/views/ai/chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="ai-page">
+
+    <!-- Hero -->
+    <div class="ai-hero">
+        <div class="ai-hero-content">
+            <div class="ai-hero-left">
+                <div class="ai-hero-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="4"/>
+                        <path d="M8 10h.01M12 10h.01M16 10h.01"/>
+                        <path d="M8 14s1 1 4 1 4-1 4-1"/>
+                        <line x1="12" y1="2" x2="12" y2="5"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                        <line x1="2" y1="12" x2="5" y2="12"/>
+                        <line x1="19" y1="12" x2="22" y2="12"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="ai-hero-title-row">
+                        <div class="ai-hero-title">BOB <span>AI</span></div>
+                        <div class="ai-hero-badge">
+                            <span class="ai-hero-badge-dot"></span>
+                            Online
+                        </div>
+                    </div>
+                    <div class="ai-hero-sub">Chiedi qualsiasi cosa sui tuoi dati in linguaggio naturale</div>
+                    <div class="ai-hero-meta">
+                        <div class="ai-hero-meta-item">
+                            <div class="ai-hero-meta-dot" style="background:#22c55e;"></div>
+                            MySQL · sola lettura
+                        </div>
+                        <div class="ai-hero-meta-item">
+                            <div class="ai-hero-meta-dot" style="background:#a78bfa;"></div>
+                            Cantieri · Operai · Fatture · Presenze
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="ai-chat-wrap">
+        <div class="ai-chat-messages" id="chat-messages">
+            <div class="ai-msg ai-msg-ai">
+                <div class="ai-msg-avatar">BOB</div>
+                <div class="ai-msg-bubble">
+                    <p>Ciao! Sono <strong>BOB AI</strong>. Chiedimi informazioni sui tuoi cantieri, operai, fatture, presenze o pagamenti — in italiano o in inglese.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="chat-loading" class="ai-chat-loading hidden">
+            <div class="ai-msg ai-msg-ai">
+                <div class="ai-msg-avatar">BOB</div>
+                <div class="ai-msg-bubble ai-msg-bubble-loading">
+                    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <div class="ai-chat-input-area">
+            <div class="ai-chat-input-wrap">
+                <textarea
+                    id="chat-input"
+                    placeholder="Chiedi qualcosa sui dati…"
+                    rows="1"
+                ></textarea>
+                <button type="button" id="chat-clear" class="ai-chat-clear" title="Nuova conversazione">
+                    <i data-lucide="rotate-cw" class="ai-chat-clear-icon"></i>
+                </button>
+                <button type="button" id="chat-send" class="ai-chat-send">
+                    <i data-lucide="send" class="ai-chat-send-icon"></i>
+                </button>
+            </div>
+            <div class="ai-chat-hint">Invio per inviare &nbsp;·&nbsp; Shift+Invio per nuova riga</div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ asset('/assets/js/views/ai/chat.js') }}"></script>
+{% endblock %}

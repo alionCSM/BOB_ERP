@@ -125,6 +125,8 @@ final class Config
     public function ollamaUrl(): string   { return $this->get('OLLAMA_URL', ''); }
     public function ollamaModel(): string { return $this->get('MODEL', ''); }
 
+    public function attestatoUrl(): string { return rtrim($this->get('ATTESTATO_URL', 'https://docs.csmontaggi.it'), '/'); }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function require(string $key): string

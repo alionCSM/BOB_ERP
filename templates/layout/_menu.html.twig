@@ -73,6 +73,16 @@
             </li>
             <li class="side-nav__devider my-6"></li>
 
+            {# ── AI CHAT ── #}
+            {% set aiChatActive = currentPath starts with '/ai' %}
+            <li>
+                <a href="/ai/chat" class="side-menu {{ aiChatActive ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="cpu"></i></div>
+                    <div class="side-menu__title">BOB AI</div>
+                </a>
+            </li>
+            <li class="side-nav__devider my-6"></li>
+
         {% endif %}
 
         {# ── OFFERTE ── #}

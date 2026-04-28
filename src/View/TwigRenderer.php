@@ -57,8 +57,12 @@ final class TwigRenderer
 
     private function registerFunctions(): void
     {
+        // Global variables available in all templates
+        $config = new Config();
+        $this->twig->addGlobal('attestatoUrl', $config->attestatoUrl());
+
         // {{ asset('/assets/css/app.css') }} → appUrl + path
-        $appUrl = (new Config())->appUrl();
+        $appUrl = $config->appUrl();
         $this->twig->addFunction(new TwigFunction('asset', static function (string $path) use ($appUrl): string {
             return $appUrl . '/' . ltrim($path, '/');
         }));
