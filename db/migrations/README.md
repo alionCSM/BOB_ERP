@@ -1,24 +1,55 @@
 # Migrations
 
-Plain `.sql` files applied in lexicographic order by `bin/migrate.php`. Tracked in the `bb_migrations` table (created automatically on first run).
-
-## Naming
-
-`YYYY_MM_DD_NNN_short_description.sql` — date + 3-digit sequence keeps lexicographic order = chronological order, even when several land on the same day.
-
-Example: `2026_04_29_001_login_attempts_username.sql`
+Managed by [Phinx](https://book.cakephp.org/phinx/0/en/index.html). Configuration lives in `phinx.php` at the repo root; it reads DB credentials from the application's `.env` file so each environment migrates against its own database.
 
 ## Running
 
 ```bash
-php bin/migrate.php          # apply all pending
-php bin/migrate.php status   # list applied + pending, do nothing
+# Apply all pending migrations
+composer migrate
+# or:
+vendor/bin/phinx migrate
+
+# Show what's applied vs pending
+composer migrate:status
+
+# Rollback the most recent migration
+composer migrate:rollback
 ```
 
-Each migration runs in its own transaction. Note that MySQL implicitly commits DDL (`ALTER`, `CREATE`, `DROP`), so a DDL statement that fails mid-file cannot be rolled back — split risky changes across separate migrations.
+## Authoring a new migration
 
-## Authoring rules
+```bash
+vendor/bin/phinx create AddSomethingToSomeTable
+```
 
-- **Forward-only.** No `down`/rollback. If you need to undo a migration, write a new one.
-- **Idempotency-friendly when possible** — prefer `CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS` (MySQL 8.0.29+). Without `IF NOT EXISTS`, re-running on a partially-applied DB will fail loudly, which is by design.
-- **Don't edit a migration after it lands in main.** Once a teammate has applied it, the row in `bb_migrations` references that filename + state forever. Add a follow-up migration instead.
+Phinx generates `db/migrations/<timestamp>_add_something_to_some_table.php` containing an `AbstractMigration` subclass. Implement either:
+
+- `change()` — Phinx works out the down direction automatically. Use this for reversible schema changes (`addColumn`, `addIndex`, `addForeignKey`, etc.).
+- `up()` + `down()` — for irreversible or complex changes (data migrations, raw SQL with side effects).
+
+Inside the migration use Phinx's table builder DSL:
+
+```php
+$this->table('bb_example')
+    ->addColumn('name', 'string', ['limit' => 150, 'null' => false])
+    ->addIndex(['name'])
+    ->create();
+```
+
+Or drop into raw SQL when needed:
+
+```php
+$this->execute("UPDATE bb_users SET ... WHERE ...");
+```
+
+## Conventions
+
+- **Use `change()` whenever possible** — it's automatically reversible.
+- **Don't edit a migration after it's been applied anywhere.** Phinx tracks applied migrations by their numeric timestamp; if the file content changes it won't be re-run, but teammates' DBs will diverge from yours. Add a follow-up migration instead.
+- **Class name = camel-cased filename suffix.** Phinx enforces this.
+- **One logical change per migration.** Easier to roll back, easier to review.
+
+## Tracking table
+
+Phinx maintains `phinxlog` automatically. Don't touch it manually unless you really know what you're doing — `vendor/bin/phinx breakpoint` and `vendor/bin/phinx status` are the safe ways to inspect/manipulate state.
