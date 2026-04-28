@@ -18,6 +18,13 @@ final class UsersController
 
     public function index(Request $request): void
     {
+        // Company-scoped users (partners) must NEVER hit this unscoped list.
+        // Bounce them to the scoped worker view that filters by their allowed
+        // companies.
+        if (isCompanyScopedUserByContext($this->conn, $request->user())) {
+            Response::redirect('/users/workers');
+        }
+
         $page   = max(1, (int)($request->get('page') ?: 1));
         $limit  = max(1, (int)($request->get('limit') ?: 10));
         $offset = ($page - 1) * $limit;
@@ -483,6 +490,24 @@ final class UsersController
             Response::json([]);
         }
 
+        // Company-scoped users may only search workers from their allowed companies
+        $isCompanyScopedUser = isCompanyScopedUserByContext($this->conn, $request->user());
+        $companyClause       = '';
+        $companyParams       = [];
+        if ($isCompanyScopedUser) {
+            $allowedNames = getCompanyScopeAllowedNames($this->conn, $request->user());
+            if (empty($allowedNames)) {
+                Response::json([]);
+            }
+            $placeholders = [];
+            foreach ($allowedNames as $i => $name) {
+                $key                  = ':company_' . $i;
+                $placeholders[]       = $key;
+                $companyParams[$key]  = $name;
+            }
+            $companyClause = ' AND company IN (' . implode(',', $placeholders) . ')';
+        }
+
         $like = '%' . $q . '%';
         $sql  = "
             SELECT id, uid, first_name, last_name, active
@@ -494,6 +519,7 @@ final class UsersController
                   OR CONCAT_WS(' ', first_name, last_name) LIKE :search_full_name
                   OR CONCAT_WS(' ', last_name, first_name) LIKE :search_full_name_reverse
               )
+              {$companyClause}
             ORDER BY last_name ASC, first_name ASC
             LIMIT 20
         ";
@@ -502,6 +528,9 @@ final class UsersController
         $stmt->bindValue(':search_last', $like, \PDO::PARAM_STR);
         $stmt->bindValue(':search_full_name', $like, \PDO::PARAM_STR);
         $stmt->bindValue(':search_full_name_reverse', $like, \PDO::PARAM_STR);
+        foreach ($companyParams as $k => $v) {
+            $stmt->bindValue($k, $v, \PDO::PARAM_STR);
+        }
         $stmt->execute();
 
         $results = [];

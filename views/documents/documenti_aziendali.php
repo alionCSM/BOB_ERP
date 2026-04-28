@@ -98,8 +98,8 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <a href="#" class="mx-2 text-yellow-500 wd-edit-btn" title="Modifica"
                            data-doc-id="<?= $doc['id'] ?>"
                            data-doc-type="<?= htmlspecialchars($doc['tipo_documento'], ENT_QUOTES) ?>"
-                           data-doc-emission="<?= $doc['data_emissione'] ?>"
-                           data-doc-expiry="<?= $doc['scadenza'] ?>">
+                           data-doc-emission="<?= htmlspecialchars((string)($doc['data_emissione'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                           data-doc-expiry="<?= htmlspecialchars((string)($doc['scadenza'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fas fa-edit fa-lg"></i>
                         </a>
 

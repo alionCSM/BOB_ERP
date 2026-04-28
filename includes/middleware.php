@@ -138,7 +138,13 @@ $mvcModuleMap = [
 
 foreach ($mvcModuleMap as $prefix => $module) {
     if ($uri === $prefix || str_starts_with($uri, $prefix . '/')) {
-        if (!$authorization->canAccessModule($user, $module)) {
+        // Company-scoped users get a permission bypass on the URIs explicitly
+        // listed in companyScopedPermissionBypassPatterns (e.g. /users/workers,
+        // /users/create, /companies/{id}). Without this, partner accounts
+        // without the `users` module permission can't reach their workers.
+        $bypass = $isCompanyScopedUser && $routePolicyMap->isCompanyScopedPermissionBypassRoute($uri);
+
+        if (!$bypass && !$authorization->canAccessModule($user, $module)) {
             header('Location: /dashboard?no_permission=1');
             exit;
         }
