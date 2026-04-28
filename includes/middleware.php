@@ -98,7 +98,7 @@ if ($isCompanyScopedUser) {
 
 // ── CSRF ─────────────────────────────────────────────────────────────────────
 csrf_token(); // ensure token exists in session for all authenticated requests
-(new CsrfMiddleware(['/api/analytics/heartbeat', '/ai/chat']))->handle();
+(new CsrfMiddleware(['/api/analytics/heartbeat', '/ai/chat', '/ai/export-table']))->handle();
 
 // ── Activity log ──────────────────────────────────────────────────────────────
 $activity = new UserActivity($connection);
