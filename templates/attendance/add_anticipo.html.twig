@@ -1,0 +1,91 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y mt-8">
+    <h2 class="text-lg font-medium mb-4">Gestione Anticipi</h2>
+</div>
+
+<div class="intro-y box p-5 mb-4">
+    <form method="POST" action="/attendance/advances/save" class="grid grid-cols-12 gap-4 items-end">
+        <input type="hidden" name="anticipo_id" value="">
+        <div class="col-span-12 md:col-span-4">
+            <label class="form-label">Data</label>
+            <input type="date" name="data" class="form-control" required>
+        </div>
+        <div class="col-span-12 md:col-span-4">
+            <label class="form-label">Nome Operaio</label>
+            <select id="operaioSelect" name="operaio_id" class="form-control" required></select>
+        </div>
+        <div class="col-span-12 md:col-span-4">
+            <label class="form-label">Importo (€)</label>
+            <input type="number" name="importo" step="0.01" min="0" class="form-control" required>
+        </div>
+        <div class="col-span-12">
+            <label class="form-label">Note</label>
+            <textarea name="note" class="form-control" rows="2" placeholder="Inserisci eventuali note..."></textarea>
+        </div>
+        <div class="col-span-12 md:col-span-1">
+            <button type="submit" class="btn btn-primary w-full">Salva</button>
+        </div>
+    </form>
+</div>
+
+<div class="intro-y box p-5 mb-4">
+    <label class="form-label">Cerca nella tabella</label>
+    <input type="text" id="searchInput" class="form-control" placeholder="Cerca per nome operaio o data...">
+</div>
+
+<div class="intro-y col-span-12 overflow-auto">
+    <table class="table table-report -mt-2" id="anticipiTable">
+        <thead>
+        <tr>
+            <th class="whitespace-nowrap">Data</th>
+            <th class="whitespace-nowrap">Operaio</th>
+            <th class="whitespace-nowrap">Importo (€)</th>
+            <th class="whitespace-nowrap">Note</th>
+            <th class="text-center whitespace-nowrap">Azioni</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in anticipi %}
+            <tr class="intro-x">
+                <td>{{ row.data|date('d/m/Y') }}</td>
+                <td>{{ row.operaio_nome }}</td>
+                <td>{{ row.importo|number_format(2, ',', '.') }}</td>
+                <td>{{ row.note }}</td>
+                <td class="table-report__action w-56">
+                    <div class="flex justify-center items-center">
+                        <button type="button" class="flex items-center mr-3 edit-btn"
+                                data-id="{{ row.id }}"
+                                data-data="{{ row.data }}"
+                                data-operaio="{{ row.operaio_id }}"
+                                data-importo="{{ row.importo }}"
+                                data-note="{{ row.note }}">
+                            <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Modifica
+                        </button>
+                        <form method="POST"
+                              action="/attendance/advances/save"
+                              class="inline-block"
+                              data-confirm="Confermi eliminazione di questo anticipo?">
+                            <input type="hidden" name="delete_id" value="{{ row.id }}">
+                            <button type="submit" class="flex items-center text-danger">
+                                <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/add_anticipo.js"></script>
+{% endblock %}

@@ -1,0 +1,269 @@
+{% extends "layout/base.html.twig" %}
+
+{# TODO: $_GET params (search, tab, active, pagato) should be passed as Twig variables
+   from the controller: searchQuery, activeFilter, pagatoFilter #}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/bookings/list_bookings.css">
+{% endblock %}
+
+{% block content %}
+{% if flashSuccess is defined and flashSuccess %}
+    <div style="background:#dcfce7;color:#15803d;border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;margin-top:16px;">
+        {{ flashSuccess }}
+    </div>
+{% endif %}
+
+<div class="bk-page">
+
+    <!-- ── PAGE HEADER ───────────────────────────── -->
+    <div class="bk-header">
+        <div class="bk-header-left">
+            <div class="bk-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+            </div>
+            <div>
+                <div class="bk-header-title">Prenotazioni</div>
+                <div class="bk-header-sub">{{ bookings|length }} prenotazion{{ bookings|length == 1 ? 'e' : 'i' }} trovate</div>
+            </div>
+        </div>
+
+        <!-- New booking dropdown -->
+        <div class="bk-dropdown" id="newBookingDropdown">
+            <button type="button" class="bk-new-btn" id="new-booking-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuova Prenotazione
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="bk-dropdown-menu">
+                <a href="/bookings/create?type=restaurant" class="bk-dropdown-item">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M3 11l9-9 9 9"/><path d="M9 21v-6h6v6"/></svg>
+                    Ristorante
+                </a>
+                <a href="/bookings/create?type=hotel" class="bk-dropdown-item">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h12"/></svg>
+                    Hotel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── MAIN CARD ─────────────────────────────── -->
+    <div class="bk-card">
+
+        <!-- Toolbar: search + tabs + filters -->
+        <div class="bk-toolbar">
+
+            <!-- Search -->
+            {# TODO: searchQuery, activeFilterRaw, pagatoFilterRaw should be passed from controller #}
+            <form method="GET" class="bk-toolbar-search">
+                <input type="hidden" name="tab" value="{{ activeTab }}">
+                {% if activeFilterRaw is defined and activeFilterRaw is not empty %}<input type="hidden" name="active" value="{{ activeFilterRaw }}">{% endif %}
+                {% if pagatoFilterRaw is defined and pagatoFilterRaw is not empty %}<input type="hidden" name="pagato" value="{{ pagatoFilterRaw }}">{% endif %}
+                <input type="text" name="search" placeholder="Cerca struttura, citta, cantiere..."
+                       class="bk-search-input" value="{{ searchQuery ?? '' }}">
+                <button type="submit" class="bk-search-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                </button>
+                {% if searchQuery is defined and searchQuery is not empty %}
+                    <a href="?tab={{ activeTab }}" class="bk-search-clear">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </a>
+                {% endif %}
+            </form>
+
+            <!-- Tabs & filters -->
+            {# TODO: filterUrl logic should be handled by the controller passing pre-built URLs,
+               or kept as JS. For now tabs use simple query strings. #}
+            <div class="bk-toolbar-right">
+                <a href="?tab=all{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}" class="bk-tab {{ activeTab == 'all' ? 'active' : '' }}">Tutti</a>
+                <a href="?tab=restaurant{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}" class="bk-tab {{ activeTab == 'restaurant' ? 'active' : '' }}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-9 9 9"/></svg>
+                    Ristoranti
+                </a>
+                <a href="?tab=hotel{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}" class="bk-tab {{ activeTab == 'hotel' ? 'active' : '' }}">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14"/></svg>
+                    Hotel
+                </a>
+
+                <div class="bk-tab-sep"></div>
+
+                <a href="?tab={{ activeTab }}{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}{% if not isActiveFilter %}&active=1{% endif %}"
+                   class="bk-tab {{ isActiveFilter ? 'active-green' : '' }}">Attivi</a>
+                <a href="?tab={{ activeTab }}{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}{% if not isCompletedFilter %}&active=0{% endif %}"
+                   class="bk-tab {{ isCompletedFilter ? 'active-amber' : '' }}">Completati</a>
+                <a href="?tab={{ activeTab }}{% if searchQuery is defined and searchQuery is not empty %}&search={{ searchQuery|url_encode }}{% endif %}{% if not isUnpaidFilter %}&pagato=0{% endif %}"
+                   class="bk-tab {{ isUnpaidFilter ? 'active-red' : '' }}">Non pagati</a>
+            </div>
+        </div>
+
+        <!-- Table -->
+        {% if bookings is not empty %}
+        <div class="bk-table-wrap">
+            <table class="bk-table">
+                <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Struttura</th>
+                    <th>Cantiere</th>
+                    <th>Capo squadra</th>
+                    <th>Servizio</th>
+                    <th>Periodo</th>
+                    <th style="text-align:center;">Persone</th>
+                    <th style="text-align:right;">€/pers</th>
+                    <th style="text-align:right;">Totale</th>
+                    <th style="text-align:center;">Pagato</th>
+                    <th style="text-align:center;">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for b in bookings %}
+                    <tr{% if b.struttura_country is defined and b.struttura_country != 'Italia' %} class="bk-row-abroad"{% endif %}>
+                        <!-- Tipo -->
+                        <td>
+                            {% if b.type == 'restaurant' %}
+                                <span class="bk-badge bk-badge-restaurant">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-9 9 9"/></svg>
+                                    Rist.
+                                </span>
+                            {% else %}
+                                <span class="bk-badge bk-badge-hotel">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14"/></svg>
+                                    Hotel
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Struttura -->
+                        <td>
+                            <div style="font-weight:600;color:#1e293b;">{{ b.struttura_nome }}</div>
+                            {% set subParts = [] %}
+                            {% if b.struttura_citta is not empty %}{% set subParts = subParts|merge([b.struttura_citta]) %}{% endif %}
+                            {% if b.struttura_indirizzo is not empty %}{% set subParts = subParts|merge([b.struttura_indirizzo]) %}{% endif %}
+                            {% if subParts is not empty %}
+                                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">{{ subParts|join(' — ') }}</div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Cantiere -->
+                        <td>{{ b.cantiere_nome ?? '-' }}</td>
+
+                        <!-- Capo squadra -->
+                        <td>{{ b.capo_squadra_nome ?? '-' }}</td>
+
+                        <!-- Servizio -->
+                        <td>
+                            {% if b.type == 'restaurant' %}
+                                {% if b.pranzo %}
+                                    <span class="bk-badge bk-badge-pranzo">Pranzo</span>
+                                {% endif %}
+                                {% if b.cena %}
+                                    <span class="bk-badge bk-badge-cena">Cena</span>
+                                {% endif %}
+                            {% else %}
+                                {% set regimeLabels = {'PC': 'P. Completa', 'MP': 'M. Pensione', 'BB': 'B&B', 'solo_dormire': 'Solo dormire'} %}
+                                {% set regimeClasses = {'PC': 'bk-badge-pc', 'MP': 'bk-badge-mp', 'BB': 'bk-badge-bb', 'solo_dormire': 'bk-badge-solo'} %}
+                                {% if b.regime %}
+                                    <span class="bk-badge bk-badge-regime {{ regimeClasses[b.regime] ?? 'bk-badge-solo' }}">
+                                        {{ regimeLabels[b.regime] ?? b.regime }}
+                                    </span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+
+                        <!-- Periodo -->
+                        <td style="white-space:nowrap;">
+                            {% if b.first_date %}
+                                {{ b.first_date|date('d/m/Y') }}
+                            {% endif %}
+                            {% if b.last_date %}
+                                <span style="color:#cbd5e1;margin:0 4px;">→</span>
+                                {{ b.last_date|date('d/m/Y') }}
+                            {% endif %}
+                            {% if b.is_active %}
+                                <span class="bk-badge bk-badge-active" style="margin-left:6px;">Attivo</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Persone -->
+                        <td style="text-align:center;font-weight:600;">
+                            {{ b.current_persone ? b.current_persone : '-' }}
+                        </td>
+
+                        <!-- €/pers -->
+                        <td style="text-align:right;font-weight:600;white-space:nowrap;">
+                            {{ b.current_prezzo ? b.current_prezzo|number_format(2, ',', '.') ~ ' €' : '-' }}
+                        </td>
+
+                        <!-- Totale -->
+                        <td style="text-align:right;font-weight:700;white-space:nowrap;color:#0f172a;">
+                            {{ b.booking_total ? b.booking_total|number_format(2, ',', '.') ~ ' €' : '—' }}
+                        </td>
+
+                        <!-- Pagato -->
+                        <td style="text-align:center;">
+                            {% if b.pagato %}
+                                <span class="bk-badge bk-badge-paid">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Si
+                                </span>
+                            {% else %}
+                                <span class="bk-badge bk-badge-unpaid">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                    No
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Azioni -->
+                        <td style="text-align:center;white-space:nowrap;">
+                            <a href="/bookings/{{ b.id }}/edit" class="bk-action bk-action-edit" style="margin-right:10px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Modifica
+                            </a>
+                            <form method="POST" action="/bookings/{{ b.id }}/delete" style="display:inline;" data-confirm="Sei sicuro di voler eliminare questa prenotazione?">
+                                <button type="submit" class="bk-action bk-action-delete">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                    Cancella
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Stats bar -->
+        {% set totalActive = 0 %}
+        {% set totalUnpaid = 0 %}
+        {% for b in bookings %}
+            {% if b.is_active %}{% set totalActive = totalActive + 1 %}{% endif %}
+            {% if not b.pagato %}{% set totalUnpaid = totalUnpaid + 1 %}{% endif %}
+        {% endfor %}
+        <div class="bk-stats">
+            <span><span class="bk-stat-num">{{ bookings|length }}</span> prenotazion{{ bookings|length == 1 ? 'e' : 'i' }}</span>
+            <span style="color:#15803d;"><span class="bk-stat-num">{{ totalActive }}</span> attiv{{ totalActive == 1 ? 'a' : 'e' }}</span>
+            {% if totalUnpaid > 0 %}
+                <span style="color:#dc2626;"><span class="bk-stat-num">{{ totalUnpaid }}</span> non pagat{{ totalUnpaid == 1 ? 'a' : 'e' }}</span>
+            {% endif %}
+        </div>
+
+        {% else %}
+        <!-- Empty state -->
+        <div class="bk-empty">
+            <div class="bk-empty-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+            </div>
+            <div class="bk-empty-title">Nessuna prenotazione trovata</div>
+            <div class="bk-empty-sub">Crea una nuova prenotazione per iniziare</div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/bookings/list_bookings.js"></script>
+{% endblock %}

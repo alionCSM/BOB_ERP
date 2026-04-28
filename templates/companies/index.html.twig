@@ -1,0 +1,234 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/companies/companies.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="cp-page">
+
+    <!-- ── HERO ────────────────────────────── -->
+    <div class="cp-hero">
+        <svg class="cp-hero-wm" viewBox="0 0 24 24" fill="white"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+        <div class="cp-hero-top">
+            <div class="cp-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+            </div>
+            <div>
+                <div class="cp-hero-title">Gestione Aziende</div>
+                <div class="cp-hero-sub">Tutte le aziende registrate nel sistema</div>
+            </div>
+        </div>
+        <div class="cp-hero-pills">
+            <div class="cp-pill"><span class="cp-pill-num">{{ totalCompanies }}</span> Totale</div>
+            <div class="cp-pill"><span class="cp-pill-num">{{ consorziate }}</span> Consorziate</div>
+            {% if nonConsorziate > 0 %}
+            <div class="cp-pill"><span class="cp-pill-num">{{ nonConsorziate }}</span> Non consorziate</div>
+            {% endif %}
+            <div class="cp-pill cp-pill-active"><span class="cp-pill-num">{{ activeCompanies }}</span> Attive</div>
+            {% if inactiveCompanies > 0 %}
+            <div class="cp-pill cp-pill-inactive"><span class="cp-pill-num">{{ inactiveCompanies }}</span> Inattive</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ─────────────────────────── -->
+    <div class="cp-toolbar">
+        <input type="text" class="cp-search" id="cp-search" placeholder="Cerca azienda...">
+        <button class="cp-filter-btn active" data-filter-type="all">Tutte</button>
+        <button class="cp-filter-btn" data-filter-type="yes">Consorziate</button>
+        <button class="cp-filter-btn" data-filter-type="no">Non consorziate</button>
+        <span class="cp-toolbar-sep"></span>
+        <button class="cp-filter-btn" data-filter-status="all">Tutti stati</button>
+        <button class="cp-filter-btn active" data-filter-status="active">Attive</button>
+        <button class="cp-filter-btn" data-filter-status="inactive">Inattive</button>
+        <span class="cp-count" id="cp-count">{{ totalCompanies }} aziend{{ totalCompanies == 1 ? 'a' : 'e' }}</span>
+        <div class="cp-actions-right">
+            <button class="cp-btn-export" data-tw-toggle="modal" data-tw-target="#modalExcelConsorziata">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+            </button>
+            <a href="/companies/create" class="cp-btn-add">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuova Azienda
+            </a>
+        </div>
+    </div>
+
+    <!-- ── TABLE ───────────────────────────── -->
+    <div class="cp-table-wrap">
+        {% if companies is empty %}
+            <div class="cp-empty">
+                <div class="cp-empty-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+                </div>
+                <p class="cp-empty-text">Nessuna azienda registrata</p>
+                <p class="cp-empty-sub">Clicca "Nuova Azienda" per iniziare</p>
+            </div>
+        {% else %}
+            {% set avatarColors = [
+                'linear-gradient(135deg,#1d4ed8,#0ea5e9)',
+                'linear-gradient(135deg,#7c3aed,#a855f7)',
+                'linear-gradient(135deg,#0f766e,#14b8a6)',
+                'linear-gradient(135deg,#b45309,#f59e0b)',
+                'linear-gradient(135deg,#be185d,#ec4899)',
+                'linear-gradient(135deg,#4338ca,#6366f1)',
+                'linear-gradient(135deg,#15803d,#22c55e)',
+                'linear-gradient(135deg,#9333ea,#c084fc)'
+            ] %}
+            <table class="cp-table" id="cp-table">
+                <thead>
+                    <tr>
+                        <th>Ragione Sociale</th>
+                        <th>Codice</th>
+                        <th>Tipo</th>
+                        <th>Stato</th>
+                        <th style="text-align:center;">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for company in companies %}
+                    {% set nameParts = company.name|trim|split(' ') %}
+                    {% set initials = (nameParts[0]|default('')|slice(0,1) ~ nameParts[1]|default('')|slice(0,1))|upper %}
+                    {% set color = avatarColors[loop.index0 % avatarColors|length] %}
+                    {% set isConsorziata = (company.consorziata|default(0)|number_format == 1) %}
+                    {% set isActive = (company.active|default(1)|number_format == 1) %}
+                    <tr class="cp-row {{ isActive ? '' : 'cp-row-inactive' }}"
+                        data-consorziata="{{ isConsorziata ? 'yes' : 'no' }}"
+                        data-active="{{ isActive ? 'active' : 'inactive' }}"
+                        data-href="/companies/{{ company.id }}">
+                        <td>
+                            <div class="cp-entity">
+                                <div class="cp-avatar" style="background:{{ color }};">{{ initials }}</div>
+                                <div>
+                                    <a href="/companies/{{ company.id }}" class="cp-name cp-name-link">{{ company.name }}</a>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% if company.codice is not empty %}
+                                <span class="cp-code">{{ company.codice }}</span>
+                            {% else %}
+                                <span style="color:#cbd5e1;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if isConsorziata %}
+                                <span class="cp-badge cp-badge-yes">
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Consorziata
+                                </span>
+                            {% else %}
+                                <span class="cp-badge cp-badge-no">Non consorziata</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if isActive %}
+                                <span class="cp-badge cp-badge-active" id="cp-status-{{ company.id }}">
+                                    <span class="cp-status-dot"></span>
+                                    Attiva
+                                </span>
+                            {% else %}
+                                <span class="cp-badge cp-badge-inactive" id="cp-status-{{ company.id }}">
+                                    <span class="cp-status-dot"></span>
+                                    Inattiva
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="cp-no-nav">
+                            <div class="cp-row-actions">
+                                <a href="/companies/{{ company.id }}" class="cp-act-btn cp-act-view" title="Dettagli">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </a>
+                                <a href="/companies/{{ company.id }}/edit" class="cp-act-btn cp-act-edit" title="Modifica">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </a>
+                                {% if user.id == 1 or user.permissions['companies'] %}
+                                <button class="cp-act-btn cp-act-toggle"
+                                        title="{{ isActive ? 'Disattiva azienda' : 'Attiva azienda' }}"
+                                        data-company-id="{{ company.id }}"
+                                        data-active="{{ isActive ? '1' : '0' }}">
+                                    {% if isActive %}
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                                    {% else %}
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                    {% endif %}
+                                </button>
+                                {% endif %}
+                                <button class="cp-act-btn cp-act-del" title="Elimina"
+                                        data-company-id="{{ company.id }}"
+                                        data-tw-toggle="modal"
+                                        data-tw-target="#delete-confirmation-modal">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ── DELETE MODAL ─────────────────────────── -->
+<div id="delete-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div style="padding:28px 24px 0;text-align:center;">
+                    <div class="cp-del-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </div>
+                    <p class="cp-del-title">Elimina Azienda</p>
+                    <p class="cp-del-sub">Sei sicuro di voler eliminare questa azienda?<br>Questa azione non può essere annullata.</p>
+                </div>
+                <div class="cp-del-bar" style="padding:0 24px 24px;">
+                    <button type="button" data-tw-dismiss="modal" class="cp-del-cancel">Annulla</button>
+                    <form id="delete-company-form" method="POST" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <button type="submit" class="cp-del-confirm">Elimina</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── EXPORT MODAL ────────────────────────── -->
+<div id="modalExcelConsorziata" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/companies/export/consorziata" method="GET">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Esporta Excel Azienda</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <div class="col-span-12">
+                        <label class="form-label">Azienda</label>
+                        <select id="aziendaSelect" name="azienda" class="w-full"></select>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control">
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/companies/companies.js?v=2"></script>
+{% endblock %}

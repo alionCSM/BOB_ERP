@@ -1,0 +1,271 @@
+<!-- DELETE MODAL -->
+<div id="delete-company-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div style="padding:28px 24px 0;text-align:center;">
+                    <div class="cd-del-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </div>
+                    <p class="cd-del-title">Elimina Azienda</p>
+                    <p class="cd-del-sub">Sei sicuro di voler eliminare questa azienda?<br>Questa azione non può essere annullata.</p>
+                </div>
+                <div class="cd-del-bar" style="padding:0 24px 24px;">
+                    <button type="button" data-tw-dismiss="modal" class="cd-del-cancel">Annulla</button>
+                    <form method="POST" action="/companies/{{ company.id }}/delete" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <button type="submit" class="cd-del-confirm">Elimina</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE DOC MODAL -->
+<div id="delete-company-doc-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" style="margin:0 auto 12px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div class="font-bold text-lg">Eliminare questo documento?</div>
+                <p class="text-slate-600 mt-2">L'azione non può essere annullata.</p>
+            </div>
+            <div class="px-5 pb-5 flex justify-center gap-3">
+                <button class="btn btn-outline-secondary w-24" data-tw-dismiss="modal">Annulla</button>
+                <button id="confirm-delete-doc-btn" type="button" class="btn btn-danger w-24">Elimina</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- UPLOAD DOC MODAL -->
+<div id="upload-company-doc-modal" class="modal" tabindex="-1" aria-hidden="true"
+     data-tw-backdrop="static" data-tw-keyboard="false">
+    <div class="modal-dialog">
+        <form id="upload-company-form" method="POST" enctype="multipart/form-data" class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">Carica Documento Azienda</h2>
+                <button type="button" class="btn-close" data-tw-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="company_id" value="{{ company.id }}">
+                <div class="mb-3">
+                    <label class="form-label">Tipo Documento</label>
+                    <input type="text"
+                           id="upload-doc-type"
+                           name="document_type"
+                           class="form-control"
+                           placeholder="Tipo documento..."
+                           list="company-doc-type-suggestions"
+                           autocomplete="off"
+                           required>
+                </div>
+                <datalist id="company-doc-type-suggestions">
+                    <option value="RLS">
+                    <option value="RSPP">
+                    <option value="RSPP Attestato">
+                    <option value="RLS Attestato">
+                    <option value="DVR">
+                    <option value="Visura">
+                    <option value="Patente a crediti">
+                    <option value="Nomina primo soccorso">
+                    <option value="Nomina medico competente">
+                    <option value="Nomina preposto">
+                    <option value="Nomina antincendio">
+                    <option value="DURC">
+                    <option value="DOMA">
+                    <option value="Dichiarazione possesso requisiti tecnico professionali">
+                    <option value="Dichiarazione informazione e formazione">
+                    <option value="Dichiarazione conformità attrezzature">
+                    <option value="Dichiarazione art.14">
+                    <option value="C.I. datore di lavoro">
+                    <option value="Assicurazione">
+                </datalist>
+                <div class="mb-3">
+                    <label class="form-label">Data Emissione</label>
+                    <input type="date" id="upload-doc-emission" name="date_emission" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Scadenza</label>
+                    <input type="date" id="upload-doc-expiry" name="expiry_date" class="form-control">
+                    <div id="upload-doc-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Carica PDF</label>
+                    <input type="file" name="document_file" class="form-control" accept="application/pdf" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                <button type="submit" class="btn btn-primary">Carica</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT DOC MODAL -->
+<div id="edit-company-doc-modal" class="modal" tabindex="-1" aria-hidden="true"
+     data-tw-backdrop="static" data-tw-keyboard="false">
+    <div class="modal-dialog">
+        <form id="edit-company-document-form" enctype="multipart/form-data" class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">Modifica Documento</h2>
+                <button type="button" class="btn-close" data-tw-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="document_id" id="edit-doc-id">
+                <div class="mb-3">
+                    <label class="form-label">Tipo Documento</label>
+                    <input type="text" id="edit-doc-type" name="document_type" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Data Emissione</label>
+                    <input type="date" id="edit-doc-emission" name="date_emission" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Scadenza</label>
+                    <input type="date" id="edit-doc-expiry" name="expiry_date" class="form-control">
+                    <div id="edit-doc-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Sostituisci PDF</label>
+                    <input type="file" id="edit-doc-file" name="document_file" class="form-control" accept="application/pdf">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                <button type="submit" class="btn btn-primary">Salva Modifiche</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- CHECK DOCS MODAL -->
+<div id="check-company-docs-modal" class="modal modal-xl" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">Controllo Documenti Aziendali</h2>
+                <button type="button" class="btn-close" data-tw-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="check-company-docs-body">
+                <div class="text-center py-10 text-slate-500">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="animate-spin mx-auto mb-3"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                    Caricamento...
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-tw-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE USER MODAL -->
+{% if not isCompanyViewer %}
+<div id="create-company-user-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">Crea utente per azienda</h2>
+            </div>
+            <form method="POST" action="/companies/{{ company.id }}/user">
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <input type="hidden" name="company_id" value="{{ company.id }}">
+                    <div class="col-span-12 sm:col-span-6">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="first_name" class="form-control" required>
+                    </div>
+                    <div class="col-span-12 sm:col-span-6">
+                        <label class="form-label">Cognome</label>
+                        <input type="text" name="last_name" class="form-control" required>
+                    </div>
+                    <div class="col-span-12">
+                        <label class="form-label">Email (username)</label>
+                        <input type="email" name="email" class="form-control" required>
+                    </div>
+                    <div class="col-span-12">
+                        <label class="form-label">Telefono (opzionale)</label>
+                        <input type="text" name="phone" class="form-control" placeholder="+39 ...">
+                    </div>
+                    <div class="col-span-12">
+                        <label class="form-label">Aziende accessibili</label>
+                        <div class="max-h-48 overflow-y-auto border rounded p-2 space-y-1">
+                            {% for ac in allCompanies %}
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" name="company_ids[]" value="{{ ac.id }}" {{ ac.id == company.id ? 'checked' : '' }}>
+                                    <span>{{ ac.name }}</span>
+                                </label>
+                            {% endfor %}
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1">Se non selezioni nulla, verrà associata solo questa azienda.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-1">Annulla</button>
+                    <button type="submit" class="btn btn-primary w-20">Crea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ASSIGN ACCESS MODAL -->
+<div id="assign-company-access-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">Aggiungi azienda a utente esistente</h2>
+            </div>
+            <form method="POST" action="/companies/{{ company.id }}/access">
+                <div class="modal-body">
+                    <input type="hidden" name="company_id" value="{{ company.id }}">
+                    {% if assignableCompanyUsers is empty %}
+                        <div class="alert alert-warning">Nessun utente disponibile da associare a questa azienda.</div>
+                    {% else %}
+                        <label class="form-label">Utente aziendale</label>
+                        <select name="user_id" class="form-select" required>
+                            <option value="">Seleziona utente</option>
+                            {% for cu in assignableCompanyUsers %}
+                                <option value="{{ cu.id }}">{{ ((cu.first_name ?? '') ~ ' ' ~ (cu.last_name ?? ''))|trim }} — {{ cu.email }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="text-xs text-slate-500 mt-2">Verrà aggiunta solo questa azienda all'utente selezionato.</div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-1">Annulla</button>
+                    <button type="submit" class="btn btn-primary" {{ assignableCompanyUsers is empty ? 'disabled' : '' }}>Aggiungi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- DELETE WORKER MODAL -->
+<div id="delete-worker-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div style="padding:28px 24px 0;text-align:center;">
+                    <div class="cd-del-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </div>
+                    <p class="cd-del-title">Elimina Operaio</p>
+                    <p class="cd-del-sub">Sei sicuro di voler eliminare questo operaio?<br>Questa azione non può essere annullata.</p>
+                </div>
+                <div class="cd-del-bar" style="padding:0 24px 24px;">
+                    <button type="button" data-tw-dismiss="modal" class="cd-del-cancel">Annulla</button>
+                    <form id="delete-worker-form" method="POST" action="/companies/{{ company.id }}/worker/delete" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <input type="hidden" name="worker_id" id="delete-worker-id">
+                        <input type="hidden" name="worker_uid" id="delete-worker-uid">
+                        <button type="submit" class="cd-del-confirm">Elimina</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,30 @@
+{#
+    print.html.twig — HTML source for DomPDF meal ticket generation.
+    Rendered by TwigRenderer and passed to Dompdf::loadHtml().
+    NOT a full page template — standalone HTML for PDF (80mm x 100mm paper).
+
+    Variables expected (from TicketsController::printTicket()):
+      pages — array of ticket objects, each with:
+        { worker_name, ticket_date (Y-m-d), progressivo, hash }
+
+    TODO: $_GET['id'], $_GET['ids'], $_GET['nome'], $_GET['data'] are read
+          directly in the original PHP view. The controller must resolve ticket IDs,
+          fetch/mark-printed each ticket, and pass the pages array.
+#}
+{% for ticket in pages %}
+<div style="text-align: left; font-family: Arial, sans-serif; margin-bottom: 9px;">
+    <h1 style="color: #003366; font-size: 21px; margin: 0; text-align: center;">Consorzio Soluzione Montaggi</h1>
+    <div style="display: flex; justify-content: space-between; font-size: 9px; color: #000; margin-top: 9px;">
+        <p style="margin: 0; text-align: center; font-size: 11px;"><strong>P.IVA:</strong> IT03584711208</p>
+        <p style="margin: 0; text-align: center; font-size: 11px;"><strong>Codice SDI:</strong> 1N74KED</p>
+    </div>
+    <hr style="border: none; height: 1px; background-color: #003366; margin: 10px 0;">
+</div><br>
+<h1 style="color: #003366; font-size: 25px; margin: 0; text-align: center;">N. {{ ticket.progressivo }}</h1><br>
+<p style="font-size: 15px; margin-bottom: 5px;"><strong>Nome:</strong> {{ ticket.worker_name }}</p>
+<p style="font-size: 15px; margin-bottom: 5px;"><strong>Data:</strong> {{ ticket.ticket_date|date('d/m/Y') }}</p>
+<p style="font-size: 13px; color: #000;"><strong>Hash:</strong> {{ ticket.hash }}</p>
+{% if not loop.last %}
+<div style="page-break-after: always;"></div>
+{% endif %}
+{% endfor %}

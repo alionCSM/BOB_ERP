@@ -1,0 +1,24 @@
+{
+    "require": {
+        "dompdf/dompdf": "^3.1",
+        "phpmailer/phpmailer": "^6.9",
+        "phpoffice/phpspreadsheet": "^2.3",
+        "firebase/php-jwt": "^7.0",
+        "vlucas/phpdotenv": "^5.6",
+        "php-di/php-di": "^7.0",
+        "twig/twig": "^3.0",
+        "monolog/monolog": "^3.0",
+        "ext-pdo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        },
+        "classmap": ["src/"],
+        "files": [
+            "includes/company_scope.php",
+            "includes/helpers/password_security.php",
+            "includes/version.php"
+        ]
+    }
+}

@@ -1,0 +1,22 @@
+/* ── Ordine Show Page ──────────────────────────────────────────────────────── */
+/* This file extends offer_show.css patterns for ordini.
+   Import offer_show.css first from the template, or duplicate needed rules. */
+
+/* cos- classes are reused from offers; define here only what is ordini-specific */
+
+
+/* Items list in left panel */
+.cos-items-list { display: flex; flex-direction: column; gap: 6px; }
+.cos-item-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    background: #f8fafc; border: 1px solid #f1f5f9;
+    font-size: 12.5px;
+}
+.cos-item-cod {
+    font-size: 11px; font-weight: 700; color: #64748b;
+    background: #e2e8f0; border-radius: 4px;
+    padding: 2px 6px; flex-shrink: 0;
+}
+.cos-item-desc { flex: 1; color: #374151; }
+.cos-item-imp  { font-weight: 700; color: #0f172a; white-space: nowrap; flex-shrink: 0; }

@@ -1,0 +1,1114 @@
+/* ── Offers Form Scoped ───────────────────────── */
+
+/* Force scrollbar always visible (override Tailwind preflight) */
+html {
+    overflow-y: scroll !important;
+}
+
+.cfo-page { margin-top: 16px; }
+
+/* ── Hero ──────────────────────────────────────── */
+.cfo-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px;
+    padding: 28px 32px 24px;
+    background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+    color: #fff; margin-bottom: 20px;
+}
+.cfo-hero::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: rgba(59,130,246,.12); pointer-events: none;
+}
+.cfo-hero::after {
+    content: ''; position: absolute; bottom: -60px; left: 25%;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(34,197,94,.06); pointer-events: none;
+}
+.cfo-hero-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+}
+.cfo-hero-left { display: flex; align-items: center; gap: 16px; }
+.cfo-hero-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfo-hero-icon svg { width: 24px; height: 24px; stroke: #fff; stroke-width: 1.5; fill: none; }
+.cfo-hero-info {
+    display: flex; flex-direction: column;
+}
+.cfo-hero-title { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+.cfo-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+.cfo-hero-actions { display: flex; gap: 8px; }
+.cfo-btn-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 16px; border-radius: 10px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+    color: #fff; font-size: 13px; font-weight: 500;
+    text-decoration: none; transition: all .15s;
+}
+.cfo-btn-back:hover { background: rgba(255,255,255,.15); }
+.cfo-btn-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+/* ── Progress Indicator ───────────────────────── */
+.cfo-progress {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+}
+.cfo-progress-track {
+    display: flex; align-items: center; justify-content: space-between;
+    position: relative;
+    max-width: 600px; margin: 0 auto;
+}
+.cfo-progress-track::before {
+    content: '';
+    position: absolute;
+    left: 24px; right: 24px; top: 50%;
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 0;
+    transform: translateY(-50%);
+}
+.cfo-progress-track::after {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    z-index: 1;
+    transform: translateY(-50%);
+    transition: width .3s ease;
+}
+.cfo-progress-track.step-1::after { width: 0%; }
+.cfo-progress-track.step-2::after { width: 33.33%; }
+.cfo-progress-track.step-3::after { width: 66.66%; }
+.cfo-progress-track.step-4::after { width: 100%; }
+
+.cfo-progress-step {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; z-index: 2;
+    flex: 1;
+}
+.cfo-progress-dot-wrapper {
+    width: 48px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+}
+.cfo-progress-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #e2e8f0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .3s ease;
+}
+.cfo-progress-step.active .cfo-progress-dot,
+.cfo-progress-step.completed .cfo-progress-dot {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    box-shadow: 0 0 0 2px #bfdbfe;
+}
+.cfo-progress-step.completed .cfo-progress-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 2px #dcfce7;
+}
+.cfo-progress-dot svg {
+    width: 16px; height: 16px;
+    stroke: #fff;
+    stroke-width: 2.5;
+    fill: none;
+    display: none;
+}
+.cfo-progress-step.completed .cfo-progress-dot svg {
+    display: block;
+}
+.cfo-progress-dot .step-number {
+    font-size: 12px; font-weight: 700; color: #64748b;
+}
+.cfo-progress-step.active .cfo-progress-dot .step-number {
+    color: #fff;
+}
+.cfo-progress-step.completed .cfo-progress-dot .step-number {
+    display: none;
+}
+.cfo-progress-label {
+    margin-top: 10px;
+    font-size: 11px; font-weight: 600; color: #94a3b8;
+    text-align: center;
+}
+.cfo-progress-step.active .cfo-progress-label,
+.cfo-progress-step.completed .cfo-progress-label {
+    color: #1e40af;
+}
+
+/* ── Form Card ────────────────────────────────── */
+.cfo-card {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    padding: 28px 32px;
+}
+
+/* ── Sub-cards (for steps 2+) ───────────────────────────────────────────────── */
+.cfo-subcard {
+    background: #fff;
+    border-radius: 12px;
+    border: 1.5px solid #e8edf3;
+    margin-bottom: 16px;
+    overflow: visible;
+    transition: all .2s;
+}
+.cfo-subcard:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.cfo-subcard-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e8edf3;
+}
+.cfo-subcard-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfo-subcard-icon svg {
+    width: 18px; height: 18px;
+    stroke: #fff; stroke-width: 1.8; fill: none;
+}
+.cfo-subcard-title {
+    font-size: 14px; font-weight: 700; color: #0f172a; margin: 0 0 2px;
+}
+.cfo-subcard-desc {
+    font-size: 12px; color: #64748b; margin: 0;
+}
+.cfo-subcard-body {
+    padding: 20px;
+}
+.cfo-subcard-body-nopadding {
+    padding: 0;
+}
+.cfo-subcard-large {
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.cfo-subcard-large .cfo-subcard-body {
+    padding: 0;
+}
+.cfo-subcard-internal {
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+.cfo-subcard-internal .cfo-subcard-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+.cfo-subcard-totals {
+    margin-top: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+
+/* Required indicator */
+.cfo-required {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+/* Form Sections */
+.cfo-section {
+    margin-bottom: 28px;
+}
+.cfo-section:last-child { margin-bottom: 0; }
+.cfo-section-title {
+    font-size: 16px; font-weight: 700; color: #0f172a;
+    margin: 0 0 18px;
+    display: flex; align-items: center; gap: 10px;
+}
+.cfo-section-title::before {
+    content: '';
+    width: 4px; height: 20px;
+    background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 2px;
+}
+.cfo-section-title svg {
+    width: 18px; height: 18px;
+    stroke: #3b82f6;
+    stroke-width: 1.8;
+    fill: none;
+}
+
+/* Form Grid */
+.cfo-grid-3 {
+    display: grid; gap: 16px;
+    grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+    .cfo-grid-3 { grid-template-columns: repeat(3, 1fr); }
+}
+.cfo-grid-2 {
+    display: grid; gap: 16px;
+    grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+    .cfo-grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Form Field */
+.cfo-field {
+    display: flex; flex-direction: column; gap: 6px;
+}
+.cfo-field label {
+    font-size: 12px; font-weight: 600; color: #475569;
+    text-transform: uppercase; letter-spacing: .3px;
+}
+.cfo-field input,
+.cfo-field select,
+.cfo-field textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #0f172a;
+    background: #fff;
+    transition: all .15s;
+    outline: none;
+}
+.cfo-field input::placeholder,
+.cfo-field select::placeholder,
+.cfo-field textarea::placeholder {
+    color: #cbd5e1;
+}
+.cfo-field input:focus,
+.cfo-field select:focus,
+.cfo-field textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.1);
+}
+.cfo-field input:hover:not(:focus),
+.cfo-field select:hover:not(:focus),
+.cfo-field textarea:hover:not(:focus) {
+    border-color: #cbd5e1;
+}
+.cfo-field textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* Input with icon wrapper */
+.cfo-field-wrapper {
+    position: relative;
+}
+.cfo-input-wrapper {
+    position: relative;
+}
+.cfo-field-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px; height: 18px;
+    stroke: #94a3b8;
+    stroke-width: 1.5;
+    fill: none;
+    pointer-events: none;
+    transition: stroke .15s;
+}
+.cfo-field input.has-icon,
+.cfo-field select.has-icon {
+    padding-left: 42px;
+}
+.cfo-field input.has-icon:focus + .cfo-field-icon,
+.cfo-field input.has-icon:focus ~ .cfo-field-icon,
+.cfo-field select.has-icon:focus + .cfo-field-icon,
+.cfo-field select.has-icon:focus ~ .cfo-field-icon {
+    stroke: #3b82f6;
+}
+
+/* File Upload */
+.cfo-file-upload {
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+}
+.cfo-file-upload:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+.cfo-file-upload input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+.cfo-file-upload-content {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.cfo-file-upload-content svg {
+    width: 32px; height: 32px;
+    stroke: #94a3b8;
+    stroke-width: 1.5;
+    fill: none;
+}
+.cfo-file-upload-text {
+    font-size: 13px; color: #475569; font-weight: 500;
+}
+.cfo-file-upload-hint {
+    font-size: 11px; color: #94a3b8;
+}
+
+/* Template Selection Cards */
+.cfo-templates-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+    .cfo-templates-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.cfo-template-card {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex; flex-direction: column; gap: 12px;
+}
+.cfo-template-card:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59,130,246,.15);
+}
+.cfo-template-card.selected {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.1);
+}
+.cfo-template-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    display: flex; align-items: center; justify-content: center;
+}
+.cfo-template-icon svg {
+    width: 22px; height: 22px;
+    stroke: #fff; stroke-width: 1.8; fill: none;
+}
+.cfo-template-info {
+    flex: 1;
+}
+.cfo-template-title {
+    font-size: 14px; font-weight: 600; color: #1e293b;
+    margin: 0 0 4px;
+}
+.cfo-template-desc {
+    font-size: 12px; color: #64748b;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* Items Table in Step 3 */
+.cfo-items-header {
+    display: grid;
+    grid-template-columns: 2fr 100px 50px 50px;
+    gap: 16px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1.5px solid #e8edf3;
+    font-size: 10px; font-weight: 700; color: #64748b;
+    text-transform: uppercase; letter-spacing: .4px;
+}
+.cfo-col-desc { font-size: 11px; }
+.cfo-col-price { text-align: right; font-size: 11px; }
+.cfo-col-position { text-align: center; }
+.cfo-col-actions { text-align: center; }
+
+.cfo-items-row {
+    display: grid;
+    grid-template-columns: 2fr 100px 50px 50px;
+    gap: 16px;
+    align-items: start;
+    padding: 16px 18px;
+    background: #fff;
+    border-bottom: 1px solid #f1f5f9;
+    animation: slideIn .2s ease;
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.cfo-items-row:last-child {
+    border-bottom: none;
+}
+.cfo-items-row .description-field,
+.cfo-items-row .amount-field {
+    width: 100%;
+    min-height: 70px;
+    padding: 12px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    resize: vertical;
+    transition: all .15s;
+    background: #fff;
+    color: #0f172a;
+    line-height: 1.5;
+}
+.cfo-items-row .description-field:focus,
+.cfo-items-row .amount-field:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.1);
+    outline: none;
+}
+.cfo-items-row .description-field::placeholder,
+.cfo-items-row .amount-field::placeholder {
+    color: #cbd5e1;
+}
+.cfo-items-row .amount-field {
+    text-align: right;
+    font-family: 'Monaco', 'Consolas', monospace;
+}
+.cfo-items-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+}
+.cfo-btn-move-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.cfo-items-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+}
+.cfo-btn-item {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s;
+    font-size: 11px;
+}
+.cfo-btn-item svg {
+    width: 16px; height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}
+.cfo-btn-move-up {
+    background: #f1f5f9; color: #475569;
+}
+.cfo-btn-move-up:hover:not(:disabled) {
+    background: #e2e8f0; color: #1e293b;
+}
+.cfo-btn-move-up:disabled {
+    opacity: .3; cursor: not-allowed;
+}
+.cfo-btn-move-down {
+    background: #f1f5f9; color: #475569;
+}
+.cfo-btn-move-down:hover:not(:disabled) {
+    background: #e2e8f0; color: #1e293b;
+}
+.cfo-btn-move-down:disabled {
+    opacity: .3; cursor: not-allowed;
+}
+.cfo-btn-remove {
+    background: #fef2f2; color: #dc2626;
+    margin-top: 4px;
+}
+.cfo-btn-remove:hover {
+    background: #fee2e2;
+}
+.cfo-btn-add {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    color: #fff;
+}
+.cfo-btn-add:hover {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    box-shadow: 0 4px 12px rgba(34,197,94,.25);
+    transform: scale(1.05);
+}
+.cfo-btn-add:disabled {
+    opacity: .5; cursor: not-allowed;
+    transform: none;
+}
+
+/* Total Display - Calcolato (solo lettura) */
+.cfo-total-section.cfo-total-calculated {
+    padding: 18px 24px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 10px 10px 0 0;
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid #bae6fd;
+    border-bottom: none;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-left {
+    display: flex; align-items: center; gap: 12px;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: rgba(3, 169, 244, .1);
+    display: flex; align-items: center; justify-content: center;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-icon svg {
+    width: 20px; height: 20px;
+    stroke: #0284c7;
+    stroke-width: 1.8;
+    fill: none;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-label {
+    font-size: 11px; font-weight: 700; color: #0369a1;
+    text-transform: uppercase; letter-spacing: .3px;
+    display: block;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-sublabel {
+    font-size: 11px; color: #0ea5e9;
+}
+.cfo-total-section.cfo-total-calculated .cfo-total-value {
+    font-size: 24px; font-weight: 800; color: #0284c7;
+    font-family: 'Monaco', 'Consolas', monospace;
+}
+
+/* Total Display - Modificabile */
+.cfo-total-section.cfo-total-editable {
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-radius: 0 0 10px 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid #fbbf24;
+}
+.cfo-total-section.cfo-total-editable .cfo-total-left {
+    display: flex; align-items: center; gap: 12px;
+}
+.cfo-total-section.cfo-total-editable .cfo-total-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, .1);
+    display: flex; align-items: center; justify-content: center;
+}
+.cfo-total-section.cfo-total-editable .cfo-total-icon svg {
+    width: 20px; height: 20px;
+    stroke: #d97706;
+    stroke-width: 1.8;
+    fill: none;
+}
+.cfo-total-section.cfo-total-editable .cfo-total-label {
+    font-size: 12px; font-weight: 700; color: #92400e;
+    text-transform: uppercase; letter-spacing: .3px;
+    display: block;
+}
+.cfo-total-section.cfo-total-editable .cfo-total-sublabel {
+    font-size: 11px; color: #d97706;
+}
+.cfo-total-input-wrapper {
+    position: relative;
+    display: flex; align-items: center;
+}
+.cfo-total-input-wrapper input {
+    font-size: 24px;
+    font-weight: 800;
+    color: #92400e;
+    text-align: right;
+    border: none;
+    background: transparent;
+    padding: 8px 12px;
+    outline: none;
+    font-family: 'Monaco', 'Consolas', monospace;
+    min-width: 150px;
+}
+.cfo-total-input-wrapper input::placeholder {
+    color: #d97706;
+    font-weight: 400;
+    font-size: 18px;
+}
+.cfo-total-currency {
+    font-size: 20px;
+    font-weight: 700;
+    color: #d97706;
+    margin-right: 8px;
+}
+
+/* Modal */
+.cfo-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(2,6,23,.6);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+.cfo-modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+.cfo-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px rgba(0,0,0,.25);
+}
+.cfo-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+.cfo-modal-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, .1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfo-modal-icon svg {
+    width: 20px; height: 20px;
+    stroke: #d97706;
+    stroke-width: 1.8;
+    fill: none;
+}
+.cfo-modal-title {
+    font-size: 16px; font-weight: 700; color: #0f172a;
+    margin: 0;
+}
+.cfo-modal-subtitle {
+    font-size: 12px; color: #d97706;
+    margin: 2px 0 0;
+}
+.cfo-modal-body {
+    padding: 24px;
+}
+.cfo-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #f1f5f9;
+    display: flex; justify-content: flex-end; gap: 10px;
+    background: #f8fafc;
+}
+
+/* Form Actions */
+.cfo-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1.5px solid #f1f5f9;
+    flex-wrap: wrap; gap: 12px;
+}
+.cfo-btn-primary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 28px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: #fff;
+    font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer;
+    text-decoration: none;
+    transition: all .18s;
+    min-width: 140px;
+}
+.cfo-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(59,130,246,.4);
+}
+.cfo-btn-primary svg {
+    width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+.cfo-btn-primary-large {
+    padding: 14px 40px;
+    font-size: 15px;
+    min-width: 180px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+.cfo-btn-primary-large:hover {
+    box-shadow: 0 8px 25px rgba(16, 185, 129, .45);
+}
+.cfo-btn-secondary {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 28px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 14px; font-weight: 600;
+    border: 1.5px solid #e2e8f0;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .15s;
+    min-width: 140px;
+}
+.cfo-btn-secondary:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+.cfo-btn-secondary svg {
+    width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+.cfo-btn-internal-notes {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer;
+    transition: all .15s;
+}
+.cfo-btn-internal-notes:hover {
+    background: #fde68a;
+}
+.cfo-btn-internal-notes svg {
+    width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+
+/* Internal Notes Button - Full Width Version */
+.cfo-btn-internal-notes-full {
+    width: 100%;
+    padding: 16px 20px;
+    border-radius: 10px;
+    background: #fff;
+    border: 2px dashed #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    text-align: left;
+}
+.cfo-btn-internal-notes-full:hover {
+    background: #fffbeb;
+    border-color: #f59e0b;
+}
+.cfo-btn-internal-notes-full svg:first-child {
+    width: 20px; height: 20px;
+    stroke: #f59e0b;
+    stroke-width: 1.8;
+    fill: none;
+}
+.cfo-btn-internal-notes-full div {
+    flex: 1;
+}
+.cfo-btn-notes-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 2px;
+}
+.cfo-btn-notes-desc {
+    display: block;
+    font-size: 11px;
+    color: #d97706;
+}
+.cfo-btn-internal-notes-full svg:last-child {
+    width: 18px; height: 18px;
+    stroke: #d97706;
+    stroke-width: 2;
+    fill: none;
+    transition: transform .15s;
+}
+.cfo-btn-internal-notes-full:hover svg:last-child {
+    transform: translateX(4px);
+}
+
+/* CKEditor Override */
+.ck-editor__editable {
+    min-height: 200px;
+    border-radius: 10px !important;
+    border-color: #e2e8f0 !important;
+}
+.ck-editor__editable:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.1) !important;
+}
+
+/* Tom Select Override */
+.ts-wrapper.multi:not(.focus) .ts-control {
+    border-radius: 10px;
+    border-color: #e2e8f0;
+    transition: all .15s;
+}
+.ts-wrapper.multi .ts-control {
+    border-radius: 10px;
+}
+.ts-wrapper.multi:focus .ts-control {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.1);
+}
+
+/* Readonly Input */
+.cfo-field input[readonly] {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+}
+.cfo-field input[readonly]:hover {
+    border-color: #e2e8f0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .cfo-grid-3, .cfo-grid-2 {
+        grid-template-columns: 1fr;
+    }
+    .cfo-subcard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .cfo-items-header, .cfo-items-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .cfo-col-price {
+        text-align: left;
+    }
+    .cfo-items-row .amount-field {
+        text-align: left;
+    }
+    .cfo-total-section.cfo-total-calculated,
+    .cfo-total-section.cfo-total-editable {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+    .cfo-total-section.cfo-total-calculated .cfo-total-left,
+    .cfo-total-section.cfo-total-editable .cfo-total-left {
+        justify-content: center;
+    }
+    .cfo-total-input-wrapper {
+        width: 100%;
+        justify-content: center;
+    }
+    .cfo-actions {
+        flex-direction: column;
+    }
+    .cfo-btn-primary, .cfo-btn-secondary {
+        width: 100%;
+    }
+}
+
+/* Uploaded PDF display */
+.cfo-uploaded-pdf {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-top: 12px;
+}
+
+.cfo-uploaded-pdf-icon {
+    color: #ef4444;
+    flex-shrink: 0;
+}
+
+.cfo-uploaded-pdf-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.cfo-uploaded-pdf-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.cfo-uploaded-pdf-name {
+    font-size: 13px;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Status badge in subcard header ────────────────────────────────────────── */
+.cfo-subcard-header { align-items: center; }
+.cfo-subcard-header-status { margin-left: auto; flex-shrink: 0; }
+
+/* ── Followup card ──────────────────────────────────────────────────────────── */
+.cfo-followup-card {
+    margin-top: 20px;
+    padding: 24px 28px;
+}
+
+/* Status selector bar */
+.cfo-followup-status-bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 24px; padding-bottom: 20px;
+    border-bottom: 1.5px solid #f1f5f9;
+}
+.cfo-followup-status-label {
+    font-size: 13px; font-weight: 600; color: #64748b; white-space: nowrap;
+}
+.cfo-status-select-group {
+    display: flex; gap: 6px; flex-wrap: wrap;
+}
+.cfo-status-btn {
+    cursor: pointer; opacity: .55; transition: opacity .15s, box-shadow .15s;
+    border: 2px solid transparent !important;
+}
+.cfo-status-btn:hover { opacity: .8; }
+.cfo-status-btn.active {
+    opacity: 1;
+    box-shadow: 0 0 0 2px currentColor;
+}
+
+/* Followup section */
+.cfo-followup-section {}
+.cfo-followup-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+}
+.cfo-followup-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700; color: #0f172a; margin: 0;
+}
+.cfo-followup-title svg {
+    width: 18px; height: 18px; stroke: #3b82f6; stroke-width: 1.8; fill: none;
+}
+.cfo-btn-sm { padding: 7px 14px; font-size: 12.5px; }
+
+/* Add form */
+.cfo-followup-form { margin-bottom: 16px; }
+.cfo-followup-form.hidden { display: none; }
+.cfo-followup-form-inner {
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; padding: 16px 20px;
+}
+.cfo-followup-type-grid {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.cfo-type-option {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    background: #fff; border: 1.5px solid #e2e8f0;
+    font-size: 12.5px; font-weight: 600; color: #475569;
+    cursor: pointer; transition: all .15s; user-select: none;
+}
+.cfo-type-option input { display: none; }
+.cfo-type-option:has(input:checked) {
+    background: #0f172a; border-color: #0f172a; color: #fff;
+}
+.cfo-followup-form-row {
+    display: grid; grid-template-columns: 160px 1fr; gap: 12px;
+    align-items: start;
+}
+.cfo-field-grow { flex: 1; }
+.cfo-followup-form-actions {
+    display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px;
+}
+
+/* Log list */
+.cfo-followup-list { display: flex; flex-direction: column; gap: 10px; }
+.cfo-followup-empty {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 32px 20px; color: #94a3b8; font-size: 13px;
+}
+.cfo-followup-empty svg {
+    width: 20px; height: 20px; stroke: #cbd5e1; stroke-width: 1.5; fill: none;
+}
+.cfo-followup-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 14px 16px; border-radius: 10px;
+    background: #f8fafc; border: 1.5px solid #e8edf3;
+    transition: border-color .15s;
+}
+.cfo-followup-item:hover { border-color: #cbd5e1; }
+.cfo-followup-item-icon {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+}
+.cfo-followup-item-icon svg {
+    width: 16px; height: 16px; stroke-width: 1.8; fill: none;
+}
+.cfo-futype-chiamata  { background: #dbeafe; } .cfo-futype-chiamata svg  { stroke: #1d4ed8; }
+.cfo-futype-email     { background: #f0fdf4; } .cfo-futype-email svg     { stroke: #166534; }
+.cfo-futype-sms       { background: #fef3c7; } .cfo-futype-sms svg       { stroke: #b45309; }
+.cfo-futype-riunione  { background: #f3e8ff; } .cfo-futype-riunione svg  { stroke: #7e22ce; }
+.cfo-futype-nota      { background: #f1f5f9; } .cfo-futype-nota svg      { stroke: #64748b; }
+.cfo-followup-item-body { flex: 1; min-width: 0; }
+.cfo-followup-item-meta {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+}
+.cfo-followup-item-type {
+    font-size: 12px; font-weight: 700; color: #334155;
+}
+.cfo-followup-item-date {
+    font-size: 12px; color: #94a3b8;
+}
+.cfo-followup-item-author {
+    font-size: 12px; color: #94a3b8;
+}
+.cfo-followup-item-meta .cfo-followup-item-date::before { content: '·'; margin-right: 8px; }
+.cfo-followup-item-meta .cfo-followup-item-author::before { content: '·'; margin-right: 8px; }
+.cfo-followup-item-note {
+    font-size: 13px; color: #475569; margin: 0; line-height: 1.5;
+}
+.cfo-followup-delete {
+    background: none; border: none; cursor: pointer;
+    color: #cbd5e1; padding: 4px; border-radius: 6px;
+    transition: color .15s, background .15s; flex-shrink: 0;
+}
+.cfo-followup-delete:hover { color: #ef4444; background: #fee2e2; }
+.cfo-followup-delete svg {
+    width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+
+.cfo-uploaded-pdf-view {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #0ea5e9;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background .15s;
+}
+
+.cfo-uploaded-pdf-view:hover {
+    background: #0284c7;
+}
+
+.cfo-uploaded-pdf-view svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+}

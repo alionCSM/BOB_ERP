@@ -1,0 +1,30 @@
+{#
+    ticket_create.html.twig — Support ticket creation form.
+
+    Variables expected (from SupportController::createTicket()):
+      autoText   string  Pre-filled description text (may be empty)
+      pageTitle  string  Page title
+#}
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <form method="post">
+
+        <label class="form-label">Titolo</label>
+        <input name="title" class="form-control" required>
+
+        <label class="form-label mt-4">Priorità</label>
+        <select name="priority" class="form-control">
+            <option value="normal">Normale</option>
+            <option value="high">Alta</option>
+            <option value="urgent">Urgente</option>
+        </select>
+
+        <label class="form-label mt-4">Descrizione</label>
+        <textarea name="description" rows="6" class="form-control" required>{{ autoText }}</textarea>
+
+        <button class="btn btn-primary mt-5">Crea Ticket</button>
+    </form>
+</div>
+{% endblock %}

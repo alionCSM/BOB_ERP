@@ -1,0 +1,150 @@
+/* ── Billing – Clients List (bc-) ──────────────── */
+.bc-page { margin-top: 16px; }
+
+/* ── Hero ──────────────────────────────────────── */
+.bc-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px;
+    padding: 28px 32px 24px;
+    background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+    color: #fff; margin-bottom: 20px;
+}
+.bc-hero::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: rgba(59,130,246,.12); pointer-events: none;
+}
+.bc-hero::after {
+    content: ''; position: absolute; bottom: -60px; left: 25%;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(34,197,94,.06); pointer-events: none;
+}
+.bc-hero-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+}
+.bc-hero-left { display: flex; align-items: center; gap: 16px; }
+.bc-hero-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.bc-hero-icon svg { width: 24px; height: 24px; stroke: #fff; stroke-width: 1.5; fill: none; }
+.bc-hero-title { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+.bc-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+
+.bc-btn-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 20px; border-radius: 10px;
+    background: rgba(255,255,255,.12); color: #fff;
+    font-size: 13px; font-weight: 600;
+    border: 1px solid rgba(255,255,255,.18); cursor: pointer;
+    transition: all .18s; text-decoration: none;
+}
+.bc-btn-back:hover { background: rgba(255,255,255,.2); color: #fff; }
+.bc-btn-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+/* ── Stats Row ─────────────────────────────────── */
+.bc-stats {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.bc-stat {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px; border-radius: 12px;
+    background: #fff; border: 1.5px solid #e8edf3;
+    flex: 1; min-width: 140px;
+    transition: all .18s; cursor: default;
+}
+.bc-stat:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,.04); transform: translateY(-1px); }
+.bc-stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.bc-stat-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1; }
+.bc-stat-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.bc-stat-label { font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 1px; }
+
+/* ── Filters Card ──────────────────────────────── */
+.bc-filters {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    padding: 16px 20px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+}
+.bc-search-wrap { position: relative; flex: 1; min-width: 200px; }
+.bc-search-wrap input {
+    width: 100%; height: 38px;
+    padding: 0 12px 0 36px;
+    border-radius: 8px; border: 1.5px solid #e2e8f0;
+    font-size: 13px; color: #334155; background: #fff;
+    transition: border-color .15s; outline: none;
+}
+.bc-search-wrap input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.bc-search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; stroke: #94a3b8; fill: none;
+    pointer-events: none;
+}
+
+/* ── Counter ───────────────────────────────────── */
+.bc-counter {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px; padding: 0 4px;
+}
+.bc-counter-text { font-size: 13px; color: #94a3b8; }
+.bc-counter-text strong { color: #475569; font-weight: 700; }
+
+/* ── Table ─────────────────────────────────────── */
+.bc-table-wrap {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3; overflow: hidden;
+}
+.bc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.bc-table thead th {
+    padding: 14px 16px; text-align: left;
+    font-size: 11px; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: .5px;
+    background: #fafbfc; border-bottom: 1.5px solid #e8edf3;
+    white-space: nowrap;
+}
+.bc-table thead th.center { text-align: center; }
+.bc-table thead th.right { text-align: right; }
+.bc-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .12s; }
+.bc-table tbody tr:last-child { border-bottom: none; }
+.bc-table tbody tr:hover { background: #f8fafc; }
+.bc-table tbody td { padding: 14px 16px; color: #475569; vertical-align: middle; }
+.bc-table tbody td.center { text-align: center; }
+.bc-table tbody td.right { text-align: right; }
+
+.bc-name { font-weight: 600; color: #1e293b; }
+.bc-count-danger { font-weight: 700; color: #dc2626; }
+.bc-count-zero { color: #cbd5e1; }
+.bc-euro-danger { font-weight: 600; color: #dc2626; }
+.bc-dash { color: #cbd5e1; }
+
+.bc-btn-detail {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 14px; border-radius: 8px;
+    background: #3b82f6; color: #fff;
+    font-size: 12px; font-weight: 600;
+    text-decoration: none; transition: all .15s;
+    border: none; cursor: pointer;
+}
+.bc-btn-detail:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(59,130,246,.3); color: #fff; }
+.bc-btn-detail svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
+/* ── Empty ─────────────────────────────────────── */
+.bc-empty { padding: 60px 20px; text-align: center; }
+.bc-empty svg { width: 40px; height: 40px; margin: 0 auto 12px; stroke: #cbd5e1; fill: none; opacity: .5; display: block; }
+.bc-empty-text { font-size: 14px; color: #94a3b8; margin: 0; }
+
+/* ── Responsive ────────────────────────────────── */
+@media (max-width: 768px) {
+    .bc-hero { padding: 20px; border-radius: 14px; }
+    .bc-hero-title { font-size: 18px; }
+    .bc-hero-content { flex-direction: column; align-items: flex-start; }
+    .bc-stats { flex-direction: column; }
+    .bc-stat { min-width: 100%; }
+    .bc-filters { flex-direction: column; align-items: stretch; }
+    .bc-table-wrap { overflow-x: auto; }
+}

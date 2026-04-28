@@ -1,0 +1,69 @@
+{#
+    create.html.twig — Meal ticket creation form (standalone page).
+
+    NOTE: The "Stampa Bigliettino" form is embedded directly in tickets/index.html.twig
+    and submits via AJAX to POST /tickets/add (which returns JSON).
+    This template exists as a dedicated create page if needed in future.
+
+    Variables expected:
+      (none — form submits via AJAX)
+#}
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/tickets/list_tickets.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="tk-page">
+
+    <div class="tk-header">
+        <div class="tk-header-left">
+            <div class="tk-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M15 5H9V3h6v2zm4 4H5a2 2 0 00-2 2v1h18v-1a2 2 0 00-2-2zM3 14v5a2 2 0 002 2h14a2 2 0 002-2v-5H3z"/></svg>
+            </div>
+            <div>
+                <div class="tk-header-title">Stampa Bigliettino</div>
+                <div class="tk-header-sub">Nuovo bigliettino pasto</div>
+            </div>
+        </div>
+        <a href="/tickets" class="tk-btn-report">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Torna alla lista
+        </a>
+    </div>
+
+    <div class="tk-card">
+        <div class="tk-card-header">
+            <div class="tk-card-title">Nuovo Bigliettino</div>
+        </div>
+        {# TODO: POST /tickets/add expects worker_names[] and ticket_date, returns JSON #}
+        <form id="ticketForm">
+            <div class="tk-form-row">
+                <div class="tk-form-group" style="flex:2;">
+                    <label>Operai</label>
+                    <select id="workerSearch" name="worker_names[]" multiple placeholder="Seleziona uno o più operai...">
+                    </select>
+                </div>
+                <div class="tk-form-group">
+                    <label>Data</label>
+                    <input type="date" class="tk-form-input" name="ticket_date" value="{{ 'now'|date('Y-m-d') }}" required>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="tk-btn-print">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Stampa
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/tickets/list_tickets.js"></script>
+{% endblock %}

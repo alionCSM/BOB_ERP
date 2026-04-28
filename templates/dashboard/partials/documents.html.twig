@@ -1,0 +1,298 @@
+<link rel="stylesheet" href="/assets/css/views/dashboard/partials/dashboard_documents.css">
+
+<div class="dd-page">
+
+    <!-- ── HERO ────────────────────────────────── -->
+    <div class="dd-hero">
+        <div class="dd-hero-content">
+            <h1 class="dd-greeting">{{ greeting }}, {{ name }}</h1>
+            <p class="dd-date">{{ todayStr }}</p>
+        </div>
+        <div class="dd-hero-pills">
+            {% if expiredTotal > 0 %}
+            <div class="dd-hero-pill dd-hero-pill-alert">
+                <span class="dd-hero-pill-num">{{ expiredTotal }}</span> Scaduti
+            </div>
+            {% endif %}
+            <div class="dd-hero-pill">
+                <span class="dd-hero-pill-num">{{ expiring30Total }}</span> In scadenza (30gg)
+            </div>
+            <div class="dd-hero-pill">
+                <span class="dd-hero-pill-num">{{ totalActiveLinks }}</span> Link attivi
+            </div>
+        </div>
+    </div>
+
+    <!-- ── STAT CARDS ──────────────────────────── -->
+    <div class="dd-stats">
+        <a href="/documents/expired" class="dd-stat">
+            <div class="dd-stat-icon" style="background:#fef2f2;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="12" y1="9" x2="12.01" y2="9"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value" style="color:#dc2626;">{{ expiredWorkerCount }}</div>
+                <div class="dd-stat-label">Scaduti Operai</div>
+                <div class="dd-stat-sub">documenti operaio scaduti</div>
+            </div>
+        </a>
+        <a href="/documents/expired" class="dd-stat">
+            <div class="dd-stat-icon" style="background:#fef3c7;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value" style="color:#d97706;">{{ expiredCompanyCount }}</div>
+                <div class="dd-stat-label">Scaduti Aziende</div>
+                <div class="dd-stat-sub">documenti aziendali scaduti</div>
+            </div>
+        </a>
+        <div class="dd-stat">
+            <div class="dd-stat-icon" style="background:#fff7ed;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value" style="color:#ea580c;">{{ expiring7Total }}</div>
+                <div class="dd-stat-label">Scadono in 7gg</div>
+                <div class="dd-stat-sub">attenzione urgente</div>
+            </div>
+        </div>
+        <div class="dd-stat">
+            <div class="dd-stat-icon" style="background:#fffbeb;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ expiring30Total }}</div>
+                <div class="dd-stat-label">Scadono in 30gg</div>
+                <div class="dd-stat-sub">da monitorare</div>
+            </div>
+        </div>
+        <a href="/share" class="dd-stat">
+            <div class="dd-stat-icon" style="background:#eff6ff;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ totalActiveLinks }}</div>
+                <div class="dd-stat-label">Link Condivisi</div>
+                <div class="dd-stat-sub">{{ totalLinks }} totali</div>
+            </div>
+        </a>
+        <div class="dd-stat">
+            <div class="dd-stat-icon" style="background:#ecfdf5;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </div>
+            <div>
+                <div class="dd-stat-value">{{ recentDownloads }}</div>
+                <div class="dd-stat-label">Download (30gg)</div>
+                <div class="dd-stat-sub">{{ recentDownloads7 }} ultimi 7 giorni</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── URGENT DOCS + COMPANIES ──────────── -->
+    <div class="dd-grid-3">
+
+        <!-- Urgent expirations -->
+        <div class="dd-section">
+            <div class="dd-section-head">
+                <h3 class="dd-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    In scadenza prossimi 7 giorni
+                </h3>
+                <span class="dd-section-badge" style="background:#fff7ed;color:#ea580c;">{{ expiring7Total }}</span>
+            </div>
+            <div class="dd-section-body" style="max-height:360px;overflow-y:auto;">
+                {% if urgentDocs is empty %}
+                    <div class="dd-empty">Nessun documento in scadenza nei prossimi 7 giorni</div>
+                {% endif %}
+                {% for doc in urgentDocs %}
+                    {% set dateClass = doc.days_left <= 2 ? 'dd-urgent-date-danger' : 'dd-urgent-date-warn' %}
+                    {% set typeClass = doc.doc_type == 'azienda' ? 'dd-urgent-type-azienda' : 'dd-urgent-type-operaio' %}
+                    <div class="dd-urgent-row">
+                        <span class="dd-urgent-type {{ typeClass }}">{{ doc.doc_type }}</span>
+                        <div class="dd-urgent-info">
+                            <div class="dd-urgent-name">{{ doc.tipo_documento }}</div>
+                            <div class="dd-urgent-entity">{{ doc.entity_name|default('—') }}</div>
+                        </div>
+                        <span class="dd-urgent-date {{ dateClass }}">
+                            {{ doc.days_left <= 0 ? 'OGGI' : doc.days_left ~ 'gg' }}
+                        </span>
+                    </div>
+                {% endfor %}
+            </div>
+            {% if expiring7Total > 8 %}
+            <div style="padding:10px 20px 14px;border-top:1px solid #f1f5f9;text-align:center;">
+                <a href="/documents/expired" class="dd-section-link">Vedi tutti i {{ expiring7Total }} documenti &rarr;</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Companies with most expired -->
+        <div class="dd-section">
+            <div class="dd-section-head">
+                <h3 class="dd-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/></svg>
+                    Aziende con pi&ugrave; scaduti
+                </h3>
+            </div>
+            <div class="dd-section-body">
+                {% if topCompaniesExpired is empty %}
+                    <div class="dd-empty">Nessun documento scaduto</div>
+                {% endif %}
+                {% for cn, cnt in topCompaniesExpired %}
+                    {% set pct = maxCompanyExpired > 0 ? ((cnt / maxCompanyExpired) * 100)|round : 0 %}
+                    <div class="dd-bar-row">
+                        <span class="dd-bar-label" title="{{ cn }}">{{ cn }}</span>
+                        <div class="dd-bar-track">
+                            <div class="dd-bar-fill" style="width:{{ pct }}%;"></div>
+                        </div>
+                        <span class="dd-bar-count">{{ cnt }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── SHARED LINKS ────────────────────────── -->
+    <div class="dd-grid-2">
+
+        <!-- Recent links -->
+        <div class="dd-section">
+            <div class="dd-section-head">
+                <h3 class="dd-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                    Link Condivisi Recenti
+                </h3>
+                <a href="/share" class="dd-section-link">Tutti &rarr;</a>
+            </div>
+            <div class="dd-section-body">
+                {% if recentLinks is empty %}
+                    <div class="dd-empty">Nessun link condiviso</div>
+                {% endif %}
+                {% for link in recentLinks %}
+                    {% set isActive = link.is_active %}
+                    {% set isExpired = link.expires_at is not empty and link.expires_at < todayStr %}
+                    {% if isExpired %}
+                        {% set statusClass = 'dd-link-expired' %}
+                        {% set statusText = 'Scaduto' %}
+                    {% elseif isActive %}
+                        {% set statusClass = 'dd-link-active' %}
+                        {% set statusText = 'Attivo' %}
+                    {% else %}
+                        {% set statusClass = 'dd-link-inactive' %}
+                        {% set statusText = 'Disattivo' %}
+                    {% endif %}
+                    {% set linkTitle = link.title is not empty ? link.title : 'Link #' ~ link.id %}
+                    {% set createdDate = link.created_at is not empty ? link.created_at|date('d/m/Y') : '—' %}
+                    {% set workerCnt = link.worker_count|default(0)|number_format(0, '.', '') %}
+                    {% set companyCnt = link.company_count|default(0)|number_format(0, '.', '') %}
+                    <div class="dd-link-row">
+                        <div class="dd-link-icon" style="background:{{ (isActive and not isExpired) ? '#eff6ff' : '#f1f5f9' }};">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{ (isActive and not isExpired) ? '#2563eb' : '#94a3b8' }}" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <div class="dd-link-info">
+                            <div class="dd-link-title">{{ linkTitle }}</div>
+                            <div class="dd-link-meta">
+                                {% set metaParts = [] %}
+                                {% if workerCnt > 0 %}{% set metaParts = metaParts|merge([workerCnt ~ ' operai']) %}{% endif %}
+                                {% if companyCnt > 0 %}{% set metaParts = metaParts|merge([companyCnt ~ ' aziende']) %}{% endif %}
+                                {% set metaParts = metaParts|merge([createdDate]) %}
+                                {{ metaParts|join(' &middot; ')|raw }}
+                            </div>
+                        </div>
+                        <span class="dd-link-status {{ statusClass }}">{{ statusText }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick actions + summary -->
+        <div class="dd-section">
+            <div class="dd-section-head">
+                <h3 class="dd-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                    Azioni Rapide
+                </h3>
+            </div>
+            <div class="dd-section-body">
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <a href="/documents/expired" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;text-decoration:none;transition:all .15s;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:#fef2f2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="12" y1="9" x2="12.01" y2="9"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1e293b;">Documenti Scaduti</div>
+                            <div style="font-size:12px;color:#94a3b8;">Visualizza e gestisci tutti i documenti scaduti</div>
+                        </div>
+                    </a>
+                    <a href="/share" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid #bfdbfe;background:#fff;text-decoration:none;transition:all .15s;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1e293b;">Link Condivisi</div>
+                            <div style="font-size:12px;color:#94a3b8;">Gestisci i link di condivisione documenti</div>
+                        </div>
+                    </a>
+                    <a href="/share/create" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid #c7d2fe;background:#fff;text-decoration:none;transition:all .15s;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:#f5f3ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1e293b;">Nuovo Link</div>
+                            <div style="font-size:12px;color:#94a3b8;">Crea un nuovo link di condivisione</div>
+                        </div>
+                    </a>
+                    <a href="/users" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid #bbf7d0;background:#fff;text-decoration:none;transition:all .15s;">
+                        <div style="width:40px;height:40px;border-radius:10px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#1e293b;">Anagrafica Operai</div>
+                            <div style="font-size:12px;color:#94a3b8;">Gestisci operai e i loro documenti</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── CRONOLOGIA NOTIFICHE ────────────────── -->
+    <div class="dd-section" style="margin-bottom:24px;">
+        <div class="dd-section-head">
+            <h3 class="dd-section-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                Cronologia Notifiche
+            </h3>
+            <span class="dd-section-badge" style="background:#f5f3ff;color:#6366f1;">{{ recentNotifications|length }}</span>
+        </div>
+        <div class="dd-section-body" style="max-height:420px;overflow-y:auto;">
+            {% if recentNotifications is empty %}
+                <div class="dd-empty">Nessuna notifica recente</div>
+            {% endif %}
+            {% for notif in recentNotifications %}
+                {% set dotClass = notif.is_read ? 'dd-notif-dot-read' : 'dd-notif-dot-unread' %}
+                <div class="dd-notif-row">
+                    <div class="dd-notif-dot {{ dotClass }}"></div>
+                    <div class="dd-notif-info">
+                        <div class="dd-notif-title">
+                            {% if notif.link is not empty %}
+                                <a href="{{ notif.link }}">{{ notif.title|default('Notifica') }}</a>
+                            {% else %}
+                                {{ notif.title|default('Notifica') }}
+                            {% endif %}
+                        </div>
+                        {% if notif.message is not empty %}
+                            <div class="dd-notif-msg">{{ notif.message }}</div>
+                        {% endif %}
+                        <div class="dd-notif-meta">
+                            <span>{{ notif.created_by_name|default('Sistema') }}</span>
+                        </div>
+                    </div>
+                    <div class="dd-notif-time">{{ notif.time_ago|default('') }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>

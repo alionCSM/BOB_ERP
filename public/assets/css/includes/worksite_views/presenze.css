@@ -1,0 +1,23 @@
+/* Personalizziamo la scrollbar solo per questo blocco */
+            .date-scrollbar::-webkit-scrollbar {
+                width: 6px;
+            }
+            .date-scrollbar::-webkit-scrollbar-thumb {
+                background-color: #9ca3af; /* grigino */
+                border-radius: 3px;
+            }
+
+            .date-scrollbar button {
+                font-size: 12px;
+                padding: 8px 12px;
+                border: 1px solid #e5e7eb; /* grigio chiaro */
+                border-radius: 6px;
+                background-color: #f9fafb;
+                transition: background-color 0.2s, color 0.2s;
+            }
+
+            .date-scrollbar button:hover {
+                background-color: #3b82f6;
+                color: white;
+                border-color: #3b82f6;
+            }

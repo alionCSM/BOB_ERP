@@ -1,0 +1,138 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-6 mt-5">
+    <!-- Bottone per aprire modale aggiunta -->
+    <div class="intro-y col-span-12 flex items-center mt-2">
+        <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal" data-tw-target="#add-lifting-modal">
+            <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi Nuovo Mezzo
+        </button>
+    </div>
+
+<!-- Campo ricerca -->
+    <div class="intro-y col-span-12 flex flex-wrap xl:flex-nowrap items-center mt-2">
+        <input
+                type="text"
+                id="search-mezzo"
+                placeholder="Cerca mezzo..."
+                class="form-control w-64 shadow-md mr-2 mt-2 xl:mt-0"
+        />
+    </div>
+
+    <!-- Tabella elenco mezzi -->
+    <div class="intro-y col-span-12 overflow-auto 2xl:overflow-visible mt-4">
+        <table class="table table-report -mt-2" id="mezziTable">
+            <thead>
+            <tr>
+                <th class="whitespace-nowrap">Descrizione</th>
+                <th class="whitespace-nowrap">Costo Giornaliero (€)</th>
+                <th class="whitespace-nowrap">Azioni</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if listaMezzi is empty %}
+                <tr>
+                    <td colspan="3" class="text-center text-slate-500 py-4">
+                        Nessun mezzo presente
+                    </td>
+                </tr>
+            {% else %}
+                {% for mezzo in listaMezzi %}
+                    <tr class="intro-x">
+                        <td class="font-medium whitespace-nowrap">
+                            {{ mezzo.descrizione }}
+                        </td>
+                        <td class="whitespace-nowrap">
+                            {{ mezzo.costo_giornaliero|number_format(2, ',', '.') }} €
+                        </td>
+                        <td class="table-report__action w-56">
+                            <div class="flex justify-center items-center">
+                                <button
+                                        class="btn btn-outline-primary py-1 px-2 mr-2"
+                                        data-tw-toggle="modal"
+                                        data-tw-target="#edit-lifting-modal-{{ mezzo.id }}"
+                                >
+                                    <i data-lucide="edit" class="w-4 h-4 mr-1"></i> Modifica
+                                </button>
+                                <form method="POST" class="inline-block" data-confirm="Sei sicuro di voler eliminare questo mezzo?">
+                                    <input type="hidden" name="_token" value="{{ csrfToken }}">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="id" value="{{ mezzo.id }}">
+                                    <button type="submit" class="btn btn-danger py-1 px-2">
+                                        <i data-lucide="trash" class="w-4 h-4 mr-1"></i> Elimina
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modale Aggiunta Mezzo -->
+<div id="add-lifting-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <form method="POST" class="modal-content">
+            <input type="hidden" name="_token" value="{{ csrfToken }}">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">Aggiungi Nuovo Mezzo</h2>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" name="action" value="add">
+                <div class="mb-3">
+                    <label class="form-label">Descrizione</label>
+                    <input type="text" name="descrizione" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Costo Giornaliero (€)</label>
+                    <input type="number" name="costo_giornaliero" step="0.01" class="form-control" required>
+                </div>
+            </div>
+            <div class="modal-footer text-right">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-2">Chiudi</button>
+                <button type="submit" class="btn btn-primary w-20">Salva</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modale Modifica Mezzo -->
+{% for mezzo in listaMezzi %}
+    <div id="edit-lifting-modal-{{ mezzo.id }}" class="modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog" style="max-width: 500px;">
+            <form action="/equipment" method="POST" class="modal-content">
+                <input type="hidden" name="_token" value="{{ csrfToken }}">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Modifica Mezzo</h2>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit">
+                    <input type="hidden" name="id" value="{{ mezzo.id }}">
+                    <div class="mb-3">
+                        <label class="form-label">Descrizione</label>
+                        <input type="text" name="descrizione" class="form-control"
+                               value="{{ mezzo.descrizione }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Costo Giornaliero (€)</label>
+                        <input type="number" name="costo_giornaliero" step="0.01"
+                               class="form-control"
+                               value="{{ mezzo.costo_giornaliero }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-2">Chiudi</button>
+                    <button type="submit" class="btn btn-primary w-20">Salva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/equipment/lifting_equipment_list.js"></script>
+{% endblock %}

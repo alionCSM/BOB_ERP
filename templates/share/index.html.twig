@@ -1,0 +1,282 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/share/list_links.css">
+{% endblock %}
+
+{% block content %}
+{# totalLinks and activeLinks are computed in the controller or passed as variables.
+   If not, they can be derived: totalLinks = links|length, activeLinks needs expires logic. #}
+<div style="margin-top:20px;">
+
+    <!-- ── HERO ──────────────────────────────────── -->
+    <div class="sl-hero">
+        <div class="sl-hero-watermark">
+            <svg width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="0.8">
+                <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+            </svg>
+        </div>
+        <div class="sl-hero-content">
+            <div class="sl-eyebrow">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                Condivisione Documenti
+            </div>
+            <h1 class="sl-hero-title">Link Condivisi</h1>
+            <p class="sl-hero-sub">Gestisci i link per la condivisione sicura dei documenti</p>
+            <div class="sl-stat-pills">
+                <div class="sl-stat-pill">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.7"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    <span class="num">{{ totalLinks }}</span> Link totali
+                </div>
+                <div class="sl-stat-pill">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.7"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <span class="num">{{ activeLinks }}</span> Attivi
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ────────────────────────────────── -->
+    <div class="sl-toolbar">
+        <a href="/share/create" class="sl-new-link-btn" style="display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#1a237e,#283593);color:#fff;font-size:13px;font-weight:700;padding:9px 18px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(26,35,126,0.35);transition:opacity .15s;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo Link
+        </a>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:12px;font-weight:600;color:#64748b;letter-spacing:.04em;text-transform:uppercase;" id="sl-count-label">
+                {{ totalLinks }} risultat{{ totalLinks == 1 ? 'o' : 'i' }}
+            </span>
+            <div class="sl-search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input id="search-links" type="text" placeholder="Cerca per titolo…" class="sl-search" />
+            </div>
+        </div>
+    </div>
+
+    <!-- ── TABLE ──────────────────────────────────── -->
+    {% if links is empty %}
+        <div class="sl-empty">
+            <div class="sl-empty-icon">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <p style="font-size:16px;font-weight:700;color:#334155;margin:0 0 8px;">Nessun link creato</p>
+            <p style="font-size:13px;color:#94a3b8;max-width:300px;margin:0 auto 20px;">Crea il tuo primo link condiviso per iniziare a condividere documenti in modo sicuro.</p>
+            <a href="/share/create" style="display:inline-flex;align-items:center;gap:6px;background:#1a237e;color:#fff;font-size:13px;font-weight:600;padding:9px 20px;border-radius:9px;text-decoration:none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Crea primo link
+            </a>
+        </div>
+    {% else %}
+        <div class="sl-table-wrap">
+            <table class="sl-table" id="links-table">
+                <thead>
+                    <tr>
+                        <th data-sort="title">Titolo <span class="sort-icon"></span></th>
+                        <th data-sort="status">Stato <span class="sort-icon"></span></th>
+                        <th data-sort="files">Contenuto <span class="sort-icon"></span></th>
+                        <th data-sort="created">Creato <span class="sort-icon"></span></th>
+                        <th data-sort="expires">Scadenza <span class="sort-icon"></span></th>
+                        <th>Link</th>
+                        <th style="text-align:right;">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="links-tbody">
+                    {% for link in links %}
+                        {# Compute derived values #}
+                        {% set isActive = link.is_active ?? 1 %}
+                        {% set expired = link.expires_at is not empty and link.expires_at < now %}
+                        {% set url = "https://docs.csmontaggi.it/?id=" ~ link.link_token %}
+                        {% set hasPassword = link.password is not empty %}
+                        {% set wCount = link.worker_count ?? 0 %}
+                        {% set cCount = link.company_count ?? 0 %}
+                        {% set mCount = link.manual_count ?? 0 %}
+                        {% set totalItems = wCount + cCount + mCount %}
+                        {% if not isActive %}
+                            {% set statusClass = 'sl-badge-inactive' %}
+                            {% set statusLabel = 'Disattivato' %}
+                        {% elseif expired %}
+                            {% set statusClass = 'sl-badge-expired' %}
+                            {% set statusLabel = 'Scaduto' %}
+                        {% else %}
+                            {% set statusClass = 'sl-badge-active' %}
+                            {% set statusLabel = 'Attivo' %}
+                        {% endif %}
+                        <tr class="sl-row"
+                            data-title="{{ link.title|lower }}"
+                            data-status="{{ expired ? 'expired' : 'active' }}"
+                            data-files="{{ totalItems }}"
+                            data-created="{{ link.created_at|date('Y-m-d') }}"
+                            data-expires="{{ link.expires_at is not empty ? link.expires_at|date('Y-m-d') : '9999-12-31' }}">
+                            <td class="sl-title-cell">
+                                {{ link.title }}
+                            </td>
+                            <td>
+                                <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+                                    <span class="sl-badge {{ statusClass }}">
+                                        <svg width="6" height="6" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+                                        {{ statusLabel }}
+                                    </span>
+                                    {% if hasPassword %}
+                                        <span class="sl-badge sl-badge-pwd" title="Protetto da password">
+                                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td style="font-weight:600;color:#475569;font-size:11px;line-height:1.4;">
+                                {% if wCount > 0 %}
+                                    <span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;" title="Operai">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                        {{ wCount }}
+                                    </span>
+                                {% endif %}
+                                {% if cCount > 0 %}
+                                    <span style="display:inline-flex;align-items:center;gap:3px;margin-right:4px;" title="Aziende">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                                        {{ cCount }}
+                                    </span>
+                                {% endif %}
+                                {% if mCount > 0 %}
+                                    <span style="display:inline-flex;align-items:center;gap:3px;" title="Manuali">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                        {{ mCount }}
+                                    </span>
+                                {% endif %}
+                                {% if totalItems == 0 %}
+                                    <span style="color:#94a3b8;">—</span>
+                                {% endif %}
+                            </td>
+                            <td style="color:#64748b;white-space:nowrap;">{{ link.created_at|date('d/m/Y') }}</td>
+                            <td style="white-space:nowrap;">
+                                <span style="{{ expired ? 'color:#b91c1c;font-weight:600;' : 'color:#64748b;' }}">
+                                    {{ link.expires_at is not empty ? link.expires_at|date('d/m/Y') : '—' }}
+                                </span>
+                            </td>
+                            <td class="sl-url-cell">
+                                <div class="sl-url-inline">
+                                    <span class="sl-url-text-sm">{{ url }}</span>
+                                    <button class="sl-copy-btn" data-action="copy-link" data-link-id="{{ link.id }}" data-link-url="{{ url }}">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                                        Copia
+                                    </button>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="sl-actions-cell" style="justify-content:flex-end;">
+                                    <a class="sl-btn-sm sl-btn-open" href="{{ url }}" target="_blank" title="Apri link">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                    </a>
+                                    <a class="sl-btn-sm" href="/share/{{ link.id }}/edit" title="Modifica" style="background:#e0f2fe;color:#0369a1;">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </a>
+                                    <button class="sl-btn-sm {{ isActive ? 'sl-btn-toggle-on' : 'sl-btn-toggle-off' }}"
+                                            data-action="toggle-link-active" data-link-id="{{ link.id }}" type="button"
+                                            title="{{ isActive ? 'Disattiva link' : 'Attiva link' }}"
+                                            data-active="{{ isActive }}">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                                    </button>
+                                    <button class="sl-btn-sm sl-btn-pwd" data-action="open-pwd-modal" data-link-id="{{ link.id }}" type="button" title="Rigenera password">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                                    </button>
+                                    <button class="sl-btn-sm sl-btn-del"
+                                            data-action="delete-link"
+                                            data-link-id="{{ link.id }}" type="button" title="Elimina">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            <div class="sl-pagination" id="sl-pagination">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span id="sl-page-info">1-{{ 25 < totalLinks ? 25 : totalLinks }} di {{ totalLinks }}</span>
+                    <select class="sl-per-page" id="sl-per-page">
+                        <option value="25">25 / pag</option>
+                        <option value="50">50 / pag</option>
+                        <option value="100">100 / pag</option>
+                    </select>
+                </div>
+                <div class="sl-page-btns" id="sl-page-btns"></div>
+            </div>
+        </div>
+
+        <div id="no-results" style="display:none;margin-top:16px;" class="sl-empty">
+            <div class="sl-empty-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            </div>
+            <p style="font-size:14px;font-weight:600;color:#475569;margin:0 0 4px;">Nessun risultato</p>
+            <p style="font-size:12px;color:#94a3b8;margin:0;">Prova con un titolo diverso</p>
+        </div>
+    {% endif %}
+
+</div>
+
+<!-- ── DELETE MODAL ──────────────────────────────── -->
+<div id="delete-link-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="deleteLinkForm" method="POST" action="/share/delete" class="modal-content">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="id" id="deleteLinkId" value="">
+            <div class="modal-body p-8 text-center">
+                <div style="width:60px;height:60px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+                </div>
+                <h3 style="font-size:18px;font-weight:700;color:#1e293b;margin:0 0 8px;">Elimina link?</h3>
+                <p style="font-size:13px;color:#64748b;margin:0;">Questa operazione è irreversibile. Il link non sarà più accessibile.</p>
+            </div>
+            <div class="modal-footer px-6 pb-6" style="gap:8px;">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary" style="flex:1;">Annulla</button>
+                <button type="submit" class="btn btn-danger" style="flex:1;">Elimina</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── TOAST ─────────────────────────────────────── -->
+<div id="sl-toast"></div>
+
+<!-- ── PASSWORD MODAL ─────────────────────────────── -->
+<div id="password-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width:440px;">
+        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+            <div class="modal-body p-6">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                    <div style="width:44px;height:44px;background:#fef3c7;border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                    </div>
+                    <div>
+                        <h3 id="pwdModalTitle" style="font-size:16px;font-weight:700;color:#1e293b;margin:0;">Rigenera Password</h3>
+                        <p id="pwdModalSub" style="font-size:12px;color:#94a3b8;margin:2px 0 0;">Genera una nuova password per questo link</p>
+                    </div>
+                </div>
+                <input type="hidden" id="pwdLinkId" value="">
+                <div style="margin-bottom:16px;">
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;">Password Generata</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="text" id="pwdGenerated" readonly style="flex:1;height:40px;border:1.5px solid #e2e8f0;border-radius:9px;padding:0 12px;font-size:14px;font-family:monospace;letter-spacing:1px;color:#1e293b;background:#f8fafc;outline:none;box-sizing:border-box;">
+                        <button id="pwdRegenBtn" type="button" style="flex-shrink:0;display:inline-flex;align-items:center;gap:4px;padding:8px 12px;border-radius:8px;font-size:11px;font-weight:600;background:#e0e7ff;color:#3730a3;border:none;cursor:pointer;transition:background .15s;" title="Rigenera">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                        </button>
+                    </div>
+                    <p style="font-size:11px;color:#94a3b8;margin-top:6px;">La password viene generata automaticamente e copiata insieme al link.</p>
+                </div>
+                <p id="pwdResult" style="font-size:12px;color:#dc2626;margin:0 0 8px;min-height:16px;"></p>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button type="button" data-tw-dismiss="modal" style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;background:#f1f5f9;color:#64748b;border:none;cursor:pointer;">Annulla</button>
+                    <button id="pwdSaveBtn" type="button" style="padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;background:linear-gradient(135deg,#1a237e,#3f51b5);color:#fff;border:none;cursor:pointer;">Salva</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<meta name="token-to-link-id" content='{{ links|map(l => {"id": l.id, "token": l.link_token})|json_encode }}'>
+<script src="/assets/js/views/share/list_links.js"></script>
+{% endblock %}

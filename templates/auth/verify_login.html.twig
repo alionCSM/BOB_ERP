@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="utf-8">
+    <link href="{{ appUrl }}/includes/template/dist/images/logo.png" rel="shortcut icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="BOB">
+    <title>Verifica Accesso - BOB</title>
+    <link rel="stylesheet" href="{{ appUrl }}/includes/template/dist/css/app.css" />
+</head>
+<body class="login">
+<div class="container sm:px-10">
+    <div class="block xl:grid grid-cols-2 gap-4">
+
+        <!-- LEFT BRAND PANEL -->
+        <div class="hidden xl:flex flex-col min-h-screen">
+            <a href="#" class="-intro-x flex items-center pt-5">
+                <img alt="Bob logo" class="w-8" src="{{ appUrl }}/includes/template/dist/images/logo.png">
+                <span class="text-white text-xl ml-3"> BOB</span>
+            </a>
+            <div class="my-auto">
+                <img alt="" class="-intro-x w-2/3 -mt-36" src="/includes/template/dist/images/csmontaggi_logo.png">
+            </div>
+        </div>
+
+        <!-- RIGHT VERIFY CARD -->
+        <div class="h-screen xl:h-auto flex py-5 xl:py-0 my-10 xl:my-0">
+            <div class="my-auto mx-auto xl:ml-20 bg-white dark:bg-darkmode-600 xl:bg-transparent
+                       px-5 sm:px-8 py-8 xl:p-0 rounded-md shadow-md xl:shadow-none
+                       w-full sm:w-3/4 lg:w-2/4 xl:w-auto">
+
+                {% if pageError is not empty %}
+                    <div class="intro-x mt-6 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+                        <div class="font-medium text-red-700">Accesso non valido</div>
+                        <div class="text-sm text-red-600 mt-1">{{ pageError }}</div>
+                        <div class="mt-3">
+                            <a href="/login" class="text-sm font-medium text-primary hover:underline">
+                                Torna alla pagina di login
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if pageError is empty %}
+                    <h2 class="intro-x font-bold text-2xl xl:text-3xl text-center xl:text-left">Verifica accesso</h2>
+
+                    <div class="intro-x mt-4 text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+                        Per motivi di sicurezza, abbiamo inviato un codice di verifica a:
+                        <div class="font-medium text-slate-800 dark:text-slate-200 mt-1">
+                            {{ maskedEmail }}
+                        </div>
+                    </div>
+
+                    {% if error is not empty %}
+                        <div class="intro-x mt-4 text-danger text-sm">{{ error }}</div>
+                    {% endif %}
+
+                    <form method="POST" class="intro-x mt-8">
+                        <input type="text"
+                               name="code"
+                               inputmode="numeric"
+                               pattern="[0-9]{6}"
+                               maxlength="6"
+                               autocomplete="one-time-code"
+                               class="form-control py-3 text-center tracking-widest text-2xl font-semibold"
+                               placeholder="● ● ● ● ● ●">
+                        <button type="submit" class="btn btn-primary py-3 px-4 w-full xl:w-40">
+                            Conferma accesso
+                        </button>
+                        <div class="text-xs text-slate-500 mt-4 text-center">
+                            Non trovi l'email? Controlla anche nella posta indesiderata.
+                        </div>
+                    </form>
+                {% endif %}
+
+            </div>
+        </div>
+
+    </div>
+</div>
+<script src="{{ appUrl }}/includes/template/dist/js/app.js"></script>
+</body>
+</html>

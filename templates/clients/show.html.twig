@@ -1,0 +1,237 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/clients/clients_detail.css">
+{% endblock %}
+
+{% block content %}
+<div class="cdl-page">
+
+{# Hero #}
+<div class="cdl-hero">
+    <div class="cdl-hero-content">
+        <div class="cdl-hero-left">
+            <div class="cdl-hero-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
+                </svg>
+            </div>
+            <div class="cdl-hero-info">
+                <h1 class="cdl-hero-title">{{ client.name }}</h1>
+                <p class="cdl-hero-sub">{{ client.via }}, {{ client.cap }}, {{ client.localita }}</p>
+            </div>
+        </div>
+        <div class="cdl-hero-actions">
+            <a href="/clients" class="cdl-btn-back">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Torna indietro
+            </a>
+            <a href="/clients/{{ client.id }}/edit" class="cdl-btn-edit">
+                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Modifica
+            </a>
+        </div>
+    </div>
+</div>
+
+{# Main Grid #}
+<div class="cdl-grid">
+
+    {# Left Column #}
+    <div class="cdl-left">
+
+        {# Info Card #}
+        <div class="cdl-card">
+            <div class="cdl-info-top">
+                <div class="cdl-avatar">
+                    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                </div>
+                <div class="cdl-info-primary">
+                    <div class="cdl-client-name">{{ client.name }}</div>
+                    <div class="cdl-vat">P.IVA: {{ client.vat }}</div>
+                </div>
+            </div>
+
+            <div class="cdl-info-row">
+                <div class="cdl-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <div class="cdl-info-content">
+                    <div class="cdl-info-label">Indirizzo</div>
+                    <div class="cdl-info-value">{{ client.via }}, {{ client.cap }}, {{ client.localita }}</div>
+                </div>
+            </div>
+
+            <div class="cdl-info-row">
+                <div class="cdl-icon">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                </div>
+                <div class="cdl-info-content">
+                    <div class="cdl-info-label">Filiale</div>
+                    <div class="cdl-info-value">{{ client.filiale }}</div>
+                </div>
+            </div>
+
+            <div class="cdl-info-row">
+                <div class="cdl-icon">
+                    <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div class="cdl-info-content">
+                    <div class="cdl-info-label">Email</div>
+                    <div class="cdl-info-value"><a href="mailto:{{ client.email }}">{{ client.email }}</a></div>
+                </div>
+            </div>
+
+            {# Delete Section #}
+            <div class="cdl-delete-section">
+                <button type="button" class="cdl-btn-delete" data-tw-toggle="modal" data-tw-target="#delete-confirmation-modal">
+                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    Elimina Cliente
+                </button>
+            </div>
+        </div>
+
+        {# Statistics Card #}
+        <div class="cdl-card">
+            <div class="cdl-card-header">
+                <h2 class="cdl-card-title">Statistiche</h2>
+            </div>
+
+            <div class="cdl-stats-grid">
+                <div class="cdl-stat-box">
+                    <div class="cdl-stat-icon offers">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <div class="cdl-stat-info">
+                        <div class="cdl-stat-value">{{ totalOffers }}</div>
+                        <div class="cdl-stat-label">Richieste Totali</div>
+                    </div>
+                </div>
+
+                <div class="cdl-stat-box">
+                    <div class="cdl-stat-icon worksites">
+                        <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+                    </div>
+                    <div class="cdl-stat-info">
+                        <div class="cdl-stat-value">{{ totalCantieri }}</div>
+                        <div class="cdl-stat-label">Cantieri Totali</div>
+                    </div>
+                </div>
+
+                {% if lastOffer %}
+                <div class="cdl-last-offer">
+                    <div class="cdl-last-offer-title">Ultima Richiesta</div>
+                    <div class="cdl-last-offer-value">
+                        <strong>{{ lastOffer.offer_number }}</strong> del {{ lastOffer.created_at|date('d/m/Y') }}
+                    </div>
+                </div>
+                {% else %}
+                <div class="cdl-stat-empty">Nessuna richiesta disponibile.</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    {# Right Column - Cantieri #}
+    <div class="cdl-right">
+        <div class="cdl-section-header">
+            <h2 class="cdl-section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+                Cantieri
+            </h2>
+            <span class="cdl-section-count">{{ totalCantieri }}</span>
+        </div>
+
+        {% if cantieri is empty %}
+        <div class="cdl-empty">
+            <svg class="cdl-empty-icon" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+            <p class="cdl-empty-text">Nessun cantiere associato a questo cliente.</p>
+        </div>
+
+        {% if cantieriTotal > 20 and cantieriPage > 1 %}
+        <div class="cdl-pagination-prev">
+            <a href="?page={{ cantieriPage - 1 }}" class="cdl-pagination-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                Cantieri precedenti
+            </a>
+        </div>
+        {% endif %}
+        {% else %}
+        {% for year, sites in cantieri %}
+        <div class="cdl-year-group">
+            <div class="cdl-year-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>{{ year == 'N/A' ? 'Senza data' : year }}</span>
+                <span class="cdl-year-count">({{ sites|length }})</span>
+            </div>
+            <div class="cdl-worksites-grid">
+                {% for cantiere in sites %}
+                <div class="cdl-worksite-card">
+                    <div class="cdl-ws-header">
+                        <div class="cdl-ws-icon">
+                            <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+                        </div>
+                        <div class="cdl-ws-info">
+                            <div class="cdl-ws-name">{{ cantiere.name }}</div>
+                            <div class="cdl-ws-sub">{{ cantiere.location }}</div>
+                        </div>
+                    </div>
+                    <div class="cdl-ws-body">
+                        <div class="cdl-ws-meta">
+                            <span class="cdl-ws-status">{{ cantiere.status }}</span>
+                        </div>
+                    </div>
+                    <div class="cdl-ws-actions">
+                        <a href="/worksites/{{ cantiere.id }}" class="cdl-ws-action">
+                            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            Visualizza
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        {% if cantieriTotal > 20 * cantieriPage %}
+        <div class="cdl-pagination-next">
+            <a href="?page={{ cantieriPage + 1 }}" class="cdl-pagination-link">
+                Cantieri precedenti
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+        </div>
+        {% endif %}
+        {% endif %}
+
+    </div>
+
+</div>
+
+{# Delete Confirmation Modal #}
+<div id="delete-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div style="padding:28px 24px 0;text-align:center;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:14px;background:#fef2f2;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    </div>
+                    <p style="font-weight:700;font-size:16px;margin:14px 0 4px;">Elimina Cliente</p>
+                    <p style="font-size:13px;color:#64748b;margin:0;">Sei sicuro di voler eliminare questo cliente?<br>Questa azione non può essere annullata.</p>
+                </div>
+                <div style="padding:0 24px 24px;display:flex;gap:10px;justify-content:center;">
+                    <button type="button" data-tw-dismiss="modal" style="flex:1;max-width:100px;padding:10px;border-radius:8px;background:#f1f5f9;border:none;color:#475569;font-size:13px;font-weight:500;cursor:pointer;">Annulla</button>
+                    <form method="POST" action="/clients/{{ client.id }}/delete" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <button type="submit" style="flex:1;max-width:100px;padding:10px;border-radius:8px;background:#dc2626;border:none;color:#fff;font-size:13px;font-weight:500;cursor:pointer;">Elimina</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

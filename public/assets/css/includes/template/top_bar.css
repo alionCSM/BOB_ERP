@@ -1,0 +1,14 @@
+@keyframes pnm-in { from { opacity:0; transform:scale(.95) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+.pnm-item {
+    display:flex; gap:12px; padding:12px 16px; border-radius:12px;
+    border:1.5px solid #fecaca; background:#fef2f2;
+    font-size:13px; color:#991b1b; animation: pnm-in .3s ease;
+}
+.pnm-item-icon {
+    width:32px; height:32px; border-radius:8px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    background:#fee2e2;
+}
+.pnm-item-title { font-weight:700; margin-bottom:2px; }
+.pnm-item-msg { font-size:12px; color:#b91c1c; line-height:1.4; white-space:pre-line; }
+.pnm-item-time { font-size:10px; color:#dc2626; opacity:.6; margin-top:4px; }

@@ -1,0 +1,53 @@
+{#
+    _rows.html.twig — AJAX partial: tbody rows for the workers list.
+
+    Variables expected:
+      workers       array   Rows from bb_workers
+#}
+{% set avatarColors = [
+    '#1d4ed8','#7c3aed','#0f766e','#b45309',
+    '#be185d','#4338ca','#15803d','#9333ea',
+] %}
+{% for w in workers %}
+    {% set isActive = (w.active == 'Y' or w.active == 1) %}
+    {% set fullName = w.last_name ~ ' ' ~ w.first_name %}
+    {% set initials = w.first_name|slice(0,1)|upper ~ w.last_name|slice(0,1)|upper %}
+    {% set bgColor  = avatarColors[w.id % avatarColors|length] %}
+    <tr class="ul-row" data-active="{{ isActive ? '1' : '0' }}"
+        data-href="/users/{{ w.id }}/edit">
+        <td>
+            <div class="ul-entity">
+                {% if w.photo is not empty %}
+                    <img class="ul-photo ul-photo-preview" src="/users/{{ w.id }}/worker-photo" alt=""
+                         data-src="/users/{{ w.id }}/worker-photo" data-name="{{ fullName }}">
+                {% else %}
+                    <div class="ul-avatar" style="background:{{ bgColor }};">{{ initials }}</div>
+                {% endif %}
+                <div>
+                    <div class="ul-name">{{ fullName }}</div>
+                    {% if w.fiscal_code is not empty %}
+                        <div class="ul-fiscal">{{ w.fiscal_code }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </td>
+        <td>{{ w.company ?: '—' }}</td>
+        <td>
+            {% if isActive %}
+                <span class="ul-badge ul-badge-active">Attivo</span>
+            {% else %}
+                <span class="ul-badge ul-badge-inactive">Inattivo</span>
+            {% endif %}
+        </td>
+        <td class="ul-actions-cell">
+            <div class="ul-actions">
+                <a href="/users/{{ w.id }}/edit?uid={{ w.uid }}" class="ul-act ul-act-view" title="Profilo">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </a>
+                <a href="javascript:;" class="ul-act ul-act-del ul-del-btn" title="Elimina" data-id="{{ w.id }}" data-uid="{{ w.uid }}">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                </a>
+            </div>
+        </td>
+    </tr>
+{% endfor %}

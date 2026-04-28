@@ -1,0 +1,28 @@
+{#
+    _pagination.html.twig — AJAX partial: pagination links for the workers list.
+
+    Variables expected:
+      page        int
+      totalPages  int
+      limit       int
+      search      string
+#}
+{% if page > 1 %}
+    <a class="ul-pg-btn" href="?page=1&limit={{ limit }}&search={{ search|url_encode }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+    </a>
+    <a class="ul-pg-btn" href="?page={{ page - 1 }}&limit={{ limit }}&search={{ search|url_encode }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+{% endif %}
+{% for i in max(1, page - 2)..min(totalPages, page + 2) %}
+    <a class="ul-pg-num {{ i == page ? 'active' : '' }}" href="?page={{ i }}&limit={{ limit }}&search={{ search|url_encode }}">{{ i }}</a>
+{% endfor %}
+{% if page < totalPages %}
+    <a class="ul-pg-btn" href="?page={{ page + 1 }}&limit={{ limit }}&search={{ search|url_encode }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+    <a class="ul-pg-btn" href="?page={{ totalPages }}&limit={{ limit }}&search={{ search|url_encode }}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+    </a>
+{% endif %}

@@ -1,0 +1,238 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/attendance/edit_attendance.css">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <h2 class="text-lg font-medium mb-4">Modifica Presenze</h2>
+
+    <form method="POST" action="/attendance/save-bulk" id="attendanceForm" novalidate
+        data-cons-count="{{ consorziate|length }}">
+        <input type="hidden" name="start_date" value="{{ data }}">
+        <input type="hidden" name="end_date" value="{{ data }}">
+        <input type="hidden" name="cantiere" value="{{ cantiereId }}">
+
+        <div class="flex gap-4 border-b mb-4">
+            <button type="button" id="tab-nostri" class="tab-button tab-active">Nostri</button>
+            <button type="button" id="tab-consorziata" class="tab-button">Consorziate</button>
+        </div>
+
+        <div id="section-nostri">
+            <div class="flex justify-end items-center gap-3 mb-4 mr-4">
+                <span class="text-sm text-slate-600">Copia valori prima riga</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="copy-first-row-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <table class="table w-full text-sm">
+                <thead>
+                <tr class="bg-sky-100 text-slate-700">
+                    <th>Nome</th>
+                    <th>Tipo Turno</th>
+                    <th>Pranzo</th>
+                    <th>Cena</th>
+                    <th>Hotel</th>
+                    <th>Auto</th>
+                    <th>Note</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="attendanceRows">
+                {% for n in nostri %}
+                    <tr>
+                        <td>
+                            <input type="hidden" name="existing_id[]" value="{{ n.id }}">
+                            <select name="worker_id[]" class="tomselect-worker" required>
+                                <option value="{{ n.worker_id }}" selected>{{ n.worker_name }}</option>
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="turno[]" class="form-select">
+                                <option value="Intero" {{ n.turno == 'Intero' ? 'selected' : '' }}>Intero</option>
+                                <option value="Mezzo" {{ n.turno == 'Mezzo' ? 'selected' : '' }}>Mezzo</option>
+                            </select>
+                        </td>
+
+                        <td class="pranzo-cell">
+                            <div class="flex items-center gap-2">
+                                <select name="pranzo[]" class="form-select pranzo-select">
+                                    {% for opt in ["-", "Loro", "Noi"] %}
+                                        <option {{ n.pranzo == opt ? 'selected' : '' }}>{{ opt }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="number" step="0.01" name="pranzo_prezzo[]"
+                                       class="form-control w-24 {{ n.pranzo == 'Noi' ? '' : 'hidden' }}"
+                                       placeholder="€"
+                                       value="{{ n.pranzo_prezzo|number_format(2, '.', '') }}">
+                            </div>
+                        </td>
+
+                        <td class="cena-cell">
+                            <div class="flex items-center gap-2">
+                                <select name="cena[]" class="form-select cena-select">
+                                    {% for opt in ["-", "Loro", "Noi"] %}
+                                        <option {{ n.cena == opt ? 'selected' : '' }}>{{ opt }}</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="number" step="0.01" name="cena_prezzo[]"
+                                       class="form-control w-24 {{ n.cena == 'Noi' ? '' : 'hidden' }}"
+                                       placeholder="€"
+                                       value="{{ n.cena_prezzo|number_format(2, '.', '') }}">
+                            </div>
+                        </td>
+
+                        <td>
+                            <input
+                                    type="text"
+                                    name="hotel[]"
+                                    class="form-control"
+                                    value="{{ n.hotel }}"
+                                    placeholder="Hotel / struttura"
+                            >
+                        </td>
+                        <td><input type="text" name="auto[]" class="form-control" value="{{ n.targa_auto }}"></td>
+                        <td><input type="text" name="note[]" class="form-control" value="{{ n.note }}"></td>
+                        <td><button type="button" class="text-red-600 font-bold remove-row">✖</button></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" id="addRow" class="btn btn-outline-primary mt-3">+ Aggiungi Operaio</button>
+        </div>
+
+        <div id="section-consorziata" class="hidden mt-6">
+            <div class="flex justify-end items-center gap-3 mb-4 mr-4">
+                <span class="text-sm text-slate-600">Copia valori prima riga</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="copy-first-cons-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <table class="table w-full text-sm">
+                <thead>
+                <tr class="bg-sky-100 text-slate-700">
+                    <th>Consorziata</th>
+                    <th>N. Persone</th>
+                    <th>Costo / Persona</th>
+                    <th>Pasti</th>
+                    <th>Auto</th>
+                    <th>Hotel</th>
+                    <th>Note</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="consorziataRows">
+                <input type="hidden" name="consorziate_mode" value="edit">
+
+                {% for i, c in consorziate %}
+                    <tr>
+                        <td>
+                            <input
+                                    type="hidden"
+                                    name="existing_cons_id[{{ i }}]"
+                                    value="{{ c.id }}"
+                            >
+                            <select
+                                    name="consorziate[{{ i }}][nome]"
+                                    class="tomselect-company"
+                                    required
+                            >
+                                <option value="{{ c.azienda_id }}" selected>{{ c.company_name }}</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input
+                                    type="number"
+                                    name="consorziate[{{ i }}][numero]"
+                                    class="form-control"
+                                    step="0.5" min="0"
+                                    value="{{ c.quantita }}"
+                            >
+                        </td>
+                        <td>
+                            <input
+                                    type="number"
+                                    name="consorziate[{{ i }}][costo]"
+                                    class="form-control"
+                                    step="0.01"
+                                    value="{{ c.costo_unitario }}"
+                            >
+                        </td>
+                        <td>
+                            <input
+                                    type="number"
+                                    name="consorziate[{{ i }}][pasti]"
+                                    class="form-control"
+                                    value="{{ c.pasti }}"
+                            >
+                        </td>
+                        <td>
+                            <input
+                                    type="text"
+                                    name="consorziate[{{ i }}][auto]"
+                                    class="form-control"
+                                    value="{{ c.auto }}"
+                            >
+                        </td>
+                        <td>
+                            <input
+                                    type="text"
+                                    name="consorziate[{{ i }}][hotel]"
+                                    class="form-control"
+                                    value="{{ c.hotel }}"
+                            >
+                        </td>
+                        <td>
+                            <input
+                                    type="text"
+                                    name="consorziate[{{ i }}][note]"
+                                    class="form-control"
+                                    value="{{ c.note }}"
+                            >
+                        </td>
+                        <td>
+                            <button type="button" class="text-red-600 font-bold remove-row">✖</button>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <button type="button" id="addConsorziataRow" class="btn btn-outline-primary mt-3">+ Aggiungi consorziata</button>
+        </div>
+
+        <div class="text-right mt-5 space-x-3">
+            <button type="button" class="btn btn-primary" id="preview-button">Anteprima Modifiche</button>
+        </div>
+
+        <div id="riepilogo-modal" class="modal fade" data-tw-backdrop="static" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-body p-0">
+                        <div class="p-5 text-center">
+                            <i data-lucide="list-check" class="w-16 h-16 text-primary mx-auto mt-3"></i>
+                            <div class="text-2xl mt-5 font-medium">Riepilogo Modifiche</div>
+                            <div id="riepilogo-modal-content" class="text-left mt-4 max-h-[400px] overflow-y-auto text-base text-slate-600 px-3 space-y-4"></div>
+                        </div>
+                        <div class="px-5 pb-5 text-center">
+                            <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-24 mr-2">Annulla</button>
+                            <button type="button" class="btn btn-primary w-32" id="confirm-save">Salva Modifiche</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/edit_attendance.js"></script>
+{% endblock %}

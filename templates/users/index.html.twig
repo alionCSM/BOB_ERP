@@ -1,0 +1,201 @@
+{#
+    index.html.twig — Workers list page.
+
+    Variables expected (from UsersController::index()):
+      workers        array   Rows from bb_workers
+      page           int
+      limit          int
+      offset         int
+      search         string
+      totalRecords   int
+      totalPages     int
+      totalActive    int
+      totalAll       int
+      totalInactive  int
+#}
+{% extends 'layout/base.html.twig' %}
+
+{% set avatarColors = [
+    '#1d4ed8','#7c3aed','#0f766e','#b45309',
+    '#be185d','#4338ca','#15803d','#9333ea',
+] %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/users/list.css">
+{% endblock %}
+
+{% block content %}
+<div class="ul-page">
+
+    <!-- ── HERO ────────────────────────────── -->
+    <div class="ul-hero">
+        <svg class="ul-hero-wm" viewBox="0 0 24 24" fill="white"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <div class="ul-hero-top">
+            <div class="ul-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div>
+                <div class="ul-hero-title">Gestione Operai</div>
+                <div class="ul-hero-sub">Anagrafica completa dei lavoratori</div>
+            </div>
+        </div>
+        <div class="ul-hero-pills">
+            <div class="ul-pill"><span class="ul-pill-num">{{ totalAll }}</span> Totale</div>
+            <div class="ul-pill"><span class="ul-pill-num">{{ totalActive }}</span> Attivi</div>
+            {% if totalInactive > 0 %}
+            <div class="ul-pill" style="background:rgba(255,255,255,.08);"><span class="ul-pill-num">{{ totalInactive }}</span> Inattivi</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ─────────────────────────── -->
+    <div class="ul-toolbar">
+        <input type="text" class="ul-search" id="search-input"
+               placeholder="Cerca operaio, azienda, codice fiscale..."
+               value="{{ search }}">
+        <span class="ul-summary" id="users-summary">
+            Mostrando {{ totalRecords > 0 ? offset + 1 : 0 }} a {{ (offset + limit) < totalRecords ? (offset + limit) : totalRecords }} di {{ totalRecords }} operai
+        </span>
+        <div class="ul-actions-right">
+            <a href="/users/create" class="ul-btn-add">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuovo Operaio
+            </a>
+        </div>
+    </div>
+
+    <!-- ── TABLE ───────────────────────────── -->
+    <div class="ul-table-wrap">
+        <table class="ul-table">
+            <thead>
+                <tr>
+                    <th>Operaio</th>
+                    <th>Azienda</th>
+                    <th>Stato</th>
+                    <th style="text-align:center;">Azioni</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body">
+                {% for w in workers %}
+                    {% set isActive = (w.active == 'Y' or w.active == 1) %}
+                    {% set fullName = w.last_name ~ ' ' ~ w.first_name %}
+                    {% set initials = w.first_name|slice(0,1)|upper ~ w.last_name|slice(0,1)|upper %}
+                    {% set bgColor  = avatarColors[w.id % avatarColors|length] %}
+                    <tr class="ul-row" data-active="{{ isActive ? '1' : '0' }}"
+                        data-href="/users/{{ w.id }}/edit">
+                        <td>
+                            <div class="ul-entity">
+                                {% if w.photo is not empty %}
+                                    <img class="ul-photo ul-photo-preview" src="/users/{{ w.id }}/worker-photo" alt=""
+                                         data-src="/users/{{ w.id }}/worker-photo" data-name="{{ fullName }}">
+                                {% else %}
+                                    <div class="ul-avatar" style="background:{{ bgColor }};">{{ initials }}</div>
+                                {% endif %}
+                                <div>
+                                    <div class="ul-name">{{ fullName }}</div>
+                                    {% if w.fiscal_code is not empty %}
+                                        <div class="ul-fiscal">{{ w.fiscal_code }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ w.company ?: '—' }}</td>
+                        <td>
+                            {% if isActive %}
+                                <span class="ul-badge ul-badge-active">Attivo</span>
+                            {% else %}
+                                <span class="ul-badge ul-badge-inactive">Inattivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="ul-actions-cell">
+                            <div class="ul-actions">
+                                <a href="/users/{{ w.id }}/edit?uid={{ w.uid }}" class="ul-act ul-act-view" title="Profilo">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </a>
+                                <a href="javascript:;" class="ul-act ul-act-del ul-del-btn" title="Elimina" data-id="{{ w.id }}" data-uid="{{ w.uid }}">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── PAGINATION ──────────────────────── -->
+    <div class="ul-pg-bar">
+        <div class="ul-pg-nav" id="users-pagination">
+            {% if page > 1 %}
+                <a class="ul-pg-btn" href="?page=1&limit={{ limit }}&search={{ search|url_encode }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+                </a>
+                <a class="ul-pg-btn" href="?page={{ page - 1 }}&limit={{ limit }}&search={{ search|url_encode }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </a>
+            {% endif %}
+            {% for i in max(1, page - 2)..min(totalPages, page + 2) %}
+                <a class="ul-pg-num {{ i == page ? 'active' : '' }}" href="?page={{ i }}&limit={{ limit }}&search={{ search|url_encode }}">{{ i }}</a>
+            {% endfor %}
+            {% if page < totalPages %}
+                <a class="ul-pg-btn" href="?page={{ page + 1 }}&limit={{ limit }}&search={{ search|url_encode }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+                <a class="ul-pg-btn" href="?page={{ totalPages }}&limit={{ limit }}&search={{ search|url_encode }}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                </a>
+            {% endif %}
+        </div>
+        <select class="ul-pg-limit" id="users-limit">
+            <option value="10" {{ limit == 10 ? 'selected' : '' }}>10</option>
+            <option value="25" {{ limit == 25 ? 'selected' : '' }}>25</option>
+            <option value="50" {{ limit == 50 ? 'selected' : '' }}>50</option>
+            <option value="100" {{ limit == 100 ? 'selected' : '' }}>100</option>
+        </select>
+    </div>
+
+</div>
+
+<!-- ── DELETE MODAL ─────────────────────────── -->
+<div id="delete-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="delete-user-form" method="POST" class="modal-content">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <div class="modal-body p-0">
+                <div style="padding:28px 24px 0;text-align:center;">
+                    <div class="ul-del-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </div>
+                    <p class="ul-del-title">Elimina Operaio</p>
+                    <p class="ul-del-sub">Sei sicuro di voler eliminare questo operaio?<br>Questa azione non può essere annullata.</p>
+                </div>
+                <div class="ul-del-bar" style="padding:0 24px 24px;">
+                    <button type="button" data-tw-dismiss="modal" class="ul-del-cancel">Annulla</button>
+                    <button type="submit" class="ul-del-confirm">Elimina</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── IMAGE PREVIEW MODAL ─────────────────── -->
+<div id="image-preview-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">
+                    Foto Profilo – <span id="preview-worker-name" class="text-slate-600 font-normal"></span>
+                </h2>
+                <button type="button" class="btn-close" data-tw-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body flex justify-center items-center">
+                <img id="preview-image" src="" alt="Foto Operaio" class="max-h-[80vh] rounded-lg shadow-md">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/users/list.js?v=3"></script>
+{% endblock %}

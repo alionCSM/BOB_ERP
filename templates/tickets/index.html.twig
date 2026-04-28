@@ -1,0 +1,240 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/tickets/list_tickets.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="tk-page">
+
+    <!-- ── HEADER ─────────────────────────────── -->
+    <div class="tk-header">
+        <div class="tk-header-left">
+            <div class="tk-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M15 5H9V3h6v2zm4 4H5a2 2 0 00-2 2v1h18v-1a2 2 0 00-2-2zM3 14v5a2 2 0 002 2h14a2 2 0 002-2v-5H3z"/></svg>
+            </div>
+            <div>
+                <div class="tk-header-title">Bigliettini Pasto</div>
+                <div class="tk-header-sub">{{ tickets|length }} bigliettin{{ tickets|length == 1 ? 'o' : 'i' }} stampat{{ tickets|length == 1 ? 'o' : 'i' }}</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button type="button" class="tk-btn-report" id="tk-report-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Genera Report
+            </button>
+        </div>
+    </div>
+
+    <!-- ── STAT CARDS ─────────────────────────── -->
+    <div class="tk-stats-row">
+        <div class="tk-stat-card">
+            <div class="tk-stat-icon green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div>
+                <div class="tk-stat-value">{{ pastiCurr }}</div>
+                <div class="tk-stat-label">Pasti mese corrente</div>
+            </div>
+        </div>
+        <div class="tk-stat-card">
+            <div class="tk-stat-icon blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div>
+                <div class="tk-stat-value">{{ pastiPrev }}</div>
+                <div class="tk-stat-label">Pasti mese precedente</div>
+            </div>
+        </div>
+        <div class="tk-stat-card">
+            <div class="tk-stat-icon amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+            </div>
+            <div>
+                <div class="tk-stat-value">{{ tickets|length }}</div>
+                <div class="tk-stat-label">Totale stampati</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── FORM CARD: Stampa Bigliettino ──────── -->
+    <div class="tk-card">
+        <div class="tk-card-header">
+            <div class="tk-card-title">Stampa Bigliettino</div>
+        </div>
+        <form id="ticketForm">
+            <div class="tk-form-row">
+                <div class="tk-form-group" style="flex:2;">
+                    <label>Operai</label>
+                    <select id="workerSearch" name="worker_names[]" multiple placeholder="Seleziona uno o più operai...">
+                    </select>
+                </div>
+                <div class="tk-form-group">
+                    <label>Data</label>
+                    <input type="date" class="tk-form-input" name="ticket_date" value="{{ 'now'|date('Y-m-d') }}" required>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button type="submit" class="tk-btn-print">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Stampa
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- ── TABLE CARD ─────────────────────────── -->
+    <div class="tk-card">
+        <div class="tk-toolbar">
+            <div class="tk-search-wrap">
+                <input type="text" class="tk-search-input" id="tkSearchInput" placeholder="Cerca per nome, data, progressivo...">
+                <button type="button" id="tk-clear-search" style="padding:6px;cursor:pointer;border:none;background:none;" title="Cancella ricerca">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div style="margin-left:auto;font-size:12px;color:#64748b;">
+                Risultati: <span id="tkRowCount" class="tk-stat-num">{{ tickets|length }}</span>
+            </div>
+        </div>
+
+        <div class="tk-table-wrap">
+            {% if tickets is empty %}
+                <div class="tk-empty">
+                    <div class="tk-empty-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                    <div class="tk-empty-title">Nessun bigliettino</div>
+                    <div class="tk-empty-sub">Stampa il primo bigliettino usando il form sopra</div>
+                </div>
+            {% else %}
+                <table class="tk-table" id="tkTable">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Nome</th>
+                            <th>N.</th>
+                            <th>Stato</th>
+                            <th style="text-align:right;">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for t in tickets %}
+                        <tr>
+                            <td>{{ t.ticket_date|date('d/m/Y') }}</td>
+                            <td style="font-weight:600;">{{ t.worker_name }}</td>
+                            <td>
+                                <span style="font-family:monospace;font-weight:700;color:#047857;">#{{ t.progressivo ?? '—' }}</span>
+                            </td>
+                            <td>
+                                {% if t.printed %}
+                                    <span class="tk-badge tk-badge-printed">Stampato</span>
+                                {% else %}
+                                    <span class="tk-badge tk-badge-pending">In attesa</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align:right; white-space:nowrap;">
+                                <a href="/tickets/print?id={{ t.id }}" target="_blank" class="tk-action tk-action-print" title="Stampa">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                    PDF
+                                </a>
+                                &nbsp;
+                                <button type="button" class="tk-action tk-action-edit tk-edit-btn" title="Modifica"
+                                    data-id="{{ t.id }}"
+                                    data-worker="{{ t.worker_name|e('html_attr') }}"
+                                    data-date="{{ t.ticket_date }}">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                &nbsp;
+                                <button type="button" class="tk-action tk-action-delete tk-delete-btn" data-id="{{ t.id }}" title="Elimina">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+
+        {% if tickets is not empty %}
+        <div class="tk-stats-bar">
+            Bigliettini stampati: <span class="tk-stat-num">{{ tickets|length }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- ── EDIT MODAL ─────────────────────────────── -->
+<div class="tk-modal-backdrop" id="editModal">
+    <div class="tk-modal">
+        <div class="tk-modal-header">
+            <span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Modifica Bigliettino
+            </span>
+            <button class="tk-modal-close" data-close-modal="editModal">&times;</button>
+        </div>
+        <form id="editForm">
+            <input type="hidden" name="id" id="editId">
+            <div class="tk-modal-body">
+                <div style="margin-bottom:14px;">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;">Nome Operaio</label>
+                    <select id="editWorkerSearch" name="worker_name" required>
+                        <option value="">Seleziona operaio...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;">Data</label>
+                    <input type="date" name="ticket_date" id="editDate" class="tk-form-input" required>
+                </div>
+            </div>
+            <div class="tk-modal-footer">
+                <button type="button" class="tk-modal-btn" data-close-modal="editModal">Annulla</button>
+                <button type="submit" class="tk-modal-btn tk-modal-btn-primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Salva
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── REPORT MODAL ───────────────────────────── -->
+<div class="tk-modal-backdrop" id="reportModal">
+    <div class="tk-modal">
+        <div class="tk-modal-header">
+            <span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:6px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Genera Report
+            </span>
+            <button class="tk-modal-close" data-close-modal="reportModal">&times;</button>
+        </div>
+        <form id="reportForm" action="/tickets/report" method="GET" target="_blank">
+            <div class="tk-modal-body">
+                <div style="margin-bottom:14px;">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;">Data Inizio</label>
+                    <input type="date" name="start_date" class="tk-form-input" required>
+                </div>
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#64748b;margin-bottom:6px;text-transform:uppercase;">Data Fine</label>
+                    <input type="date" name="end_date" class="tk-form-input" required>
+                </div>
+            </div>
+            <div class="tk-modal-footer">
+                <button type="button" class="tk-modal-btn" data-close-modal="reportModal">Annulla</button>
+                <button type="submit" class="tk-modal-btn tk-modal-btn-primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Genera PDF
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/tickets/list_tickets.js"></script>
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_form.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="cof-page">
+
+  <div class="cof-hero">
+    <div class="cof-hero-content">
+      <div class="cof-hero-left">
+        <div class="cof-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </div>
+        <div class="cof-hero-info">
+          <h1 class="cof-hero-title">Modifica Ordine n° {{ ordine.order_number }}</h1>
+          <p class="cof-hero-sub">{{ ordine.destinatario_name ?? '' }} · {{ ordine.order_date|date('d/m/Y') }}</p>
+        </div>
+      </div>
+      <div class="cof-hero-actions">
+        <a href="/ordini/{{ ordineId }}" class="cof-btn-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Torna all'ordine
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if app.request.get('error') %}
+  <div class="cof-alert cof-alert-error">{{ app.request.get('error') }}</div>
+  {% endif %}
+
+  <form method="POST" action="/ordini/{{ ordineId }}/edit" id="ordineForm">
+
+    {# ── Testata ── #}
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Testata Ordine
+      </div>
+      <div class="cof-grid-2">
+        <div class="cof-field">
+          <label for="worksite_id">Cantiere <span class="req">*</span></label>
+          <select name="worksite_id" id="worksite_id" required>
+            <option value="">— Seleziona cantiere —</option>
+            {% for w in worksites %}
+            <option value="{{ w.id }}" {% if w.id == ordine.worksite_id %}selected{% endif %}>{{ w.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cof-field">
+          <label for="destinatario_id">Consorziata (Destinatario)</label>
+          <select name="destinatario_id" id="destinatario_id">
+            <option value="">— Seleziona consorziata —</option>
+            {% for c in consorziate %}
+            <option value="{{ c.id }}" {% if c.id == ordine.destinatario_id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cof-field">
+          <label for="order_date">Data Ordine <span class="req">*</span></label>
+          <input type="date" name="order_date" id="order_date" value="{{ ordine.order_date }}" required>
+        </div>
+        <div class="cof-field cof-field-span2">
+          <label for="oggetto">Oggetto</label>
+          <textarea name="oggetto" id="oggetto" rows="2">{{ ordine.oggetto }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    {# ── Articoli ── #}
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Articoli / Righe Ordine
+      </div>
+      <div class="cof-items-wrap">
+        <div class="cof-items-header">
+          <div class="cof-ih-cod">Cod.</div>
+          <div class="cof-ih-desc">Descrizione</div>
+          <div class="cof-ih-um">UM</div>
+          <div class="cof-ih-qta">Q.tà</div>
+          <div class="cof-ih-prezzo">Prezzo</div>
+          <div class="cof-ih-imp">Importo</div>
+          <div class="cof-ih-del"></div>
+        </div>
+        <div id="itemsContainer" data-items="{{ items|json_encode|e('html_attr') }}"></div>
+      </div>
+      <button type="button" class="cof-btn-addrow" id="addItemRow">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Aggiungi riga
+      </button>
+      <div class="cof-subtotal">
+        <span>Totale Merce:</span>
+        <strong id="subtotalDisplay">0,00 €</strong>
+      </div>
+    </div>
+
+    {# ── Condizioni ── #}
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Pagamento e Condizioni
+      </div>
+      <div class="cof-grid-2">
+        <div class="cof-field">
+          <label for="iva_percentage">IVA</label>
+          <select name="iva_percentage" id="iva_percentage">
+            <option value="0"  {% if ordine.iva_percentage == 0  %}selected{% endif %}>Nessuna IVA (0%)</option>
+            <option value="4"  {% if ordine.iva_percentage == 4  %}selected{% endif %}>IVA 4%</option>
+            <option value="10" {% if ordine.iva_percentage == 10 %}selected{% endif %}>IVA 10%</option>
+            <option value="22" {% if ordine.iva_percentage == 22 or not ordine.iva_percentage %}selected{% endif %}>IVA 22%</option>
+          </select>
+        </div>
+        <div class="cof-field cof-field-span2">
+          <label for="termini_pagamento">Termini di Pagamento</label>
+          <textarea name="termini_pagamento" id="termini_pagamento" rows="2">{{ ordine.termini_pagamento }}</textarea>
+        </div>
+        <div class="cof-field cof-field-span2">
+          <label for="note">Note</label>
+          <textarea name="note" id="note" rows="3">{{ ordine.note }}</textarea>
+        </div>
+      </div>
+      <div class="cof-totale-finale">
+        <div class="cof-totale-row">
+          <span>Totale Merce</span>
+          <strong id="totaleMerce">0,00 €</strong>
+        </div>
+        <div class="cof-totale-row" id="ivaRow">
+          <span id="ivaLabel">IVA 22%</span>
+          <strong id="ivaAmount">0,00 €</strong>
+        </div>
+        <div class="cof-totale-row cof-totale-doc">
+          <span>Totale Documento</span>
+          <strong id="totaleDocumento">0,00 €</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="cof-form-actions">
+      <a href="/ordini/{{ ordineId }}" class="cof-btn-cancel">Annulla</a>
+      <button type="submit" class="cof-btn-submit">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v14a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Salva Modifiche
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/ordini/create_ordine.js"></script>
+{% endblock %}

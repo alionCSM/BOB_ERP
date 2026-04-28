@@ -1,0 +1,8 @@
+body { font-family: Arial, sans-serif; font-size: 12px; color: #333; }
+    h1 { color: #003366; font-size: 18px; text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #666; font-size: 11px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th { background: #003366; color: #fff; padding: 8px 10px; text-align: left; font-size: 11px; }
+    td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
+    tr:nth-child(even) td { background: #f9fafb; }
+    .total { font-weight: bold; font-size: 13px; margin-top: 16px; }

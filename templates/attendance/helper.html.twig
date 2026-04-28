@@ -1,0 +1,11 @@
+{#
+    attendance_helper.php was a raw JSON API endpoint (Content-Type: application/json).
+    It does NOT render HTML — it is handled directly in the controller as a JSON response.
+    This file exists as a placeholder; the actual logic lives in AttendanceController::helper().
+
+    Actions supported (GET ?action=...&q=...):
+      - workers  → searches bb_workers by name
+      - companies → searches bb_companies by name
+      - clients  → searches bb_clients by name
+#}
+{{ data|json_encode|raw }}

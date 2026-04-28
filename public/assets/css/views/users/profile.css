@@ -1,0 +1,106 @@
+.pr-page { margin-top: 20px; max-width: 800px; }
+
+.pr-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px; padding: 32px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #4c1d95 100%);
+    color: #fff; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 24px;
+}
+.pr-hero::before {
+    content: ''; position: absolute; top: -50px; right: -50px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: rgba(139,92,246,.12); pointer-events: none;
+}
+.pr-hero-avatar {
+    width: 80px; height: 80px; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 800; flex-shrink: 0;
+    background: rgba(255,255,255,.15); color: #fff;
+    overflow: hidden; position: relative; z-index: 1;
+}
+.pr-hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pr-hero-info { position: relative; z-index: 1; }
+.pr-hero-name { font-size: 24px; font-weight: 800; margin: 0 0 4px; }
+.pr-hero-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.pr-hero-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 600; opacity: .7;
+}
+
+.pr-section {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    margin-bottom: 20px; overflow: hidden;
+}
+.pr-section-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 24px; border-bottom: 1px solid #f1f5f9;
+}
+.pr-section-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.pr-section-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
+.pr-section-sub { font-size: 12px; color: #94a3b8; margin: 0; }
+.pr-section-body { padding: 24px; }
+
+.pr-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.pr-field { display: flex; flex-direction: column; gap: 6px; }
+.pr-label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+.pr-input {
+    height: 42px; padding: 0 14px;
+    border: 1.5px solid #e2e8f0; border-radius: 10px;
+    font-size: 13px; color: #1e293b; background: #fff;
+    outline: none; transition: border-color .15s;
+}
+.pr-input:focus { border-color: #7c3aed; }
+.pr-input:read-only { background: #f8fafc; color: #94a3b8; cursor: default; }
+
+.pr-toast {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600; margin-bottom: 16px;
+    animation: pr-slide .3s ease;
+}
+.pr-toast-ok { background: #f0fdf4; border: 1.5px solid #bbf7d0; color: #15803d; }
+.pr-toast-err { background: #fef2f2; border: 1.5px solid #fecaca; color: #dc2626; }
+@keyframes pr-slide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+.pr-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 42px; padding: 0 22px; border-radius: 10px;
+    font-size: 13px; font-weight: 700;
+    border: none; cursor: pointer; transition: opacity .15s;
+}
+.pr-btn-primary {
+    background: linear-gradient(135deg, #312e81, #7c3aed);
+    color: #fff; box-shadow: 0 4px 14px rgba(124,58,237,.25);
+}
+.pr-btn-primary:hover { opacity: .88; }
+.pr-btn-outline { background: #fff; color: #475569; border: 1.5px solid #e2e8f0; }
+.pr-btn-outline:hover { border-color: #7c3aed; color: #7c3aed; }
+
+.pr-photo-wrap { display: flex; align-items: center; gap: 20px; }
+.pr-photo-preview {
+    width: 80px; height: 80px; border-radius: 14px;
+    background: #f1f5f9; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800; color: #94a3b8; flex-shrink: 0;
+}
+.pr-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.pr-photo-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+.pr-pwd-bar-bg {
+    width: 100%; height: 6px; border-radius: 3px;
+    background: #f1f5f9; overflow: hidden; margin-top: 6px;
+}
+.pr-pwd-bar-fill { height: 100%; border-radius: 3px; transition: all .2s; width: 0; }
+.pr-pwd-text { font-size: 11px; color: #94a3b8; margin-top: 4px; min-height: 16px; }
+
+@media (max-width: 640px) {
+    .pr-form-grid { grid-template-columns: 1fr; }
+    .pr-hero { flex-direction: column; text-align: center; padding: 24px 20px; }
+    .pr-hero-meta { justify-content: center; }
+    .pr-photo-wrap { flex-direction: column; text-align: center; }
+}

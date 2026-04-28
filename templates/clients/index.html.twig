@@ -1,0 +1,209 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/clients/clients_list.css">
+{% endblock %}
+
+{% block content %}
+<div class="cl-page">
+
+{# Flash Messages #}
+{% if session_success %}
+<div class="cl-toast cl-toast-success">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    {{ session_success }}
+</div>
+{% endif %}
+
+{% if session_error %}
+<div class="cl-toast cl-toast-error">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+    {{ session_error }}
+</div>
+{% endif %}
+
+{# Hero Section #}
+<div class="cl-hero">
+    <div class="cl-hero-content">
+        <div class="cl-hero-left">
+            <div class="cl-hero-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
+                </svg>
+            </div>
+            <h1 class="cl-hero-title">Clienti</h1>
+        </div>
+        <a href="/clients/create" class="cl-btn-new">
+            <svg viewBox="0 0 24 24">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Nuovo Cliente
+        </a>
+    </div>
+</div>
+
+{# Stats Row #}
+<div class="cl-stats">
+    <div class="cl-stat">
+        <div class="cl-stat-dot" style="background:#22c55e;"></div>
+        <div>
+            <div class="cl-stat-value">{{ totalClients }}</div>
+            <div class="cl-stat-label">Clienti Totali</div>
+        </div>
+    </div>
+    <div class="cl-stat">
+        <div class="cl-stat-dot" style="background:#3b82f6;"></div>
+        <div>
+            <div class="cl-stat-value">{{ totalWorksites }}</div>
+            <div class="cl-stat-label">Cantieri Totali</div>
+        </div>
+    </div>
+    <div class="cl-stat">
+        <div class="cl-stat-dot" style="background:#f59e0b;"></div>
+        <div>
+            <div class="cl-stat-value">{{ totalOffers }}</div>
+            <div class="cl-stat-label">Richieste Totali</div>
+        </div>
+    </div>
+</div>
+
+{# Filters Card #}
+<div class="cl-filters">
+    <div class="cl-search-wrap">
+        <svg class="cl-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="11" y2="11"></line>
+        </svg>
+        <input type="text" id="search-client" placeholder="Cerca cliente, email, P.IVA..." />
+    </div>
+</div>
+
+{# Counter #}
+<div class="cl-counter">
+    <span class="cl-counter-text"><strong>{{ totalClients }}</strong> clienti trovati</span>
+</div>
+
+{# Table #}
+<div class="cl-table-wrap">
+    <table class="cl-table">
+        <thead>
+        <tr>
+            <th>Ragione Sociale</th>
+            <th class="center">P.IVA</th>
+            <th class="center">Indirizzo</th>
+            <th class="center">Filiale</th>
+            <th class="center">Richieste</th>
+            <th class="center">Cantieri</th>
+            <th class="center" style="width:100px;">Azioni</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for client in clients %}
+            <tr>
+                <td>
+                    <div>
+                        <a href="/clients/{{ client.id }}" class="cl-name">{{ client.name }}</a>
+                        <div class="cl-email">{{ client.email }}</div>
+                    </div>
+                </td>
+                <td class="center"><span class="cl-badge">{{ client.vat }}</span></td>
+                <td class="center"><span class="cl-address">{{ client.via }}, {{ client.cap }}, {{ client.localita }}</span></td>
+                <td class="center">{{ client.filiale }}</td>
+                <td class="center">{{ client.total_offers }}</td>
+                <td class="center">{{ client.total_worksites }}</td>
+                <td class="center">
+                    <div class="cl-actions">
+                        <a href="/clients/{{ client.id }}/edit" class="cl-action-btn primary" title="Modifica">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </a>
+                        <a href="/clients/{{ client.id }}" class="cl-action-btn secondary" title="Vista rapida">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </a>
+                        <button class="cl-action-btn danger"
+                                data-tw-toggle="modal"
+                                data-tw-target="#delete-confirmation-modal"
+                                data-client-id="{{ client.id }}"
+                                title="Elimina">
+                            <svg viewBox="0 0 24 24">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# Empty State (shown via JS when no results) #}
+<div id="cl-empty-state" class="cl-table-wrap cl-empty" style="display:none;">
+    <svg class="cl-empty-icon" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="11" y2="11"></line>
+    </svg>
+    <p class="cl-empty-text">Nessun cliente trovato</p>
+</div>
+
+{# Delete Confirmation Modal #}
+<div id="delete-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+
+                {# Confirm panel — shown when client has no related records #}
+                <div id="delete-confirm-panel">
+                    <div style="padding:28px 24px 0;text-align:center;">
+                        <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:14px;background:#fef2f2;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        </div>
+                        <p style="font-weight:700;font-size:16px;margin:14px 0 4px;">Elimina Cliente</p>
+                        <p style="font-size:13px;color:#64748b;margin:0;">Sei sicuro di voler eliminare questo cliente?<br>Questa azione non può essere annullata.</p>
+                    </div>
+                    <div style="padding:16px 24px 24px;display:flex;gap:10px;justify-content:center;">
+                        <button type="button" data-tw-dismiss="modal" style="flex:1;max-width:100px;padding:10px;border-radius:8px;background:#f1f5f9;border:none;color:#475569;font-size:13px;font-weight:500;cursor:pointer;">Annulla</button>
+                        <form id="deleteForm" method="POST" action="">
+                            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                            <button type="submit" style="padding:10px 20px;border-radius:8px;background:#dc2626;border:none;color:#fff;font-size:13px;font-weight:500;cursor:pointer;">Elimina</button>
+                        </form>
+                    </div>
+                </div>
+
+                {# Warning panel — shown when client has related records #}
+                <div id="delete-warning-panel" style="display:none;">
+                    <div style="padding:28px 24px 0;text-align:center;">
+                        <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:14px;background:#fff7ed;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                        <p style="font-weight:700;font-size:16px;margin:14px 0 4px;">Impossibile eliminare</p>
+                        <p id="delete-warning-text" style="font-size:13px;color:#64748b;margin:0;"></p>
+                    </div>
+                    <div style="padding:16px 24px 24px;display:flex;justify-content:center;">
+                        <button type="button" data-tw-dismiss="modal" style="padding:10px 24px;border-radius:8px;background:#f1f5f9;border:none;color:#475569;font-size:13px;font-weight:500;cursor:pointer;">Chiudi</button>
+                    </div>
+                </div>
+
+                {# Loading state #}
+                <div id="delete-loading-panel" style="display:none;padding:40px 24px;text-align:center;">
+                    <p style="font-size:13px;color:#94a3b8;margin:0;">Verifica in corso…</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/clients/clients.js"></script>
+{% endblock %}

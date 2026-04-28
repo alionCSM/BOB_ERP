@@ -1,0 +1,203 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_detail.css">
+{% endblock %}
+
+{% block content %}
+<div class="bd-page">
+
+{# ── Hero ── #}
+<div class="bd-hero">
+    <div class="bd-hero-content">
+        <div class="bd-hero-left">
+            <div class="bd-hero-icon">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div>
+                <div class="bd-hero-breadcrumb">
+                    <a href="/billing/clients">Fatture per Cliente</a> › {{ client.name }}
+                </div>
+                <h1 class="bd-hero-title">{{ client.name }}</h1>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            {% if daEmettere is not empty %}
+            <a href="/billing/client/{{ client.id }}/export" class="bd-btn-export">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Excel Da Emettere
+            </a>
+            {% endif %}
+            <a href="/billing/clients" class="bd-btn-back">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                Tutti i clienti
+            </a>
+        </div>
+    </div>
+</div>
+
+{# ── Stats Row (current year) ── #}
+<div class="bd-stats">
+    <div class="bd-stat">
+        <div class="bd-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
+        <div>
+            <div class="bd-stat-value danger">{{ daEmettereCountYr }}</div>
+            <div class="bd-stat-sub">€ {{ daEmettereEuroYr|number_format(2, ',', '.') }}</div>
+            <div class="bd-stat-label">Da emettere <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+    <div class="bd-stat">
+        <div class="bd-stat-dot" style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4);"></div>
+        <div>
+            <div class="bd-stat-value success">{{ emesseCountYr }}</div>
+            <div class="bd-stat-sub">€ {{ emesseEuroYr|number_format(2, ',', '.') }}</div>
+            <div class="bd-stat-label">Emesse <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+    <div class="bd-stat">
+        <div class="bd-stat-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,.4);"></div>
+        <div>
+            <div class="bd-stat-value">{{ daEmettereCountYr + emesseCountYr }}</div>
+            <div class="bd-stat-label">Totale fatture <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+    <div class="bd-stat">
+        <div class="bd-stat-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4);"></div>
+        <div>
+            <div class="bd-stat-value" style="font-size:16px;">€ {{ (daEmettereEuroYr + emesseEuroYr)|number_format(2, ',', '.') }}</div>
+            <div class="bd-stat-label">Totale <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+</div>
+
+{# ── DA EMETTERE ── #}
+<div class="bd-section">
+    <div class="bd-section-header">
+        <h3 class="bd-section-title">
+            <span class="bd-section-dot" style="background:#ef4444;box-shadow:0 0 5px rgba(239,68,68,.4);"></span>
+            Da emettere
+            <span class="bd-section-count">({{ daEmettere|length }})</span>
+        </h3>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span class="bd-section-total danger">€ {{ totalDaEmettere|number_format(2, ',', '.') }}</span>
+            {% if daEmettere is not empty %}
+            <div class="bd-search-wrap">
+                <svg class="bd-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input id="search-da-emettere" type="text" placeholder="Cerca cantiere…">
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if daEmettere is empty %}
+    <div class="bd-empty-wrap">
+        <div class="bd-empty">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <p class="bd-empty-text">Nessuna fattura da emettere.</p>
+        </div>
+    </div>
+    {% else %}
+    <div class="bd-table-wrap">
+        <table class="bd-table" id="da-emettere-table">
+            <thead>
+            <tr>
+                <th>Data</th>
+                <th>Cantiere</th>
+                <th>Ordine</th>
+                <th>Descrizione</th>
+                <th class="right">Imponibile (€)</th>
+                <th class="right">IVA %</th>
+                <th class="center">Yard ID</th>
+            </tr>
+            </thead>
+            <tbody id="da-emettere-tbody">
+            {% for r in daEmettere %}
+            <tr class="da-emettere-row" data-cantiere="{{ r.cantiere|lower }}">
+                <td class="bd-muted" style="white-space:nowrap;">{{ r.data }}</td>
+                <td>
+                    <a href="/worksites/{{ r.worksite_id }}" class="bd-link">{{ r.cantiere }}</a>
+                </td>
+                <td class="bd-muted" style="white-space:nowrap;">{{ r.order_number ?? '—' }}</td>
+                <td style="font-size:12px;color:#64748b;">{{ r.descrizione }}</td>
+                <td class="right"><span class="bd-amount-danger">€ {{ r.totale_imponibile|number_format(2, ',', '.') }}</span></td>
+                <td class="right bd-muted">{{ r.aliquota_iva }}%</td>
+                <td class="center">
+                    {% if r.yard_id %}
+                        <span class="bd-yard-badge">{{ r.yard_id }}</span>
+                    {% else %}
+                        <span class="bd-yard-dash">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+            <tr>
+                <td colspan="4" class="right" style="color:#64748b;">Totale da emettere</td>
+                <td class="right" style="color:#dc2626;">€ {{ totalDaEmettere|number_format(2, ',', '.') }}</td>
+                <td colspan="2"></td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{# ── EMESSE ── #}
+<div class="bd-section">
+    <div class="bd-section-header">
+        <h3 class="bd-section-title">
+            <span class="bd-section-dot" style="background:#22c55e;box-shadow:0 0 5px rgba(34,197,94,.4);"></span>
+            Emesse
+            <span class="bd-section-count">({{ totalEmesse }})</span>
+        </h3>
+        <span class="bd-section-total success">€ {{ totalEmesseEuro|number_format(2, ',', '.') }}</span>
+    </div>
+
+    <div class="bd-table-wrap">
+        <table class="bd-table">
+            <thead>
+            <tr>
+                <th>Data</th>
+                <th>Cantiere</th>
+                <th>Ordine</th>
+                <th>Descrizione</th>
+                <th class="right">Imponibile (€)</th>
+                <th class="right">IVA %</th>
+            </tr>
+            </thead>
+            <tbody id="emesse-tbody">
+            {% for r in emesse %}
+            <tr>
+                <td class="bd-muted" style="white-space:nowrap;">{{ r.data }}</td>
+                <td><a href="/worksites/{{ r.worksite_id }}" class="bd-link">{{ r.cantiere }}</a></td>
+                <td class="bd-muted" style="white-space:nowrap;">{{ r.order_number ?? '—' }}</td>
+                <td style="font-size:12px;color:#64748b;">{{ r.descrizione }}</td>
+                <td class="right">€ {{ r.totale_imponibile|number_format(2, ',', '.') }}</td>
+                <td class="right bd-muted">{{ r.aliquota_iva }}%</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% if totalEmesse > perPage %}
+        <div class="bd-load-more-wrap" id="load-more-wrap">
+            <button id="load-more-btn" class="bd-load-more-btn"
+                    data-client="{{ client.id }}"
+                    data-page="2"
+                    data-per-page="{{ perPage }}"
+                    data-total="{{ totalEmesse }}">
+                <svg viewBox="0 0 24 24"><polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/></svg>
+                Carica altri <span id="remaining-count">{{ totalEmesse - perPage }}</span> fatture
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/billing/client_detail.js"></script>
+{% endblock %}

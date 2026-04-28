@@ -1,0 +1,266 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   Worksite Tab Content — modern override for all tab panes
+   Scoped to .wv-tabs-content so nothing leaks outside the tab area.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tab pane wrapper ─────────────────────────────────────────────────────── */
+.wv-tabs-content { padding: 20px 20px 24px; }
+
+/* ── Unified table card ───────────────────────────────────────────────────── */
+.wv-tabs-content .w-full.overflow-x-auto {
+    border-radius: 12px;
+    border: 1.5px solid #e8edf3;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(15,23,42,.04);
+}
+
+/* ── Add-button toolbar — standalone ─────────────────────────────────────── */
+.wv-tabs-content .flex.justify-end.mb-3 {
+    padding: 0;
+    border-bottom: none;
+    margin-bottom: 12px !important;
+}
+
+/* ── Stitch toolbar into table card when directly adjacent ───────────────── */
+/* Toolbar becomes the card header; table card loses its top corners/border   */
+.wv-tabs-content .flex.justify-end.mb-3 + .w-full.overflow-x-auto {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top-color: transparent;
+    margin-top: 0;
+}
+
+/* Toolbar gets card top styling when it's directly above the table card */
+.wv-tabs-content .flex.justify-end.mb-3:has(+ .w-full.overflow-x-auto) {
+    margin-bottom: 0 !important;
+    padding: 10px 14px;
+    background: #fafbfc;
+    border: 1.5px solid #e8edf3;
+    border-bottom: 1.5px solid #f1f5f9;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 1px 4px rgba(15,23,42,.04);
+}
+
+/* ── Add button ───────────────────────────────────────────────────────────── */
+.wv-tabs-content .btn.btn-primary {
+    background: #1e3a5f;
+    border-color: #1e3a5f;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background .15s, box-shadow .15s;
+}
+.wv-tabs-content .btn.btn-primary:hover {
+    background: #162d4a;
+    box-shadow: 0 3px 8px rgba(30,58,95,.25);
+}
+.wv-tabs-content .btn.btn-primary i { width: 13px; height: 13px; }
+
+/* ── Modern table ─────────────────────────────────────────────────────────── */
+.wv-tabs-content .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+    color: #374151;
+    margin-bottom: 0;
+}
+
+/* Remove Bootstrap stripe */
+.wv-tabs-content .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: transparent;
+    --bs-table-accent-bg: transparent;
+}
+
+.wv-tabs-content .table thead th {
+    background: #f8fafc;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 10px 14px;
+    border-top: none;
+    border-bottom: 1.5px solid #e8edf3 !important;
+    white-space: nowrap;
+}
+
+.wv-tabs-content .table tbody td {
+    padding: 10px 14px;
+    border-top: none;
+    border-bottom: 1px solid #f1f5f9 !important;
+    vertical-align: middle;
+    color: #374151;
+}
+
+.wv-tabs-content .table tbody tr:last-child td { border-bottom: none !important; }
+
+.wv-tabs-content .table tbody tr { transition: background .1s; }
+.wv-tabs-content .table tbody tr:hover > td { background: #f8fafc; }
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.wv-tabs-content .table tbody td[colspan] {
+    text-align: center;
+    padding: 36px 24px !important;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+/* ── Action buttons inside tables ─────────────────────────────────────────── */
+.wv-tabs-content .table td .flex.justify-center { gap: 4px; }
+
+.wv-tabs-content .table td a.flex.items-center,
+.wv-tabs-content .table td button.flex.items-center {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1.5px solid transparent;
+    background: #f1f5f9;
+    color: #475569;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+    margin-right: 0 !important;
+}
+.wv-tabs-content .table td a.flex.items-center:hover,
+.wv-tabs-content .table td button.flex.items-center:hover {
+    background: #e2e8f0;
+    color: #1e3a5f;
+    border-color: #cbd5e1;
+}
+
+/* Edit/duplicate: blue tint */
+.wv-tabs-content .table td a.flex.items-center.text-blue-600 {
+    color: #3b82f6;
+    background: #eff6ff;
+}
+.wv-tabs-content .table td a.flex.items-center.text-blue-600:hover {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-color: #93c5fd;
+}
+
+/* Delete: red tint */
+.wv-tabs-content .table td button.flex.items-center.text-danger,
+.wv-tabs-content .table td button.flex.items-center[class*="danger"] {
+    color: #dc2626;
+    background: #fef2f2;
+}
+.wv-tabs-content .table td button.flex.items-center.text-danger:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+    border-color: #fca5a5;
+}
+
+/* ── Date filter sidebar ──────────────────────────────────────────────────── */
+.date-scrollbar,
+.date-scrollbar-cons {
+    background: #f8fafc !important;
+    border: 1.5px solid #e8edf3 !important;
+    border-radius: 10px !important;
+    padding: 10px 8px !important;
+    box-shadow: none !important;
+    min-width: 112px;
+    max-width: 112px;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+.date-scrollbar::-webkit-scrollbar,
+.date-scrollbar-cons::-webkit-scrollbar { width: 4px; }
+.date-scrollbar::-webkit-scrollbar-thumb,
+.date-scrollbar-cons::-webkit-scrollbar-thumb {
+    background: #cbd5e1; border-radius: 4px;
+}
+
+.date-filter-btn {
+    display: block;
+    width: 100%;
+    padding: 6px 8px !important;
+    font-size: 11.5px !important;
+    font-weight: 500;
+    color: #475569;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 7px !important;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+}
+.date-filter-btn:hover {
+    background: #e2e8f0 !important;
+    color: #1e3a5f !important;
+}
+.date-filter-btn.active {
+    background: #1e3a5f !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+
+/* ── Search input ─────────────────────────────────────────────────────────── */
+.wv-tabs-content input[type="text"]#searchInput,
+.wv-tabs-content input[type="text"]#searchInputCons {
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 7px 12px !important;
+    font-size: 13px !important;
+    color: #374151;
+    background: #fff;
+    width: 100%;
+    max-width: 280px;
+    outline: none;
+    transition: border-color .15s;
+    margin-bottom: 12px;
+    display: block;
+}
+.wv-tabs-content input[type="text"]#searchInput:focus,
+.wv-tabs-content input[type="text"]#searchInputCons:focus {
+    border-color: #1e3a5f !important;
+    box-shadow: 0 0 0 3px rgba(30,58,95,.08);
+}
+
+/* ── Stats tab — stat cards ───────────────────────────────────────────────── */
+.wv-tabs-content .box {
+    background: #fff;
+    border-radius: 12px;
+    border: 1.5px solid #e8edf3 !important;
+    padding: 16px 18px !important;
+    box-shadow: 0 1px 4px rgba(15,23,42,.04);
+}
+.wv-tabs-content .box .text-slate-500 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #94a3b8 !important;
+    margin-bottom: 4px;
+}
+.wv-tabs-content .box .text-2xl {
+    font-size: 22px !important;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* Coloured left border accent on stats */
+.wv-tabs-content .box.border-l-4.border-primary  { border-left-color: #3b82f6 !important; }
+.wv-tabs-content .box.border-l-4.border-success  { border-left-color: #22c55e !important; }
+.wv-tabs-content .box.border-l-4.border-warning  { border-left-color: #f59e0b !important; }
+.wv-tabs-content .box.border-l-4.border-danger   { border-left-color: #ef4444 !important; }
+.wv-tabs-content .box.border-l-4 { border-left-width: 4px !important; }
+
+/* ── Mezzi status badges ──────────────────────────────────────────────────── */
+.wv-tabs-content .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 6px;
+}

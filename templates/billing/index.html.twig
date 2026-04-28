@@ -1,0 +1,115 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_active.css">
+{% endblock %}
+
+{% block content %}
+<div class="baw-page">
+
+{# ── Hero ── #}
+<div class="baw-hero">
+    <div class="baw-hero-content">
+        <div class="baw-hero-left">
+            <div class="baw-hero-icon">
+                <svg viewBox="0 0 24 24"><path d="M2 20h20"/><path d="M5 20V6l7-3 7 3v14"/><path d="M9 20v-4h6v4"/><path d="M9 10h1"/><path d="M14 10h1"/></svg>
+            </div>
+            <div>
+                <h1 class="baw-hero-title">Cantieri Movimentati</h1>
+                <p class="baw-hero-sub">Cantieri con presenze nel periodo selezionato e relativo residuo da fatturare</p>
+            </div>
+        </div>
+        <div class="baw-hero-actions">
+            <a id="export-excel" href="#" class="baw-btn-export">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Esporta Excel
+            </a>
+            <a href="/billing/clients" class="baw-btn-clients">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                Fatture per Cliente
+            </a>
+        </div>
+    </div>
+</div>
+
+{# ── Stats Row ── #}
+<div class="baw-stats" id="kpi-row" style="display:none;">
+    <div class="baw-stat">
+        <div class="baw-stat-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,.4);"></div>
+        <div>
+            <div class="baw-stat-value" id="kpi-cantieri">—</div>
+            <div class="baw-stat-label">Cantieri</div>
+        </div>
+    </div>
+    <div class="baw-stat">
+        <div class="baw-stat-dot" style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4);"></div>
+        <div>
+            <div class="baw-stat-value" id="kpi-offerta">—</div>
+            <div class="baw-stat-label">Totale Offerta</div>
+        </div>
+    </div>
+    <div class="baw-stat">
+        <div class="baw-stat-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4);"></div>
+        <div>
+            <div class="baw-stat-value" id="kpi-fatturato">—</div>
+            <div class="baw-stat-label">Fatturato</div>
+        </div>
+    </div>
+    <div class="baw-stat">
+        <div class="baw-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
+        <div>
+            <div class="baw-stat-value" id="kpi-residuo">—</div>
+            <div class="baw-stat-label">Residuo</div>
+        </div>
+    </div>
+</div>
+
+{# ── Filters ── #}
+<div class="baw-filters">
+    <div class="baw-filter-group">
+        <span class="baw-filter-label">Anno</span>
+        <select id="year-filter"></select>
+    </div>
+    <div class="baw-filter-group">
+        <span class="baw-filter-label">Mese</span>
+        <select id="month-filter"></select>
+    </div>
+    <div class="baw-divider"></div>
+    <div class="baw-search-wrap">
+        <svg class="baw-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search-input" placeholder="Cliente, cantiere, ordine…">
+    </div>
+</div>
+
+{# ── Counter ── #}
+<div class="baw-counter">
+    <p class="baw-counter-text"><strong id="baw-count">—</strong> cantieri trovati</p>
+</div>
+
+{# ── Table ── #}
+<div class="baw-table-wrap">
+    <table class="baw-table">
+        <thead>
+        <tr>
+            <th>Cliente</th>
+            <th>Cantiere</th>
+            <th class="center">Ordine</th>
+            <th class="right">Offerta (€)</th>
+            <th class="right">Fatturato (€)</th>
+            <th class="right">Residuo (€)</th>
+        </tr>
+        </thead>
+        <tbody id="worksiteTable">
+        <tr>
+            <td colspan="6" class="baw-loading">Caricamento…</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/billing/active_worksites.js?v=4"></script>
+{% endblock %}

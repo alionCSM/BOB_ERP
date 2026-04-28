@@ -1,0 +1,126 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-6 mt-5">
+    <!-- Prima riga: solo bottone nuovo -->
+    <div class="intro-y col-span-12 flex items-center mt-2">
+        <a href="/equipment/assign" class="btn btn-primary shadow-md mr-2">
+            Assegna Nuovo Noleggio
+        </a>
+    </div>
+    <!-- Seconda riga: ricerca + filtro -->
+    <div class="intro-y col-span-12 flex flex-wrap xl:flex-nowrap items-center mt-2">
+        <input
+                type="text"
+                id="search-rental"
+                placeholder="Cerca cantiere..."
+                class="form-control w-64 shadow-md mr-2 mt-2 xl:mt-0"
+        />
+        <button id="filter-active" class="btn btn-outline-primary shadow-md mr-2 mt-2 xl:mt-0">
+            Filtra Attivi
+        </button>
+    </div>
+    <!-- Tabella -->
+    <div class="intro-y col-span-12 overflow-auto 2xl:overflow-visible mt-4">
+        <table class="table table-report -mt-2" id="rentalTable">
+            <thead>
+            <tr>
+                <th class="whitespace-nowrap">Cantiere</th>
+                <th class="whitespace-nowrap">Periodo</th>
+                <th class="whitespace-nowrap">Totale Mezzi</th>
+                <th class="whitespace-nowrap">Attivi</th>
+                <th class="whitespace-nowrap">Azioni</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in noleggi %}
+                <tr class="intro-x">
+                    <td>
+                        <a
+                                href="/equipment/rentals/{{ row.worksite_id }}/edit"
+                                class="font-medium whitespace-nowrap"
+                        >
+                            {{ row.worksite_code ~ ' - ' ~ row.cantiere_nome }}
+                        </a>
+                    </td>
+                    <td>
+                        {{ row.prima_data_inizio|date('d/m/Y') }}
+                        {% if row.ultima_data_fine %}
+                            - {{ row.ultima_data_fine|date('d/m/Y') }}
+                        {% else %}
+                            - (in corso)
+                        {% endif %}
+                    </td>
+                    <td>{{ row.total_mezzi }}</td>
+                    <td class="attivi-count">{{ row.mezzi_attivi }}</td>
+                    <td class="table-report__action w-56">
+                        <div class="flex justify-center items-center">
+                            <!-- Modifica -->
+                            <a
+                                    href="javascript:;"
+                                    class="flex items-center mr-3"
+                                    data-tw-toggle="modal"
+                                    data-tw-target="#modifica-confirmation-modal"
+                                    data-edit-url="/equipment/rentals/{{ row.worksite_id }}/edit"
+                            >
+                                <i data-lucide="check-square" class="w-4 h-4 mr-1"></i>
+                                Modifica
+                            </a>
+                            <!-- Chiudi Noleggio -->
+                            <a
+                                    href="/equipment/rentals/{{ row.worksite_id }}/complete"
+                                    class="flex items-center text-danger"
+                            >
+                                <i data-lucide="x-circle" class="w-4 h-4 mr-1"></i>
+                                Termina
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- BEGIN: Modifica Confirmation Modal -->
+<div id="modifica-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-body p-5 text-center">
+                <i data-lucide="alert-triangle" class="w-16 h-16 text-warning mx-auto"></i>
+
+                <h3 class="text-2xl mt-5">Confermare la modifica?</h3>
+
+                <p class="text-slate-500 mt-2">
+                    Stai per modificare i <strong>dati di noleggio</strong> associati al cantiere.<br><br>
+                    Questa operazione può influire su costi, storico mezzi e consuntivi.<br><br>
+                    Se devi solo ritirare i mezzi, utilizza l'azione
+                    <strong>"Termina Noleggio"</strong>.
+                </p>
+            </div>
+
+            <div class="modal-footer px-5 pb-8 text-center">
+                <button type="button"
+                        data-tw-dismiss="modal"
+                        class="btn btn-outline-secondary w-24 mr-1">
+                    Annulla
+                </button>
+
+                <a href="#"
+                   id="confirmModificaBtn"
+                   class="btn btn-warning w-40">
+                    Sì, modifica
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!-- END: Modifica Confirmation Modal -->
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/equipment/rental_list.js"></script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'layout/base.html.twig' %}
+{% block content %}
+<div class="intro-y mt-8">
+    {% if role == 'admin' %}
+        {% include 'dashboard/partials/admin.html.twig' %}
+    {% elseif role == 'document_manager' %}
+        {% include 'dashboard/partials/documents.html.twig' %}
+    {% elseif role == 'offerte' %}
+        {% include 'dashboard/partials/offers.html.twig' %}
+    {% elseif role == 'cantiere' or role == 'manager' %}
+        {% include 'dashboard/partials/cantieri.html.twig' %}
+    {% else %}
+        {% include 'dashboard/partials/user.html.twig' %}
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'layout/base.html.twig' %}
+
+{# Data provided by UsersController::permissionsEdit()
+   Variables: target (object with .id, .username, .permissions),
+              groups (nested structure: groupKey → {label, icon, color, perms: {key → {label, icon, color}}}),
+              modules (flat key→{label,icon,color}), activeCount, message
+   TODO: controller must move POST handling, User object instantiation,
+         savePermissions call, and AuditLogger call out of the old view into
+         a dedicated permissionsUpdate() action, then pass the read-only
+         variables above to this template. #}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/users/permissions_edit.css">
+{% endblock %}
+
+{% block content %}
+<div class="pe-page">
+
+    <!-- ── HEADER ──────────────────────────── -->
+    <div class="pe-header">
+        <div class="pe-header-top">
+            <a href="/users/permissions" class="pe-back">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </a>
+            <div class="pe-avatar">{{ target.username|slice(0,2)|upper }}</div>
+            <div>
+                <div class="pe-user-name">{{ target.username }}</div>
+                <div class="pe-user-sub"><span id="pe-counter">{{ activeCount }}</span>/{{ modules|length }} moduli attivi</div>
+            </div>
+            <div class="pe-header-right">
+                <button type="button" class="pe-toggle-btn" id="btn-all">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Tutti
+                </button>
+                <button type="button" class="pe-toggle-btn" id="btn-none">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Nessuno
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if message %}
+        <div class="pe-toast">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            {{ message }}
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        {% for groupKey, group in groups %}
+            {% set groupActiveCount = 0 %}
+            {% for k, m in group.perms %}
+                {% if target.permissions[k] is defined and target.permissions[k] %}
+                    {% set groupActiveCount = groupActiveCount + 1 %}
+                {% endif %}
+            {% endfor %}
+            <div class="pe-group">
+                <div class="pe-group-header">
+                    <div class="pe-group-icon" style="background: {{ group.color }}20;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="{{ group.color }}"
+                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="{{ group.icon }}"/>
+                        </svg>
+                    </div>
+                    <div class="pe-group-label">{{ group.label }}</div>
+                    <div class="pe-group-count" data-group="{{ groupKey }}">
+                        <span class="pe-gc-num">{{ groupActiveCount }}</span>/{{ group.perms|length }}
+                    </div>
+                </div>
+                <div class="pe-group-body">
+                    <div class="pe-grid">
+                        {% for key, mod in group.perms %}
+                            {% set isActive = target.permissions[key] is defined and target.permissions[key] %}
+                            <div class="pe-card {{ isActive ? 'active' : '' }}"
+                                 style="--mod-color:{{ mod.color }};"
+                                 data-key="{{ key }}"
+                                 data-group="{{ groupKey }}">
+                                <div class="pe-card-icon">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                         stroke="{{ isActive ? '#fff' : mod.color }}"
+                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="{{ mod.icon }}"/>
+                                    </svg>
+                                </div>
+                                <div class="pe-card-label">{{ mod.label }}</div>
+                                <div class="pe-card-toggle"></div>
+                                <input type="checkbox" name="perm_{{ key }}"{{ isActive ? ' checked' : '' }}>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="pe-footer">
+            <div class="pe-footer-info">
+                <span class="pe-footer-count" id="pe-footer-count">{{ activeCount }}</span>
+                su {{ modules|length }} moduli selezionati
+            </div>
+            <button type="submit" class="pe-save-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Salva Permessi
+            </button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/users/permissions_edit.js"></script>
+{% endblock %}

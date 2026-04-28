@@ -1,0 +1,146 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/fatturazione/consorziate_index.css">
+{% endblock %}
+
+{% block content %}
+<div class="fc-page">
+
+    {# ── Hero ── #}
+    <div class="fc-hero">
+        <div class="fc-hero-content">
+            <div class="fc-hero-left">
+                <div class="fc-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div>
+                    <h1 class="fc-hero-title">Pagamenti Consorziate</h1>
+                    <p class="fc-hero-sub">Seleziona una consorziata e il periodo per registrare i pagamenti</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Stats ── #}
+    <div class="fc-stats">
+        <div class="fc-stat">
+            <div class="fc-stat-dot" style="background:#3b82f6;"></div>
+            <div>
+                <div class="fc-stat-value">{{ totalConsorziate }}</div>
+                <div class="fc-stat-label">Consorziate</div>
+            </div>
+        </div>
+        <div class="fc-stat">
+            <div class="fc-stat-dot" style="background:#8b5cf6;"></div>
+            <div>
+                <div class="fc-stat-value">{{ totalPresenzeAll|number_format(1, ',', '.') }}</div>
+                <div class="fc-stat-label">Presenze tot. (gg)</div>
+            </div>
+        </div>
+        <div class="fc-stat">
+            <div class="fc-stat-dot" style="background:#f97316;"></div>
+            <div>
+                <div class="fc-stat-value">€ {{ totalCostoAll|number_format(0, ',', '.') }}</div>
+                <div class="fc-stat-label">Costo presenze tot.</div>
+            </div>
+        </div>
+        <div class="fc-stat">
+            <div class="fc-stat-dot" style="background:#22c55e;"></div>
+            <div>
+                <div class="fc-stat-value">€ {{ totalPagatoAll|number_format(0, ',', '.') }}</div>
+                <div class="fc-stat-label">Totale pagato</div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Table ── #}
+    {% if consorziate is empty %}
+        <div class="fc-table-wrap">
+            <div class="fc-empty">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <p class="fc-empty-text">Nessuna consorziata registrata.</p>
+            </div>
+        </div>
+    {% else %}
+        <div class="fc-table-wrap">
+            <table class="fc-table">
+                <thead>
+                    <tr>
+                        <th>Consorziata</th>
+                        <th class="right">Presenze tot. (gg)</th>
+                        <th class="right">Costo presenze tot.</th>
+                        <th class="right">Totale pagato</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in consorziate %}
+                    <tr>
+                        <td>
+                            <span class="fc-name">{{ c.name }}</span>
+                            {% if c.codice %}<span class="fc-code">({{ c.codice }})</span>{% endif %}
+                        </td>
+                        <td class="right">{{ c.totale_presenze|number_format(2, ',', '.') }}</td>
+                        <td class="right">€ {{ c.totale_costo_presenze|number_format(2, ',', '.') }}</td>
+                        <td class="right">
+                            {% if c.totale_pagato > 0 %}
+                                € {{ c.totale_pagato|number_format(2, ',', '.') }}
+                            {% else %}
+                                <span class="fc-dash">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="right">
+                            <button class="fc-btn-select"
+                                    data-tw-toggle="modal"
+                                    data-tw-target="#period-modal"
+                                    data-action="update-period-form"
+                                    data-id="{{ c.id }}"
+                                    data-name="{{ c.name|e('html_attr') }}">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                Seleziona periodo
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+</div>
+
+{# ── Period picker modal ── #}
+<div id="period-modal" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto" id="modal-title">Seleziona Periodo</h2>
+            </div>
+            <form id="period-form" method="GET" action="">
+                <div class="modal-body grid grid-cols-2 gap-4 p-5">
+                    <div>
+                        <label class="form-label">Dal <span class="text-danger">*</span></label>
+                        <input type="date" name="from" class="form-control"
+                               value="{{ "now"|date("Y-m-01") }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Al <span class="text-danger">*</span></label>
+                        <input type="date" name="to" class="form-control"
+                               value="{{ "now"|date("Y-m-d") }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary mr-2" data-tw-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">Vai al dettaglio</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/fatturazione/consorziate.js"></script>
+{% endblock %}

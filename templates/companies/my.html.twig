@@ -1,0 +1,167 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/companies/my_companies.css">
+{% endblock %}
+
+{% block content %}
+{# Compute summary counts in Twig #}
+{% set totalCompanies = companies|length %}
+{% set consorziataCount = 0 %}
+{% for c in companies %}
+    {% if c.consorziata|default(0)|number_format == 1 %}
+        {% set consorziataCount = consorziataCount + 1 %}
+    {% endif %}
+{% endfor %}
+
+{# Avatar palette — resolved per-card via a JS data attribute; colours are injected inline #}
+{% set palettes = [
+    {'bg': '#3b82f6', 'light': '#dbeafe', 'text': '#1d4ed8', 'grad': 'linear-gradient(135deg,#3b82f6,#6366f1)'},
+    {'bg': '#6366f1', 'light': '#e0e7ff', 'text': '#4338ca', 'grad': 'linear-gradient(135deg,#6366f1,#8b5cf6)'},
+    {'bg': '#8b5cf6', 'light': '#ede9fe', 'text': '#6d28d9', 'grad': 'linear-gradient(135deg,#8b5cf6,#ec4899)'},
+    {'bg': '#10b981', 'light': '#d1fae5', 'text': '#047857', 'grad': 'linear-gradient(135deg,#10b981,#0ea5e9)'},
+    {'bg': '#0ea5e9', 'light': '#e0f2fe', 'text': '#0369a1', 'grad': 'linear-gradient(135deg,#0ea5e9,#6366f1)'},
+    {'bg': '#f59e0b', 'light': '#fef3c7', 'text': '#b45309', 'grad': 'linear-gradient(135deg,#f59e0b,#ef4444)'},
+    {'bg': '#ef4444', 'light': '#fee2e2', 'text': '#b91c1c', 'grad': 'linear-gradient(135deg,#ef4444,#f97316)'},
+    {'bg': '#14b8a6', 'light': '#ccfbf1', 'text': '#0f766e', 'grad': 'linear-gradient(135deg,#14b8a6,#3b82f6)'}
+] %}
+
+<div class="mc-page">
+
+    <!-- ── HERO ────────────────────────────────────── -->
+    <div class="mc-hero">
+        <div class="mc-hero-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="color:#fff;">
+                <path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11M8 11H4m16 0h-4M8 11a4 4 0 018 0"/>
+            </svg>
+        </div>
+
+        <div class="mc-hero-content">
+            <div class="mc-hero-eyebrow">
+                <svg style="width:12px;height:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                Portale Aziendale
+            </div>
+
+            <h1 class="mc-hero-title">Le mie aziende</h1>
+            <p class="mc-hero-sub">Visualizza e gestisci le aziende associate al tuo profilo</p>
+
+            <div class="mc-hero-stats">
+                <div class="mc-stat-pill">
+                    <svg style="width:16px;height:16px;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+                    <span class="num">{{ totalCompanies }}</span>
+                    Aziend{{ totalCompanies == 1 ? 'a' : 'e' }}
+                </div>
+                {% if consorziataCount > 0 %}
+                    <div class="mc-stat-pill">
+                        <svg style="width:16px;height:16px;opacity:.7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        <span class="num">{{ consorziataCount }}</span>
+                        Consorziat{{ consorziataCount == 1 ? 'a' : 'e' }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if companies is not empty %}
+
+        <!-- ── TOOLBAR ─────────────────────────────── -->
+        <div class="mc-toolbar">
+            <span class="mc-toolbar-title">
+                {{ totalCompanies }} risultat{{ totalCompanies == 1 ? 'o' : 'i' }}
+            </span>
+            <div class="mc-search-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input id="search-companies" type="text" placeholder="Cerca per nome o codice…" class="mc-search" />
+            </div>
+        </div>
+
+        <!-- ── CARDS ───────────────────────────────── -->
+        <div id="companies-grid" class="mc-grid">
+            {% for c in companies %}
+                {# Pick palette by loop index (mirrors the visual variety of PHP companyAccent) #}
+                {% set accent = palettes[loop.index0 % palettes|length] %}
+
+                {% set raw = c.name|default('?')|trim %}
+                {% set words = raw|split(' ') %}
+                {% set initials = (words[0]|slice(0,1) ~ (words[1] is defined ? words[1]|slice(0,1) : words[0]|slice(1,1)))|upper %}
+                {% set isConsorziata = (c.consorziata|default(0)|number_format == 1) %}
+
+                <a href="/companies/{{ c.id }}"
+                   class="mc-card"
+                   data-name="{{ c.name|default('')|lower }}"
+                   data-codice="{{ c.codice|default('')|lower }}">
+
+                    <div class="mc-card-stripe" style="background:{{ accent.grad }};"></div>
+
+                    <div class="mc-card-body">
+                        <div class="mc-card-row">
+
+                            <div class="mc-avatar" style="background:{{ accent.grad }}; box-shadow: 0 4px 14px -2px {{ accent.bg }}55;">
+                                {{ initials }}
+                            </div>
+
+                            <div style="flex:1;min-width:0;">
+                                <div class="mc-card-name">{{ c.name }}</div>
+                                <div class="mc-chips">
+                                    {% if c.codice is not empty %}
+                                        <span class="mc-chip" style="background:{{ accent.light }};color:{{ accent.text }};">
+                                            <svg style="width:10px;height:10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                                            {{ c.codice }}
+                                        </span>
+                                    {% endif %}
+                                    {% if isConsorziata %}
+                                        <span class="mc-chip" style="background:#fef3c7;color:#92400e;">
+                                            <svg style="width:10px;height:10px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                                            Consorziata
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="mc-card-arrow">
+                                <svg style="width:16px;height:16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                            </div>
+                        </div>
+
+                        <div class="mc-card-footer">
+                            <span class="mc-card-footer-label">Apri scheda azienda</span>
+                            <span class="mc-card-open" style="background:{{ accent.light }};color:{{ accent.text }};">
+                                Dettagli
+                                <svg style="width:11px;height:11px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+
+        <div id="no-results" style="display:none;margin-top:16px;" class="mc-empty">
+            <div class="mc-empty-icon">
+                <svg style="width:28px;height:28px;color:#cbd5e1;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M8 11h6M11 8v6"/></svg>
+            </div>
+            <p style="font-size:15px;font-weight:600;color:#475569;margin:0 0 6px;">Nessun risultato</p>
+            <p style="font-size:13px;color:#94a3b8;margin:0;">Prova con un nome o codice diverso</p>
+        </div>
+
+    {% else %}
+
+        <div class="mc-empty">
+            <div class="mc-empty-icon">
+                <svg style="width:30px;height:30px;color:#94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11M8 11H4m16 0h-4M8 11a4 4 0 018 0"/></svg>
+            </div>
+            <p style="font-size:16px;font-weight:700;color:#334155;margin:0 0 8px;">Nessuna azienda assegnata</p>
+            <p style="font-size:13px;color:#94a3b8;max-width:320px;margin:0 auto;">
+                Non hai ancora accesso ad alcuna azienda. Contatta l&rsquo;amministratore per ricevere i permessi.
+            </p>
+        </div>
+
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/companies/my_companies.js"></script>
+{% endblock %}

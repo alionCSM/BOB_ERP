@@ -1,0 +1,293 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/bookings/add_booking.css">
+{% endblock %}
+
+{% block content %}
+{# type is derived from old.type or defaultType, passed from controller #}
+{% set type = old.type ?? defaultType %}
+
+{% if errors is not empty %}
+    <div style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#991b1b;border-radius:12px;padding:14px 20px;font-size:13px;font-weight:600;margin-top:16px;border:1px solid #fca5a5;">
+        {% for e in errors %}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg> {{ e }}</div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<div class="bk-page">
+
+    <div class="bk-header">
+        <div class="bk-header-left">
+            <div class="bk-header-icon {{ type == 'hotel' ? 'hotel' : '' }}" id="header-icon">
+                {% if type == 'hotel' %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h12M6 7h12M9 3h6"/></svg>
+                {% else %}
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 8a6 6 0 01-6 6M6 8a6 6 0 006 6M12 2v2M3 20h18M7 20v-2a2 2 0 012-2h6a2 2 0 012 2v2"/></svg>
+                {% endif %}
+            </div>
+            <div>
+                <div class="bk-header-title" id="header-title">{{ type == 'hotel' ? 'Nuova Prenotazione Hotel' : 'Nuova Prenotazione Ristorante' }}</div>
+                <div class="bk-header-sub">Compila i dettagli della struttura e i periodi di soggiorno</div>
+            </div>
+        </div>
+        <a href="/bookings" class="bk-btn-cancel">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Torna alla lista
+        </a>
+    </div>
+
+    <form method="POST" id="booking-form"
+          data-period-index="{{ existingPeriods|length > 1 ? existingPeriods|length : 1 }}"
+          data-old-struttura-id="{{ (old.struttura_id ?? '')|json_encode }}"
+          data-old-struttura-nome="{{ (old.struttura_nome ?? '')|json_encode }}"
+          data-old-struttura-in-new-mode="{{ (old.struttura_nome is not empty and old.struttura_id is empty) ? '1' : '0' }}">
+
+        <div style="margin-bottom:24px;">
+            <div class="bk-type-toggle">
+                <button type="button" class="bk-type-btn restaurant {{ type == 'restaurant' ? 'active' : '' }}" data-bk-type="restaurant">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 01-6 6M6 8a6 6 0 006 6M12 2v2M3 20h18"/></svg>
+                    Ristorante
+                </button>
+                <button type="button" class="bk-type-btn hotel {{ type == 'hotel' ? 'active' : '' }}" data-bk-type="hotel">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h12"/></svg>
+                    Hotel
+                </button>
+            </div>
+            <input type="hidden" name="type" id="type-input" value="{{ type }}">
+        </div>
+
+        <div class="bk-layout">
+
+            <!-- ── LEFT COLUMN ─────────────────────── -->
+            <div>
+
+                <!-- Struttura card -->
+                <div class="bk-card">
+                    <div class="bk-card-header">
+                        <div class="bk-card-header-icon" style="background:linear-gradient(135deg,#fef3c7,#fde68a);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+                        </div>
+                        <div>
+                            <div class="bk-card-header-title">Struttura</div>
+                            <div class="bk-card-header-sub">Cerca esistente o inserisci nuova</div>
+                        </div>
+                    </div>
+                    <div class="bk-card-body">
+                        <input type="hidden" name="struttura_id" id="struttura_id" value="{{ old.struttura_id ?? '' }}">
+                        <input type="hidden" name="struttura_nome" id="struttura_nome" value="{{ old.struttura_nome ?? '' }}">
+
+                        <!-- Mode toggle -->
+                        <div class="bk-mode-toggle">
+                            <button type="button" class="bk-mode-btn active" id="mode-search-btn" data-bk-mode="search">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                Cerca esistente
+                            </button>
+                            <button type="button" class="bk-mode-btn" id="mode-new-btn" data-bk-mode="new">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Crea nuova
+                            </button>
+                        </div>
+
+                        <!-- MODE: Search existing -->
+                        <div id="struttura-mode-search">
+                            <div class="bk-field">
+                                <label class="bk-label">Cerca struttura</label>
+                                <select id="struttura-search-select">
+                                    <option value="">Digita per cercare...</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- MODE: Create new -->
+                        <div id="struttura-mode-new" style="display:none;">
+                            <div class="bk-field">
+                                <label class="bk-label">Nome struttura *</label>
+                                <input type="text" id="struttura_nome_input" class="bk-input" placeholder="Es. Hotel Cristallo"
+                                       value="{{ old.struttura_nome ?? '' }}">
+                            </div>
+                        </div>
+
+                        <!-- Detail fields -->
+                        <div id="struttura-details" style="display:none;">
+                            <div class="bk-struttura-details">
+                                <div class="bk-field">
+                                    <label class="bk-label">Telefono</label>
+                                    <input type="text" name="struttura_telefono" id="struttura_telefono" class="bk-input" placeholder="+39 0123 456789"
+                                           value="{{ old.struttura_telefono ?? '' }}">
+                                </div>
+                                <div class="bk-field">
+                                    <label class="bk-label">Indirizzo</label>
+                                    <input type="text" name="struttura_indirizzo" id="struttura_indirizzo" class="bk-input" placeholder="Via Roma 1"
+                                           value="{{ old.struttura_indirizzo ?? '' }}">
+                                </div>
+                                <div class="bk-row-3">
+                                    <div class="bk-field">
+                                        <label class="bk-label">Città</label>
+                                        <input type="text" name="struttura_citta" id="struttura_citta" class="bk-input" placeholder="Milano"
+                                               value="{{ old.struttura_citta ?? '' }}">
+                                    </div>
+                                    <div class="bk-field">
+                                        <label class="bk-label">Prov.</label>
+                                        <input type="text" name="struttura_provincia" id="struttura_provincia" class="bk-input" placeholder="MI" maxlength="10"
+                                               value="{{ old.struttura_provincia ?? '' }}">
+                                    </div>
+                                    <div class="bk-field">
+                                        <label class="bk-label">Paese</label>
+                                        <input type="text" name="struttura_country" id="struttura_country" class="bk-input"
+                                               value="{{ old.struttura_country ?? 'Italia' }}">
+                                    </div>
+                                </div>
+                                <div class="bk-field">
+                                    <label class="bk-label">Ragione sociale</label>
+                                    <input type="text" name="struttura_ragione_sociale" id="struttura_ragione_sociale" class="bk-input" placeholder="Ragione sociale (opzionale)"
+                                           value="{{ old.struttura_ragione_sociale ?? '' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dettagli card -->
+                <div class="bk-card">
+                    <div class="bk-card-header">
+                        <div class="bk-card-header-icon" style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+                        </div>
+                        <div>
+                            <div class="bk-card-header-title">Dettagli prenotazione</div>
+                            <div class="bk-card-header-sub">Cantiere, capo squadra e servizio</div>
+                        </div>
+                    </div>
+                    <div class="bk-card-body">
+                        <div class="bk-field">
+                            <label class="bk-label">Cantiere</label>
+                            <select name="worksite_id" id="worksite-select">
+                                <option value="">-- Nessuno --</option>
+                                {% for ws in worksites %}
+                                    <option value="{{ ws.id }}" {{ (old.worksite_id ?? '') == ws.id ? 'selected' : '' }}>
+                                        {{ ws.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="bk-field">
+                            <label class="bk-label">Capo squadra</label>
+                            <select name="capo_squadra_id" id="capo-squadra-select">
+                                <option value="">-- Nessuno --</option>
+                                {% for w in workers %}
+                                    <option value="{{ w.id }}" {{ (old.capo_squadra_id ?? '') == w.id ? 'selected' : '' }}>
+                                        {{ w.nome }} ({{ w.company }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div id="restaurant-fields" class="bk-field" style="display:{{ type == 'restaurant' ? 'block' : 'none' }};">
+                            <label class="bk-label">Pasti inclusi</label>
+                            <div class="bk-check-group">
+                                <label class="bk-check-label"><input type="checkbox" name="pranzo" value="1" {{ old.pranzo is not empty ? 'checked' : '' }}> Pranzo</label>
+                                <label class="bk-check-label"><input type="checkbox" name="cena" value="1" {{ old.cena is not empty ? 'checked' : '' }}> Cena</label>
+                            </div>
+                        </div>
+
+                        <div id="hotel-fields" class="bk-field" style="display:{{ type == 'hotel' ? 'block' : 'none' }};">
+                            <label class="bk-label">Regime</label>
+                            <select name="regime" class="bk-select">
+                                <option value="">-- Seleziona --</option>
+                                <option value="PC" {{ (old.regime ?? '') == 'PC' ? 'selected' : '' }}>Pensione Completa (PC)</option>
+                                <option value="MP" {{ (old.regime ?? '') == 'MP' ? 'selected' : '' }}>Mezza Pensione (MP)</option>
+                                <option value="BB" {{ (old.regime ?? '') == 'BB' ? 'selected' : '' }}>B&B</option>
+                                <option value="solo_dormire" {{ (old.regime ?? '') == 'solo_dormire' ? 'selected' : '' }}>Solo dormire</option>
+                            </select>
+                        </div>
+
+                        <div class="bk-field">
+                            <label class="bk-label">Note</label>
+                            <textarea name="note" class="bk-textarea" placeholder="Indicazioni particolari, allergie, orari...">{{ old.note ?? '' }}</textarea>
+                        </div>
+
+                        {% if consorziate is not empty %}
+                        <div class="bk-field" style="border-top:1px solid #f1f5f9; padding-top:14px; margin-top:4px;">
+                            <label class="bk-check-label" style="font-weight:600; font-size:13px; color:#1e293b; gap:8px; cursor:pointer;">
+                                <input type="checkbox" name="a_carico_consorziata" value="1"
+                                       id="chk-consorziata"
+                                       {{ (old.a_carico_consorziata ?? '') ? 'checked' : '' }}>
+                                A carico della consorziata
+                            </label>
+                            <div id="consorziata-select-wrap" style="margin-top:10px; display:{{ (old.a_carico_consorziata ?? '') ? 'block' : 'none' }};">
+                                <label class="bk-label">Consorziata</label>
+                                <select name="consorziata_id" class="bk-select">
+                                    <option value="">-- Seleziona consorziata --</option>
+                                    {% for c in consorziate %}
+                                        <option value="{{ c.id }}" {{ (old.consorziata_id ?? '') == c.id ? 'selected' : '' }}>{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <input type="hidden" name="pagato" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── RIGHT COLUMN: Periods ───────────── -->
+            <div>
+                <div class="bk-card">
+                    <div class="bk-card-header">
+                        <div class="bk-card-header-icon" style="background:linear-gradient(135deg,#dcfce7,#bbf7d0);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <div>
+                            <div class="bk-card-header-title">Periodi</div>
+                            <div class="bk-card-header-sub">Definisci persone, prezzi e date per ogni fase</div>
+                        </div>
+                    </div>
+                    <div class="bk-card-body">
+                        <div id="periods-container">
+                            {% for i, period in existingPeriods %}
+                            <div class="bk-period-row" data-index="{{ i }}">
+                                <div class="bk-period-field" style="width:120px;"><span class="bk-period-label">Dal</span><input type="date" name="periods[{{ i }}][data_dal]" class="bk-period-input period-dal" value="{{ period.data_dal ?? '' }}"></div>
+                                <div class="bk-period-field" style="width:120px;"><span class="bk-period-label">Al</span><input type="date" name="periods[{{ i }}][data_al]" class="bk-period-input period-al" value="{{ period.data_al ?? '' }}"></div>
+                                <div class="bk-period-field" style="width:85px;"><span class="bk-period-label">Persone</span><input type="number" name="periods[{{ i }}][n_persone]" class="bk-period-input period-persone" min="1" placeholder="4" value="{{ period.n_persone ?? '' }}"></div>
+                                <div class="bk-period-field" style="width:100px;"><span class="bk-period-label">€ / persona</span><input type="number" name="periods[{{ i }}][prezzo_persona]" class="bk-period-input period-prezzo" step="0.01" min="0" placeholder="28.00" value="{{ period.prezzo_persona ?? '' }}" required></div>
+                                <div class="bk-period-field grow"><span class="bk-period-label">Nota</span><input type="text" name="periods[{{ i }}][note]" class="bk-period-input" placeholder="Es. avvio cantiere" value="{{ period.note ?? '' }}"></div>
+                                <span class="bk-period-subtotal period-subtotal" style="display:none;"></span>
+                                <button type="button" class="bk-period-remove" title="Rimuovi periodo"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap;gap:10px;">
+                            <button type="button" class="bk-add-btn" data-bk-action="add-period">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Aggiungi periodo
+                            </button>
+                            <div class="bk-grand-total" id="grand-total">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                                Totale: <span id="grand-total-value">€0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bk-submit-bar">
+                    <a href="/bookings" class="bk-btn-cancel">Annulla</a>
+                    <button type="submit" class="bk-btn-submit {{ type == 'hotel' ? 'hotel' : '' }}" id="submit-btn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+                        Salva Prenotazione
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/bookings/add_booking.js"></script>
+{% endblock %}

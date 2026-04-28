@@ -1,0 +1,36 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="intro-y box p-5">
+    <h2 class="text-lg font-medium mb-4">Cantieri in bozza</h2>
+
+    {% if drafts is empty %}
+        <div class="text-slate-500">Nessun cantiere in attesa.</div>
+    {% else %}
+        <table class="table table-sm">
+            <thead>
+            <tr>
+                <th>Cantiere</th>
+                <th>Cliente</th>
+                <th>Motivo</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for d in drafts %}
+                <tr>
+                    <td>{{ d.name }}</td>
+                    <td>{{ d.client_id }}</td>
+                    <td>{{ d.draft_reason }}</td>
+                    <td class="text-right">
+                        <a href="/worksites/drafts/{{ d.id }}/activate" class="btn btn-sm btn-primary">
+                            Attiva
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+{% endblock %}

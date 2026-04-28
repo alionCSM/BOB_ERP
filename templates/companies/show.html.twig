@@ -1,0 +1,415 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/companies/company_details.css">
+{% endblock %}
+
+{% block content %}
+<!-- CSP-compliant config passed via data attribute -->
+<div class="cd-page"
+     data-company-id="{{ company.id }}"
+     data-default-tab="{{ isCompanyViewer ? 'tab-documenti' : 'tab-info' }}"
+     data-restricted-tabs="{{ isCompanyViewer ? '["tab-info","tab-cantieri"]' : '[]' }}">
+
+    <!-- ── BREADCRUMB ──────────────────────────────────── -->
+    <div class="cd-breadcrumb">
+        <a href="{{ isCompanyViewer ? '/companies/my' : '/companies' }}" class="cd-breadcrumb-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Aziende
+        </a>
+    </div>
+
+    <!-- ── HERO ────────────────────────────────────────── -->
+    <div class="cd-hero">
+        <div class="cd-hero-top">
+            <div class="cd-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+            </div>
+            <div>
+                <div class="cd-hero-title">{{ company.name }}</div>
+                {% if company.codice %}
+                <div class="cd-hero-sub">Codice: {{ company.codice }}</div>
+                {% else %}
+                <div class="cd-hero-sub">Dettagli azienda</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="cd-hero-pills">
+            <div class="cd-pill">
+                <span class="cd-pill-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </span>
+                <span class="cd-pill-num">{{ documents|length }}</span>
+                <span>Documenti</span>
+            </div>
+            <div class="cd-pill">
+                <span class="cd-pill-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="cd-pill-num">{{ workers|length }}</span>
+                <span>Totale</span>
+            </div>
+            {% set activeWorkers = workers|filter(w => (w.active|default('Y') == 'Y' or w.active|default('1') == '1' or (w.active|default('')|lower) == 'true')) %}
+            {% set activeCount = activeWorkers|length %}
+            {% set inactiveCount = workers|length - activeCount %}
+            <div class="cd-pill">
+                <span class="cd-pill-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="cd-pill-num">{{ activeCount }}</span>
+                <span>Attivi</span>
+            </div>
+            {% if inactiveCount > 0 %}
+            <div class="cd-pill" style="background:rgba(255,255,255,.08);">
+                <span class="cd-pill-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </span>
+                <span class="cd-pill-num">{{ inactiveCount }}</span>
+                <span>Inattivi</span>
+            </div>
+            {% endif %}
+            <div class="cd-pill {{ company.consorziata|default(0) ? 'cd-pill-consorziata' : '' }}">
+                <span class="cd-pill-icon">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+                <span>{{ company.consorziata|default(0) ? 'Consorziata' : 'Non consorziata' }}</span>
+            </div>
+            {% set isActive = (company.active|default(1)|number_format == 1) %}
+            <div class="cd-pill {{ isActive ? 'cd-pill-status-active' : 'cd-pill-status-inactive' }}">
+                <span class="cd-pill-icon">
+                    {% if isActive %}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    {% else %}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    {% endif %}
+                </span>
+                <span>{{ isActive ? 'Attiva' : 'Inattiva' }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── ALERTS ──────────────────────────────────────── -->
+    {% if userCreated == '1' %}
+    <div class="cd-alert cd-alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Utente creato con successo. Username: <strong>{{ createdUsername }}</strong> - Password temporanea: <strong>{{ tempPassword }}</strong>
+    </div>
+    {% elseif userError is not empty %}
+    <div class="cd-alert cd-alert-danger">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Errore creazione utente azienda ({{ userError }}{{ errCode is not empty ? ' - code ' ~ errCode : '' }}).
+    </div>
+    {% endif %}
+
+    {% if accessAdded == '1' %}
+    <div class="cd-alert cd-alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Accesso azienda aggiunto con successo all'utente selezionato.
+    </div>
+    {% elseif accessError is not empty %}
+    <div class="cd-alert cd-alert-danger">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Errore aggiunta accesso azienda ({{ accessError }}).
+    </div>
+    {% endif %}
+
+    {% if workerDeleted == '1' %}
+    <div class="cd-alert cd-alert-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Operaio eliminato con successo.
+    </div>
+    {% elseif workerError is not empty %}
+    <div class="cd-alert cd-alert-danger">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        {{ workerError == 'non_trovato' ? 'Operaio non trovato.' : ('Errore eliminazione operaio: ' ~ workerError) }}.
+    </div>
+    {% endif %}
+
+    <!-- ── LAYOUT ──────────────────────────────────────── -->
+    <div class="cd-layout">
+
+        <!-- ── SIDEBAR ─────────────────────────────────── -->
+        <aside class="cd-sidebar">
+            <!-- Company Actions -->
+            <div class="cd-card">
+                <div class="cd-card-header">
+                    <span class="cd-card-title">Azioni</span>
+                </div>
+                <div class="cd-card-body cd-card-body-flat">
+                    {% if not isCompanyViewer %}
+                    <button class="cd-action-item" data-tw-toggle="modal" data-tw-target="#create-company-user-modal">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                        Crea Utente Azienda
+                    </button>
+                    <button class="cd-action-item" data-tw-toggle="modal" data-tw-target="#assign-company-access-modal">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                        Aggiungi Accesso a Utente
+                    </button>
+                    <form method="POST" action="/companies/{{ company.id }}/toggle-active" style="margin:0;">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <button type="submit" class="cd-action-item {{ isActive ? 'cd-action-deactivate' : 'cd-action-activate' }}">
+                            {% if isActive %}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                                Disattiva Azienda
+                            {% else %}
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Attiva Azienda
+                            {% endif %}
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="cd-nav">
+                <ul class="cd-nav-list">
+                    {% if not isCompanyViewer %}
+                    <li class="cd-nav-item"><a href="#tab-info" class="cd-nav-link {{ isCompanyViewer ? '' : 'active' }}" data-tab="tab-info">Informazioni</a></li>
+                    {% endif %}
+                    <li class="cd-nav-item"><a href="#tab-documenti" class="cd-nav-link" data-tab="tab-documenti">Documenti</a></li>
+                    <li class="cd-nav-item"><a href="#tab-operai" class="cd-nav-link" data-tab="tab-operai">Operai</a></li>
+                    {% if not isCompanyViewer %}
+                    <li class="cd-nav-item"><a href="#tab-cantieri" class="cd-nav-link" data-tab="tab-cantieri">Cantieri</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- ── MAIN CONTENT ────────────────────────────── -->
+        <main class="cd-main">
+
+            <!-- ── TAB: INFO ───────────────────────────── -->
+            <div id="tab-info" class="cd-tab-content {{ isCompanyViewer ? 'hidden' : '' }}">
+                <div class="cd-card">
+                    <div class="cd-card-header">
+                        <h2 class="cd-card-title-lg">Informazioni Aziendali</h2>
+                    </div>
+                    <div class="cd-card-body">
+                        <div class="cd-info-grid">
+                            <div class="cd-info-item">
+                                <span class="cd-info-label">Ragione Sociale</span>
+                                <span class="cd-info-value">{{ company.name }}</span>
+                            </div>
+                            <div class="cd-info-item">
+                                <span class="cd-info-label">Codice</span>
+                                <span class="cd-info-value">{{ company.codice ?: '—' }}</span>
+                            </div>
+                            <div class="cd-info-item">
+                                <span class="cd-info-label">Consorziata</span>
+                                <span class="cd-info-value">{{ company.consorziata|default(0) ? 'Sì' : 'No' }}</span>
+                            </div>
+                        </div>
+                        <p class="cd-info-desc">
+                            Utilizza il pulsante "Modifica" per aggiornare i dettagli dell'azienda.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB: DOCUMENTI ──────────────────────── -->
+            <div id="tab-documenti" class="cd-tab-content hidden">
+                <div class="cd-card">
+                    <div class="cd-card-header cd-card-header-split">
+                        <h2 class="cd-card-title-lg">Documenti Aziendali</h2>
+                        <div class="cd-card-actions">
+                            <button class="cd-btn cd-btn-sm" data-tw-toggle="modal" data-tw-target="#check-company-docs-modal">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                Controllo Documenti
+                            </button>
+                            <button class="cd-btn cd-btn-sm cd-btn-primary" data-tw-toggle="modal" data-tw-target="#upload-company-doc-modal">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Aggiungi
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cd-card-body">
+                        {% if documents is not empty %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Stato</th>
+                                        <th>Tipo Documento</th>
+                                        <th>Data Emissione</th>
+                                        <th>Scadenza</th>
+                                        <th class="text-end">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for doc in documents %}
+                                    {% set rawExpiry = doc.scadenza|default('')|trim %}
+                                    {% set isExpired = false %}
+                                    {% set isExpiringSoon = false %}
+                                    {% set isValid = false %}
+                                    {% set formattedExpiry = '-' %}
+                                    {% if rawExpiry is not empty and rawExpiry matches '#^\\d{4}-\\d{2}-\\d{2}$#' %}
+                                        {% set formattedExpiry = rawExpiry|date('d/m/Y') %}
+                                        {% set todayStr = 'now'|date('Y-m-d') %}
+                                        {% set diffDays = (rawExpiry|date('U') - 'now'|date('U')) / 86400 %}
+                                        {% if rawExpiry < todayStr %}
+                                            {% set isExpired = true %}
+                                        {% elseif diffDays <= 30 %}
+                                            {% set isExpiringSoon = true %}
+                                        {% else %}
+                                            {% set isValid = true %}
+                                        {% endif %}
+                                    {% elseif rawExpiry is not empty %}
+                                        {% set formattedExpiry = rawExpiry %}
+                                    {% endif %}
+                                    <tr>
+                                        <td style="text-align:center;">
+                                            {% if isExpired %}
+                                                <span style="color:#dc2626; font-size:18px; line-height:1;">●</span>
+                                            {% elseif isExpiringSoon %}
+                                                <span style="color:#f59e0b; font-size:18px; line-height:1;">●</span>
+                                            {% elseif isValid %}
+                                                <span style="color:#16a34a; font-size:18px; line-height:1;">●</span>
+                                            {% else %}
+                                                <span style="color:#64748b; font-size:18px; line-height:1;">●</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><strong>{{ doc.tipo_documento }}</strong></td>
+                                        <td>{{ doc.data_emissione ? doc.data_emissione|date('d/m/Y') : '-' }}</td>
+                                        <td>
+                                            {% if isExpired %}
+                                                <span class="text-danger">{{ formattedExpiry }}</span>
+                                            {% elseif isExpiringSoon %}
+                                                <span class="text-warning">{{ formattedExpiry }}</span>
+                                            {% elseif isValid %}
+                                                <span class="text-success">{{ formattedExpiry }}</span>
+                                            {% else %}
+                                                {{ formattedExpiry }}
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="/companies/documents/serve?id={{ doc.id }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Visualizza">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            </a>
+                                            <button class="btn btn-sm btn-outline-primary cd-edit-doc-btn"
+                                                    data-doc-id="{{ doc.id }}"
+                                                    data-doc-type="{{ doc.tipo_documento }}"
+                                                    data-doc-emission="{{ doc.data_emissione }}"
+                                                    data-doc-expiry="{{ doc.scadenza }}"
+                                                    title="Modifica">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger cd-delete-doc-btn"
+                                                    data-doc-id="{{ doc.id }}"
+                                                    title="Elimina">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="cd-empty">
+                            <div class="cd-empty-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            </div>
+                            <p class="cd-empty-text">Nessun documento</p>
+                            <p class="cd-empty-sub">Carica il primo documento dell'azienda</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB: OPERAI ─────────────────────────── -->
+            <div id="tab-operai" class="cd-tab-content hidden">
+                <div class="cd-card">
+                    <div class="cd-card-header">
+                        <h2 class="cd-card-title-lg">Operai Associati</h2>
+                    </div>
+                    <div class="cd-card-body">
+                        {% if workers is empty %}
+                        <div class="cd-empty">
+                            <div class="cd-empty-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            </div>
+                            <p class="cd-empty-text">Nessun operaio</p>
+                            <p class="cd-empty-sub">Crea un utente per associarlo a questa azienda</p>
+                        </div>
+                        {% else %}
+                        <!-- TOOLBAR -->
+                        <div class="cd-toolbar">
+                            <span class="cd-count">Totale: <strong>{{ workers|length }}</strong></span>
+                            <div class="cd-filter-group ml-auto">
+                                <button class="cd-filter-btn active" data-filter="all">Tutti</button>
+                                <button class="cd-filter-btn" data-filter="active">Attivi</button>
+                            </div>
+                            <input type="text" class="cd-search" id="search-workers" placeholder="Cerca operaio...">
+                        </div>
+
+                        <!-- WORKERS GRID -->
+                        <div class="cd-workers-grid">
+                            {% for w in workers|sort((a, b) => ((a.last_name ?? '')|lower > (b.last_name ?? '')|lower) ? 1 : ((a.last_name ?? '')|lower < (b.last_name ?? '')|lower) ? -1 : ((a.first_name ?? '')|lower <=> (b.first_name ?? '')|lower)) %}
+                            {% set rawActive = w.active|default('Y') %}
+                            {% set isActive = rawActive == 'Y' or rawActive == '1' or rawActive|lower == 'true' %}
+                            <div class="cd-worker-card worker-row {{ isActive ? 'cd-worker-active' : 'cd-worker-inactive' }}" data-active="{{ isActive ? '1' : '0' }}">
+                                <div class="cd-worker-avatar">
+                                    {{ ((w.first_name|default('')|slice(0,1)) ~ (w.last_name|default('')|slice(0,1)))|upper }}
+                                </div>
+                                <div class="cd-worker-info">
+                                    <div class="cd-worker-name">
+                                        {{ w.last_name }}, {{ w.first_name }}
+                                    </div>
+                                    <div class="cd-worker-company">
+                                        {{ w.company }}
+                                    </div>
+                                </div>
+                                <div class="cd-worker-status">
+                                    <div class="cd-status-dot {{ isActive ? 'cd-status-active' : 'cd-status-inactive' }}"></div>
+                                    <span class="cd-status-text {{ isActive ? 'cd-status-active-text' : 'cd-status-inactive-text' }}">
+                                        {{ isActive ? 'Attivo' : 'Inattivo' }}
+                                    </span>
+                                </div>
+                                <div class="cd-worker-actions">
+                                    <a href="/users/{{ w.id }}/edit?uid={{ w.uid }}" class="cd-worker-link" title="Apri Profilo">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    </a>
+                                    <button class="cd-worker-link cd-delete-worker-btn" data-worker-id="{{ w.id }}" data-worker-uid="{{ w.uid }}" data-worker-name="{{ (w.first_name ~ ' ' ~ w.last_name)|e('js') }}" title="Elimina">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB: CANTIERI ──────────────────────── -->
+            <div id="tab-cantieri" class="cd-tab-content hidden">
+                <div class="cd-card">
+                    <div class="cd-card-header">
+                        <h2 class="cd-card-title-lg">Cantieri Associati</h2>
+                    </div>
+                    <div class="cd-card-body">
+                        <div class="cd-empty">
+                            <div class="cd-empty-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+                            </div>
+                            <p class="cd-empty-text">In sviluppo</p>
+                            <p class="cd-empty-sub">Questa funzionalità sarà disponibile presto</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<!-- ── MODALS (same as before) ────────────────────────── -->
+{% include 'companies/_modals.html.twig' %}
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/companies/company_details.js?v=6"></script>
+{% endblock %}

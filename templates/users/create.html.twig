@@ -1,0 +1,213 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<link rel="stylesheet" href="/assets/css/views/users/add.css">
+{% endblock %}
+
+{% block content %}
+<div class="ua-page">
+
+    {% if successParam == '1' %}
+        <div class="ua-success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Nuovo operaio salvato con successo!
+        </div>
+    {% endif %}
+
+    <div class="ua-layout">
+
+        <!-- ── SIDEBAR ─────────────────────── -->
+        <div class="ua-sidebar">
+            <div class="ua-sidebar-top">
+                <div class="ua-sidebar-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                </div>
+                <div class="ua-sidebar-title">Nuovo Operaio</div>
+                <div class="ua-sidebar-sub">Compila tutti i passaggi</div>
+            </div>
+
+            <div class="ua-sidebar-steps">
+                <div class="ua-ss active" id="ss-1" onclick="goToStep(1)">
+                    <div class="ua-ss-num" id="ss-num-1">1</div>
+                    <div class="ua-ss-text">
+                        <div class="ua-ss-label">Anagrafica</div>
+                        <div class="ua-ss-desc">Nome, azienda, contatti</div>
+                    </div>
+                </div>
+                <div class="ua-ss" id="ss-2" onclick="goToStep(2)">
+                    <div class="ua-ss-num" id="ss-num-2">2</div>
+                    <div class="ua-ss-text">
+                        <div class="ua-ss-label">Dettagli Personali</div>
+                        <div class="ua-ss-desc">Nascita, assunzione, CF</div>
+                    </div>
+                </div>
+                <div class="ua-ss" id="ss-3" onclick="goToStep(3)">
+                    <div class="ua-ss-num" id="ss-num-3">3</div>
+                    <div class="ua-ss-text">
+                        <div class="ua-ss-label">Foto & Conferma</div>
+                        <div class="ua-ss-desc">Carica foto e salva</div>
+                    </div>
+                </div>
+            </div>
+
+            <a href="{{ isCompanyScopedUser ? '/users/workers' : '/users' }}" class="ua-sidebar-back">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                Torna alla lista operai
+            </a>
+        </div>
+
+        <!-- ── MAIN CONTENT ────────────────── -->
+        <div>
+            <form id="user-form" method="POST" action="/users" enctype="multipart/form-data">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                <!-- STEP 1 -->
+                <div id="step-1" class="ua-card step-content">
+                    <div class="ua-card-header">
+                        <div class="ua-card-header-icon" style="background:#ede9fe;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </div>
+                        <div>
+                            <div class="ua-card-header-title">Informazioni di Base</div>
+                            <div class="ua-card-header-sub">Nome, azienda e contatti del lavoratore</div>
+                        </div>
+                    </div>
+                    <div class="ua-card-body">
+                        <div class="ua-grid">
+                            <div class="ua-field">
+                                <label class="ua-label">Nome *</label>
+                                <input type="text" name="first_name" class="ua-input" placeholder="Mario" required>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Cognome *</label>
+                                <input type="text" name="last_name" class="ua-input" placeholder="Rossi" required>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Azienda *</label>
+                                <select name="company" id="company-select" class="ua-input" required>
+                                    <option value="">Seleziona azienda</option>
+                                    {% for c in companies %}
+                                        <option value="{{ c.name }}">{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Ruolo</label>
+                                <select name="role" class="ua-input">
+                                    <option value="OPERAIO">OPERAIO</option>
+                                    <option value="PREPOSTO">PREPOSTO</option>
+                                    <option value="LEGALE RAPPRESENTANTE">LEGALE RAPPRESENTANTE</option>
+                                </select>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Email</label>
+                                <input type="email" name="email" class="ua-input" placeholder="mario@example.com">
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Telefono *</label>
+                                <input type="text" name="phone" class="ua-input" placeholder="+39 333 123 4567" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ua-footer">
+                        <div></div>
+                        <button type="button" class="ua-btn-next next-step">
+                            Avanti
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2 -->
+                <div id="step-2" class="ua-card step-content hidden">
+                    <div class="ua-card-header">
+                        <div class="ua-card-header-icon" style="background:#dbeafe;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </div>
+                        <div>
+                            <div class="ua-card-header-title">Dettagli Personali</div>
+                            <div class="ua-card-header-sub">Date, luogo di nascita e codice fiscale</div>
+                        </div>
+                    </div>
+                    <div class="ua-card-body">
+                        <div class="ua-grid">
+                            <div class="ua-field">
+                                <label class="ua-label">Data di Nascita *</label>
+                                <input type="date" name="birth_date" class="ua-input" required>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Luogo di Nascita *</label>
+                                <input type="text" name="birth_place" class="ua-input" placeholder="Stato" required>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Data Assunzione *</label>
+                                <input type="date" name="hire_date" class="ua-input" required>
+                            </div>
+                            <div class="ua-field">
+                                <label class="ua-label">Codice Fiscale *</label>
+                                <input type="text" name="fiscal_code" class="ua-input"
+                                       style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ua-footer">
+                        <button type="button" class="ua-btn-prev prev-step">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                            Indietro
+                        </button>
+                        <button type="button" class="ua-btn-next next-step">
+                            Avanti
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3 -->
+                <div id="step-3" class="ua-card step-content hidden">
+                    <div class="ua-card-header">
+                        <div class="ua-card-header-icon" style="background:#dcfce7;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        </div>
+                        <div>
+                            <div class="ua-card-header-title">Foto Profilo & Conferma</div>
+                            <div class="ua-card-header-sub">Carica una foto opzionale e salva</div>
+                        </div>
+                    </div>
+                    <div class="ua-card-body">
+                        <div class="ua-photo-area">
+                            <div class="ua-photo-circle" onclick="document.getElementById('profile-photo').click()">
+                                <img id="profile-preview" src="/uploads/default-avatar.png" alt="">
+                            </div>
+                            <div class="ua-photo-info">
+                                <p class="ua-photo-title">Foto Profilo</p>
+                                <p class="ua-photo-sub">JPG o PNG, max 5MB. Clicca per selezionare.</p>
+                                <label class="ua-photo-btn" style="cursor:pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    Scegli File
+                                    <input type="file" name="profile_photo" id="profile-photo" style="display:none;" accept="image/*">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ua-footer">
+                        <button type="button" class="ua-btn-prev prev-step">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                            Indietro
+                        </button>
+                        <button type="submit" class="ua-btn-submit">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            Salva Operaio
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/users/add.js"></script>
+{% endblock %}

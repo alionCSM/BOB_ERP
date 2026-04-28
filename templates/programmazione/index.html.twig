@@ -1,0 +1,98 @@
+{% extends "layout/base.html.twig" %}
+
+{#
+  Variables expected from ProgrammazioneController::index():
+    currentMonth – int (1-12)
+    currentYear  – int
+    mesiNomi     – array indexed 1-12: month name strings
+    pageTitle    – string
+#}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/programmazione/programmazione.css">
+{% endblock %}
+
+{% block content %}
+<div class="pg-wrap">
+
+    <!-- Alerts banner -->
+    <div class="pg-alerts" id="pg-alerts">
+        <div class="pg-alerts-title" id="pg-alerts-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span id="pg-alerts-count">0</span> cantieri in scadenza con attivit&agrave; incomplete
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="pg-alerts-list" id="pg-alerts-list"></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="pg-toolbar">
+        <div class="pg-toolbar-left">
+            <div class="pg-year-nav">
+                <button class="pg-year-btn" data-dir="-1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <span class="pg-year-label" id="pg-year">{{ currentYear }}</span>
+                <button class="pg-year-btn" data-dir="1">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+            <div class="pg-status">
+                <span><span class="pg-status-dot" style="background:#059669"></span> <span id="pg-count">0</span> voci</span>
+            </div>
+        </div>
+        <div class="pg-toolbar-right">
+            <button class="pg-btn pg-btn-outline" id="pg-add-row-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuova Riga
+            </button>
+        </div>
+    </div>
+
+    <!-- Month Tabs -->
+    <div class="pg-months" id="pg-months">
+        {% for m in 1..12 %}
+        <button class="pg-month-tab {{ m == currentMonth ? 'active' : '' }}"
+                data-mese="{{ m }}">
+            {{ mesiNomi[m]|slice(0, 3) }}
+            <span class="pg-badge" id="pg-badge-{{ m }}" style="display:none"></span>
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Table -->
+    <div class="pg-table-wrap">
+        <table class="pg-table" id="pg-table">
+            <thead>
+                <tr>
+                    <th class="pg-col-actions"></th>
+                    <th class="pg-col-data">Data</th>
+                    <th class="pg-col-indirizzo">Indirizzo</th>
+                    <th class="pg-col-committente">Committente</th>
+                    <th class="pg-col-mezzi">Mezzi Necessari</th>
+                    <th class="pg-col-durata">Durata</th>
+                    <th class="pg-col-referente">Referente + Info</th>
+                    <th class="pg-col-caposquadra">Capo Squadra</th>
+                    <th class="pg-col-totpersone">Tot Pers.</th>
+                    <th class="pg-col-trasferta">Trasferta</th>
+                    <th class="pg-col-info">Info Beppe</th>
+                </tr>
+            </thead>
+            <tbody id="pg-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Add row bottom -->
+    <div class="pg-add-row" id="pg-add-row-bottom">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi riga
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="pg-toast" id="pg-toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/programmazione/programmazione.js?v=2"></script>
+{% endblock %}

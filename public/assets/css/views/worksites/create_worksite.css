@@ -1,0 +1,184 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   Worksite Create Form  (wcf-*)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.wcf-page { margin-top: 16px; }
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.wcf-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px;
+    padding: 28px 32px 24px;
+    background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+    color: #fff; margin-bottom: 24px;
+}
+.wcf-hero::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: rgba(59,130,246,.12); pointer-events: none;
+}
+.wcf-hero-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+}
+.wcf-hero-left  { display: flex; align-items: center; gap: 16px; }
+.wcf-hero-icon  {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.wcf-hero-icon svg { width: 24px; height: 24px; stroke: #fff; stroke-width: 1.5; fill: none; }
+.wcf-hero-title { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+.wcf-hero-sub   { font-size: 13px; opacity: .55; margin: 0; }
+.wcf-btn-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 18px; border-radius: 10px;
+    background: rgba(255,255,255,.08); color: rgba(255,255,255,.85);
+    border: 1px solid rgba(255,255,255,.15);
+    font-size: 13px; font-weight: 600; text-decoration: none;
+    transition: background .15s;
+}
+.wcf-btn-back:hover { background: rgba(255,255,255,.15); color: #fff; }
+.wcf-btn-back svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+/* ── Section card ─────────────────────────────────────────────────────────── */
+.wcf-section {
+    background: #fff;
+    border: 1.5px solid #e8edf3;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+.wcf-section-title {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 24px;
+    border-bottom: 1.5px solid #f1f5f9;
+    background: #fafbfc;
+    font-size: 13px; font-weight: 700; color: #1e293b;
+}
+.wcf-section-title svg {
+    width: 16px; height: 16px; stroke: #64748b; fill: none; stroke-width: 2;
+}
+.wcf-section-body { padding: 24px; }
+
+/* ── Field grid ───────────────────────────────────────────────────────────── */
+.wcf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.wcf-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.wcf-span-2 { grid-column: span 2; }
+.wcf-span-3 { grid-column: span 3; }
+
+.wcf-field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: #64748b; margin-bottom: 6px; letter-spacing: .02em;
+}
+.wcf-field .req { color: #ef4444; }
+
+.wcf-field input[type="text"],
+.wcf-field input[type="date"],
+.wcf-field input[type="number"],
+.wcf-field textarea,
+.wcf-field select {
+    width: 100%;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 9px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: #1e293b;
+    background: #fff;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+}
+.wcf-field input:focus,
+.wcf-field textarea:focus,
+.wcf-field select:focus {
+    border-color: #1e3a5f;
+    box-shadow: 0 0 0 3px rgba(30,58,95,.08);
+}
+.wcf-field textarea { resize: vertical; min-height: 80px; }
+
+/* TomSelect override */
+.wcf-field .ts-wrapper .ts-control {
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 9px !important;
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+    box-shadow: none !important;
+}
+.wcf-field .ts-wrapper.focus .ts-control {
+    border-color: #1e3a5f !important;
+    box-shadow: 0 0 0 3px rgba(30,58,95,.08) !important;
+}
+
+/* ── Contract type toggle ─────────────────────────────────────────────────── */
+.wcf-type-toggle {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    margin-bottom: 20px;
+}
+.wcf-type-option { position: relative; }
+.wcf-type-option input[type="radio"] {
+    position: absolute; opacity: 0; width: 0; height: 0;
+}
+.wcf-type-label {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-radius: 12px;
+    border: 2px solid #e2e8f0;
+    background: #fafbfc; cursor: pointer;
+    transition: all .18s; user-select: none;
+}
+.wcf-type-label:hover { border-color: #cbd5e1; background: #f1f5f9; }
+.wcf-type-option input:checked + .wcf-type-label {
+    border-color: #1e3a5f;
+    background: #f0f4f9;
+    box-shadow: 0 0 0 3px rgba(30,58,95,.08);
+}
+.wcf-type-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.wcf-type-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.wcf-type-icon-contract { background: #eff6ff; color: #3b82f6; }
+.wcf-type-icon-consuntivo { background: #fffbeb; color: #f59e0b; }
+.wcf-type-option input:checked + .wcf-type-label .wcf-type-icon-contract  { background: #dbeafe; color: #1d4ed8; }
+.wcf-type-option input:checked + .wcf-type-label .wcf-type-icon-consuntivo { background: #fef3c7; color: #d97706; }
+.wcf-type-text strong { display: block; font-size: 13px; font-weight: 700; color: #1e293b; }
+.wcf-type-text span   { font-size: 11px; color: #94a3b8; }
+
+/* ── Form actions ─────────────────────────────────────────────────────────── */
+.wcf-actions {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 20px 24px;
+    border-top: 1.5px solid #f1f5f9;
+    background: #fafbfc;
+}
+.wcf-btn-cancel {
+    padding: 10px 22px; border-radius: 10px;
+    border: 1.5px solid #e2e8f0; background: #fff;
+    font-size: 13px; font-weight: 600; color: #64748b;
+    text-decoration: none;
+    transition: all .15s; cursor: pointer;
+}
+.wcf-btn-cancel:hover { background: #f8fafc; border-color: #cbd5e1; }
+.wcf-btn-submit {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 10px 24px; border-radius: 10px;
+    background: #1e3a5f; color: #fff; border: none;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+}
+.wcf-btn-submit:hover {
+    background: #162d4a;
+    box-shadow: 0 4px 12px rgba(30,58,95,.3);
+}
+.wcf-btn-submit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .wcf-hero { padding: 20px; border-radius: 14px; }
+    .wcf-hero-title { font-size: 18px; }
+    .wcf-grid-2, .wcf-grid-3 { grid-template-columns: 1fr; }
+    .wcf-span-2, .wcf-span-3 { grid-column: span 1; }
+    .wcf-type-toggle { grid-template-columns: 1fr; }
+    .wcf-section-body { padding: 16px; }
+}

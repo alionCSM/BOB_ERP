@@ -1,0 +1,118 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <h2 class="text-lg font-medium mb-4">
+        Modifica Mezzi Noleggio - {{ worksite.worksite_code }} {{ worksite.name }}
+    </h2>
+
+    {% if message is not empty %}
+        <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
+            <span>{{ message }}</span>
+            <button type="button" onclick="this.parentElement.style.display='none';" class="text-green-800 text-lg font-bold ml-4">&times;</button>
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="save_changes" value="1">
+
+        <table class="table w-full text-sm">
+            <thead class="bg-sky-100 text-slate-700">
+            <tr>
+                <th>Mezzo</th>
+                <th>Tipo</th>
+                <th>Quantità</th>
+                <th>Costo €/gg</th>
+                <th>Data Inizio</th>
+                <th>Stato</th>
+                <th>Azioni</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in mezzi %}
+                {% if row.stato == 'Attivo' %}
+                <tr class="hover:bg-slate-100">
+                    <td>
+                        {{ row.mezzo_descrizione }}
+                        <input type="hidden" name="id[]" value="{{ row.id }}">
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            <select name="tipo_noleggio[]" class="form-select w-full" disabled>
+                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
+                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
+                            </select>
+                            <input type="hidden" name="tipo_noleggio[]" value="{{ row.tipo_noleggio }}">
+                        {% else %}
+                            <select name="tipo_noleggio[]" class="form-select w-full">
+                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
+                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
+                            </select>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            {{ row.quantita }}
+                            <input type="hidden" name="quantita[]" value="{{ row.quantita }}">
+                        {% else %}
+                            <input type="number" name="quantita[]" class="form-input w-20 text-center" min="1" value="{{ row.quantita }}">
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            {{ row.costo_giornaliero|number_format(2, ',', '.') }}
+                            <input type="hidden" name="costo[]" value="{{ row.costo_giornaliero }}">
+                        {% else %}
+                            <input type="number" step="0.01" name="costo[]" class="form-input w-full" value="{{ row.costo_giornaliero }}">
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            {{ row.data_inizio|date('d/m/Y') }}
+                            <input type="hidden" name="data_inizio[]" value="{{ row.data_inizio }}">
+                        {% else %}
+                            <input type="date" name="data_inizio[]" class="form-input w-full" value="{{ row.data_inizio }}">
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            <select name="stato[]" class="form-select w-full">
+                                <option value="Completato" selected>Completato</option>
+                                <option value="Attivo">Attivo</option>
+                            </select>
+                        {% else %}
+                            <span class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+                                Attivo
+                            </span>
+                            <input type="hidden" name="stato[]" value="Attivo">
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button
+                                type="button"
+                                class="btn btn-danger text-xs px-3 py-1"
+                                data-delete-id="{{ row.id }}"
+                        >
+                             Elimina
+                        </button>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="text-right mt-5">
+            <button type="submit" class="btn btn-primary">
+                Salva Modifiche
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/equipment/edit_lifting_equipment.js"></script>
+{% endblock %}

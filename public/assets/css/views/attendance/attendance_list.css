@@ -1,0 +1,10 @@
+/* Tab attivo = blu / testo bianco */
+    .nav-link[aria-selected="true"] {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+    /* Tab inattivo = sfondo bianco / testo slate */
+    .nav-link[aria-selected="false"] {
+        background-color: #ffffff !important;
+        color: #475569 !important;
+    }

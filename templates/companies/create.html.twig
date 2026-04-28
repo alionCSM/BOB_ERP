@@ -1,0 +1,47 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-6 mt-5">
+    <div class="intro-y col-span-12">
+        <div class="box p-5">
+            <h2 class="text-lg font-medium mb-4">Inserisci Nuova Azienda</h2>
+
+            {% if errors is not empty %}
+                <div class="alert alert-danger mb-4">
+                    <ul>
+                        {% for error in errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="/companies">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Ragione Sociale</label>
+                        <input type="text" name="name" class="form-control" value="{{ old.name ?? '' }}" required>
+                    </div>
+                    <div>
+                        <label class="form-label">Codice</label>
+                        <input type="text" name="codice" class="form-control" value="{{ old.codice ?? '' }}" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                        <label class="form-label">Consorziata 0/1</label>
+                        <input type="text" name="consorziata" class="form-control" value="{{ old.consorziata ?? '' }}">
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Salva Azienda</button>
+                    <a href="/companies" class="btn btn-secondary">Annulla</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

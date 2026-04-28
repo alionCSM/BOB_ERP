@@ -1,0 +1,255 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/worksites/create_worksite.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="wcf-page">
+
+    {# ── Hero ── #}
+    <div class="wcf-hero">
+        <div class="wcf-hero-content">
+            <div class="wcf-hero-left">
+                <div class="wcf-hero-icon">
+                    <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 20h20"/><path d="M5 20V6l7-3 7 3v14"/>
+                        <path d="M9 20v-4h6v4"/><path d="M9 10h1"/><path d="M14 10h1"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="wcf-hero-title">Modifica Cantiere</h1>
+                    <p class="wcf-hero-sub">Aggiorna le informazioni del cantiere</p>
+                </div>
+            </div>
+            <a href="/worksites" class="wcf-btn-back">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Annulla
+            </a>
+        </div>
+    </div>
+
+    <form method="POST" action="/worksites/{{ worksite_id }}/edit">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <input type="hidden" name="return_to" value="{{ returnTo }}">
+
+        {# ── Section 1: Informazioni Cantiere ── #}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Informazioni Cantiere
+            </div>
+            <div class="wcf-section-body">
+                <div class="wcf-grid-2">
+
+                    <div class="wcf-field">
+                        <label>Nome Cantiere <span class="req">*</span></label>
+                        <input type="text" name="name" required value="{{ worksite.name }}">
+                    </div>
+
+                    {% if companyId == 1 %}
+                        <div class="wcf-field">
+                            <label>Cliente <span class="req">*</span></label>
+                            <select id="client_search" name="client_id" required>
+                                {% for client in clients %}
+                                    <option value="{{ client.id }}"{% if client.id == worksite.client_id %} selected{% endif %}>{{ client.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% else %}
+                        <input type="hidden" name="client_id" value="{{ worksite.client_id }}">
+                        <div class="wcf-field">
+                            <label>Numero Offerta</label>
+                            <select id="offer_number_select" name="offer_number">
+                                <option value="{{ worksite.offer_number }}">{{ worksite.offer_number }}</option>
+                            </select>
+                        </div>
+                    {% endif %}
+
+                    <div class="wcf-field">
+                        <label>Località</label>
+                        <input type="text" name="location" value="{{ worksite.location }}">
+                    </div>
+
+                    <div class="wcf-field">
+                        <label>Data Inizio <span class="req">*</span></label>
+                        <input type="date" name="start_date" required value="{{ worksite.start_date }}">
+                    </div>
+
+                    {% if companyId == 1 %}
+                        <div class="wcf-field wcf-span-2">
+                            <label>Numero Offerta</label>
+                            <select id="offer_number_select" name="offer_number">
+                                <option value="{{ worksite.offer_number }}">{{ worksite.offer_number }}</option>
+                            </select>
+                        </div>
+                        <div class="wcf-field wcf-span-2">
+                            <label>Descrizione</label>
+                            <textarea name="descrizione" rows="3">{{ worksite.descrizione }}</textarea>
+                        </div>
+                    {% else %}
+                        <input type="hidden" name="descrizione" value="">
+                        <div class="wcf-field wcf-span-2">
+                            <label>Descrizione</label>
+                            <textarea name="ext_descrizione" rows="3">{{ worksite.ext_descrizione }}</textarea>
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+
+        {% if companyId == 1 %}
+        {# ── Section 2: Contratto ── #}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Contratto e Valore
+            </div>
+            <div class="wcf-section-body">
+
+                {# Contract type toggle #}
+                <div class="wcf-type-toggle">
+                    <div class="wcf-type-option">
+                        <input type="radio" name="is_consuntivo" id="tipo_contratto" value="0"
+                               {% if not worksite.is_consuntivo %}checked{% endif %}>
+                        <label class="wcf-type-label" for="tipo_contratto">
+                            <div class="wcf-type-icon wcf-type-icon-contract">
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                            </div>
+                            <div class="wcf-type-text">
+                                <strong>Contratto fisso</strong>
+                                <span>Valore totale definito</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="wcf-type-option">
+                        <input type="radio" name="is_consuntivo" id="tipo_consuntivo" value="1"
+                               {% if worksite.is_consuntivo %}checked{% endif %}>
+                        <label class="wcf-type-label" for="tipo_consuntivo">
+                            <div class="wcf-type-icon wcf-type-icon-consuntivo">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            </div>
+                            <div class="wcf-type-text">
+                                <strong>Consuntivo</strong>
+                                <span>Ricavo da presenze &times; tariffa</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="wcf-grid-2">
+
+                    {# Contratto fisso fields #}
+                    <div class="wcf-field" id="total_offer_wrap"
+                         style="{{ worksite.is_consuntivo ? 'display:none;' : '' }}">
+                        <label>Totale Contratto (€) <span class="req">{% if worksite.is_consuntivo %}{% else %}*{% endif %}</span></label>
+                        <input type="text" name="total_offer" id="total_offer"
+                               {% if not worksite.is_consuntivo %}required{% endif %}
+                               value="{{ worksite.total_offer|number_format(2, ',', '.') }}"
+                               placeholder="Es. 150.000,00">
+                    </div>
+
+                    {# Consuntivo field #}
+                    <div class="wcf-field" id="prezzo_persona_wrap"
+                         style="{{ worksite.is_consuntivo ? '' : 'display:none;' }}">
+                        <label>Tariffa/persona (€/giorno) <span class="req">*</span></label>
+                        <input type="number" name="prezzo_persona" id="prezzo_persona" step="0.01" min="0"
+                               value="{{ worksite.prezzo_persona ? worksite.prezzo_persona|number_format(2, '.', '') : '' }}"
+                               placeholder="Es. 350.00">
+                    </div>
+
+                    <div class="wcf-field">
+                        <label>Numero Ordine <span class="req">*</span></label>
+                        <input type="text" name="order_number" value="{{ worksite.order_number }}" placeholder="Es. ORD-2026-001">
+                    </div>
+
+                    <div class="wcf-field">
+                        <label>Commessa</label>
+                        <input type="text" name="commessa" value="{{ worksite.commessa }}" placeholder="Es. C25-001">
+                    </div>
+
+                    <div class="wcf-field">
+                        <label>Data Ordine</label>
+                        <input type="date" name="order_date" value="{{ worksite.order_date }}">
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {% else %}
+        {# External company economic fields #}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Dati Economici
+            </div>
+            <div class="wcf-section-body">
+                <div class="wcf-grid-2">
+                    <div class="wcf-field">
+                        <label>Totale Offerta (€)</label>
+                        <input type="text" name="ext_total_offer"
+                               value="{{ worksite.ext_total_offer|number_format(2, ',', '.') }}"
+                               placeholder="Es. 50.000,00">
+                    </div>
+                    <div class="wcf-field">
+                        <label>Numero Ordine</label>
+                        <input type="text" name="ext_order_number" value="{{ worksite.ext_order_number }}">
+                    </div>
+                    <div class="wcf-field">
+                        <label>Data Ordine</label>
+                        <input type="date" name="ext_order_date" value="{{ worksite.ext_order_date }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── Section 3: Stato ── #}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Stato del Cantiere
+            </div>
+            <div class="wcf-section-body">
+                <div class="wcf-grid-2">
+
+                    <div class="wcf-field">
+                        <label>Stato</label>
+                        <select name="status" id="status_select">
+                            {% for status in ["In corso", "Completato", "Sospeso"] %}
+                                <option value="{{ status }}"{% if worksite.status == status %} selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="wcf-field" id="end_date_wrapper"
+                         style="{{ worksite.status == 'Completato' ? '' : 'display:none;' }}">
+                        <label>Data Fine</label>
+                        <input type="date" name="end_date" value="{{ worksite.end_date }}">
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        {# ── Actions ── #}
+        <div class="wcf-section" style="margin-bottom:0;">
+            <div class="wcf-actions">
+                <a href="/worksites" class="wcf-btn-cancel">Annulla</a>
+                <button type="submit" class="wcf-btn-submit">
+                    <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Salva Modifiche
+                </button>
+            </div>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/worksites/edit_worksite.js"></script>
+{% endblock %}

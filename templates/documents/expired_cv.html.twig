@@ -1,0 +1,262 @@
+{% extends "layout/base.html.twig" %}
+
+{#
+  Variables expected from DocumentsController::expiredCv():
+    allExpired   – array merged from company + worker expired docs, each with:
+                   _type ('company'|'worker'), scadenza_norm, tipo_documento,
+                   company_id?, company_name?, worker_id?, worker_name?
+    allExpiring  – same shape, docs expiring within 30 days
+    totalExpired  – int
+    totalExpiring – int
+    criticalCount – int  (expired > 30 days ago)
+
+  Avatar colours are computed client-side via a hash; the PHP logic used a
+  server-side crc32 hash – reproduced here with Twig's cycle() approximation.
+  For pixel-perfect parity the controller should pre-compute 'avatarColor' on
+  each row and pass it through, but the template works without it by cycling
+  through the same palette.
+#}
+
+{% set avatarColors = [
+    'linear-gradient(135deg,#7c3aed,#a855f7)',
+    'linear-gradient(135deg,#1d4ed8,#0ea5e9)',
+    'linear-gradient(135deg,#059669,#10b981)',
+    'linear-gradient(135deg,#dc2626,#f97316)',
+    'linear-gradient(135deg,#7c3aed,#ec4899)',
+    'linear-gradient(135deg,#0891b2,#06b6d4)',
+] %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/documents/expired_cv.css">
+{% endblock %}
+
+{% block content %}
+<div class="dc-page">
+
+    <!-- ── HERO BANNER ─────────────────────── -->
+    <div class="dc-hero">
+        <svg class="dc-hero-watermark" viewBox="0 0 24 24" fill="white"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2"/><line x1="12" y1="17" x2="12.01" y2="17" stroke="white" stroke-width="2"/></svg>
+
+        <div class="dc-hero-top">
+            <div class="dc-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+                <div class="dc-hero-title">Documenti Scaduti</div>
+                <div class="dc-hero-sub">Panoramica dei documenti scaduti e in scadenza</div>
+            </div>
+        </div>
+
+        <div class="dc-hero-pills">
+            <div class="dc-pill">
+                <span class="dc-pill-num">{{ totalExpired }}</span> Scaduti
+            </div>
+            <div class="dc-pill">
+                <span class="dc-pill-num">{{ totalExpiring }}</span> In scadenza
+            </div>
+            {% if criticalCount > 0 %}
+            <div class="dc-pill" style="background:rgba(0,0,0,.25);">
+                <span class="dc-pill-num">{{ criticalCount }}</span> Oltre 30gg
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ─────────────────────────── -->
+    <div class="dc-toolbar">
+        <input type="text" class="dc-search" id="dc-search" placeholder="Cerca documento, azienda, operaio...">
+        <button class="dc-filter-btn active" data-filter="all">Tutti</button>
+        <button class="dc-filter-btn" data-filter="company">Aziendali</button>
+        <button class="dc-filter-btn" data-filter="worker">Operai</button>
+        <span class="dc-count-label" id="dc-count">{{ totalExpired + totalExpiring }} risultat{{ (totalExpired + totalExpiring) == 1 ? 'o' : 'i' }}</span>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- SECTION 1: SCADUTI (Expired)          -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="dc-section" id="dc-section-expired">
+        <div class="dc-section-head" data-section-toggle="dc-section-expired">
+            <div class="dc-section-icon" style="background:#fef2f2;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <span class="dc-section-title">Documenti Scaduti</span>
+            <span class="dc-section-badge" style="background:#fef2f2;color:#dc2626;">{{ totalExpired }}</span>
+            <svg class="dc-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+
+        <div class="dc-section-body">
+            <div class="dc-table-wrap">
+                {% if allExpired is empty %}
+                    <div class="dc-empty">
+                        <div class="dc-empty-icon" style="background:#f0fdf4;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
+                        <p class="dc-empty-text" style="color:#15803d;">Tutto in regola</p>
+                        <p class="dc-empty-sub">Nessun documento scaduto</p>
+                    </div>
+                {% else %}
+                    <table class="dc-table">
+                        <thead>
+                            <tr>
+                                <th>Soggetto</th>
+                                <th>Tipo Documento</th>
+                                <th class="dc-col-hide-mobile">Categoria</th>
+                                <th>Scadenza</th>
+                                <th>Scaduto da</th>
+                                <th style="text-align:center;">Azione</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for doc in allExpired %}
+                            {% set daysAgo = ((doc.scadenza_norm|date('U') - 'now'|date('U')) / 86400)|abs|round(0, 'floor') %}
+                            {% set isCritical = daysAgo > 30 %}
+                            {% set isCompany = doc._type == 'company' %}
+                            {% set entityName = isCompany ? doc.company_name : doc.worker_name %}
+                            {% set nameParts = entityName|split(' ') %}
+                            {% set initials = nameParts[0]|first|upper ~ (nameParts[1] is defined ? nameParts[1]|first|upper : '') %}
+                            {% set colour = doc.avatarColor is defined ? doc.avatarColor : avatarColors[loop.index0 % 6] %}
+                            {% set linkUrl = isCompany ? '/companies/' ~ doc.company_id : '/users/' ~ doc.worker_id ~ '/edit?uid=' ~ doc.worker_uid %}
+                            <tr class="dc-row" data-type="{{ doc._type }}" data-search="{{ (entityName ~ ' ' ~ doc.tipo_documento)|lower }}">
+                                <td>
+                                    <div class="dc-entity">
+                                        <div class="dc-avatar" style="background:{{ colour }};">{{ initials }}</div>
+                                        <div>
+                                            <div class="dc-entity-name">{{ entityName }}</div>
+                                            {% if not isCompany and doc.company_name is defined and doc.company_name is not empty %}
+                                                <div class="dc-entity-sub">{{ doc.company_name }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ doc.tipo_documento }}</td>
+                                <td class="dc-col-hide-mobile">
+                                    <span class="dc-type-pill {{ isCompany ? 'dc-type-company' : 'dc-type-worker' }}">
+                                        {{ isCompany ? 'Aziendale' : 'Operaio' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="dc-expiry {{ isCritical ? 'dc-expiry-critical' : 'dc-expiry-warning' }}">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        {{ doc.scadenza_norm|date('d/m/Y') }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="dc-days">{{ daysAgo }} giorn{{ daysAgo == 1 ? 'o' : 'i' }} fa</span>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a href="{{ linkUrl }}" class="dc-view-link">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        Apri
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════ -->
+    <!-- SECTION 2: IN SCADENZA (Expiring)     -->
+    <!-- ══════════════════════════════════════ -->
+    <div class="dc-section" id="dc-section-expiring">
+        <div class="dc-section-head" data-section-toggle="dc-section-expiring">
+            <div class="dc-section-icon" style="background:#fffbeb;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="dc-section-title">In Scadenza (prossimi 30 giorni)</span>
+            <span class="dc-section-badge" style="background:#fffbeb;color:#d97706;">{{ totalExpiring }}</span>
+            <svg class="dc-section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+
+        <div class="dc-section-body">
+            <div class="dc-table-wrap">
+                {% if allExpiring is empty %}
+                    <div class="dc-empty">
+                        <div class="dc-empty-icon" style="background:#f0fdf4;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
+                        <p class="dc-empty-text" style="color:#15803d;">Tutto in regola</p>
+                        <p class="dc-empty-sub">Nessun documento in scadenza nei prossimi 30 giorni</p>
+                    </div>
+                {% else %}
+                    <table class="dc-table">
+                        <thead>
+                            <tr>
+                                <th>Soggetto</th>
+                                <th>Tipo Documento</th>
+                                <th class="dc-col-hide-mobile">Categoria</th>
+                                <th>Scadenza</th>
+                                <th>Scade tra</th>
+                                <th style="text-align:center;">Azione</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for doc in allExpiring %}
+                            {% set daysLeft = ((doc.scadenza_norm|date('U') - 'now'|date('U')) / 86400)|round(0, 'floor') %}
+                            {% if daysLeft < 0 %}{% set daysLeft = 0 %}{% endif %}
+                            {% set isCompany = doc._type == 'company' %}
+                            {% set entityName = isCompany ? doc.company_name : doc.worker_name %}
+                            {% set nameParts = entityName|split(' ') %}
+                            {% set initials = nameParts[0]|first|upper ~ (nameParts[1] is defined ? nameParts[1]|first|upper : '') %}
+                            {% set colour = doc.avatarColor is defined ? doc.avatarColor : avatarColors[loop.index0 % 6] %}
+                            {% set linkUrl = isCompany ? '/companies/' ~ doc.company_id : '/users/' ~ doc.worker_id ~ '/edit?uid=' ~ doc.worker_uid %}
+                            {% if daysLeft <= 7 %}
+                                {% set daysColour = '#dc2626' %}
+                            {% elseif daysLeft <= 14 %}
+                                {% set daysColour = '#ea580c' %}
+                            {% else %}
+                                {% set daysColour = '#d97706' %}
+                            {% endif %}
+                            <tr class="dc-row" data-type="{{ doc._type }}" data-search="{{ (entityName ~ ' ' ~ doc.tipo_documento)|lower }}">
+                                <td>
+                                    <div class="dc-entity">
+                                        <div class="dc-avatar" style="background:{{ colour }};">{{ initials }}</div>
+                                        <div>
+                                            <div class="dc-entity-name">{{ entityName }}</div>
+                                            {% if not isCompany and doc.company_name is defined and doc.company_name is not empty %}
+                                                <div class="dc-entity-sub">{{ doc.company_name }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ doc.tipo_documento }}</td>
+                                <td class="dc-col-hide-mobile">
+                                    <span class="dc-type-pill {{ isCompany ? 'dc-type-company' : 'dc-type-worker' }}">
+                                        {{ isCompany ? 'Aziendale' : 'Operaio' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="dc-expiry dc-expiry-soon">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        {{ doc.scadenza_norm|date('d/m/Y') }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="dc-days" style="color:{{ daysColour }};">
+                                        {{ daysLeft }} giorn{{ daysLeft == 1 ? 'o' : 'i' }}
+                                    </span>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a href="{{ linkUrl }}" class="dc-view-link">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                        Apri
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/documents/expired_cv.js"></script>
+{% endblock %}

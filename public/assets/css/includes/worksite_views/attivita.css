@@ -1,0 +1,94 @@
+/* ── Attività tab – photo grid + lightbox ───────────────────────────────── */
+
+/* Existing-photos grid inside the edit modal */
+.att-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+}
+.att-photo-item {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f1f5f9;
+    aspect-ratio: 1;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color .15s;
+}
+.att-photo-item:hover { border-color: #3b82f6; }
+.att-photo-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.att-photo-cat {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2px 5px;
+    font-size: .6rem;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.att-photo-cat.info      { background: rgba(59,130,246,.75);  color: #fff; }
+.att-photo-cat.problemi  { background: rgba(220,38,38,.75);   color: #fff; }
+.att-photo-cat.soluzioni { background: rgba(22,163,74,.75);   color: #fff; }
+
+/* Lightbox */
+.att-lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.9);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+.att-lightbox.active { display: flex; }
+.att-lightbox-img {
+    max-width: 90vw;
+    max-height: 85vh;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 4px 40px rgba(0,0,0,.5);
+}
+.att-lightbox-close,
+.att-lightbox-prev,
+.att-lightbox-next {
+    position: absolute;
+    background: rgba(255,255,255,.12);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+    z-index: 1;
+}
+.att-lightbox-close:hover,
+.att-lightbox-prev:hover,
+.att-lightbox-next:hover { background: rgba(255,255,255,.25); }
+.att-lightbox-close { top: 18px;  right: 20px; font-size: 1.6rem; }
+.att-lightbox-prev  { left: 16px; top: 50%; transform: translateY(-50%); }
+.att-lightbox-next  { right: 16px; top: 50%; transform: translateY(-50%); }
+.att-lightbox-caption {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.6);
+    color: #fff;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: .8rem;
+    white-space: nowrap;
+}

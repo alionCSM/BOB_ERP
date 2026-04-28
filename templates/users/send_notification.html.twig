@@ -1,0 +1,80 @@
+{% extends 'layout/base.html.twig' %}
+
+{# Data provided by UsersController::sendNotification()
+   Variables: users (array of {id, first_name, last_name, username}),
+              success, error
+   TODO: controller must move POST handling, DB insert loop, and user-fetch
+         query out of the old view into this action, passing the above
+         variables to this template. #}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <h2 class="text-lg font-medium">Invio notifiche (Admin)</h2>
+
+    {% if success %}
+        <div class="mt-4 p-3 rounded bg-emerald-100 text-emerald-800">{{ success }}</div>
+    {% endif %}
+
+    {% if error %}
+        <div class="mt-4 p-3 rounded bg-rose-100 text-rose-800">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" class="mt-5 space-y-4">
+        <input type="hidden" name="send_notification" value="1">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div>
+            <label class="form-label">Titolo</label>
+            <input type="text" name="title" class="form-control" required>
+        </div>
+
+        <div>
+            <label class="form-label">Messaggio</label>
+            <textarea name="message" class="form-control" rows="4" required></textarea>
+        </div>
+
+        <div>
+            <label class="form-label">Link (opzionale)</label>
+            <input type="text" name="link" class="form-control" placeholder="/dashboard.php">
+        </div>
+
+        <div>
+            <label class="form-label">Priorità</label>
+            <div class="mt-2 flex gap-4">
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="priority" value="normal" checked>
+                    <span>Normale</span>
+                    <span class="text-xs text-slate-400">— bell icon</span>
+                </label>
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="priority" value="high">
+                    <span class="text-rose-600 font-semibold">Alta</span>
+                    <span class="text-xs text-slate-400">— popup modale al login</span>
+                </label>
+            </div>
+        </div>
+
+        <div>
+            <label class="form-label">Destinatari</label>
+            <div class="mt-2 flex gap-4">
+                <label><input type="radio" name="target_mode" value="all"> Tutti</label>
+                <label><input type="radio" name="target_mode" value="selected" checked> Selezionati</label>
+            </div>
+        </div>
+
+        <div>
+            <label class="form-label">Utenti selezionati</label>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 max-h-72 overflow-y-auto border rounded p-3">
+                {% for u in users %}
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="user_ids[]" value="{{ u.id }}">
+                        <span>{{ (u.first_name ~ ' ' ~ u.last_name)|trim }} ({{ u.username }})</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Invia notifica</button>
+    </form>
+</div>
+{% endblock %}

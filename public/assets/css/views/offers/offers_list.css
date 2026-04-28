@@ -1,0 +1,357 @@
+/* ── Offers List Scoped ───────────────────────── */
+.cfl-page { margin-top: 16px; }
+
+/* ── Hero ──────────────────────────────────────── */
+.cfl-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px;
+    padding: 28px 32px 24px;
+    background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+    color: #fff; margin-bottom: 20px;
+}
+.cfl-hero::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: rgba(59,130,246,.12); pointer-events: none;
+}
+.cfl-hero::after {
+    content: ''; position: absolute; bottom: -60px; left: 25%;
+    width: 200px; height: 200px; border-radius: 50%;
+    background: rgba(34,197,94,.06); pointer-events: none;
+}
+.cfl-hero-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+}
+.cfl-hero-left { display: flex; align-items: center; gap: 16px; }
+.cfl-hero-icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfl-hero-icon svg { width: 24px; height: 24px; stroke: #fff; stroke-width: 1.5; fill: none; }
+.cfl-hero-info {
+    display: flex; flex-direction: column;
+}
+.cfl-hero-title { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+.cfl-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+.cfl-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Action Buttons in Hero */
+.cfl-btn-create {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 20px; border-radius: 10px;
+    background: #3b82f6; color: #fff;
+    font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer;
+    transition: all .18s; text-decoration: none;
+}
+.cfl-btn-create:hover { background: #2563eb; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,.3); }
+.cfl-btn-create svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+/* Search Input */
+.cfl-search-wrapper {
+    position: relative;
+}
+.cfl-search-input {
+    width: 280px;
+    padding: 10px 14px 10px 40px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+    transition: all .15s;
+}
+.cfl-search-input::placeholder {
+    color: rgba(255,255,255,.5);
+}
+.cfl-search-input:focus {
+    background: rgba(255,255,255,.15);
+    border-color: rgba(255,255,255,.3);
+    box-shadow: 0 0 0 4px rgba(59,130,246,.2);
+}
+.cfl-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px; height: 16px;
+    stroke: rgba(255,255,255,.5);
+    stroke-width: 1.8;
+    fill: none;
+    pointer-events: none;
+}
+
+/* ── Statistics Row ────────────────────────────── */
+.cfl-stats-row {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(2, 1fr);
+    margin-bottom: 20px;
+}
+@media (min-width: 768px) {
+    .cfl-stats-row { grid-template-columns: repeat(4, 1fr); }
+}
+.cfl-stat-card {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    padding: 18px 20px;
+    display: flex; align-items: center; gap: 14px;
+    transition: all .15s;
+}
+.cfl-stat-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0,0,0,.05);
+}
+.cfl-stat-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfl-stat-icon.total { background: #dbeafe; }
+.cfl-stat-icon.revenue { background: #d1fae5; }
+.cfl-icon.pending { background: #fef3c7; }
+.cfl-stat-icon.sent { background: #ede9fe; }
+.cfl-stat-icon.total svg { stroke: #2563eb; }
+.cfl-stat-icon.revenue svg { stroke: #059669; }
+.cfl-stat-icon.pending svg { stroke: #d97706; }
+.cfl-stat-icon.sent svg { stroke: #7c3aed; }
+.cfl-stat-icon svg { width: 22px; height: 22px; stroke-width: 1.8; fill: none; }
+.cfl-stat-info {
+    flex: 1; min-width: 0;
+}
+.cfl-stat-value {
+    font-size: 24px; font-weight: 800; color: #0f172a;
+    line-height: 1;
+}
+.cfl-stat-label {
+    font-size: 11px; color: #94a3b8; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .3px;
+    margin-top: 4px;
+}
+
+/* ── Offers Table ──────────────────────────────── */
+.cfl-table-wrapper {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3;
+    overflow-x: auto;
+}
+.cfl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.cfl-table thead {
+    background: #f8fafc;
+}
+.cfl-table th {
+    text-align: left;
+    padding: 14px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    border-bottom: 1.5px solid #e2e8f0;
+}
+.cfl-table th.text-center { text-align: center; }
+.cfl-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background .15s;
+}
+.cfl-table tbody tr:hover {
+    background: #f8fafc;
+}
+.cfl-table tbody tr:last-child {
+    border-bottom: none;
+}
+.cfl-table td {
+    padding: 14px 16px;
+    color: #334155;
+    vertical-align: middle;
+}
+.cfl-table td.text-center { text-align: center; }
+
+/* Offer Number Link */
+.cfl-offer-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #1d4ed8; font-weight: 600;
+    text-decoration: none;
+    transition: color .15s;
+}
+.cfl-offer-link:hover {
+    color: #1e40af;
+}
+.cfl-offer-link svg {
+    width: 16px; height: 16px;
+    stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+
+/* Client Info */
+.cfl-client-info {
+    display: flex; align-items: center; gap: 10px;
+}
+.cfl-client-avatar {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.cfl-client-avatar svg {
+    width: 16px; height: 16px;
+    stroke: #fff; stroke-width: 1.5; fill: none;
+}
+.cfl-client-name {
+    font-weight: 500; color: #0f172a;
+}
+
+/* Subject Cell */
+.cfl-subject {
+    font-size: 12px; color: #64748b;
+    font-style: italic;
+    max-width: 250px;
+    overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Amount Cell */
+.cfl-amount {
+    font-weight: 600; color: #0f172a;
+}
+
+/* Date Cell */
+.cfl-date {
+    font-size: 12px; color: #64748b;
+}
+
+/* Actions Cell */
+.cfl-actions {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; flex-wrap: wrap;
+}
+.cfl-action-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    text-decoration: none;
+    transition: all .15s;
+}
+.cfl-action-view {
+    background: #eff6ff; color: #1d4ed8;
+}
+.cfl-action-view:hover {
+    background: #dbeafe;
+}
+.cfl-action-revise {
+    background: #fefce8; color: #92400e;
+}
+.cfl-action-revise:hover {
+    background: #fef9c3;
+}
+.cfl-action-download {
+    background: #f0fdf4; color: #15803d;
+}
+.cfl-action-download:hover {
+    background: #dcfce7;
+}
+.cfl-action-btn svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; stroke-width: 1.8; fill: none;
+}
+
+/* Empty State */
+.cfl-empty {
+    padding: 60px 20px; text-align: center;
+}
+.cfl-empty-icon {
+    width: 64px; height: 64px; margin: 0 auto 16px;
+    stroke: #cbd5e1; stroke-width: 1.5; fill: none;
+    opacity: .5;
+}
+.cfl-empty-title {
+    font-size: 16px; font-weight: 600; color: #475569;
+    margin-bottom: 6px;
+}
+.cfl-empty-text {
+    font-size: 13px; color: #94a3b8;
+}
+
+/* No Results State */
+.cfl-no-results {
+    padding: 40px 20px; text-align: center;
+}
+.cfl-no-results-icon {
+    width: 48px; height: 48px; margin: 0 auto 12px;
+    stroke: #cbd5e1; stroke-width: 1.5; fill: none;
+}
+.cfl-no-results-text {
+    font-size: 13px; color: #94a3b8;
+}
+
+/* ── Status Badges ──────────────────────────────────────────────────────────── */
+.cfl-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .3px;
+    white-space: nowrap; border: none; cursor: default;
+}
+.cfl-badge-bozza        { background: #f1f5f9; color: #64748b; }
+.cfl-badge-inviata      { background: #dbeafe; color: #1d4ed8; }
+.cfl-badge-in_trattativa{ background: #fef3c7; color: #b45309; }
+.cfl-badge-approvata    { background: #dcfce7; color: #166534; }
+.cfl-badge-rifiutata    { background: #fee2e2; color: #b91c1c; }
+.cfl-badge-scaduta      { background: #f3e8ff; color: #7e22ce; }
+
+/* Clickable badge button (index inline change) */
+.cfl-badge-btn {
+    cursor: pointer; transition: opacity .15s;
+    padding: 4px 10px;
+}
+.cfl-badge-btn svg {
+    width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none;
+    transition: transform .15s;
+}
+.cfl-badge-btn:hover { opacity: .85; }
+
+/* Status cell + dropdown */
+.cfl-status-cell { position: relative; display: inline-block; }
+.cfl-status-dropdown {
+    display: none;
+    position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+    z-index: 200;
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.1);
+    padding: 6px; min-width: 160px;
+    flex-direction: column; gap: 3px;
+}
+.cfl-status-dropdown.open { display: flex; }
+.cfl-status-dropdown button {
+    background: none; border: none; cursor: pointer;
+    padding: 4px 6px; border-radius: 6px; text-align: left;
+    transition: background .12s;
+}
+.cfl-status-dropdown button:hover { background: #f8fafc; }
+
+/* ── Status Filter Tabs ─────────────────────────────────────────────────────── */
+.cfl-status-tabs {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 16px; padding: 4px 0;
+}
+.cfl-status-tab {
+    background: none; border: 1.5px solid #e2e8f0;
+    border-radius: 20px; padding: 5px 14px;
+    font-size: 12.5px; font-weight: 600; color: #64748b;
+    cursor: pointer; transition: all .15s;
+}
+.cfl-status-tab:hover { border-color: #94a3b8; color: #334155; }
+.cfl-status-tab.active {
+    background: #0f172a; border-color: #0f172a; color: #fff;
+}
+.cfl-status-tab .cfl-badge { cursor: pointer; }
+
+/* ── Saved status tick on badge ─────────────────────────────────────────────── */
+.cfl-badge-btn.saving { opacity: .5; pointer-events: none; }

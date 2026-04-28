@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="utf-8">
+    <link href="{{ asset('/includes/template/dist/images/logo.png') }}" rel="shortcut icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrfToken }}">
+    <title>BOB - {{ pageTitle ?? '' }}</title>
+    <link rel="stylesheet" href="{{ asset('/includes/template/dist/css/app.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="py-5">
+
+{% include 'layout/_flash.html.twig' %}
+
+<!-- BEGIN: Mobile Menu -->
+{% include 'layout/_mobile_menu.html.twig' %}
+<!-- END: Mobile Menu -->
+
+<div class="flex mt-[4.7rem] md:mt-0">
+    <!-- BEGIN: Side Menu -->
+    {% include 'layout/_menu.html.twig' %}
+    <!-- END: Side Menu -->
+
+    <!-- BEGIN: Content -->
+    <div class="content">
+        <!-- BEGIN: Top Bar -->
+        {% include 'layout/_topbar.html.twig' %}
+        <!-- END: Top Bar -->
+
+        {% block content %}{% endblock %}
+    </div>
+    <!-- END: Content -->
+</div>
+
+<link rel="stylesheet" href="/assets/css/includes/template/footer.css">
+<script src="/assets/js/includes/template/footer.js"></script>
+<script src="{{ asset('/includes/template/dist/js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,143 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_clients.css">
+{% endblock %}
+
+{% block content %}
+<div class="bc-page">
+
+{# ── Hero ── #}
+<div class="bc-hero">
+    <div class="bc-hero-content">
+        <div class="bc-hero-left">
+            <div class="bc-hero-icon">
+                <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div>
+                <h1 class="bc-hero-title">Fatture per Cliente</h1>
+                <p class="bc-hero-sub">Riepilogo fatture da emettere ed emesse, raggruppate per cliente</p>
+            </div>
+        </div>
+        <a href="/billing" class="bc-btn-back">
+            <svg viewBox="0 0 24 24"><path d="M2 20h20"/><path d="M5 20V6l7-3 7 3v14"/></svg>
+            Cantieri Movimentati
+        </a>
+    </div>
+</div>
+
+{# ── Stats Row ── #}
+<div class="bc-stats">
+    <div class="bc-stat">
+        <div class="bc-stat-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,.4);"></div>
+        <div>
+            <div class="bc-stat-value">{{ clients|length }}</div>
+            <div class="bc-stat-label">Clienti</div>
+        </div>
+    </div>
+    <div class="bc-stat">
+        <div class="bc-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
+        <div>
+            <div class="bc-stat-value" style="color:#dc2626;">{{ totDaEmettere }}</div>
+            <div class="bc-stat-sub">€ {{ totEuroDa|number_format(2, ',', '.') }}</div>
+            <div class="bc-stat-label">Da emettere <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+    <div class="bc-stat">
+        <div class="bc-stat-dot" style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4);"></div>
+        <div>
+            <div class="bc-stat-value" style="color:#16a34a;">{{ totEmesse }}</div>
+            <div class="bc-stat-sub">€ {{ totEuroEm|number_format(2, ',', '.') }}</div>
+            <div class="bc-stat-label">Emesse <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+    <div class="bc-stat">
+        <div class="bc-stat-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4);"></div>
+        <div>
+            <div class="bc-stat-value">{{ totDaEmettere + totEmesse }}</div>
+            <div class="bc-stat-label">Totale <span style="opacity:.55;font-size:10px;">({{ currentYear }})</span></div>
+        </div>
+    </div>
+</div>
+
+{# ── Filters ── #}
+<div class="bc-filters">
+    <div class="bc-search-wrap">
+        <svg class="bc-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="Cerca cliente…">
+    </div>
+</div>
+
+{# ── Counter ── #}
+<div class="bc-counter">
+    <p class="bc-counter-text"><strong id="bc-count">{{ clients|length }}</strong> clienti</p>
+</div>
+
+{# ── Table ── #}
+<div class="bc-table-wrap">
+    {% if clients is empty %}
+    <div class="bc-empty">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <p class="bc-empty-text">Nessuna fattura registrata.</p>
+    </div>
+    {% else %}
+    <table class="bc-table" id="clients-table">
+        <thead>
+        <tr>
+            <th>Cliente</th>
+            <th class="center">Da emettere</th>
+            <th class="right">Importo da emettere</th>
+            <th class="center">Emesse</th>
+            <th class="right">Importo emesso</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for c in clients %}
+        <tr class="client-row" data-name="{{ c.name|lower }}">
+            <td><span class="bc-name">{{ c.name }}</span></td>
+            <td class="center">
+                {% if c.da_emettere_count > 0 %}
+                    <span class="bc-count-danger">{{ c.da_emettere_count }}</span>
+                {% else %}
+                    <span class="bc-count-zero">0</span>
+                {% endif %}
+            </td>
+            <td class="right">
+                {% if c.da_emettere_euro > 0 %}
+                    <span class="bc-euro-danger">€ {{ c.da_emettere_euro|number_format(2, ',', '.') }}</span>
+                {% else %}
+                    <span class="bc-dash">—</span>
+                {% endif %}
+            </td>
+            <td class="center" style="color:#64748b;">{{ c.emesse_count }}</td>
+            <td class="right" style="color:#64748b;">
+                {% if c.emesse_euro > 0 %}
+                    € {{ c.emesse_euro|number_format(2, ',', '.') }}
+                {% else %}
+                    <span class="bc-dash">—</span>
+                {% endif %}
+            </td>
+            <td class="right">
+                <a href="/billing/client/{{ c.id }}" class="bc-btn-detail">
+                    Dettaglio
+                    <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div id="bc-no-results" class="bc-empty" style="display:none;">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <p class="bc-empty-text">Nessun cliente trovato.</p>
+    </div>
+    {% endif %}
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/billing/clients.js"></script>
+{% endblock %}

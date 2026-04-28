@@ -1,0 +1,98 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <h2 class="text-lg font-medium mb-4">
+        Marca Mezzi Completati - {{ worksiteId }}
+    </h2>
+
+    {% if message %}
+        <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
+            <span>{{ message }}</span>
+            <button type="button" onclick="this.parentElement.style.display='none';" class="text-green-800 font-bold ml-4">&times;</button>
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        <input type="hidden" name="_token" value="{{ csrfToken }}">
+        <input type="hidden" name="mark_completed" value="1">
+
+        <table class="table w-full text-sm">
+            <thead class="bg-sky-100 text-slate-700">
+            <tr>
+                <th>Seleziona</th>
+                <th>Mezzo</th>
+                <th>Prezzo Unitario</th>
+                <th>Quantità Totale</th>
+                <th>Q.ta da Completare</th>
+                <th>Data Fine</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for i, r in attivi %}
+                <tr class="hover:bg-slate-100">
+                    <td class="px-2">
+                        <input
+                                type="checkbox"
+                                name="selected[]"
+                                value="{{ i }}"
+                                onchange="toggleRow({{ i }})"
+                        >
+                        <input
+                                type="hidden"
+                                name="id[{{ i }}]"
+                                value="{{ r.id }}"
+                        >
+                    </td>
+                    <td>{{ r.mezzo_descrizione }}</td>
+                    <td>{{ r.costo_giornaliero|number_format(2, ',', '') }} €</td>
+                    <td>
+                        {{ r.quantita }}
+                        <input
+                                type="hidden"
+                                name="quantita[{{ i }}]"
+                                value="{{ r.quantita }}"
+                        >
+                    </td>
+                    <td>
+                        <input
+                                id="quantita_{{ i }}"
+                                type="number"
+                                name="quantita_finire[{{ i }}]"
+                                class="form-input w-20 text-center"
+                                min="1"
+                                max="{{ r.quantita }}"
+                                value="1"
+                                disabled
+                                required
+                        >
+                    </td>
+                    <td>
+                        <input
+                                id="datafine_{{ i }}"
+                                type="date"
+                                name="data_fine[{{ i }}]"
+                                class="form-input w-full"
+                                disabled
+                                required
+                        >
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5" class="text-center py-4">Nessun mezzo Attivo da completare.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="text-right mt-5">
+            <button type="submit" class="btn btn-primary">
+                Marca come Completati
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/equipment/mark_completed_lifting_equipment.js"></script>
+{% endblock %}

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>BOB - Office</title>
+    <script src="https://office.potiweb.com/web-apps/apps/api/documents/api.js"></script>
+</head>
+<body style="margin:0;height:100vh">
+
+<div id="editor" style="width:100%;height:100%"></div>
+
+<script>
+    window.ONLYOFFICE_CONFIG = {{ editorConfig|json_encode|raw }};
+</script>
+<script src="/assets/js/views/worksites/documents/open.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,98 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y mt-8">
+    <h2 class="text-lg font-medium">Assegna Mezzi - Noleggio</h2>
+</div>
+
+<div class="mt-6 mb-6">
+    <label class="form-label">Seleziona Cantiere</label>
+    <select id="worksiteSelect" class="tomselect" placeholder="Cerca cantiere..."
+            data-mezzi="{{ mezzi|json_encode }}"
+            data-selected-value="{{ selectedOption.value ?? '' }}"
+            data-selected-text="{{ selectedOption.text ?? '' }}"
+    ></select>
+</div>
+
+{# TODO: 'selectedWorksite' comes from $_GET['worksite_id'] — passed from controller as `selectedWorksite` variable #}
+{% if selectedWorksite %}
+    <form method="POST">
+        <input type="hidden" name="_token" value="{{ csrfToken }}">
+        <input type="hidden" name="worksite_id" value="{{ selectedWorksite }}">
+        <input type="hidden" name="save_all" value="1">
+
+        <div id="mezzi-container" class="mt-12 space-y-2">
+            <div class="mt-2">
+                <button
+                        type="button"
+                        id="copy-start-date"
+                        class="btn btn-success"
+                >
+                    Copia Prima Data Inizio
+                </button>
+            </div>
+            <!-- Prima riga -->
+            <div class="row-item grid grid-cols-12 gap-2 items-end bg-gray-50 p-2 rounded">
+                <div class="col-span-3">
+                    <label class="form-label">Mezzo</label>
+                    <select name="mezzo_id[]" class="form-select mezzo-select" required>
+                        <option value="">-- Scegli mezzo --</option>
+                        {% for m in mezzi %}
+                            <option
+                                    value="{{ m.id }}"
+                                    data-special="{{ m.descrizione == 'Trasporto A/R' ? '1' : '0' }}"
+                            >
+                                {{ m.descrizione }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="form-label">Tipo</label>
+                    <select name="tipo_noleggio[]" class="form-select">
+                        <option value="Giornaliero">Giornaliero</option>
+                        <option value="Una Tantum">Una Tantum</option>
+                    </select>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="form-label">Quantità</label>
+                    <input type="number" name="quantita[]" min="1" value="1" class="form-control" required>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="form-label">Costo (€)</label>
+                    <input type="number" step="0.01" name="costo[]" class="form-control" required>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="form-label">Data Inizio</label>
+                    <input type="date" name="data_inizio[]" class="form-control" required>
+                </div>
+
+                <div class="col-span-1">
+                    <button type="button" class="btn btn-danger remove-row hidden">Elimina Riga</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <button id="add-row" type="button" class="btn btn-primary">+ Aggiungi Mezzo</button>
+        </div>
+
+        <div class="flex justify-end mt-6">
+            <button type="submit" class="btn btn-primary">Salva</button>
+        </div>
+    </form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/equipment/assign_lifting_equipment.js"></script>
+{% endblock %}

@@ -1,0 +1,418 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/attendance/attendance_list.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y mt-8">
+    <h2 class="text-lg font-medium">Presenze</h2>
+</div>
+
+<div class="intro-y col-span-12 flex flex-wrap xl:flex-nowrap items-center mt-2">
+
+    <a href="/attendance/create" class="btn btn-primary shadow-md mr-2"><i class="fa fa-plus mr-1"></i> Aggiungi Presenza</a>
+
+    <div class="dropdown">
+        <button class="dropdown-toggle btn px-2 box" aria-expanded="false" data-tw-toggle="dropdown">
+            <span class="w-5 h-5 flex items-center justify-center"> <i class="w-4 h-4" data-lucide="plus"></i> </span>
+        </button>
+        <div class="dropdown-menu lg:w-56">
+            <ul class="dropdown-content">
+                <li>
+                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelOperaio"
+                       class="dropdown-item">
+                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Operaio
+                    </button>
+                </li>
+
+                <li>
+                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelBulkOperai"
+                       class="dropdown-item">
+                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Bulk Operai (ZIP)
+                    </button>
+                </li>
+
+                <li>
+                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelAzienda"
+                       class="dropdown-item">
+                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Azienda
+                    </button>
+                </li>
+
+                <li>
+                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelCommittente"
+                       class="dropdown-item">
+                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Committente
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<br>
+<ul class="nav nav-tabs" role="tablist">
+    <li class="nav-item flex-1" role="presentation">
+        <button
+                class="nav-link w-full py-2 !bg-blue-500 !text-white font-medium rounded-t-md border border-b-0"
+                data-tw-target="#tab-presenze" role="tab"
+                aria-controls="tab-presenze" aria-selected="true">
+            Presenze Nostri
+        </button>
+    </li>
+    <li class="nav-item flex-1" role="presentation">
+        <button
+                class="nav-link w-full py-2 !bg-white !text-slate-600 font-medium rounded-t-md border border-b-0"
+                data-tw-target="#tab-consorziate" role="tab"
+                aria-controls="tab-consorziate" aria-selected="false">
+           Presenze Consorziate
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content mt-5">
+    <div id="tab-presenze" class="tab-pane active" role="tabpanel">
+        <!-- FILTRI -->
+        <form method="GET" class="intro-y mt-4 flex flex-wrap gap-4 items-end">
+            <div>
+                <label class="form-label">Data Inizio</label><br>
+                <input type="date" name="start_date" value="{{ startDate }}" class="form-control w-56">
+            </div>
+            <div>
+                <label class="form-label">Data Fine</label><br>
+                <input type="date" name="end_date" value="{{ endDate }}" class="form-control w-56">
+            </div>
+            <div>
+                <label class="form-label">Cantiere</label><br>
+                <select name="cantiere_id" id="cantiereSelect" class="w-72">
+                    {% if cantiereId is not empty %}
+                        <option value="{{ cantiereId }}" selected>{{ selectedCantiere }}</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Operaio</label><br>
+                <select name="worker_id" id="workerSelect" class="w-72">
+                    {% if workerId is not empty %}
+                        <option value="{{ selectedWorker.id }}" selected>{{ selectedWorker.first_name }} {{ selectedWorker.last_name }}</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">&nbsp;</label><br>
+                <button type="submit" class="btn btn-primary w-40">Filtra</button>
+            </div>
+            <div>
+                <label class="form-label">&nbsp;</label><br>
+                <a href="/attendance" class="btn btn-outline-primary w-40">Reset filtri</a>
+            </div>
+        </form>
+
+        <!-- TABELLA -->
+        <div class="intro-y col-span-12 overflow-auto mt-6">
+            <table class="table table-report -mt-2">
+                <thead>
+                <tr>
+                    <th class="whitespace-nowrap">Data</th>
+                    <th class="whitespace-nowrap">Operaio</th>
+                    <th class="whitespace-nowrap">Cantiere</th>
+                    <th class="text-center whitespace-nowrap">Turno</th>
+                    <th class="text-center whitespace-nowrap">Pranzo</th>
+                    <th class="text-center whitespace-nowrap">Cena</th>
+                    <th class="text-center whitespace-nowrap">Hotel</th>
+                    <th class="text-center whitespace-nowrap">Targa</th>
+                    <th class="whitespace-nowrap">Note</th>
+                    <th class="text-center whitespace-nowrap">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in presenze %}
+                    <tr class="intro-x">
+                        <td>{{ row.data|date('d/m/Y') }}</td>
+                        <td>{{ row.lavoratore }}</td>
+                        <td>{{ row.cantiere }}</td>
+                        <td class="text-center">
+                            <span class="{{ row.turno == 'Mezzo' ? 'text-orange-600 font-semibold' : '' }}">
+                                {{ row.turno }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            {% if row.pranzo == 'Noi' and row.pranzo_prezzo is not null %}
+                                {{ row.pranzo_prezzo|number_format(2, ',', '') }} €
+                            {% else %}
+                                {{ row.pranzo }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if row.cena == 'Noi' and row.cena_prezzo is not null %}
+                                {{ row.cena_prezzo|number_format(2, ',', '') }} €
+                            {% else %}
+                                {{ row.cena }}
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ row.hotel }}</td>
+                        <td class="text-center">{{ row.targa_auto }}</td>
+                        <td>{{ row.note }}</td>
+                        <td class="table-report__action w-56">
+                            <div class="flex justify-center items-center">
+                                <a class="flex items-center mr-3" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data|url_encode }}">
+                                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Edit
+                                </a>
+                                <form
+                                        action="/attendance/delete"
+                                        method="POST"
+                                        data-confirm="Confermi eliminazione di questa presenza?"
+                                        class="inline-block"
+                                >
+                                    <input type="hidden" name="type" value="nostri">
+                                    <input type="hidden" name="id"   value="{{ row.id }}">
+                                    <button type="submit" class="flex items-center text-danger">
+                                        <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-consorziate" class="tab-pane hidden" role="tabpanel">
+        <form method="GET" action="/attendance" class="intro-y mt-4 flex flex-wrap gap-4 items-end">
+            <input type="hidden" name="type" value="consorziata">
+            <div>
+                <label class="form-label">Data Inizio</label><br>
+                <input type="date" name="cons_start_date" class="form-control w-56">
+            </div>
+            <div>
+                <label class="form-label">Data Fine</label><br>
+                <input type="date" name="cons_end_date" class="form-control w-56">
+            </div>
+            <div>
+                <label class="form-label">Cantiere</label><br>
+                <select name="cons_cantiere_id" id="consCantiereSelect" class="form-control w-72"></select>
+            </div>
+            <div>
+                <label class="form-label">Consorziata</label><br>
+                <input type="text" name="cons_name" class="form-control w-72" placeholder="Nome consorziata">
+            </div>
+            <div>
+                <label class="form-label">&nbsp;</label><br>
+                <button type="submit" class="btn btn-primary w-40">Filtra</button>
+            </div>
+            <div>
+                <label class="form-label">&nbsp;</label><br>
+                <a href="/attendance?type=consorziata" class="btn btn-outline-primary w-40">Reset</a>
+            </div>
+        </form>
+
+        <div class="intro-y col-span-12 overflow-auto mt-6">
+            <table class="table table-report -mt-2">
+                <thead>
+                <tr>
+                    <th class="whitespace-nowrap">Data</th>
+                    <th class="whitespace-nowrap">Consorziata</th>
+                    <th class="whitespace-nowrap">Cantiere</th>
+                    <th class="text-center whitespace-nowrap">N. Operai</th>
+                    <th class="text-center whitespace-nowrap">Costo Unitario</th>
+                    <th class="text-center whitespace-nowrap">Pasti</th>
+                    <th class="text-center whitespace-nowrap">Auto</th>
+                    <th class="text-center whitespace-nowrap">Hotel</th>
+                    <th class="text-center whitespace-nowrap">Note</th>
+                    <th class="text-center whitespace-nowrap">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in presenzeConsorziate %}
+                    <tr class="intro-x">
+                        <td>{{ row.data_presenza|date('d/m/Y') }}</td>
+                        <td>{{ row.consorziata_name }}</td>
+                        <td>{{ row.cantiere }}</td>
+                        <td class="text-center">{{ row.quantita }}</td>
+                        <td class="text-center">{{ row.costo_unitario|number_format(2) }} €</td>
+                        <td class="text-center">{{ row.pasti }}</td>
+                        <td class="text-center">{{ row.auto }}</td>
+                        <td class="text-center">{{ row.hotel }}</td>
+                        <td>{{ row.note }}</td>
+                        <td class="table-report__action w-56">
+                            <div class="flex justify-center items-center">
+                                <a class="flex items-center mr-3" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data_presenza|url_encode }}">
+                                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Edit
+                                </a>
+                                <form
+                                        action="/attendance/delete"
+                                        method="POST"
+                                        data-confirm="Confermi eliminazione di questa presenza consorziata?"
+                                        class="inline-block"
+                                >
+                                    <input type="hidden" name="type" value="consorziata">
+                                    <input type="hidden" name="id"   value="{{ row.id }}">
+                                    <button type="submit" class="flex items-center text-danger">
+                                        <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<div id="delete-confirmation-modal" class="modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body p-0">
+                <div class="p-5 text-center">
+                    <i data-lucide="x-circle" class="w-16 h-16 text-danger mx-auto mt-3"></i>
+                    <div class="text-3xl mt-5">Are you sure?</div>
+                    <div class="text-slate-500 mt-2">
+                        Do you really want to delete these records?
+                        <br>
+                        This process cannot be undone.
+                    </div>
+                </div>
+                <div class="px-5 pb-8 text-center">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-24 mr-1">Cancel</button>
+                    <button type="button" class="btn btn-danger w-24">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Excel -->
+
+<div id="modalExcelOperaio" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/attendance/export/worker" method="GET">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Esporta Excel Operaio</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4 gap-y-3">
+                    <div class="col-span-12">
+                        <label class="form-label">Operaio</label>
+                        <select id="operaioSelect" name="worker_id" class="w-full"></select>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control">
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modalExcelBulkOperai" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/attendance/export/bulk" method="GET">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Excel Bulk Operai (ZIP)</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control" required>
+                    </div>
+                    <div class="col-span-12 text-slate-500 text-sm mt-2">
+                        Esporta uno ZIP con una cartella per azienda interna (consorziata=0) e un Excel per ogni operaio che ha almeno una presenza.
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modalExcelAzienda" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/attendance/export/company" method="GET">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Esporta Excel Azienda</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <div class="col-span-12">
+                        <label class="form-label">Azienda</label>
+                        <select id="aziendaSelect" name="azienda" class="w-full"></select>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control">
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="modalExcelCommittente" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/attendance/export/client" method="POST">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Excel Committente</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <div class="col-span-12">
+                        <label class="form-label">Committente</label>
+                        <select id="committenteSelect" name="client_id" class="w-full"></select>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control">
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- END Modal Excel -->
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/attendance_list.js"></script>
+{% endblock %}

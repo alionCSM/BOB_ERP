@@ -1,0 +1,292 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/share/create_link.css">
+{% endblock %}
+
+{% block content %}
+{% if successMessage %}
+    <div class="intro-y mt-4">
+        <div style="background:#dcfce7;color:#15803d;border-radius:10px;padding:12px 18px;font-size:13px;font-weight:600;">
+            {{ successMessage }}
+        </div>
+    </div>
+{% endif %}
+
+<div class="cl-page">
+
+    <!-- ── PAGE HEADER ─────────────────────────── -->
+    <div class="cl-header">
+        <div class="cl-header-left">
+            <div class="cl-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <div>
+                <div class="cl-header-title">Nuovo Link Condiviso</div>
+                <div class="cl-header-sub">Crea un link sicuro per condividere documenti</div>
+            </div>
+        </div>
+        <a href="/share" class="cl-btn-cancel">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Torna alla lista
+        </a>
+    </div>
+
+    <!-- ── FORM ──────────────────────────────────── -->
+    <form id="create-link-form" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="cl-layout">
+
+            <!-- ── LEFT: settings ──────────────── -->
+            <div>
+
+                <!-- Info base -->
+                <div class="cl-card" style="margin-bottom:16px;">
+                    <div class="cl-card-header">
+                        <div class="cl-card-header-icon" style="background:#ede9fe;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        </div>
+                        <div>
+                            <div class="cl-card-header-title">Informazioni link</div>
+                            <div class="cl-card-header-sub">Titolo e scadenza</div>
+                        </div>
+                    </div>
+                    <div class="cl-card-body">
+                        <div class="cl-field">
+                            <label class="cl-label">Titolo *</label>
+                            <input type="text" name="title" class="cl-input" placeholder="Es. Documenti cantiere Milano" required>
+                        </div>
+                        <div class="cl-field">
+                            <label class="cl-label">Scadenza</label>
+                            <input type="date" name="expires_at" class="cl-input" value="{{ "+3 months"|date('Y-m-d') }}">
+                        </div>
+                        <div class="cl-field">
+                            <label class="cl-label">Password (generata automaticamente)</label>
+                            <div id="cl-pwd-display">
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <input type="text" id="cl-password-show" class="cl-input" readonly style="flex:1;font-family:monospace;font-size:14px;letter-spacing:1px;background:#f8fafc;cursor:default;">
+                                    <input type="hidden" name="password" id="cl-password" value="">
+                                    <button type="button" id="cl-pwd-regen" style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:9px;font-size:12px;font-weight:600;background:#e0e7ff;color:#3730a3;border:none;cursor:pointer;transition:background .15s;" title="Genera nuova password">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                                        Rigenera
+                                    </button>
+                                </div>
+                                <p style="font-size:11px;color:#94a3b8;margin-top:6px;">La password viene generata automaticamente. Verra' copiata insieme al link.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selezione -->
+                <div class="cl-card">
+                    <div class="cl-card-header">
+                        <div class="cl-card-header-icon" style="background:#dbeafe;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                        </div>
+                        <div>
+                            <div class="cl-card-header-title">Aggiungi documenti da</div>
+                            <div class="cl-card-header-sub">Operai o aziende presenti nel sistema</div>
+                        </div>
+                    </div>
+                    <div class="cl-card-body">
+                        <div class="cl-select-buttons">
+                            <button type="button" class="cl-select-btn" id="btn-sel-workers"
+                                    data-tw-toggle="modal" data-tw-target="#select-workers-modal">
+                                <div class="cl-select-btn-icon" style="background:#ede9fe;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                </div>
+                                <div>
+                                    <div class="cl-select-btn-text">Seleziona Operai</div>
+                                    <div class="cl-select-btn-sub">Tutti i documenti condivisi automaticamente</div>
+                                </div>
+                                <span class="cl-select-badge" id="workers-badge" style="display:none;"></span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="flex-shrink:0;margin-left:auto;"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+
+                            <button type="button" class="cl-select-btn" id="btn-sel-companies"
+                                    data-tw-toggle="modal" data-tw-target="#select-company-modal">
+                                <div class="cl-select-btn-icon" style="background:#dbeafe;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+                                </div>
+                                <div>
+                                    <div class="cl-select-btn-text">Seleziona Aziende</div>
+                                    <div class="cl-select-btn-sub">Tutti i documenti condivisi automaticamente</div>
+                                </div>
+                                <span class="cl-select-badge" id="companies-badge" style="display:none;"></span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" style="flex-shrink:0;margin-left:auto;"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── RIGHT: document preview ─────── -->
+            <div>
+                <div class="cl-card">
+                    <div class="cl-card-header">
+                        <div class="cl-card-header-icon" style="background:#dcfce7;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </div>
+                        <div>
+                            <div class="cl-card-header-title">Contenuto del link</div>
+                            <div class="cl-card-header-sub">Tutti i documenti vengono condivisi in tempo reale</div>
+                        </div>
+                    </div>
+                    <div class="cl-card-body">
+
+                        <!-- loader -->
+                        <div id="loader" style="display:none;">
+                            <div class="cl-loader">
+                                <div class="cl-spinner"></div>
+                                Caricamento documenti…
+                            </div>
+                        </div>
+
+                        <!-- workers docs -->
+                        <div id="documents-section" style="display:none;">
+                            <div class="cl-section-title">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                Operai
+                            </div>
+                            <div id="workers-documents"></div>
+                        </div>
+
+                        <!-- company docs -->
+                        <div id="company-documents-section" style="display:none;">
+                            <div class="cl-section-title">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+                                Aziende
+                            </div>
+                            <div id="company-documents"></div>
+                        </div>
+
+                        <!-- empty placeholder -->
+                        <div id="docs-placeholder" style="text-align:center;padding:32px 16px;">
+                            <div style="width:52px;height:52px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            </div>
+                            <p style="font-size:13px;font-weight:600;color:#64748b;margin:0 0 4px;">Nessun contenuto</p>
+                            <p style="font-size:12px;color:#94a3b8;margin:0;">Seleziona operai o aziende — tutti i loro documenti saranno condivisi automaticamente</p>
+                        </div>
+
+                        <!-- manual docs -->
+                        <div id="manual-docs-section" style="margin-top:20px;">
+                            <div class="cl-section-title">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                Documenti non presenti nel sistema
+                            </div>
+                            <div id="manual-rows"></div>
+                            <button type="button" class="cl-add-doc-btn" data-action="add-manual-doc">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Aggiungi documento
+                            </button>
+                        </div>
+
+                        <!-- progress -->
+                        <div id="upload-progress-wrapper" style="display:none;margin-top:16px;">
+                            <div class="cl-progress-wrap">
+                                <div class="cl-progress-label" id="upload-progress-label">Caricamento: 0%</div>
+                                <div class="cl-progress-track">
+                                    <div id="upload-progress-bar" class="cl-progress-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="cl-submit-bar">
+                    <input type="hidden" name="workers"   id="workers-hidden">
+                    <input type="hidden" name="companies" id="companies-hidden">
+                    <a href="/share" class="cl-btn-cancel">Annulla</a>
+                    <button id="create-link-submit" type="submit" class="cl-btn-submit">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+                        Crea Link
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ── WORKERS MODAL ─────────────────────────── -->
+<div id="select-workers-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">Seleziona Operai</h2>
+                <button type="button" class="btn-close" data-tw-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="search-workers" class="form-control mb-4" placeholder="Cerca lavoratore…">
+                <div class="overflow-auto" style="max-height:450px;">
+                    <table class="table table-report w-full">
+                        <thead><tr>
+                            <th class="w-10 text-center"><input type="checkbox" id="select-all-workers"></th>
+                            <th>Nome</th>
+                        </tr></thead>
+                        <tbody id="workers-list">
+                        {% for w in workers %}
+                            <tr>
+                                <td class="text-center"><input type="checkbox" value="{{ w.id }}" class="worker-checkbox"></td>
+                                <td>
+                                    {{ w.nome }}
+                                    <span class="text-xs text-slate-500 block">{{ w.company }}</span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-tw-dismiss="modal">Chiudi</button>
+                <button type="button" class="btn btn-primary" id="confirm-workers">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── COMPANIES MODAL ───────────────────────── -->
+<div id="select-company-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-lg">Seleziona Aziende</h2>
+                <button class="btn-close" data-tw-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="search-company" class="form-control mb-4" placeholder="Cerca azienda…">
+                <div class="overflow-auto" style="max-height:450px;">
+                    <table class="table table-report w-full">
+                        <thead><tr>
+                            <th class="w-10 text-center"><input type="checkbox" id="select-all-companies"></th>
+                            <th>Azienda</th>
+                        </tr></thead>
+                        <tbody id="company-list">
+                        {% for c in companies %}
+                            <tr>
+                                <td class="text-center"><input type="checkbox" value="{{ c.id }}" class="company-checkbox"></td>
+                                <td>{{ c.name }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary" data-tw-dismiss="modal">Chiudi</button>
+                <button class="btn btn-primary" id="confirm-company">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/share/create_link.js"></script>
+{% endblock %}

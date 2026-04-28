@@ -1,0 +1,11 @@
+#chat-floating-widget {
+        height: 350px;
+        max-height: 350px;
+        transition: all 0.3s ease-in-out;
+        overflow: hidden;
+    }
+
+    #chat-floating-widget.expanded {
+        height: auto;
+        max-height: 800px;
+    }

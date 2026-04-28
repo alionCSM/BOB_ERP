@@ -1,0 +1,36 @@
+{#
+    report.html.twig — HTML source for DomPDF report generation.
+    Rendered by TwigRenderer and passed to Dompdf::loadHtml().
+    NOT a full page template — standalone HTML fragment for PDF.
+
+    Variables expected (from TicketsController::report()):
+      report      — array of { worker_name, total_tickets }
+      fromFmt     — formatted start date (d/m/Y)
+      toFmt       — formatted end date (d/m/Y)
+      totalTickets — int sum of all tickets in range
+
+    TODO: startDate and endDate are read from $_GET in the original PHP view.
+          The controller must extract them and pass fromFmt/toFmt/totalTickets/report.
+#}
+<link rel="stylesheet" href="/assets/css/views/tickets/report_tickets.css">
+
+<h1>Report Bigliettini Pasto</h1>
+<p class="subtitle">Periodo: {{ fromFmt }} &ndash; {{ toFmt }}</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Operaio</th>
+            <th style="text-align:center;">Bigliettini</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in report %}
+        <tr>
+            <td>{{ row.worker_name }}</td>
+            <td style="text-align:center;">{{ row.total_tickets }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p class="total">Totale bigliettini: {{ totalTickets }}</p>

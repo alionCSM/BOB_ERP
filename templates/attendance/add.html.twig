@@ -1,0 +1,144 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/attendance/add_attendance.css">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y box p-5 mt-5">
+    <h2 class="text-lg font-medium mb-4">Inserisci Presenze</h2>
+
+    <div class="flex gap-4 border-b mb-4">
+        <button type="button" id="tab-nostri" class="tab-button tab-active">Nostri</button>
+        <button type="button" id="tab-consorziata" class="tab-button">Consorziate</button>
+    </div>
+
+    <form method="POST" action="/attendance/save-bulk" id="attendanceForm" novalidate
+        data-cantiere-option="{{ cantiere_id and c ? {'value': cantiere_id, 'text': c.getName()}|json_encode : 'null' }}"
+        data-disable-cantiere="{{ cantiere_id ? '1' : '0' }}"
+        data-duplicate="{{ duplicateData|json_encode }}">
+        <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-12 sm:col-span-6">
+                <label class="form-label">Data Inizio</label>
+                <input type="date" name="start_date" class="form-control" required>
+            </div>
+            <div class="col-span-12 sm:col-span-6">
+                <label class="form-label">Data Fine</label>
+                <input type="date" name="end_date" class="form-control">
+            </div>
+            <div class="col-span-12">
+                <label class="form-label">Cantiere</label>
+                <select id="cantiere" name="cantiere" required {{ cantiere_id ? 'disabled' : '' }}>
+                    {% if cantiere_id and c %}
+                        <option value="{{ cantiere_id }}" selected>{{ c.getName() }}</option>
+                    {% else %}
+                        <option value="">-- Seleziona Cantiere --</option>
+                    {% endif %}
+                </select>
+
+                {% if cantiere_id %}
+                    <input type="hidden" name="cantiere" value="{{ cantiere_id }}">
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="section-nostri" class="mt-6">
+            <div class="flex justify-end items-center gap-3 mb-4 mr-4">
+                <span class="text-sm text-slate-600">Copia valori prima riga</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="copyToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <table class="table w-full text-sm">
+                <thead>
+                <tr class="bg-sky-100 text-slate-700">
+                    <th>Nome</th>
+                    <th>Tipo Turno</th>
+                    <th>Pranzo</th>
+                    <th>Cena</th>
+                    <th>Hotel</th>
+                    <th>Auto</th>
+                    <th>Note</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="attendanceRows"></tbody>
+            </table>
+
+            <button type="button" id="addRow" class="btn btn-outline-primary mt-3">+ Aggiungi Operaio</button>
+        </div>
+
+        <div id="section-consorziata" class="mt-6 hidden">
+            <div class="flex justify-end items-center gap-3 mb-4 mr-4">
+                <span class="text-sm text-slate-600">Copia valori prima riga</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="copyConsToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="responsive-table">
+                <table class="table w-full text-sm">
+                    <thead>
+                    <tr class="bg-sky-100 text-slate-700">
+                        <th>Consorziata</th>
+                        <th>N. Persone</th>
+                        <th>Costo / Persona</th>
+                        <th>Pasti TOT</th>
+                        <th>Auto</th>
+                        <th>Hotel TOT</th>
+                        <th>Note</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="consorziataRows">
+                    <input type="hidden" name="consorziate_mode" value="insert">
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" id="addConsorziataRow" class="btn btn-outline-primary mt-3">+ Aggiungi consorziata</button>
+        </div>
+
+        <div class="text-right mt-5 space-x-3">
+            <input type="hidden" id="duplicate-last-day">
+            <button type="button" class="btn btn-primary" id="preview-button" data-tw-toggle="modal" data-tw-target="#riepilogo-modal">
+                Anteprima Presenze
+            </button>
+        </div>
+
+    </form>
+
+    <div id="riepilogo-modal" class="modal fade" data-tw-backdrop="static" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-body p-0">
+                    <div class="p-5 text-center">
+                        <i data-lucide="list-check" class="w-16 h-16 text-primary mx-auto mt-3"></i>
+                        <div class="text-2xl mt-5 font-medium">Riepilogo Modifiche</div>
+                        <div id="riepilogo-modal-content" class="text-left mt-4 max-h-[400px] overflow-y-auto text-base text-slate-600 px-3 space-y-4"></div>
+                    </div>
+                    <div class="px-5 pb-5 text-center">
+                        <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-24 mr-2">Annulla</button>
+                        <button type="submit" class="btn btn-primary w-32" id="confirm-save">Salva Modifiche</button>
+                        <button type="button"
+                                class="btn btn-danger w-48"
+                                id="confirm-save-overwrite"
+                                data-save-mode="overwrite"
+                                style="display:none;">
+                            Salva sovrascrivendo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/add_attendance.js"></script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends 'layout/base.html.twig' %}
+
+{# Data provided by UsersController::auditLog()
+   Variables: rows, allActions, total, totalPages, page,
+              filterAction, filterUser, filterDateFrom, filterDateTo
+   TODO: controller must move all DB queries + pagination logic out of the
+         old view into the controller, passing the above variables to this template. #}
+
+{% block content %}
+<div class="content-wrapper">
+<div class="content-header">
+  <div class="container-fluid">
+    <div class="row mb-2 align-items-center">
+      <div class="col-sm-6">
+        <h1 class="m-0">Audit Log</h1>
+        <p class="text-muted mb-0">{{ total|number_format(0, ',', '.') }} eventi registrati</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="content">
+  <div class="container-fluid">
+
+    <!-- Filters -->
+    <div class="card card-outline card-primary mb-3">
+      <div class="card-body">
+        <form method="GET" class="row g-2 align-items-end">
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">Azione</label>
+            <select name="action" class="form-select form-select-sm">
+              <option value="">— Tutte —</option>
+              {% for act in allActions %}
+                <option value="{{ act }}"{{ filterAction == act ? ' selected' : '' }}>{{ act }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">Utente</label>
+            <input type="text" name="username" class="form-control form-control-sm" value="{{ filterUser }}" placeholder="username...">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">Da data</label>
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ filterDateFrom }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">A data</label>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ filterDateTo }}">
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-primary btn-sm w-100">Filtra</button>
+          </div>
+          <div class="col-md-2">
+            <a href="/users/audit-log" class="btn btn-secondary btn-sm w-100">Reset</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Data/Ora</th>
+                <th>Utente</th>
+                <th>Azione</th>
+                <th>Entità</th>
+                <th>Etichetta</th>
+                <th>IP</th>
+                <th>Dettagli</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% if rows is empty %}
+              <tr><td colspan="8" class="text-center text-muted py-4">Nessun evento trovato.</td></tr>
+            {% else %}
+              {% for row in rows %}
+              {% set badgeClass = 'bg-info text-dark' %}
+              {% if 'delete' in row.action %}{% set badgeClass = 'bg-danger' %}
+              {% elseif 'upload' in row.action %}{% set badgeClass = 'bg-success' %}
+              {% elseif 'login' in row.action %}{% set badgeClass = 'bg-primary' %}
+              {% elseif 'logout' in row.action %}{% set badgeClass = 'bg-secondary' %}
+              {% elseif 'permission' in row.action %}{% set badgeClass = 'bg-warning text-dark' %}
+              {% endif %}
+              <tr>
+                <td class="text-muted small">{{ row.id }}</td>
+                <td class="small text-nowrap">{{ row.created_at }}</td>
+                <td class="small">{{ row.username ? row.username : '—' }}</td>
+                <td><span class="badge {{ badgeClass }}">{{ row.action }}</span></td>
+                <td class="small">{{ row.entity_type ? row.entity_type : '—' }}{{ row.entity_id ? ' #' ~ row.entity_id : '' }}</td>
+                <td class="small">{{ row.entity_label ? row.entity_label : '—' }}</td>
+                <td class="small text-nowrap">{{ row.ip_address }}</td>
+                <td class="small">
+                  {% if row.detail %}
+                    <code class="small">{{ row.detail }}</code>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% if totalPages > 1 %}
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Pagina {{ page }} di {{ totalPages }}</span>
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            {% if page > 1 %}
+              <li class="page-item"><a class="page-link" href="?action={{ filterAction|url_encode }}&username={{ filterUser|url_encode }}&date_from={{ filterDateFrom|url_encode }}&date_to={{ filterDateTo|url_encode }}&page={{ page - 1 }}">‹</a></li>
+            {% endif %}
+            {% for p in range((page - 2) > 1 ? (page - 2) : 1, (page + 2) < totalPages ? (page + 2) : totalPages) %}
+              <li class="page-item{{ p == page ? ' active' : '' }}">
+                <a class="page-link" href="?action={{ filterAction|url_encode }}&username={{ filterUser|url_encode }}&date_from={{ filterDateFrom|url_encode }}&date_to={{ filterDateTo|url_encode }}&page={{ p }}">{{ p }}</a>
+              </li>
+            {% endfor %}
+            {% if page < totalPages %}
+              <li class="page-item"><a class="page-link" href="?action={{ filterAction|url_encode }}&username={{ filterUser|url_encode }}&date_from={{ filterDateFrom|url_encode }}&date_to={{ filterDateTo|url_encode }}&page={{ page + 1 }}">›</a></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</section>
+</div>
+{% endblock %}

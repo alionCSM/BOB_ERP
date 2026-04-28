@@ -1,0 +1,110 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_list.css">
+{% endblock %}
+
+{% block content %}
+{% set statusLabels = {bozza: 'Bozza', inviato: 'Inviato', accettato: 'Accettato', rifiutato: 'Rifiutato'} %}
+
+<div class="col-page">
+
+  {# Hero #}
+  <div class="col-hero">
+    <div class="col-hero-left">
+      <div class="col-hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <div>
+        <div class="col-hero-row">
+          <h1 class="col-hero-title">Ordini Consorziata</h1>
+          <span class="col-hero-count">{{ ordini|length }}</span>
+        </div>
+        <p class="col-hero-sub">Gestione ordini alle consorziate</p>
+      </div>
+    </div>
+    <div class="col-hero-actions">
+      <a href="/ordini/create" class="col-btn-new">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Nuovo Ordine
+      </a>
+    </div>
+  </div>
+
+  {# Flash messages #}
+  {% if app.request.get('success') %}
+  <div class="col-alert col-alert-success">{{ app.request.get('success') }}</div>
+  {% endif %}
+  {% if app.request.get('error') %}
+  <div class="col-alert col-alert-error">{{ app.request.get('error') }}</div>
+  {% endif %}
+
+  {# Filter tabs #}
+  <div class="col-tabs" id="statusTabs">
+    <button type="button" class="col-tab active" data-filter="all">Tutti <span class="col-tab-count">{{ ordini|length }}</span></button>
+    {% for val, label in statusLabels %}
+    <button type="button" class="col-tab" data-filter="{{ val }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+
+  {# Table #}
+  <div class="col-table-wrap">
+    <table class="col-table">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Data</th>
+          <th>Consorziata</th>
+          <th>Cantiere</th>
+          <th>Oggetto</th>
+          <th>Totale</th>
+          <th>Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="ordiniBody">
+        {% for o in ordini %}
+        {% set s = o.status ?? 'bozza' %}
+        {% set valid = o.order_number > 0 %}
+        <tr data-status="{{ s }}">
+          <td>
+            {% if valid %}<a href="/ordini/{{ o.id }}" class="col-link-num">n° {{ o.order_number }}</a>
+            {% else %}<span class="col-link-num" style="opacity:.4;">—</span>{% endif %}
+          </td>
+          <td class="col-date">{{ o.order_date|date('d/m/Y') }}</td>
+          <td class="col-dest">{{ o.destinatario_name ?? '—' }}</td>
+          <td class="col-ws">{{ o.worksite_name ?? '—' }}</td>
+          <td class="col-ogg">{{ o.oggetto ?? '—' }}</td>
+          <td class="col-total">{{ o.total|number_format(2, ',', '.')|replace({',00': ''}) }} €</td>
+          <td>
+            <span class="col-badge col-badge-{{ s }}">{{ statusLabels[s] ?? s }}</span>
+          </td>
+          <td class="col-actions">
+            {% if valid %}
+            <a href="/ordini/{{ o.id }}" class="col-action-btn" title="Visualizza">
+              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </a>
+            <a href="/ordini/{{ o.id }}/edit" class="col-action-btn" title="Modifica">
+              <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </a>
+            <button type="button" class="col-action-btn col-action-btn-del"
+                    title="Elimina" data-id="{{ o.id }}" data-num="{{ o.order_number }}">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+            </button>
+            <form method="POST" action="/ordini/{{ o.id }}/delete" id="del-form-{{ o.id }}" style="display:none;"></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="col-empty">Nessun ordine trovato.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/ordini/ordini_list.js"></script>
+{% endblock %}

@@ -1,0 +1,515 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/offers/offers_form.css">
+{% endblock %}
+
+{% block content %}
+<div class="cfo-page">
+
+{# Hero #}
+<div class="cfo-hero">
+    <div class="cfo-hero-content">
+        <div class="cfo-hero-left">
+            <div class="cfo-hero-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <div class="cfo-hero-info">
+                <h1 class="cfo-hero-title">Crea Offerta</h1>
+                <p class="cfo-hero-sub">Compila i dettagli dell'offerta commerciale</p>
+            </div>
+        </div>
+        <div class="cfo-hero-actions">
+            <a href="/offers" class="cfo-btn-back">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Annulla
+            </a>
+        </div>
+    </div>
+</div>
+
+{# Progress Indicator #}
+<div class="cfo-progress">
+    <div class="cfo-progress-track step-1" id="progress-track">
+        <div class="cfo-progress-step active" id="progress-step-1">
+            <div class="cfo-progress-dot-wrapper">
+                <div class="cfo-progress-dot">
+                    <span class="step-number">1</span>
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            </div>
+            <div class="cfo-progress-label">Template</div>
+        </div>
+        <div class="cfo-progress-step" id="progress-step-2">
+            <div class="cfo-progress-dot-wrapper">
+                <div class="cfo-progress-dot">
+                    <span class="step-number">2</span>
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            </div>
+            <div class="cfo-progress-label">Dati Offerta</div>
+        </div>
+        <div class="cfo-progress-step" id="progress-step-3">
+            <div class="cfo-progress-dot-wrapper">
+                <div class="cfo-progress-dot">
+                    <span class="step-number">3</span>
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            </div>
+            <div class="cfo-progress-label">Importi</div>
+        </div>
+        <div class="cfo-progress-step" id="progress-step-4">
+            <div class="cfo-progress-dot-wrapper">
+                <div class="cfo-progress-dot">
+                    <span class="step-number">4</span>
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            </div>
+            <div class="cfo-progress-label">Termini</div>
+        </div>
+    </div>
+</div>
+
+{# Form Card #}
+<div class="cfo-card">
+    <form action="/offers/create" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <!-- Modal Note Interne -->
+        <div class="cfo-modal-overlay" id="modal-notes">
+            <div class="cfo-modal">
+                <div class="cfo-modal-header">
+                    <div class="cfo-modal-icon">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    </div>
+                    <div>
+                        <h3 class="cfo-modal-title">Note Interne</h3>
+                        <p class="cfo-modal-subtitle">Queste informazioni non sono visibili nell'offerta finale</p>
+                    </div>
+                </div>
+                <div class="cfo-modal-body">
+                    <div class="cfo-field">
+                        <div class="cfo-field-wrapper">
+                            <label>Note</label>
+                            <textarea id="note_interne" name="note_interne" placeholder="Inserisci note interne per il team..."></textarea>
+                        </div>
+                    </div>
+                    <div class="cfo-field" style="margin-top: 16px;">
+                        <div class="cfo-field-wrapper">
+                            <label>Allega PDF</label>
+                            <div class="cfo-file-upload">
+                                <input type="file" id="offer_pdf" name="offer_pdf" accept="application/pdf">
+                                <div class="cfo-file-upload-content">
+                                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                    <span class="cfo-file-upload-text">Trascina qui un PDF o clicca per selezionare</span>
+                                    <span class="cfo-file-upload-hint">Solo file PDF, max 10MB</span>
+                                </div>
+                            </div>
+                            <div id="uploaded-pdf-container" style="display:none; align-items:center; gap:8px; margin-top:8px; color:#2563eb; font-size:0.875rem;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span id="uploaded-pdf-name"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="cfo-modal-footer">
+                    <button type="button" class="cfo-btn-secondary" id="clearModal">
+                        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Cancella
+                    </button>
+                    <button type="button" class="cfo-btn-primary" id="saveModal">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Salva
+                    </button>
+                </div>
+            </div>
+        </div>
+
+                <!-- STEP 1: SCELTA TEMPLATE -->
+                <div id="step1">
+                    <div class="cfo-section">
+                        <h3 class="cfo-section-title">
+                            <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            Seleziona il Template
+                        </h3>
+                        <p style="font-size: 13px; color: #64748b; margin: 0 0 16px;">Scegli un template preconfigurato o continua senza template</p>
+
+                        <div class="cfo-templates-grid">
+                            <div class="cfo-template-card" data-template="template1">
+                                <div class="cfo-template-icon">
+                                    <svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+                                </div>
+                                <div class="cfo-template-info">
+                                    <h4 class="cfo-template-title">Scaffalature + Automazione</h4>
+                                    <p class="cfo-template-desc">Template completo per offerte di montaggio scaffalature, autoportanti e sistemi di automazione</p>
+                                </div>
+                            </div>
+
+                            <div class="cfo-template-card" data-template="template2">
+                                <div class="cfo-template-icon">
+                                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                                </div>
+                                <div class="cfo-template-info">
+                                    <h4 class="cfo-template-title">Automazione</h4>
+                                    <p class="cfo-template-desc">Template per offerte di sistemi automatizzati</p>
+                                </div>
+                            </div>
+
+                            <div class="cfo-template-card" data-template="template3">
+                                <div class="cfo-template-icon">
+                                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                </div>
+                                <div class="cfo-template-info">
+                                    <h4 class="cfo-template-title">Visite Ispettive</h4>
+                                    <p class="cfo-template-desc">Template per visite annuali di controllo scaffalature (UNI-EN 15635)</p>
+                                </div>
+                            </div>
+
+                            <div class="cfo-template-card" data-template="template4">
+                                <div class="cfo-template-icon">
+                                    <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                </div>
+                                <div class="cfo-template-info">
+                                    <h4 class="cfo-template-title">Certificazioni</h4>
+                                    <p class="cfo-template-desc">Template per certificazioni statiche portapallet</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px; text-align: center;">
+                            <button type="button" class="cfo-btn-secondary" id="toStep2NoTemplate">
+                                Continua senza template
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: DATI OFFERTA -->
+                <div id="step2" class="hidden">
+                    <!-- Card: Dati Cliente -->
+                    <div class="cfo-subcard">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Dati Cliente</h4>
+                                <p class="cfo-subcard-desc">Seleziona il cliente e la data dell'offerta</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <div class="cfo-grid-3">
+                                <div class="cfo-field">
+                                    <div class="cfo-field-wrapper">
+                                        <label>Cliente <span class="cfo-required">*</span></label>
+                                        <div class="cfo-input-wrapper">
+                                            <select id="client_search" name="client" class="has-icon" required>
+                                                <option value="">Seleziona un cliente...</option>
+                                            </select>
+                                            <svg class="cfo-field-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="cfo-field">
+                                    <div class="cfo-field-wrapper">
+                                        <label>Data <span class="cfo-required">*</span></label>
+                                        <div class="cfo-input-wrapper">
+                                            <input type="date" id="offer_date" name="offer_date" class="has-icon" value="{{ 'now'|date('Y-m-d') }}" required>
+                                            <svg class="cfo-field-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="cfo-field">
+                                    <div class="cfo-field-wrapper">
+                                        <label>Numero Offerta</label>
+                                        <div class="cfo-input-wrapper">
+                                            <input type="text" readonly id="offer_number" name="offer_number" class="has-icon cfo-readonly" value="{{ nextOfferNumber }}">
+                                            <svg class="cfo-field-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card: Dettagli Offerta -->
+                    <div class="cfo-subcard">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Dettagli Offerta</h4>
+                                <p class="cfo-subcard-desc">Informazioni sull'oggetto e i riferimenti</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <div class="cfo-field">
+                                <div class="cfo-field-wrapper">
+                                    <label>Oggetto <span class="cfo-required">*</span></label>
+                                    <div class="cfo-input-wrapper">
+                                        <input type="text" id="oggetto" name="oggetto" class="has-icon" placeholder="Inserisci l'oggetto dell'offerta" required>
+                                        <svg class="cfo-field-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="cfo-grid-2" style="margin-top: 16px;">
+                                <div class="cfo-field">
+                                    <div class="cfo-field-wrapper">
+                                        <label>Riferimento Richiesta</label>
+                                        <div class="cfo-input-wrapper">
+                                            <input type="text" id="riferimento" name="riferimento" class="has-icon" placeholder="es. RDO n. 12345">
+                                            <svg class="cfo-field-icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><path d="M15 3h6v6"/><path d="M10 15a4 4 0 004-4V3h-4v8a4 4 0 00-4 4z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="cfo-field">
+                                    <div class="cfo-field-wrapper">
+                                        <label>Alla cortese attenzione di:</label>
+                                        <div class="cfo-input-wrapper">
+                                            <input type="text" id="cortese_att" name="cortese_att" class="has-icon" placeholder="Nome referente">
+                                            <svg class="cfo-field-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Note Interne Card -->
+                    <div class="cfo-subcard cfo-subcard-internal">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Note Interne</h4>
+                                <p class="cfo-subcard-desc">Queste informazioni non sono visibili nell'offerta finale</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <button type="button" class="cfo-btn-internal-notes cfo-btn-internal-notes-full" data-open-notes>
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <div>
+                                    <span class="cfo-btn-notes-title">Apri Note Interne</span>
+                                    <span class="cfo-btn-notes-desc">Aggiungi note private e allega PDF</span>
+                                </div>
+                                <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="cfo-actions">
+                        <button type="button" class="cfo-btn-secondary" id="backToStep1">
+                            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                            Indietro
+                        </button>
+                        <button type="button" class="cfo-btn-primary" id="toStep3">
+                            Prossimo Passo
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: RIGA STATICA + RIGHE DINAMICHE -->
+                <div id="step3" class="hidden">
+                    <!-- Card: Dettagli Importi -->
+                    <div class="cfo-subcard cfo-subcard-large">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Dettagli Importi</h4>
+                                <p class="cfo-subcard-desc">Aggiungi le voci di preventivo</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <!-- Items Header -->
+                            <div class="cfo-items-header">
+                                <div class="cfo-col-desc">Descrizione</div>
+                                <div class="cfo-col-price">Prezzo</div>
+                                <div class="cfo-col-position">Posizione</div>
+                                <div class="cfo-col-actions"></div>
+                            </div>
+
+                            <!-- RIGA STATICA (non rimovibile) -->
+                            <div id="static-row" class="cfo-items-row">
+                                <textarea class="description-field" placeholder="Inserisci descrizione..."></textarea>
+                                <textarea class="amount-field" placeholder="€"></textarea>
+                                <div class="cfo-items-actions">
+                                    <div class="cfo-btn-move-wrapper">
+                                        <button type="button" class="cfo-btn-item cfo-btn-move-up" title="Sposta su" disabled>
+                                            <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                                        </button>
+                                        <button type="button" class="cfo-btn-item cfo-btn-move-down" title="Sposta giù" disabled>
+                                            <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="cfo-items-buttons">
+                                    <button type="button" class="cfo-btn-item cfo-btn-add" id="add-row" title="Aggiungi riga">
+                                        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Contenitore per le righe aggiuntive -->
+                            <div id="items-container"></div>
+                        </div>
+                    </div>
+
+                    <!-- Card: Informazioni Aggiuntive -->
+                    <div class="cfo-subcard">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Informazioni Aggiuntive</h4>
+                                <p class="cfo-subcard-desc">Note aggiuntive per l'offerta</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <div class="cfo-field">
+                                <div class="cfo-field-wrapper">
+                                    <label>Info Aggiuntive</label>
+                                    <textarea name="additional" placeholder="Eventuali informazioni aggiuntive..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="items_data" id="items_data">
+
+                    <!-- Totals Card -->
+                    <div class="cfo-subcard cfo-subcard-totals">
+                        <div class="cfo-subcard-body cfo-subcard-body-nopadding">
+                            <!-- Totale Calcolato (informativo) -->
+                            <div class="cfo-total-section cfo-total-calculated">
+                                <div class="cfo-total-left">
+                                    <span class="cfo-total-icon">
+                                        <svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                                    </span>
+                                    <div>
+                                        <span class="cfo-total-label">Totale Calcolato</span>
+                                        <span class="cfo-total-sublabel">Somma delle righe</span>
+                                    </div>
+                                </div>
+                                <span class="cfo-total-value" id="total-calculated">€ 0,00</span>
+                            </div>
+
+                            <!-- Totale Offerta (modificabile) -->
+                            <div class="cfo-total-section cfo-total-editable">
+                                <div class="cfo-total-left">
+                                    <span class="cfo-total-icon">
+                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </span>
+                                    <div>
+                                        <span class="cfo-total-label">Totale Offerta</span>
+                                        <span class="cfo-total-sublabel">Puoi modificare il totale finale</span>
+                                    </div>
+                                </div>
+                                <div class="cfo-total-input-wrapper">
+                                    <input type="text"
+                                           id="total-amount"
+                                           name="total_amount"
+                                           placeholder="€ o 'da definire'">
+                                    <span class="cfo-total-currency">€</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="cfo-actions">
+                        <button type="button" class="cfo-btn-secondary" id="backToStep2">
+                            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                            Indietro
+                        </button>
+                        <button type="button" class="cfo-btn-primary" id="toStep4">
+                            Prossimo Passo
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 4: TERMINI & CONDIZIONI -->
+                <div id="step4" class="hidden">
+                    <!-- Card: Termini e Pagamento -->
+                    <div class="cfo-subcard">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Termini e Pagamento</h4>
+                                <p class="cfo-subcard-desc">Condizioni di pagamento dell'offerta</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <div class="cfo-field">
+                                <div class="cfo-field-wrapper">
+                                    <label>Termini e Pagamento</label>
+                                    <textarea id="termini_pagamento" name="termini_pagamento" placeholder="es. 30% all'ordine, 70% alla consegna..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card: Condizioni -->
+                    <div class="cfo-subcard">
+                        <div class="cfo-subcard-header">
+                            <div class="cfo-subcard-icon">
+                                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            </div>
+                            <div>
+                                <h4 class="cfo-subcard-title">Condizioni</h4>
+                                <p class="cfo-subcard-desc">Note e condizioni aggiuntive</p>
+                            </div>
+                        </div>
+                        <div class="cfo-subcard-body">
+                            <div class="cfo-field">
+                                <div class="cfo-field-wrapper">
+                                    <label>Condizioni</label>
+                                    <textarea id="condizioni" name="condizioni" placeholder="Eventuali condizioni aggiuntive..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="cfo-actions">
+                        <button type="button" class="cfo-btn-secondary" id="backToStep3">
+                            <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                            Indietro
+                        </button>
+                        <button type="submit" class="cfo-btn-primary cfo-btn-primary-large">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                            Conferma Offerta
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
+<script src="/assets/js/views/offers/create_offer.js"></script>
+{% endblock %}

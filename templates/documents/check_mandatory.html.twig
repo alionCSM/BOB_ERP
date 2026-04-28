@@ -1,0 +1,70 @@
+{% extends "layout/base.html.twig" %}
+
+{#
+  Variables expected from DocumentsController::checkMandatory():
+    workerId     – int
+    mandatoryDocs – array of strings (document type names)
+    workerDocs   – assoc array: tipo_documento => scadenza (raw VARCHAR)
+
+  The colour/status logic mirrors the PHP original:
+    - missing (raw == '')     → red dot, 'Da inserire'
+    - dd/mm/YYYY valid date   → compare to today: red/amber/green
+    - any other string        → grey dot, 'Nessuna scadenza'
+#}
+
+{% block content %}
+<table class="table-auto w-full border-collapse border border-gray-300">
+    <thead class="bg-gray-100">
+        <tr>
+            <th class="border p-3 text-left">Documento</th>
+            <th class="border p-3 text-left">Scadenza</th>
+            <th class="border p-3 text-left">Stato</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for docName in mandatoryDocs %}
+        {% set raw = workerDocs[docName] is defined ? workerDocs[docName] : '' %}
+        {% set formattedDate = raw != '' ? raw : '-' %}
+        {% set dotColour = '#6b7280' %}
+        {% set statusClass = 'text-gray-600' %}
+        {% set statusLabel = 'Nessuna scadenza' %}
+
+        {% if raw == '' %}
+            {# Document missing entirely #}
+            {% set formattedDate = '-' %}
+            {% set dotColour = '#ef4444' %}
+            {% set statusClass = 'text-red-600' %}
+            {% set statusLabel = 'Da inserire' %}
+        {% elseif raw matches '/^[0-9]{2}\\/[0-9]{2}\\/[0-9]{4}$/' %}
+            {# Valid dd/mm/YYYY date – parse and compare #}
+            {% set parts = raw|split('/') %}
+            {% set isoDate = parts[2] ~ '-' ~ parts[1] ~ '-' ~ parts[0] %}
+            {% set diffDays = (isoDate|date('U') - 'now'|date('U')) / 86400 %}
+            {% if diffDays < 0 %}
+                {% set dotColour = '#ef4444' %}
+                {% set statusClass = 'text-red-600' %}
+                {% set statusLabel = 'Scaduto' %}
+            {% elseif diffDays <= 30 %}
+                {% set dotColour = '#CCB000' %}
+                {% set statusClass = 'text-amber-500' %}
+                {% set statusLabel = 'In scadenza' %}
+            {% else %}
+                {% set dotColour = '#22c55e' %}
+                {% set statusClass = 'text-green-600' %}
+                {% set statusLabel = 'Valido' %}
+            {% endif %}
+        {% endif %}
+        {# Any other string falls through with grey / Nessuna scadenza defaults #}
+
+        <tr>
+            <td class="border p-3">{{ docName }}</td>
+            <td class="border p-3">{{ formattedDate }}</td>
+            <td class="border p-3 flex items-center gap-2">
+                <span style="width:12px;height:12px;border-radius:50%;background-color:{{ dotColour }};display:inline-block;"></span>
+                <span class="{{ statusClass }} font-semibold">{{ statusLabel }}</span>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

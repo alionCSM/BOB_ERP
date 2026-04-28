@@ -1,0 +1,159 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/clients/clients_form.css">
+{% endblock %}
+
+{% block content %}
+<div class="cfm-page">
+
+{# Hero #}
+<div class="cfm-hero">
+    <div class="cfm-hero-content">
+        <div class="cfm-hero-left">
+            <div class="cfm-hero-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </div>
+            <div class="cfm-hero-info">
+                <h1 class="cfm-hero-title">Modifica Cliente</h1>
+                <p class="cfm-hero-sub">Aggiorna i dati del cliente</p>
+            </div>
+        </div>
+        <div class="cfm-hero-actions">
+            <a href="/clients" class="cfm-btn-back">
+                <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Annulla
+            </a>
+        </div>
+    </div>
+</div>
+
+{# Form Card #}
+<div class="cfm-card">
+
+    {# Errors #}
+    {% if errors is not empty %}
+    <div class="cfm-errors">
+        <div class="cfm-errors-title">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Errori di validazione
+        </div>
+        <ul class="cfm-errors-list">
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/clients/{{ client.id }}/update">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        {# Sezione: Dati Anagrafici #}
+        <div class="cfm-section">
+            <h3 class="cfm-section-title">Dati Anagrafici</h3>
+
+            <div class="cfm-grid-2">
+                <div class="cfm-field {% if old.name is defined and old.name == '' %}error{% endif %}">
+                    <div class="cfm-field-wrapper">
+                        <label>Ragione Sociale *</label>
+                        <div class="cfm-input-wrapper">
+                            <input type="text" name="name" class="has-icon" value="{{ old.name ?? client.name }}" required autofocus>
+                            <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cfm-field {% if old.via is defined and old.via == '' %}error{% endif %}">
+                    <div class="cfm-field-wrapper">
+                        <label>Indirizzo *</label>
+                        <div class="cfm-input-wrapper">
+                            <input type="text" name="via" class="has-icon" value="{{ old.via ?? client.via }}" required>
+                            <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Sezione: Localizzazione #}
+        <div class="cfm-section">
+            <h3 class="cfm-section-title">Localizzazione</h3>
+
+            <div class="cfm-grid-3">
+                <div class="cfm-field {% if old.cap is defined and old.cap == '' %}error{% endif %}">
+                    <div class="cfm-field-wrapper">
+                        <label>CAP *</label>
+                        <div class="cfm-input-wrapper">
+                            <input type="text" name="cap" class="has-icon" value="{{ old.cap ?? client.cap }}" required pattern="[0-9]{5}" title="Inserisci 5 cifre">
+                            <svg class="cfm-field-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cfm-field {% if old.localita is defined and old.localita == '' %}error{% endif %}">
+                    <div class="cfm-field-wrapper">
+                        <label>Località *</label>
+                        <div class="cfm-input-wrapper">
+                            <input type="text" name="localita" class="has-icon" value="{{ old.localita ?? client.localita }}" required>
+                            <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cfm-field">
+                    <div class="cfm-field-wrapper">
+                        <label>Filiale</label>
+                        <div class="cfm-input-wrapper">
+                            <input type="text" name="filiale" class="has-icon" value="{{ old.filiale ?? client.filiale ?? '' }}">
+                            <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14"/><path d="M17 21v-8a2 2 0 00-2-2h-2a2 2 0 00-2 2v8"/></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Sezione: Contatti #}
+        <div class="cfm-section">
+            <h3 class="cfm-section-title">Contatti</h3>
+
+            <div class="cfm-grid-2">
+                <div class="cfm-field">
+                    <div class="cfm-field-wrapper">
+                        <label>Partita IVA</label>
+                        <input type="text" name="vat" class="has-icon" value="{{ old.vat ?? client.vat ?? '' }}" placeholder="IT00000000000">
+                        <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                </div>
+
+                <div class="cfm-field">
+                    <div class="cfm-field-wrapper">
+                        <label>Email</label>
+                        <input type="email" name="email" class="has-icon" value="{{ old.email ?? client.email ?? '' }}" placeholder="cliente@esempio.it">
+                        <svg class="cfm-field-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Actions #}
+        <div class="cfm-actions">
+            <button type="submit" class="cfm-btn-primary">
+                <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Aggiorna Cliente
+            </button>
+            <a href="/clients" class="cfm-btn-secondary">
+                <svg viewBox="0 0 24 24"><path d="M18 13H6M18 18H6M18 8H6M13 18l5-5-5-5"/></svg>
+                Annulla
+            </a>
+        </div>
+
+    </form>
+
+</div>
+
+</div>
+{% endblock %}

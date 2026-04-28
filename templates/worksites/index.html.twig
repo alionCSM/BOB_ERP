@@ -1,0 +1,284 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/worksites/worksite_list.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="wl-page">
+
+<!-- Hero -->
+<div class="wl-hero">
+    <div class="wl-hero-content">
+        <div class="wl-hero-left">
+            <div class="wl-hero-icon">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2 20h20"/><path d="M5 20V6l7-3 7 3v14"/><path d="M9 20v-4h6v4"/><path d="M9 10h1"/><path d="M14 10h1"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="wl-hero-title">Cantieri</h1>
+                <p class="wl-hero-sub">{{ totalWorksites }} cantieri totali</p>
+            </div>
+        </div>
+        <div class="wl-hero-actions">
+            <a href="/worksites/create" class="wl-btn-new">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuovo Cantiere
+            </a>
+            <div class="dropdown">
+                <button class="wl-btn-menu dropdown-toggle" data-tw-toggle="dropdown">
+                    <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                    </svg>
+                </button>
+                <div class="dropdown-menu w-56">
+                    <ul class="dropdown-content">
+                        <li>
+                            <button type="button" data-tw-toggle="modal" data-tw-target="#modalPresenzeCantiere" class="dropdown-item">
+                                <i data-lucide="table" class="w-4 h-4 mr-2"></i> Excel Presenze
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="wl-stats">
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#22c55e;box-shadow:0 0 6px rgba(34,197,94,.4);"></div>
+        <div>
+            <div class="wl-stat-value">{{ countInCorso }}</div>
+            <div class="wl-stat-label">In Corso</div>
+        </div>
+    </div>
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#94a3b8;"></div>
+        <div>
+            <div class="wl-stat-value">{{ countCompletato }}</div>
+            <div class="wl-stat-label">Completati</div>
+        </div>
+    </div>
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4);"></div>
+        <div>
+            <div class="wl-stat-value">{{ countSospeso }}</div>
+            <div class="wl-stat-label">Sospesi</div>
+        </div>
+    </div>
+    {% if countRisk > 0 %}
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
+        <div>
+            <div class="wl-stat-value">{{ countRisk }}</div>
+            <div class="wl-stat-label">A Rischio (in corso)</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Filters -->
+<form method="GET" id="worksite-filters-form">
+<div class="wl-filters">
+    <div class="wl-filter-group">
+        <span class="wl-filter-label">Stato</span>
+        <select id="status-filter" name="status">
+            <option value="all" {% if statusQueryValue == 'all' %}selected{% endif %}>Tutti</option>
+            {% for status in statuses %}
+                <option value="{{ status }}" {% if filterStatus == status %}selected{% endif %}>{{ status }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="wl-filter-group">
+        <span class="wl-filter-label">Anno</span>
+        <select id="year-filter" name="year">
+            <option value="">Tutti</option>
+            {% for year in years %}
+                <option value="{{ year }}" {% if filterYear == year %}selected{% endif %}>{{ year }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="wl-divider"></div>
+
+    <div class="wl-filter-group wl-search-wrap">
+        <span class="wl-filter-label">Cerca</span>
+        <div style="position:relative;">
+            <svg class="wl-search-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text"
+                   id="instant-search"
+                   name="q"
+                   value="{{ filterSearch }}"
+                   placeholder="Nome, codice, località..."
+                   autocomplete="off">
+        </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;">
+        <div class="wl-spinner" id="search-spinner"></div>
+        <a href="/worksites" class="wl-reset-btn">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Reset
+        </a>
+    </div>
+</div>
+</form>
+
+<!-- Counter -->
+<div class="wl-counter">
+    <p class="wl-counter-text">
+        <strong id="wl-count">{{ worksites|length }}</strong> cantieri trovati
+    </p>
+    <span id="search-counter" style="font-size:12px;color:#94a3b8;"></span>
+</div>
+
+<!-- Table -->
+<div class="wl-table-wrap">
+    <table class="wl-table">
+        <thead>
+        <tr>
+            <th style="width:36px;"></th>
+            <th>Nome</th>
+            <th class="center">Codice</th>
+            <th class="center">Ordine</th>
+            <th class="center">Data Ordine</th>
+            {% if companyId == 1 %}
+                <th class="center">Cliente</th>
+            {% endif %}
+            {% if canSeePrices %}
+                <th class="center">Totale</th>
+            {% endif %}
+            <th class="center">Località</th>
+            <th class="center">Stato</th>
+            <th class="center" style="width:100px;">Azioni</th>
+        </tr>
+        </thead>
+        <tbody id="worksiteTable"
+               data-show-client="{{ companyId == 1 ? '1' : '0' }}"
+               data-show-prices="{{ canSeePrices ? '1' : '0' }}"
+               data-original-count="{{ worksites|length }}">
+        {% for w in worksites %}
+            {% set contract = companyId == 1 ? w.total_offer|default(0)|number_format(2, '.', '') : w.ext_total_offer|default(0)|number_format(2, '.', '') %}
+            {% set contractFloat = companyId == 1 ? w.total_offer|default(0) : w.ext_total_offer|default(0) %}
+            {% set marginVal = w.margin is defined and w.margin is not null ? w.margin|default(0) : null %}
+            {% set marginPerc = marginVal is not null and contractFloat > 0 ? (marginVal / contractFloat) * 100 : null %}
+            {% set isLoss = marginVal is not null and marginVal < 0 %}
+            {% set isLow = not isLoss and marginPerc is not null and marginPerc <= 30 %}
+            {% set isRisk = isLoss or isLow %}
+
+            {% set statusClass = 'wl-status-completato' %}
+            {% if w.status == 'In corso' %}
+                {% set statusClass = 'wl-status-incorso' %}
+            {% elseif w.status == 'Completato' %}
+                {% set statusClass = 'wl-status-completato' %}
+            {% elseif w.status == 'Sospeso' %}
+                {% set statusClass = 'wl-status-sospeso' %}
+            {% endif %}
+
+            <tr data-risk="{{ isRisk ? '1' : '0' }}">
+                <td>
+                    {% if isLoss %}
+                        <div class="wl-risk wl-risk-loss">
+                            <svg viewBox="0 0 24 24" stroke="#dc2626" title="In perdita">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </div>
+                    {% elseif isLow %}
+                        <div class="wl-risk wl-risk-low">
+                            <svg viewBox="0 0 24 24" stroke="#d97706" title="Margine basso ({{ marginPerc|round(1) }}%)">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </div>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="/worksites/{{ w.id }}" class="wl-name">
+                        {{ w.worksite_name }}
+                    </a>
+                </td>
+                <td class="center">
+                    <span class="wl-code">{{ w.worksite_code }}</span>
+                </td>
+                <td class="center wl-muted">{{ w.order_number ?? '-' }}</td>
+                <td class="center wl-muted">
+                    {% if w.order_date is not empty %}
+                        {{ w.order_date|date('d/m/Y') }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                {% if companyId == 1 %}
+                    <td class="center wl-muted">{{ w.client_name }}</td>
+                {% endif %}
+                {% if canSeePrices %}
+                    <td class="center wl-price">
+                        {% if companyId == 1 %}
+                            {{ w.total_offer|default(0)|number_format(2, ',', '.') }} &euro;
+                        {% else %}
+                            {{ w.ext_total_offer|default(0)|number_format(2, ',', '.') }} &euro;
+                        {% endif %}
+                    </td>
+                {% endif %}
+                <td class="center wl-muted">{{ w.location }}</td>
+                <td class="center">
+                    <span class="wl-status {{ statusClass }}">{{ w.status }}</span>
+                </td>
+                <td class="center">
+                    <div class="wl-actions">
+                        <a href="/worksites/{{ w.id }}" class="wl-action-btn primary" title="Apri">
+                            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </a>
+                        <a href="/worksites/{{ w.id }}/edit" class="wl-action-btn warning" title="Modifica">
+                            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+</div><!-- .wl-page -->
+
+<!-- Modal Excel Presenze -->
+<div id="modalPresenzeCantiere" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/worksites/export-presenze" method="GET">
+                <div class="modal-header">
+                    <h2 class="font-medium text-base mr-auto">Excel Presenze Cantiere</h2>
+                </div>
+                <div class="modal-body grid grid-cols-12 gap-4">
+                    <div class="col-span-12">
+                        <label class="form-label">Cantiere</label>
+                        <select id="presenzeCantiereSelect" name="cantiere_id" class="w-full" required></select>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-span-6">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" name="end_date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer text-right">
+                    <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Chiudi</button>
+                    <button type="submit" class="btn btn-primary">Esporta Excel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/worksites/worksite_list.js"></script>
+{% endblock %}

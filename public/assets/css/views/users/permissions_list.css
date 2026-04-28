@@ -1,0 +1,121 @@
+.pm-page { margin-top: 20px; }
+
+/* ── Hero ──────────────────────────────────── */
+.pm-hero {
+    position: relative; overflow: hidden;
+    border-radius: 16px;
+    padding: 28px 28px 24px;
+    background: linear-gradient(135deg, #0f172a 0%, #312e81 50%, #7c3aed 100%);
+    color: #fff; margin-bottom: 24px;
+}
+.pm-hero-wm { position: absolute; right: -10px; top: -10px; width: 170px; height: 170px; opacity: .06; }
+.pm-hero-top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; position: relative; z-index: 1; }
+.pm-hero-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: rgba(255,255,255,.15);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.pm-hero-title { font-size: 22px; font-weight: 800; margin: 0 0 2px; }
+.pm-hero-sub   { font-size: 13px; opacity: .75; margin: 0; }
+.pm-hero-pills { display: flex; flex-wrap: wrap; gap: 10px; position: relative; z-index: 1; }
+.pm-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 10px;
+    background: rgba(255,255,255,.12); backdrop-filter: blur(4px);
+    font-size: 13px; font-weight: 600;
+}
+.pm-pill-num { font-size: 18px; font-weight: 800; line-height: 1; }
+
+/* ── Toolbar ───────────────────────────────── */
+.pm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+.pm-search {
+    width: 280px; height: 40px;
+    border: 1.5px solid #e2e8f0; border-radius: 10px;
+    padding: 0 12px 0 38px; font-size: 13px; color: #1e293b;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat 12px center;
+    outline: none; transition: border-color .15s;
+}
+.pm-search:focus { border-color: #7c3aed; }
+.pm-count { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+/* ── Table ─────────────────────────────────── */
+.pm-table-wrap {
+    background: #fff; border-radius: 14px;
+    border: 1.5px solid #e8edf3; overflow: hidden;
+}
+.pm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pm-table thead th {
+    padding: 13px 16px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em;
+    color: #64748b; background: #f8fafc;
+    border-bottom: 1px solid #f1f5f9; text-align: left;
+}
+.pm-table tbody tr {
+    border-bottom: 1px solid #f5f7fa;
+    transition: background .1s;
+    cursor: pointer;
+}
+.pm-table tbody tr:last-child { border-bottom: none; }
+.pm-table tbody tr:hover { background: #f5f3ff; }
+.pm-table td { padding: 12px 16px; color: #334155; vertical-align: middle; }
+
+/* ── Entity ────────────────────────────────── */
+.pm-entity { display: flex; align-items: center; gap: 12px; }
+.pm-avatar {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.pm-name { font-weight: 700; color: #1e293b; }
+.pm-email { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+
+/* ── Company badge ─────────────────────────── */
+.pm-company-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    background: #f1f5f9; color: #475569;
+}
+
+/* ── Permission bar ────────────────────────── */
+.pm-perm-wrap { display: flex; align-items: center; gap: 10px; }
+.pm-perm-bar-bg {
+    width: 100px; height: 6px; border-radius: 3px;
+    background: #f1f5f9; overflow: hidden;
+}
+.pm-perm-bar-fill {
+    height: 100%; border-radius: 3px;
+    transition: width .3s ease;
+}
+.pm-perm-count { font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
+
+/* ── Admin badge ───────────────────────────── */
+.pm-admin-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #78350f;
+}
+
+/* ── Action button ─────────────────────────── */
+.pm-act-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 32px; padding: 0 14px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    border: 1.5px solid #e2e8f0; background: #fff; color: #475569;
+    cursor: pointer; transition: all .15s; text-decoration: none;
+}
+.pm-act-btn:hover { border-color: #7c3aed; color: #7c3aed; background: #f5f3ff; text-decoration: none; }
+.pm-act-btn svg { flex-shrink: 0; }
+
+/* ── Responsive ────────────────────────────── */
+@media (max-width: 768px) {
+    .pm-search { width: 100%; }
+    .pm-table thead { display: none; }
+    .pm-table, .pm-table tbody, .pm-table tr, .pm-table td { display: block; }
+    .pm-table tr { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+    .pm-table td { padding: 4px 0; border: none; }
+    .pm-table td:first-child { padding-bottom: 8px; }
+    .pm-perm-bar-bg { width: 80px; }
+}

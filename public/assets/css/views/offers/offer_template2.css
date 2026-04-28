@@ -1,0 +1,89 @@
+@page {
+            margin-top: 170px; /* reduced slightly to remove extra space */
+            margin-bottom: 130px; /* increased for footer space */
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+        }
+
+        /* DOMPDF requires fixed positioning for headers and footers */
+        header {
+            position: fixed;
+            top: -140px; /* matches the header height */
+            left: 0;
+            right: 0;
+            height: 130px; /* increased for more header height */
+            padding-bottom: 10px;
+        }
+
+        footer {
+            position: fixed;
+            bottom: -90px; /* increased space for client signature */
+            left: 0;
+            right: 0;
+            height: 90px; /* adjusted height for more signing space */
+        }
+
+        .logo {
+            width:200px;
+            margin-bottom: 10px;
+        }
+
+
+
+        .content {
+            margin-top: 0; /* Ensures minimal gap after header */
+            font-size: 12px;
+        }
+
+        table.main-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+
+        table.main-table td {
+            border: 1px solid #676767;
+            padding: 8px;
+            vertical-align: top;
+            font-size: 11px;
+            line-height: 0.9; /* Reduce line spacing */
+            white-space: pre-wrap;
+        }
+
+        table.main-table td.price {
+            text-align: right;
+            white-space: nowrap; /* prevents unwanted line-breaks in prices */
+        }
+
+        table.main-table .total-row {
+            font-weight: bold;
+            background-color: #e6e6e6;
+        }
+
+        table.main-table .header-row {
+            font-weight: bold;
+            background-color: #e6e6e6;
+        }
+
+        .price {
+            text-align:right;
+        }
+
+        .total-row {
+            font-weight:bold;
+            background-color:#e6e6e6;
+        }
+        .terms p {
+            font-size: 11px; /* Adjust to your desired size */
+        }
+
+        .condizioni {
+            margin-top: 20px;
+            font-size: 10px;
+            line-height: 1.2;
+        }

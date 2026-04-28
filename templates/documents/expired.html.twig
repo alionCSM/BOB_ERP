@@ -1,0 +1,205 @@
+{% extends "layout/base.html.twig" %}
+
+{#
+  Variables expected from DocumentsController::expired():
+    companyDocs – array of rows: company_id, company_name, tipo_documento, scadenza_norm
+    workerDocs  – array of rows: worker_id, worker_name, tipo_documento, scadenza_norm
+    totalExpired  – int
+    companyCount  – int
+    workerCount   – int
+    criticalCount – int  (docs > 30 days overdue)
+#}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/documents/expired.css">
+{% endblock %}
+
+{% block content %}
+<div class="ex-page">
+
+    <!-- ── HERO BANNER ─────────────────────── -->
+    <div class="ex-hero">
+        <svg class="ex-hero-watermark" viewBox="0 0 24 24" fill="white"><path d="M12 9a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3m0 8a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z"/></svg>
+
+        <div class="ex-hero-top">
+            <div class="ex-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+                <div class="ex-hero-title">Documenti Scaduti</div>
+                <div class="ex-hero-sub">Panoramica dei documenti che richiedono attenzione immediata</div>
+            </div>
+        </div>
+
+        <div class="ex-hero-pills">
+            <div class="ex-pill">
+                <span class="ex-pill-num">{{ totalExpired }}</span> Totale scaduti
+            </div>
+            <div class="ex-pill">
+                <span class="ex-pill-num">{{ companyCount }}</span> Aziendali
+            </div>
+            <div class="ex-pill">
+                <span class="ex-pill-num">{{ workerCount }}</span> Operai
+            </div>
+            {% if criticalCount > 0 %}
+            <div class="ex-pill" style="background:rgba(0,0,0,.25);">
+                <span class="ex-pill-num">{{ criticalCount }}</span> Oltre 30gg
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ─────────────────────────── -->
+    <div class="ex-toolbar">
+        <input type="text" class="ex-search" id="ex-search" placeholder="Cerca documento, azienda, operaio...">
+        <button class="ex-filter-btn active" data-filter="all">Tutti</button>
+        <button class="ex-filter-btn" data-filter="company">Aziendali</button>
+        <button class="ex-filter-btn" data-filter="worker">Operai</button>
+        <span class="ex-count-label" id="ex-count">{{ totalExpired }} risultat{{ totalExpired == 1 ? 'o' : 'i' }}</span>
+    </div>
+
+    <!-- ── COMPANY DOCS SECTION ────────────── -->
+    <div class="ex-section" data-section="company">
+        <div class="ex-section-head">
+            <div class="ex-section-icon" style="background:#dbeafe;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2.5"><path d="M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M8 21V11m8 10V11"/></svg>
+            </div>
+            <span class="ex-section-title">Documenti Aziendali</span>
+            <span class="ex-section-badge" style="background:#dbeafe;color:#1d4ed8;">{{ companyCount }}</span>
+        </div>
+
+        <div class="ex-table-wrap">
+            {% if companyDocs is empty %}
+                <div class="ex-empty">
+                    <div class="ex-empty-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <p class="ex-empty-text">Tutto in regola</p>
+                    <p class="ex-empty-sub">Nessun documento aziendale scaduto</p>
+                </div>
+            {% else %}
+                <table class="ex-table">
+                    <thead>
+                        <tr>
+                            <th>Azienda</th>
+                            <th>Tipo Documento</th>
+                            <th>Scadenza</th>
+                            <th>Scaduto da</th>
+                            <th style="text-align:center;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for doc in companyDocs %}
+                        {% set daysAgo = ((doc.scadenza_norm|date('U') - 'now'|date('U')) / 86400)|abs|round(0, 'floor') %}
+                        {% set isCritical = daysAgo > 30 %}
+                        {# Build initials from company_name (up to 2 words) #}
+                        {% set nameParts = doc.company_name|split(' ') %}
+                        {% set initials = nameParts[0]|first|upper ~ (nameParts[1] is defined ? nameParts[1]|first|upper : '') %}
+                        <tr class="ex-row" data-type="company">
+                            <td>
+                                <div class="ex-entity">
+                                    <div class="ex-avatar" style="background:linear-gradient(135deg,#1d4ed8,#0ea5e9);">{{ initials }}</div>
+                                    <span class="ex-entity-name">{{ doc.company_name }}</span>
+                                </div>
+                            </td>
+                            <td>{{ doc.tipo_documento }}</td>
+                            <td>
+                                <span class="ex-expiry {{ isCritical ? 'ex-expiry-critical' : 'ex-expiry-warning' }}">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    {{ doc.scadenza_norm|date('d/m/Y') }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="ex-days">{{ daysAgo }} giorn{{ daysAgo == 1 ? 'o' : 'i' }} fa</span>
+                            </td>
+                            <td style="text-align:center;">
+                                <a href="/companies/{{ doc.company_id }}" class="ex-view-link">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                    Apri
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── WORKER DOCS SECTION ─────────────── -->
+    <div class="ex-section" data-section="worker">
+        <div class="ex-section-head">
+            <div class="ex-section-icon" style="background:#ede9fe;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <span class="ex-section-title">Documenti Operai</span>
+            <span class="ex-section-badge" style="background:#ede9fe;color:#7c3aed;">{{ workerCount }}</span>
+        </div>
+
+        <div class="ex-table-wrap">
+            {% if workerDocs is empty %}
+                <div class="ex-empty">
+                    <div class="ex-empty-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    </div>
+                    <p class="ex-empty-text">Tutto in regola</p>
+                    <p class="ex-empty-sub">Nessun documento operaio scaduto</p>
+                </div>
+            {% else %}
+                <table class="ex-table">
+                    <thead>
+                        <tr>
+                            <th>Operaio</th>
+                            <th>Azienda</th>
+                            <th>Tipo Documento</th>
+                            <th>Scadenza</th>
+                            <th>Scaduto da</th>
+                            <th style="text-align:center;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for doc in workerDocs %}
+                        {% set daysAgo = ((doc.scadenza_norm|date('U') - 'now'|date('U')) / 86400)|abs|round(0, 'floor') %}
+                        {% set isCritical = daysAgo > 30 %}
+                        {% set nameParts = doc.worker_name|split(' ') %}
+                        {% set initials = nameParts[0]|first|upper ~ (nameParts[1] is defined ? nameParts[1]|first|upper : '') %}
+                        <tr class="ex-row" data-type="worker">
+                            <td>
+                                <div class="ex-entity">
+                                    <div class="ex-avatar" style="background:linear-gradient(135deg,#7c3aed,#a855f7);">{{ initials }}</div>
+                                    <span class="ex-entity-name">{{ doc.worker_name }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="ex-company-text">{{ doc.company_name }}</span>
+                            </td>
+                            <td>{{ doc.tipo_documento }}</td>
+                            <td>
+                                <span class="ex-expiry {{ isCritical ? 'ex-expiry-critical' : 'ex-expiry-warning' }}">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    {{ doc.scadenza_norm|date('d/m/Y') }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="ex-days">{{ daysAgo }} giorn{{ daysAgo == 1 ? 'o' : 'i' }} fa</span>
+                            </td>
+                            <td style="text-align:center;">
+                                <a href="/users/{{ doc.worker_id }}/edit?uid={{ doc.worker_uid }}" class="ex-view-link">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                    Apri
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/documents/expired.js"></script>
+{% endblock %}

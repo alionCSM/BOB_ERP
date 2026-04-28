@@ -1,0 +1,246 @@
+<link rel="stylesheet" href="/assets/css/views/dashboard/partials/dashboard_admin.css">
+
+<div class="da-page">
+
+    <!-- ── HERO ────────────────────────────────── -->
+    <div class="da-hero">
+        <div class="da-hero-content">
+            <h1 class="da-greeting">{{ greeting }}, {{ name }}</h1>
+            <p class="da-date">{{ today }}</p>
+        </div>
+    </div>
+
+    <!-- ── STAT CARDS ──────────────────────────── -->
+    <div class="da-stats">
+        <div class="da-stat">
+            <div class="da-stat-icon" style="background:#eff6ff;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <div>
+                <div class="da-stat-value">{{ totalUsers }}</div>
+                <div class="da-stat-label">Utenti registrati</div>
+                <div class="da-stat-sub">{{ activeUsers }} attivi</div>
+            </div>
+        </div>
+        <div class="da-stat">
+            <div class="da-stat-icon" style="background:#fef3c7;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            </div>
+            <div>
+                <div class="da-stat-value">{{ activeWorksites }}</div>
+                <div class="da-stat-label">Cantieri attivi</div>
+                <div class="da-stat-sub">{{ totalWorksites }} totali</div>
+            </div>
+        </div>
+        <div class="da-stat">
+            <div class="da-stat-icon" style="background:#ecfdf5;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </div>
+            <div>
+                <div class="da-stat-value">{{ todayAttendance }}</div>
+                <div class="da-stat-label">Presenze oggi</div>
+                <div class="da-stat-sub">{{ todayNostri }} nostri + {{ todayCons }} cons.</div>
+            </div>
+        </div>
+        <div class="da-stat">
+            <div class="da-stat-icon" style="background:{{ expiredDocs > 0 ? '#fef2f2' : (expiringDocs > 0 ? '#fffbeb' : '#ecfdf5') }};">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ expiredDocs > 0 ? '#dc2626' : (expiringDocs > 0 ? '#d97706' : '#059669') }}" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M12 12l-2 2"/><path d="M12 12l2 2"/></svg>
+            </div>
+            <div>
+                <div class="da-stat-value" style="color:{{ expiredDocs > 0 ? '#dc2626' : '#0f172a' }};">{{ expiredDocs }}</div>
+                <div class="da-stat-label">Documenti scaduti</div>
+                <div class="da-stat-sub">{{ expiringDocs }} in scadenza (30gg)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SYSTEM STATUS + SERVER RESOURCES ──── -->
+    <div class="da-grid-2">
+
+        <!-- System Status -->
+        <div class="da-section">
+            <div class="da-section-head">
+                <h3 class="da-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Stato Sistema
+                </h3>
+            </div>
+            <div class="da-section-body">
+                <div class="da-status-row">
+                    <span class="da-status-label">
+                        <span class="da-status-dot {{ dbStatus == 'Online' ? 'da-dot-green' : 'da-dot-red' }}"></span>
+                        Database MySQL
+                    </span>
+                    <span class="da-status-val">{{ dbStatus }}</span>
+                </div>
+                <div class="da-status-row">
+                    <span class="da-status-label">
+                        <span class="da-status-dot {{ mailStatus == 'Operativo' ? 'da-dot-green' : (mailStatus == 'Non configurato' ? 'da-dot-gray' : 'da-dot-red') }}"></span>
+                        Mail Service
+                    </span>
+                    <span class="da-status-val">{{ mailStatus }}</span>
+                </div>
+                <div class="da-status-row">
+                    <span class="da-status-label">
+                        <span class="da-status-dot {{ storageStatus == 'Online' ? 'da-dot-green' : (storageStatus == 'Sola lettura' ? 'da-dot-yellow' : 'da-dot-red') }}"></span>
+                        Cloud Storage (NFS)
+                    </span>
+                    <span class="da-status-val">
+                        {{ storageStatus }}{% if storageLatency is not null %} <span style="color:#94a3b8;font-weight:400;">{{ storageLatency }}ms</span>{% endif %}
+                    </span>
+                </div>
+                <div class="da-status-row">
+                    <span class="da-status-label">
+                        <span class="da-status-dot da-dot-green"></span>
+                        PHP Runtime
+                    </span>
+                    <span class="da-status-val">{{ phpMemoryUsage }} / {{ phpMemoryLimit }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Server Resources -->
+        <div class="da-section">
+            <div class="da-section-head">
+                <h3 class="da-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                    Risorse Server
+                </h3>
+            </div>
+            <div class="da-section-body">
+                <!-- CPU -->
+                <div class="da-status-row">
+                    <span class="da-status-label">CPU Load</span>
+                    <span class="da-status-val" style="color:{{ cpuLoad > 4 ? '#dc2626' : (cpuLoad > 2 ? '#d97706' : '#059669') }};">{{ cpuLoad }}</span>
+                </div>
+                <!-- RAM -->
+                <div style="padding: 8px 0;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:13px;color:#475569;">RAM</span>
+                        <span style="font-size:13px;font-weight:600;color:#1e293b;">{{ ramPercent }}%</span>
+                    </div>
+                    <div class="da-progress-bg">
+                        <div class="da-progress-fill" style="width:{{ ramPercent }}%;background:{{ ramPercent > 85 ? '#dc2626' : (ramPercent > 60 ? '#d97706' : '#6366f1') }};"></div>
+                    </div>
+                    <div class="da-progress-info"><span>{{ ramUsedGB }} GB usati</span><span>{{ ramTotalGB }} GB totali</span></div>
+                </div>
+                <!-- Disk -->
+                <div style="padding: 8px 0;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:13px;color:#475569;">Disco Server</span>
+                        <span style="font-size:13px;font-weight:600;color:#1e293b;">{{ diskPercent }}%</span>
+                    </div>
+                    <div class="da-progress-bg">
+                        <div class="da-progress-fill" style="width:{{ diskPercent }}%;background:{{ diskPercent > 85 ? '#dc2626' : (diskPercent > 60 ? '#d97706' : '#6366f1') }};"></div>
+                    </div>
+                    <div class="da-progress-info"><span>{{ diskUsedGB }} GB usati</span><span>{{ diskTotalGB }} GB totali</span></div>
+                </div>
+                {% if cloudPercent is not null %}
+                <!-- Cloud -->
+                <div style="padding: 8px 0 0;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                        <span style="font-size:13px;color:#475569;">Cloud NFS</span>
+                        <span style="font-size:13px;font-weight:600;color:#1e293b;">{{ cloudPercent }}%</span>
+                    </div>
+                    <div class="da-progress-bg">
+                        <div class="da-progress-fill" style="width:{{ cloudPercent }}%;background:{{ cloudPercent > 85 ? '#dc2626' : (cloudPercent > 60 ? '#d97706' : '#6366f1') }};"></div>
+                    </div>
+                    <div class="da-progress-info"><span>{{ cloudUsedGB }} GB usati</span><span>{{ cloudTotalGB }} GB totali</span></div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── USER ANALYTICS ──────────────────────── -->
+    <div class="da-grid-3">
+
+        <!-- Online Users -->
+        <div class="da-section">
+            <div class="da-section-head">
+                <h3 class="da-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                    Utenti online
+                </h3>
+                <span class="da-section-badge" id="online-count" style="background:#ecfdf5;color:#059669;">{{ onlineCount }}</span>
+            </div>
+            <div class="da-section-body" id="online-users" style="max-height:320px;overflow-y:auto;">
+                {% if not onlineUsers %}
+                    <div class="da-empty">Nessun utente online</div>
+                {% endif %}
+                {% set uColors = ['#6366f1','#0ea5e9','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#ef4444','#22c55e'] %}
+                {% for u in onlineUsers %}
+                    {% set uInit = u.first_name|slice(0,1)|upper %}
+                    {% set uColor = uColors[loop.index0 % uColors|length] %}
+                    <div class="da-user-row">
+                        <div class="da-user-avatar" style="background:{{ uColor }};">{{ uInit }}</div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="da-user-name">{{ u.first_name }}</div>
+                            <div class="da-user-page">{{ u.page|friendly_page }}</div>
+                        </div>
+                        <div class="da-user-pulse"></div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Top Users Today -->
+        <div class="da-section">
+            <div class="da-section-head">
+                <h3 class="da-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    Top utenti oggi
+                </h3>
+            </div>
+            <div class="da-section-body" id="top-users">
+                {% if not topUsers %}
+                    <div class="da-empty">Nessun dato disponibile</div>
+                {% endif %}
+                {% for u in topUsers %}
+                    {% set rankClass = loop.index0 == 0 ? 'da-rank-1' : (loop.index0 == 1 ? 'da-rank-2' : (loop.index0 == 2 ? 'da-rank-3' : 'da-rank-n')) %}
+                    {% set secs = u.total_seconds|default(0)|number_format(0, '.', '') %}
+                    {% set hrs = (secs / 3600)|round(0, 'floor') %}
+                    {% set mins = ((secs % 3600) / 60)|round(0, 'floor') %}
+                    <div class="da-top-row">
+                        <div class="da-top-rank {{ rankClass }}">{{ loop.index }}</div>
+                        <div class="da-top-name">{{ u.first_name }}</div>
+                        <div class="da-top-time">{% if hrs > 0 %}{{ hrs }}h {{ mins }}m{% else %}{{ mins }}m{% endif %}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="da-section">
+            <div class="da-section-head">
+                <h3 class="da-section-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Attività recenti
+                </h3>
+            </div>
+            <div class="da-section-body" id="recent-actions" style="max-height:320px;overflow-y:auto;">
+                {% if not recentActions %}
+                    <div class="da-empty">Nessuna attività recente</div>
+                {% endif %}
+                {% for r in recentActions %}
+                    <div class="da-act-row">
+                        <div class="da-act-dot"></div>
+                        <div style="min-width:0;">
+                            <div>
+                                <span class="da-act-name">{{ r.first_name }}</span>
+                                <span class="da-act-action">{{ r.action|friendly_action }}</span>
+                            </div>
+                            <span class="da-act-page">{{ r.page|friendly_page }}</span>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ================= AUTO REFRESH ================= -->
+<script src="/assets/js/views/dashboard/partials/dashboard_admin.js"></script>

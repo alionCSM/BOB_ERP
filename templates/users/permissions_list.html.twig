@@ -1,0 +1,128 @@
+{% extends 'layout/base.html.twig' %}
+
+{# Data provided by UsersController::permissionsList()
+   Variables: users, allModules (assoc key→label), totalUsers, totalModules
+   TODO: controller must build $users, $allModules, $totalUsers, $totalModules
+         and pass them to this template instead of building them in the old view. #}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/users/permissions_list.css">
+{% endblock %}
+
+{% block content %}
+{% set avatarColors = [
+    'linear-gradient(135deg,#1d4ed8,#0ea5e9)',
+    'linear-gradient(135deg,#7c3aed,#a855f7)',
+    'linear-gradient(135deg,#0f766e,#14b8a6)',
+    'linear-gradient(135deg,#b45309,#f59e0b)',
+    'linear-gradient(135deg,#be185d,#ec4899)',
+    'linear-gradient(135deg,#4338ca,#6366f1)',
+    'linear-gradient(135deg,#15803d,#22c55e)',
+    'linear-gradient(135deg,#9333ea,#c084fc)',
+] %}
+
+<div class="pm-page">
+
+    <!-- ── HERO ────────────────────────────── -->
+    <div class="pm-hero">
+        <svg class="pm-hero-wm" viewBox="0 0 24 24" fill="white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <div class="pm-hero-top">
+            <div class="pm-hero-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+                <div class="pm-hero-title">Gestione Permessi</div>
+                <div class="pm-hero-sub">Controlla accessi e moduli per ogni utente</div>
+            </div>
+        </div>
+        <div class="pm-hero-pills">
+            <div class="pm-pill"><span class="pm-pill-num">{{ totalUsers }}</span> Utenti</div>
+            <div class="pm-pill"><span class="pm-pill-num">{{ totalModules }}</span> Moduli</div>
+        </div>
+    </div>
+
+    <!-- ── TOOLBAR ─────────────────────────── -->
+    <div class="pm-toolbar">
+        <input type="text" class="pm-search" id="pm-search" placeholder="Cerca utente...">
+        <span class="pm-count" id="pm-count">{{ totalUsers }} utent{{ totalUsers == 1 ? 'e' : 'i' }}</span>
+        <a href="/users/bob/create" class="pm-act-btn" style="margin-left:auto; background:linear-gradient(135deg,#1e40af,#3b82f6); color:#fff; border:none; font-weight:700; box-shadow:0 3px 10px rgba(59,130,246,.25);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuovo Utente
+        </a>
+    </div>
+
+    <!-- ── TABLE ───────────────────────────── -->
+    <div class="pm-table-wrap">
+        <table class="pm-table" id="pm-table">
+            <thead>
+                <tr>
+                    <th>Utente</th>
+                    <th>Azienda</th>
+                    <th>Permessi</th>
+                    <th style="text-align:center;">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for i, u in users %}
+                {% set activeModules = u.active_modules ? u.active_modules|split(',') : [] %}
+                {% set activeCount = activeModules|length %}
+                {% set isSuperAdmin = u.id == 1 %}
+                {% set pct = totalModules > 0 ? (activeCount / totalModules * 100)|round : 0 %}
+                {% set color = avatarColors[i % avatarColors|length] %}
+                {% set initial = u.username|slice(0,2)|upper %}
+                {% if pct >= 70 %}{% set barColor = '#22c55e' %}
+                {% elseif pct >= 30 %}{% set barColor = '#f59e0b' %}
+                {% elseif activeCount > 0 %}{% set barColor = '#ef4444' %}
+                {% else %}{% set barColor = '#cbd5e1' %}{% endif %}
+                <tr class="pm-row" onclick="window.location='/users/permissions/{{ u.id }}'">
+                    <td>
+                        <div class="pm-entity">
+                            <div class="pm-avatar" style="background:{{ color }};">{{ initial }}</div>
+                            <div>
+                                <div class="pm-name">{{ u.username }}</div>
+                                {% if u.email is not empty %}
+                                    <div class="pm-email">{{ u.email }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if u.company_name is not empty %}
+                            <span class="pm-company-badge">{{ u.company_name }}</span>
+                        {% else %}
+                            <span style="color:#cbd5e1;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if isSuperAdmin %}
+                            <span class="pm-admin-badge">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                Super Admin
+                            </span>
+                        {% else %}
+                            <div class="pm-perm-wrap">
+                                <span class="pm-perm-count">{{ activeCount }}/{{ totalModules }}</span>
+                                <div class="pm-perm-bar-bg">
+                                    <div class="pm-perm-bar-fill" style="width:{{ pct }}%;background:{{ barColor }};"></div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;" onclick="event.stopPropagation();">
+                        <a href="/users/permissions/{{ u.id }}" class="pm-act-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            Gestisci
+                        </a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/users/permissions_list.js"></script>
+{% endblock %}
