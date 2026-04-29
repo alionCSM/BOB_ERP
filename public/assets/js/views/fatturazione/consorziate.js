@@ -17,6 +17,23 @@ document.addEventListener('click', function (e) {
     }
 });
 
+// ── Index page: live search filter ────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function () {
+    var input = document.getElementById('fc-search');
+    var table = document.getElementById('fc-table');
+    if (!input || !table) return;
+
+    input.addEventListener('input', function () {
+        var q = (input.value || '').trim().toLowerCase();
+        var rows = table.querySelectorAll('tbody tr[data-search]');
+        rows.forEach(function (tr) {
+            var hay = tr.dataset.search || '';
+            tr.style.display = (q === '' || hay.indexOf(q) !== -1) ? '' : 'none';
+        });
+    });
+});
+
 // ── Confirm delete forms ──────────────────────────────────────────────────────
 
 document.addEventListener('submit', function (e) {

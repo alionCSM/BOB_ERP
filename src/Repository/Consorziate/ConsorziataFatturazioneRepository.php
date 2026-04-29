@@ -83,6 +83,13 @@ final class ConsorziataFatturazioneRepository
                       AND  o.worksite_id     = w.id
                       AND  o.order_date <= :to1
                 ), 0)                                                             AS valore_ordine,
+                (
+                    SELECT MAX(o2.order_date)
+                    FROM   bb_ordini o2
+                    WHERE  o2.destinatario_id = :aid5
+                      AND  o2.worksite_id     = w.id
+                      AND  o2.order_date <= :to2
+                )                                                                 AS data_ordine,
                 COALESCE((
                     SELECT SUM(pg.importo)
                     FROM   bb_pagamenti_consorziate pg
@@ -116,6 +123,8 @@ final class ConsorziataFatturazioneRepository
             ':aid2' => $aziendaId,
             ':aid4' => $aziendaId,
             ':aid3' => $aziendaId,
+            ':aid5' => $aziendaId,
+            ':to2'  => $to,
             ':from' => $from,
             ':to'   => $to,
         ]);
