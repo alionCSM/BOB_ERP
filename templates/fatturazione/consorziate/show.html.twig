@@ -130,6 +130,7 @@
                                     <th class="right">Presenze (gg)</th>
                                     <th class="right">Costo presenze</th>
                                     <th class="right">Valore ordine</th>
+                                    <th class="right">Data ordine</th>
                                     <th class="right">Già pagato</th>
                                     <th class="right">Spese a carico</th>
                                     <th class="right">Residuo</th>
@@ -154,6 +155,13 @@
                                     <td class="right">
                                         {% if r.valore_ordine > 0 %}
                                             € {{ r.valore_ordine|number_format(2, ',', '.') }}
+                                        {% else %}
+                                            <span class="fp-dash">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="right" style="white-space:nowrap;">
+                                        {% if r.data_ordine %}
+                                            {{ r.data_ordine|date('d/m/Y') }}
                                         {% else %}
                                             <span class="fp-dash">—</span>
                                         {% endif %}
@@ -195,6 +203,7 @@
                                     <td class="right fp-muted" colspan="2">Totali</td>
                                     <td class="right">€ {{ totalCosto|number_format(2, ',', '.') }}</td>
                                     <td class="right">€ {{ totalOrdine|number_format(2, ',', '.') }}</td>
+                                    <td class="right"></td>
                                     <td class="right">€ {{ totalGiaPagato|number_format(2, ',', '.') }}</td>
                                     <td class="right">{% if totalSpese > 0 %}<span class="fp-danger">€ {{ totalSpese|number_format(2, ',', '.') }}</span>{% else %}—{% endif %}</td>
                                     <td class="right" id="tot-residuo"></td>

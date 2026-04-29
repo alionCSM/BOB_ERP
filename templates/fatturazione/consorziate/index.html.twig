@@ -64,7 +64,15 @@
         </div>
     {% else %}
         <div class="fc-table-wrap">
-            <table class="fc-table">
+            <div style="padding:12px 12px 0 12px;">
+                <input type="search"
+                       id="fc-search"
+                       class="form-control"
+                       placeholder="Cerca consorziata per nome o codice…"
+                       autocomplete="off"
+                       style="max-width:420px;">
+            </div>
+            <table class="fc-table" id="fc-table">
                 <thead>
                     <tr>
                         <th>Consorziata</th>
@@ -76,7 +84,7 @@
                 </thead>
                 <tbody>
                     {% for c in consorziate %}
-                    <tr>
+                    <tr data-search="{{ (c.name ~ ' ' ~ (c.codice ?? ''))|lower|e('html_attr') }}">
                         <td>
                             <span class="fc-name">{{ c.name }}</span>
                             {% if c.codice %}<span class="fc-code">({{ c.codice }})</span>{% endif %}
