@@ -53,6 +53,10 @@ final class ConsorziataFatturazioneController
         $rows     = $this->repo->getDetailRows($id, $from, $to);
         $payments = $this->repo->getPayments($id);
 
+        // Orders per cantiere, used by the payment form's ordine dropdown
+        $worksiteIds = array_map('intval', array_column($rows, 'worksite_id'));
+        $ordiniByWorksite = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
+
         // Pre-compute totals for Twig (avoids |sum(attribute=...) filter issues)
         $totalPresenze     = array_sum(array_column($rows, 'presenze_gg'));
         $totalCosto        = array_sum(array_column($rows, 'costo_presenze'));
@@ -66,7 +70,7 @@ final class ConsorziataFatturazioneController
 
         Response::view('fatturazione/consorziate/show.html.twig', $request, compact(
             'consorziata', 'from', 'to', 'fromLabel', 'toLabel',
-            'rows', 'payments',
+            'rows', 'payments', 'ordiniByWorksite',
             'totalPresenze', 'totalCosto', 'totalOrdine', 'totalGiaPagato', 'totalSpese', 'totalStorico'
         ));
     }
@@ -117,6 +121,7 @@ final class ConsorziataFatturazioneController
         $nota          = trim($_POST['nota'] ?? '') ?: null;
         $worksiteIds   = $_POST['worksite_id'] ?? [];
         $importi       = $_POST['importo']     ?? [];
+        $ordineIds     = $_POST['ordine_id']   ?? [];
 
         if (!$dataPagamento || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $dataPagamento)) {
             $_SESSION['error'] = 'Data pagamento non valida.';
@@ -128,12 +133,14 @@ final class ConsorziataFatturazioneController
             $worksiteId = (int)$worksiteId;
             $rawImporto = str_replace(['.', ','], ['', '.'], trim((string)($importi[$idx] ?? '')));
             $importo    = (float)$rawImporto;
+            $ordineId   = (int)($ordineIds[$idx] ?? 0);
+            $ordineId   = $ordineId > 0 ? $ordineId : null;
 
             if ($worksiteId <= 0 || $importo <= 0) {
                 continue;
             }
 
-            $this->repo->insertPayment($id, $worksiteId, $importo, $dataPagamento, $nota, $userId);
+            $this->repo->insertPayment($id, $worksiteId, $importo, $dataPagamento, $nota, $userId, $ordineId);
             $saved++;
         }
 
