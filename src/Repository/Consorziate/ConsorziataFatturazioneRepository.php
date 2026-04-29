@@ -131,10 +131,46 @@ final class ConsorziataFatturazioneRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    // ── Ordini per cantiere (for the payment form dropdown) ──────────────────
+
+    /**
+     * All orders for a consorziata across the supplied worksite ids, up to
+     * the period end. Returns rows grouped by worksite_id for easy lookup
+     * in the template.
+     *
+     * @param  int[]  $worksiteIds
+     * @return array<int, array<int, array{id:int, order_number:string, order_date:?string, total:float}>>
+     */
+    public function getOrdiniByWorksite(int $aziendaId, array $worksiteIds, string $to): array
+    {
+        if (empty($worksiteIds)) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
+        $sql = "
+            SELECT id, worksite_id, order_number, order_date, total
+            FROM   bb_ordini
+            WHERE  destinatario_id = ?
+              AND  worksite_id IN ({$placeholders})
+              AND  order_date <= ?
+            ORDER BY worksite_id ASC, order_date DESC, id DESC
+        ";
+        $params = array_merge([$aziendaId], $worksiteIds, [$to]);
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+
+        $byWorksite = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $byWorksite[(int)$row['worksite_id']][] = $row;
+        }
+        return $byWorksite;
+    }
+
     // ── Storico pagamenti ─────────────────────────────────────────────────────
 
     /**
-     * All payment rows for a consorziata, newest first, joined to worksite name.
+     * All payment rows for a consorziata, newest first, joined to worksite
+     * name and (when set) the linked order.
      */
     public function getPayments(int $aziendaId): array
     {
@@ -145,10 +181,14 @@ final class ConsorziataFatturazioneRepository
                 pg.data_pagamento,
                 pg.note,
                 pg.created_at,
+                pg.ordine_id,
                 w.worksite_code,
-                w.name AS worksite_name
+                w.name AS worksite_name,
+                o.order_number,
+                o.order_date
             FROM bb_pagamenti_consorziate pg
             INNER JOIN bb_worksites w ON w.id = pg.worksite_id
+            LEFT  JOIN bb_ordini    o ON o.id = pg.ordine_id
             WHERE pg.azienda_id = :aid
             ORDER BY pg.data_pagamento DESC, pg.created_at DESC
         ");
@@ -164,17 +204,19 @@ final class ConsorziataFatturazioneRepository
         float   $importo,
         string  $dataPagamento,
         ?string $note,
-        int     $createdBy
+        int     $createdBy,
+        ?int    $ordineId = null
     ): void {
         $stmt = $this->conn->prepare("
             INSERT INTO bb_pagamenti_consorziate
-                (azienda_id, worksite_id, importo, data_pagamento, note, created_by)
+                (azienda_id, worksite_id, ordine_id, importo, data_pagamento, note, created_by)
             VALUES
-                (:aid, :wid, :importo, :data, :note, :uid)
+                (:aid, :wid, :oid, :importo, :data, :note, :uid)
         ");
         $stmt->execute([
             ':aid'    => $aziendaId,
             ':wid'    => $worksiteId,
+            ':oid'    => $ordineId,
             ':importo'=> $importo,
             ':data'   => $dataPagamento,
             ':note'   => $note ?: null,

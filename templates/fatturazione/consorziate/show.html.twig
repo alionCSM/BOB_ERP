@@ -134,6 +134,7 @@
                                     <th class="right">Già pagato</th>
                                     <th class="right">Spese a carico</th>
                                     <th class="right">Residuo</th>
+                                    <th style="min-width:170px;">Ordine da pagare</th>
                                     <th class="right" style="min-width:150px;">Da pagare (€)</th>
                                 </tr>
                             </thead>
@@ -186,6 +187,19 @@
                                             € {{ residuo|number_format(2, ',', '.') }}
                                         </span>
                                     </td>
+                                    <td>
+                                        {% set wsOrdini = ordiniByWorksite[r.worksite_id] ?? [] %}
+                                        <select name="ordine_id[]" class="fp-input">
+                                            <option value="">— nessuno —</option>
+                                            {% for o in wsOrdini %}
+                                                <option value="{{ o.id }}"{{ wsOrdini|length == 1 ? ' selected' : '' }}>
+                                                    {{ o.order_number ?: ('Ordine #' ~ o.id) }}
+                                                    {% if o.order_date %} · {{ o.order_date|date('d/m/Y') }}{% endif %}
+                                                    {% if o.total %} · € {{ o.total|number_format(0, ',', '.') }}{% endif %}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
                                     <td class="right">
                                         <input type="number"
                                                name="importo[]"
@@ -207,6 +221,7 @@
                                     <td class="right">€ {{ totalGiaPagato|number_format(2, ',', '.') }}</td>
                                     <td class="right">{% if totalSpese > 0 %}<span class="fp-danger">€ {{ totalSpese|number_format(2, ',', '.') }}</span>{% else %}—{% endif %}</td>
                                     <td class="right" id="tot-residuo"></td>
+                                    <td></td>
                                     <td class="right" id="tot-da-pagare">—</td>
                                 </tr>
                             </tfoot>
@@ -265,6 +280,7 @@
                             <tr>
                                 <th>Data</th>
                                 <th>Cantiere</th>
+                                <th>Ordine</th>
                                 <th class="right">Importo</th>
                                 <th>Note</th>
                                 <th>Registrato il</th>
@@ -278,6 +294,14 @@
                                 <td>
                                     {% if p.worksite_code %}<span class="fp-code">{{ p.worksite_code }}</span>{% endif %}
                                     {{ p.worksite_name }}
+                                </td>
+                                <td style="white-space:nowrap;">
+                                    {% if p.ordine_id %}
+                                        {{ p.order_number ?: ('Ordine #' ~ p.ordine_id) }}
+                                        {% if p.order_date %}<span class="fp-muted" style="font-size:11px;"> · {{ p.order_date|date('d/m/Y') }}</span>{% endif %}
+                                    {% else %}
+                                        <span class="fp-dash">—</span>
+                                    {% endif %}
                                 </td>
                                 <td class="right fp-success">€ {{ p.importo|number_format(2, ',', '.') }}</td>
                                 <td class="fp-muted" style="font-size:12px;">{{ p.note ?? '—' }}</td>
@@ -298,7 +322,7 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="2" class="right fp-muted">Totale pagato</td>
+                                <td colspan="3" class="right fp-muted">Totale pagato</td>
                                 <td class="right">€ {{ totalStorico|number_format(2, ',', '.') }}</td>
                                 <td colspan="3"></td>
                             </tr>
