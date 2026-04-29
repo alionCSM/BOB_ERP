@@ -182,7 +182,7 @@ final class CompaniesController
 
         $doc = $this->ctrl->getDocumentById($id);
         if (!$doc) {
-            Response::error('Documento non trovato', 404);
+            render_not_found_and_exit();
         }
 
         $canManageAll = (int)$user->id === 1 || !empty($user->permissions['companies']);
@@ -213,10 +213,11 @@ final class CompaniesController
             $canManageAll = (int)$user->id === 1 || !empty($user->permissions['companies']);
             if (!$canManageAll && isCompanyScopedUserByContext($this->conn, $user)) {
                 $doc = $this->ctrl->getDocumentById((int)$_POST['document_id']);
-                if (!$doc) throw new \Exception('Documento non trovato.');
                 $allowedIds = getCompanyScopeAllowedIds($this->conn, $user);
-                if (!in_array((int)$doc['company_id'], $allowedIds, true)) {
-                    throw new \Exception('Accesso negato.');
+                // Render the same response whether the doc doesn't exist or is
+                // out of scope, so callers can't distinguish the two.
+                if (!$doc || !in_array((int)$doc['company_id'], $allowedIds, true)) {
+                    render_not_found_and_exit();
                 }
             }
 
@@ -240,7 +241,7 @@ final class CompaniesController
             if (!$canManageAll && isCompanyScopedUserByContext($this->conn, $user)) {
                 $allowedIds = getCompanyScopeAllowedIds($this->conn, $user);
                 if (!in_array((int)$_POST['company_id'], $allowedIds, true)) {
-                    throw new \Exception('Accesso negato.');
+                    render_not_found_and_exit();
                 }
             }
 
@@ -321,7 +322,7 @@ final class CompaniesController
         $ctrl = new CompanyController($this->conn);
         $doc  = $ctrl->getDocumentById($docId);
         if (!$doc) {
-            Response::error('Documento non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         assertCompanyScopeCompanyDocAccess($this->conn, $request->user(), (int)$doc['company_id']);
@@ -330,11 +331,11 @@ final class CompaniesController
         $filePath  = realpath($cloudBase . '/' . $doc['file_path']);
 
         if (!$filePath || !file_exists($filePath)) {
-            Response::error('File non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         if (strpos($filePath, $cloudBase) !== 0) {
-            Response::error('Percorso non valido.', 403);
+            render_not_found_and_exit();
         }
 
         header('Content-Type: application/pdf');
