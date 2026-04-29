@@ -133,6 +133,11 @@ final class CompaniesController
 
     public function update(Request $request): void
     {
+        $user = $request->user();
+        if ((int)$user->id !== 1 && !($user->permissions['companies'] ?? false)) {
+            Response::error('Accesso negato', 403);
+        }
+
         $id   = $request->intParam('id');
         $data = [
             'name'        => $request->post('name', ''),
@@ -146,6 +151,11 @@ final class CompaniesController
 
     public function destroy(Request $request): void
     {
+        $user = $request->user();
+        if ((int)$user->id !== 1 && !($user->permissions['companies'] ?? false)) {
+            Response::error('Accesso negato', 403);
+        }
+
         $id = $request->intParam('id');
         try {
             // Get company name before deletion

@@ -331,7 +331,7 @@ final class WorksitesController
                 $mail->addCC('info@csmontaggi.it');
 
                 $appUrl         = rtrim($_ENV['APP_URL'], '/');
-                $activationLink = $appUrl . "/worksites/activate/{$draftId}";
+                $activationLink = $appUrl . "/worksites/{$draftId}/activate";
 
                 $mail->Subject = "🚧 Cantiere in bozza – azione richiesta";
 

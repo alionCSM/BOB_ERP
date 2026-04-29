@@ -73,15 +73,18 @@
             </li>
             <li class="side-nav__devider my-6"></li>
 
-            {# ── AI CHAT ── #}
-            {% set aiChatActive = currentPath starts with '/ai' %}
-            <li>
-                <a href="/ai/chat" class="side-menu {{ aiChatActive ? 'side-menu--active' : '' }}">
-                    <div class="side-menu__icon"><i data-lucide="cpu"></i></div>
-                    <div class="side-menu__title">BOB AI</div>
-                </a>
-            </li>
-            <li class="side-nav__devider my-6"></li>
+            {# ── AI CHAT — restricted to a small allowlist (mirrors AiSqlController::USERS_WITH_AI_ACCESS) ── #}
+            {% set aiAllowedUsers = ['alion', 'laura', 'osman', 'elena', 'ermal'] %}
+            {% if user.id == 1 or user.username in aiAllowedUsers %}
+                {% set aiChatActive = currentPath starts with '/ai' %}
+                <li>
+                    <a href="/ai/chat" class="side-menu {{ aiChatActive ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="cpu"></i></div>
+                        <div class="side-menu__title">BOB AI</div>
+                    </a>
+                </li>
+                <li class="side-nav__devider my-6"></li>
+            {% endif %}
 
         {% endif %}
 

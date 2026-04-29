@@ -67,7 +67,8 @@ final class AuthController
 
         // 3) POST handler
         if (!$autoRedirect && $_SERVER['REQUEST_METHOD'] === 'POST') {
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $username = (string)($_POST['username'] ?? '');
 
             // Rate limiting: max 5 failed attempts per IP per 15 minutes
             $countStmt = $this->conn->prepare("
@@ -80,7 +81,21 @@ final class AuthController
             $failCount = (int)$rateRow['cnt'];
             $lastAt    = $rateRow['last_at'];
 
-            if ($failCount >= 5) {
+            // Per-account lockout: 10 failed attempts on the same username
+            // across any IP within 15 minutes. Defends against distributed
+            // brute-force where the IP-only limit is trivially bypassed.
+            $userFailCount = 0;
+            if ($username !== '') {
+                $userStmt = $this->conn->prepare("
+                    SELECT COUNT(*) AS cnt
+                    FROM bb_login_attempts
+                    WHERE username = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+                ");
+                $userStmt->execute([$username]);
+                $userFailCount = (int)$userStmt->fetch(\PDO::FETCH_ASSOC)['cnt'];
+            }
+
+            if ($failCount >= 5 || $userFailCount >= 10) {
                 http_response_code(429);
                 $error = 'Troppi tentativi di accesso. Riprova tra 15 minuti.';
             } elseif ($failCount > 0 && $lastAt !== null) {
@@ -196,8 +211,8 @@ final class AuthController
 
                 } else {
                     $this->conn->prepare(
-                        "INSERT INTO bb_login_attempts (ip_address, attempted_at) VALUES (?, NOW())"
-                    )->execute([$ip]);
+                        "INSERT INTO bb_login_attempts (ip_address, username, attempted_at) VALUES (?, ?, NOW())"
+                    )->execute([$ip, $username !== '' ? $username : null]);
                     $error = 'Nome utente o password non corretti.';
                 }
             }
@@ -288,6 +303,23 @@ final class AuthController
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($pageError)) {
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+            // Rate limiting: max 5 failed verify attempts per IP per 15 minutes
+            $countStmt = $this->conn->prepare("
+                SELECT COUNT(*) AS cnt
+                FROM bb_login_attempts
+                WHERE ip_address = ? AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+            ");
+            $countStmt->execute([$ip]);
+            $failCount = (int)$countStmt->fetch(\PDO::FETCH_ASSOC)['cnt'];
+
+            if ($failCount >= 5) {
+                http_response_code(429);
+                $error = 'Troppi tentativi. Riprova tra 15 minuti.';
+                Response::view('auth/verify_login.html.twig', $request, compact('pageError', 'error', 'maskedEmail', 'appUrl'));
+            }
+
             $code = trim($_POST['code'] ?? '');
 
             if ($user->verifyLoginCode($token, $code)) {
@@ -310,6 +342,11 @@ final class AuthController
 
                 Response::redirect('/');
             }
+
+            // Log failed attempt for rate limiting
+            $this->conn->prepare(
+                "INSERT INTO bb_login_attempts (ip_address, username, attempted_at) VALUES (?, ?, NOW())"
+            )->execute([$ip, !empty($user->username) ? $user->username : null]);
 
             $error = 'Codice non valido o scaduto.';
         }
