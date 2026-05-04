@@ -96,6 +96,21 @@ document.addEventListener('DOMContentLoaded', function () {
         aggiungiRiga('', '');
     }
 
+    // "Aggiungi riga" button — appends a fresh empty item row
+    const addRowBtn = document.getElementById('add-row');
+    if (addRowBtn) {
+        addRowBtn.addEventListener('click', function () {
+            aggiungiRiga('', '');
+            // Focus the description of the just-added row for fast entry
+            const rows = document.querySelectorAll('#items-container .item-row');
+            const last = rows[rows.length - 1];
+            if (last) {
+                const desc = last.querySelector('.description-field');
+                if (desc) desc.focus();
+            }
+        });
+    }
+
     // File input change handler - show uploaded PDF info
     const fileInput = document.getElementById('offer_pdf');
     if (fileInput) {
@@ -310,7 +325,26 @@ document.addEventListener('click', function(e) {
 // --------------------------------------------------------------
 // Submit: serializzo le righe
 // --------------------------------------------------------------
-document.querySelector('form').addEventListener('submit', function () {
+document.querySelector('form').addEventListener('submit', function (e) {
+    // Count rows where exactly one of (descrizione, importo) is filled —
+    // those would otherwise be silently dropped on save. Warn the operator
+    // before continuing.
+    let partial = 0;
+    document.querySelectorAll('#items-container .item-row').forEach(riga => {
+        let d = riga.querySelector('.description-field')?.value.trim();
+        let a = riga.querySelector('.amount-field')?.value.trim();
+        if ((d && !a) || (!d && a)) partial++;
+    });
+    if (partial > 0) {
+        const msg = partial === 1
+            ? "C'è 1 riga incompleta (descrizione senza prezzo o viceversa). Verrà scartata. Procedere?"
+            : "Ci sono " + partial + " righe incomplete (descrizione senza prezzo o viceversa). Verranno scartate. Procedere?";
+        if (!confirm(msg)) {
+            e.preventDefault();
+            return;
+        }
+    }
+
     let items = [];
 
     document.querySelectorAll('#items-container .item-row').forEach(riga => {

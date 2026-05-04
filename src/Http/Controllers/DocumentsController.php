@@ -220,7 +220,7 @@ final class DocumentsController
         $doc = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$doc) {
-            Response::error('Documento non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         assertCompanyScopeWorkerAccess($this->conn, $request->user(), (int)$doc['worker_id']);
@@ -229,11 +229,11 @@ final class DocumentsController
         $filePath      = realpath($cloudBasePath . '/' . $doc['path']);
 
         if (!$filePath || !file_exists($filePath)) {
-            Response::error('File non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         if (strpos($filePath, $cloudBasePath) !== 0) {
-            Response::error('Percorso non valido.', 403);
+            render_not_found_and_exit();
         }
 
         header('Content-Type: application/pdf');

@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <textarea name="item_desc[]" placeholder="Descrizione..." rows="2" autocomplete="off">${escText(data.descrizione || '')}</textarea>
             <input type="text"   name="item_um[]"     placeholder="N" value="${esc(data.um || 'N')}" style="text-align:center;" autocomplete="off">
             <input type="number" name="item_qta[]"    placeholder="1" value="${esc(data.qta || '1')}" step="0.001" min="0" class="text-right" autocomplete="off">
-            <input type="number" name="item_prezzo[]" placeholder="0,00" value="${esc(data.prezzo_unitario || '')}" step="0.01" min="0" class="text-right" autocomplete="off">
+            <input type="number" name="item_prezzo[]" placeholder="0,00" value="${esc(data.prezzo_unitario || '')}" step="0.01" min="-999999" class="text-right" autocomplete="off">
             <div class="cof-item-importo" data-importo="0">0,00 €</div>
             <button type="button" class="cof-btn-del-row" title="Rimuovi">
                 <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>

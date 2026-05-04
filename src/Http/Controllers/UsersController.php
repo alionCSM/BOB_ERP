@@ -566,7 +566,7 @@ final class UsersController
         // Validate uid parameter for security (only if worker has a UID)
         $providedUid = (string)($request->get('uid') ?? '');
         if ($providedUid && !validateWorkerUid($this->conn, $workerId, $providedUid)) {
-            Response::error('Operaio non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         assertCompanyScopeWorkerAccess($this->conn, $request->user(), $workerId);
@@ -576,18 +576,18 @@ final class UsersController
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row || empty($row['photo'])) {
-            Response::error('Foto non trovata.', 404);
+            render_not_found_and_exit();
         }
 
         $cloudBasePath = realpath(dirname(APP_ROOT) . '/cloud');
         $filePath      = realpath($cloudBasePath . '/' . $row['photo']);
 
         if (!$filePath || !file_exists($filePath)) {
-            Response::error('File non trovato.', 404);
+            render_not_found_and_exit();
         }
 
         if (strpos($filePath, $cloudBasePath) !== 0) {
-            Response::error('Percorso non valido.', 403);
+            render_not_found_and_exit();
         }
 
         $finfo    = new \finfo(FILEINFO_MIME_TYPE);
@@ -611,15 +611,17 @@ final class UsersController
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$row || empty($row['photo'])) {
-            Response::error('Foto non trovata.', 404);
+            render_not_found_and_exit();
         }
 
-        // Company-scoped users may only view photos of users in their allowed companies
+        // Company-scoped users may only view photos of users in their allowed
+        // companies. Render the same 404 as the "doesn't exist" path so an
+        // attacker can't tell missing-resource from access-denied.
         if (isCompanyScopedUserByContext($this->conn, $request->user())) {
             $allowedIds = getCompanyScopeAllowedIds($this->conn, $request->user());
             $targetCompanyId = (int)($row['company_id'] ?? 0);
             if ($targetCompanyId <= 0 || !in_array($targetCompanyId, $allowedIds, true)) {
-                Response::error('Accesso negato.', 403);
+                render_not_found_and_exit();
             }
         }
 
@@ -635,14 +637,14 @@ final class UsersController
             if ($legacyPath && file_exists($legacyPath)) {
                 $filePath = $legacyPath;
             } else {
-                Response::error('File non trovato.', 404);
+                render_not_found_and_exit();
             }
         }
 
         if (strpos($filePath, $cloudRoot) !== 0) {
             $uploadsRoot = realpath(APP_ROOT . '/uploads');
             if (!$uploadsRoot || strpos($filePath, $uploadsRoot) !== 0) {
-                Response::error('Percorso non valido.', 403);
+                render_not_found_and_exit();
             }
         }
 

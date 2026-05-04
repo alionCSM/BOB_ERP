@@ -236,9 +236,10 @@ final class ShareController
             Response::json(['ok' => false, 'message' => 'Payload chunk non valido'], 422);
         }
 
-        // Validate chunk size (20 MB max per chunk — matches frontend CHUNK_SIZE)
-        if (($chunk['size'] ?? 0) > 20 * 1024 * 1024) {
-            Response::json(['ok' => false, 'message' => 'Chunk troppo grande (max 20 MB).'], 422);
+        // Validate chunk size (50 MB max per chunk; frontend chunks at 20 MB,
+        // this is just an anti-abuse upper bound)
+        if (($chunk['size'] ?? 0) > 50 * 1024 * 1024) {
+            Response::json(['ok' => false, 'message' => 'Chunk troppo grande (max 50 MB).'], 422);
         }
 
         $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $origName) ?: 'upload.bin';

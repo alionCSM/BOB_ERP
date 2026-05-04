@@ -38,13 +38,13 @@ function getBobVersion(): array
     $branchRaw = trim(shell_exec("cd " . escapeshellarg($repoRoot) . " && git rev-parse --abbrev-ref HEAD 2>/dev/null") ?? '');
 
     if ($desc) {
-        // Format: v1.2.4 or v1.2.4-15-gabcdef0
-        if (preg_match('/^(v?\d+\.\d+\.\d+)(?:-(\d+)-g([a-f0-9]+))?$/', $desc, $m)) {
+        // Format: v1.2 / v1.2.4 / v1.2.4.5 / optionally followed by -<n>-g<hash>
+        if (preg_match('/^(v?\d+(?:\.\d+){1,3})(?:-(\d+)-g([a-f0-9]+))?$/', $desc, $m)) {
             $version = $m[1];
             $commits = $m[2] ?? '';
             $hash    = $m[3] ?? '';
         } else {
-            // Just a hash (no tags)
+            // Just a hash (no tags reachable)
             $version = 'dev';
             $hash    = $desc;
         }
