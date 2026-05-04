@@ -498,7 +498,30 @@ document.addEventListener('click', function(e) {
 // --------------------------------------------------------------
 // Submit: serializzo la riga statica + righe dinamiche
 // --------------------------------------------------------------
-document.querySelector('form').addEventListener('submit', function () {
+document.querySelector('form').addEventListener('submit', function (e) {
+    // Warn before silently dropping rows where only one of the two fields
+    // is filled (covers the static first row + every dynamic row).
+    let partial = 0;
+    {
+        const sd = document.querySelector('#static-row .description-field')?.value.trim();
+        const sa = document.querySelector('#static-row .amount-field')?.value.trim();
+        if ((sd && !sa) || (!sd && sa)) partial++;
+    }
+    document.querySelectorAll('#items-container .item-row').forEach(riga => {
+        let d = riga.querySelector('.description-field')?.value.trim();
+        let a = riga.querySelector('.amount-field')?.value.trim();
+        if ((d && !a) || (!d && a)) partial++;
+    });
+    if (partial > 0) {
+        const msg = partial === 1
+            ? "C'è 1 riga incompleta (descrizione senza prezzo o viceversa). Verrà scartata. Procedere?"
+            : "Ci sono " + partial + " righe incomplete (descrizione senza prezzo o viceversa). Verranno scartate. Procedere?";
+        if (!confirm(msg)) {
+            e.preventDefault();
+            return;
+        }
+    }
+
     let items = [];
 
     // RIGA STATICA
