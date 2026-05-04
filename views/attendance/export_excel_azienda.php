@@ -282,6 +282,11 @@ unset($totals);
 $rowNumber    = 5;
 $lastStaticRow = 5; // la riga che usiamo come "modello" da clonare
 
+// Ordino gli operai per cognome A-Z (la chiave è già "last_name first_name",
+// quindi ksort case-insensitive sull'intera chiave fa il lavoro: cognomi
+// uguali vengono comunque sub-ordinati per nome).
+ksort($workerTotals, SORT_NATURAL | SORT_FLAG_CASE);
+
 foreach ($workerTotals as $workerName => $totals) {
 
     // ferie = giorni lavorativi teorici periodo - giorni effettivamente lavorati (lun-ven)
