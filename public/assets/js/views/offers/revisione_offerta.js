@@ -96,6 +96,20 @@ document.addEventListener('DOMContentLoaded', function () {
         aggiungiRiga('', '');
     }
 
+    // "Aggiungi riga" button — appends a fresh empty item row
+    const addRowBtn = document.getElementById('add-row');
+    if (addRowBtn) {
+        addRowBtn.addEventListener('click', function () {
+            aggiungiRiga('', '');
+            const rows = document.querySelectorAll('#items-container .item-row');
+            const last = rows[rows.length - 1];
+            if (last) {
+                const desc = last.querySelector('.description-field');
+                if (desc) desc.focus();
+            }
+        });
+    }
+
     // File input change handler - show uploaded PDF info
     const fileInput = document.getElementById('offer_pdf');
     if (fileInput) {

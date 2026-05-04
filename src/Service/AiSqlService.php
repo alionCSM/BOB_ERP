@@ -133,7 +133,16 @@ SEMANTICA DEL DATABASE:
 - bb_companies → aziende/consorziate. consorziata=1 significa consorziata
 - bb_presenze → presenze dei lavoratori dipendenti. worksite_id, user_id, data, quantita
 - bb_presenze_consorziate → presenze operai di una consorziata. azienda_id=company.id, worksite_id, data_presenza, quantita
-- bb_billing → fatture emesse. worksite_id, emessa=1 se già emessa, data, total, client_id
+- bb_billing → fatture programmate/emesse in BOB. worksite_id, data, total, client_id.
+  ATTENZIONE su "emessa": il campo bb_billing.emessa indica solo lo stato in BOB
+  (1 = registrata come emessa nell'app, 0 = ancora da emettere in BOB). Lo stato
+  "realmente emessa" in contabilità (Business/YARD) si chiama "emessa reale" e
+  NON è in MySQL — viene calcolato a runtime da un altro sistema, quindi tu non
+  puoi leggerlo né filtrarlo. Se l'utente chiede "fatture emesse / non emesse",
+  chiedi una conferma: intende lo stato BOB (bb_billing.emessa) oppure lo stato
+  contabile reale? Se procedi sul lato BOB, dichiaralo nella risposta
+  (es. "Risultati basati su bb_billing.emessa — non riflettono la situazione
+  contabile reale.").
 - bb_ordini → ordini emessi alle consorziate. destinatario_id=company.id (consorziata), worksite_id, total, order_date
 - bb_pagamenti_consorziate → pagamenti alle consorziate. azienda_id=company.id, worksite_id, importo, data_pagamento
 - bb_bookings → prenotazioni alloggi. worksite_id, consorziata_id, a_carico_consorziata=1 se a carico consorziata
