@@ -911,9 +911,9 @@ final class WorksitesController
             Response::error('Errore upload file', 500);
         }
 
-        // Validate file size (20 MB max)
-        if (($file['size'] ?? 0) > 20 * 1024 * 1024) {
-            Response::error('Il file supera la dimensione massima consentita (20 MB).', 422);
+        // Validate file size (50 MB max)
+        if (($file['size'] ?? 0) > 50 * 1024 * 1024) {
+            Response::error('Il file supera la dimensione massima consentita (50 MB).', 422);
         }
 
         $originalName = $file['name'];
@@ -2306,9 +2306,9 @@ final class WorksitesController
             Response::error('Nessun file caricato', 400);
         }
 
-        // Validate file size (20 MB max)
-        if (($_FILES['file']['size'] ?? 0) > 20 * 1024 * 1024) {
-            Response::error('Il file supera la dimensione massima consentita (20 MB).', 422);
+        // Validate file size (50 MB max)
+        if (($_FILES['file']['size'] ?? 0) > 50 * 1024 * 1024) {
+            Response::error('Il file supera la dimensione massima consentita (50 MB).', 422);
         }
 
         $allowed = ['docx', 'xlsx', 'pptx', 'pdf'];

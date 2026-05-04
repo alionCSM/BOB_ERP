@@ -87,9 +87,9 @@ class CompanyService
             throw new RuntimeException('Nessun file caricato.');
         }
 
-        // Validate file size (20 MB max)
-        if (($files['document_file']['size'] ?? 0) > 20 * 1024 * 1024) {
-            throw new RuntimeException('Il file supera la dimensione massima consentita (20 MB).');
+        // Validate file size (50 MB max)
+        if (($files['document_file']['size'] ?? 0) > 50 * 1024 * 1024) {
+            throw new RuntimeException('Il file supera la dimensione massima consentita (50 MB).');
         }
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
@@ -147,9 +147,9 @@ class CompanyService
         }
 
         if (!empty($files['document_file']['tmp_name'])) {
-            // Validate file size (20 MB max)
-            if (($files['document_file']['size'] ?? 0) > 20 * 1024 * 1024) {
-                throw new RuntimeException('Il file supera la dimensione massima consentita (20 MB).');
+            // Validate file size (50 MB max)
+            if (($files['document_file']['size'] ?? 0) > 50 * 1024 * 1024) {
+                throw new RuntimeException('Il file supera la dimensione massima consentita (50 MB).');
             }
 
             $finfo = new \finfo(FILEINFO_MIME_TYPE);

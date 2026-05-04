@@ -69,6 +69,23 @@ final class Config
         return rtrim($this->require('APP_URL'), '/');
     }
 
+    /**
+     * Maximum upload size in bytes for documents, photos, attachments.
+     * Configurable via UPLOAD_MAX_MB env var; defaults to 50 MB.
+     *
+     * NOTE: PHP's own upload_max_filesize / post_max_size in php.ini must
+     * be at least this value, otherwise PHP rejects the upload before
+     * application code runs.
+     */
+    public function maxUploadBytes(): int
+    {
+        $mb = (int)($this->env['UPLOAD_MAX_MB'] ?? 50);
+        if ($mb <= 0) {
+            $mb = 50;
+        }
+        return $mb * 1024 * 1024;
+    }
+
     // ── MySQL ─────────────────────────────────────────────────────────────────
 
     public function dbHost(): string { return $this->require('DB_HOST'); }

@@ -116,7 +116,7 @@ Apri **Le Mie Aziende → [nome azienda] → Documenti aziendali → Carica docu
 | Tipo documento | sì | scegli dall'elenco standard |
 | Data emissione | sì | `gg/mm/aaaa` |
 | Data scadenza | sì | `gg/mm/aaaa` |
-| File | sì | PDF, max 10 MB |
+| File | sì | PDF, max 50 MB |
 
 **Tipi documenti aziendali tipici:**
 - **DURC** — Documento Unico di Regolarità Contributiva. Validità di norma 4 mesi.

@@ -90,9 +90,9 @@ class SharedLinkService
                 continue;
             }
 
-            // Validate file size (20 MB max)
+            // Validate file size (50 MB max)
             $legacySize = (int)($files['manual_docs']['size'][$i]['file'] ?? 0);
-            if ($legacySize > 20 * 1024 * 1024) {
+            if ($legacySize > 50 * 1024 * 1024) {
                 continue;
             }
 

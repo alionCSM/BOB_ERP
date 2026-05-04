@@ -150,9 +150,9 @@ class BookingService
         $filePath = null;
 
         if ($uploadedFile && !empty($uploadedFile['tmp_name']) && $uploadedFile['error'] === UPLOAD_ERR_OK) {
-            // Validate file size (20 MB max)
-            if (($uploadedFile['size'] ?? 0) > 20 * 1024 * 1024) {
-                throw new \InvalidArgumentException('Il file supera la dimensione massima consentita (20 MB).');
+            // Validate file size (50 MB max)
+            if (($uploadedFile['size'] ?? 0) > 50 * 1024 * 1024) {
+                throw new \InvalidArgumentException('Il file supera la dimensione massima consentita (50 MB).');
             }
 
             // Validate MIME type server-side
