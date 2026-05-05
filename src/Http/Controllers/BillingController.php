@@ -83,6 +83,61 @@ final class BillingController
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
         }
 
+        // Group brogliaccio line items into fatture by (tm_anno, tm_numdoc),
+        // sort the resulting fatture by primary cliente (A-Z), then by
+        // numero. Rows without tm_numdoc collapse under a single "senza
+        // numero" sentinel group so they're still visible.
+        $groupFn = function (array $rows): array {
+            $groups = [];
+            foreach ($rows as $r) {
+                $anno  = (int)($r['tm_anno']   ?? 0);
+                $num   = (int)($r['tm_numdoc'] ?? 0);
+                $key   = ($anno > 0 && $num > 0) ? ($anno . '-' . $num) : 'senza-numero';
+
+                if (!isset($groups[$key])) {
+                    $groups[$key] = [
+                        'key'                => $key,
+                        'tm_anno'            => $anno,
+                        'tm_numdoc'          => $num,
+                        'numero_label'       => ($anno > 0 && $num > 0) ? ($num . '/' . $anno) : 'Senza numero',
+                        'data'               => $r['data'] ?? null,   // will become MAX
+                        'clienti'            => [],                    // distinct, preserves first-seen order
+                        'cliente_principale' => (string)($r['nome_cliente'] ?? ''),
+                        'totale'             => 0.0,
+                        'rows'               => [],
+                    ];
+                }
+                $g =& $groups[$key];
+
+                // MAX(data)
+                if (!empty($r['data']) && (empty($g['data']) || $r['data'] > $g['data'])) {
+                    $g['data'] = $r['data'];
+                }
+
+                $cliente = (string)($r['nome_cliente'] ?? '');
+                if ($cliente !== '' && !in_array($cliente, $g['clienti'], true)) {
+                    $g['clienti'][] = $cliente;
+                }
+
+                $g['totale'] += (float)($r['totale_imponibile'] ?? 0);
+                $g['rows'][]  = $r;
+                unset($g);
+            }
+
+            // Sort: primary cliente A-Z, then by numero ascending
+            usort($groups, function ($a, $b) {
+                $c = strcasecmp($a['cliente_principale'] ?: 'zzz', $b['cliente_principale'] ?: 'zzz');
+                if ($c !== 0) return $c;
+                if ($a['tm_anno'] !== $b['tm_anno']) return $a['tm_anno'] <=> $b['tm_anno'];
+                return $a['tm_numdoc'] <=> $b['tm_numdoc'];
+            });
+
+            return $groups;
+        };
+
+        $emessRealCurFatture  = $groupFn($emessRealCurRows);
+        $emessRealPrevFatture = $groupFn($emessRealPrevRows);
+
         // Authoritative footer totals computed in PHP — independent of the
         // Yard aggregate query above. If they disagree, something's off.
         $emessRealCurRowsTotal  = 0.0;
@@ -101,7 +156,8 @@ final class BillingController
             'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
             'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
             'emessRealCurRows', 'emessRealPrevRows',
-            'emessRealCurRowsTotal', 'emessRealPrevRowsTotal'
+            'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
+            'emessRealCurFatture', 'emessRealPrevFatture'
         ));
     }
 
