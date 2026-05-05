@@ -108,6 +108,40 @@ class YardWorksiteBilling
     }
 
     /**
+     * Righe "emesse reale" (Yard) per un mese.
+     * Filtra su emessa=1 e obsoleto=0, ordinate per data DESC.
+     *
+     * @return array<int, array<string,mixed>>
+     */
+    public function getEmesseRowsForMonth(int $year, int $month): array
+    {
+        $start = sprintf('%04d-%02d-01', $year, $month);
+        $nextYear  = $month === 12 ? $year + 1 : $year;
+        $nextMonth = $month === 12 ? 1         : $month + 1;
+        $endExcl   = sprintf('%04d-%02d-01', $nextYear, $nextMonth);
+
+        $stmt = $this->conn->prepare("
+            SELECT
+                id,
+                data,
+                nome_cliente,
+                nome_cantiere,
+                descrizione,
+                totale_imponibile,
+                tm_anno,
+                tm_numdoc
+            FROM dbo.CNT_cantieri_brogliacci
+            WHERE emessa  = 1
+              AND obsoleto = 0
+              AND data >= :start
+              AND data <  :endExcl
+            ORDER BY data DESC, id DESC
+        ");
+        $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Totali "emesse reale" (Yard) per un mese.
      * Filtra su emessa=1 e obsoleto=0, sulla colonna data del brogliaccio.
      *

@@ -28,8 +28,8 @@
 
 {# ── Stats Row ── #}
 <div class="bc-stats">
-    {# Emesse reale — mese corrente (da YARD) #}
-    <div class="bc-stat">
+    {# Emesse reale — mese corrente (da YARD) — cliccabile, apre modale #}
+    <div class="bc-stat bc-stat-clickable" data-er-period="cur" data-er-label="{{ emessRealCurLabel }}" style="cursor:pointer;">
         <div class="bc-stat-dot" style="background:#0ea5e9;box-shadow:0 0 6px rgba(14,165,233,.4);"></div>
         <div>
             <div class="bc-stat-value" style="color:#0284c7;">{{ emessRealCur.count }}</div>
@@ -37,8 +37,8 @@
             <div class="bc-stat-label">Emesse reale <span style="opacity:.55;font-size:10px;">({{ emessRealCurLabel }})</span></div>
         </div>
     </div>
-    {# Emesse reale — mese precedente (da YARD) #}
-    <div class="bc-stat">
+    {# Emesse reale — mese precedente (da YARD) — cliccabile, apre modale #}
+    <div class="bc-stat bc-stat-clickable" data-er-period="prev" data-er-label="{{ emessRealPrevLabel }}" style="cursor:pointer;">
         <div class="bc-stat-dot" style="background:#6366f1;box-shadow:0 0 6px rgba(99,102,241,.4);"></div>
         <div>
             <div class="bc-stat-value" style="color:#4f46e5;">{{ emessRealPrev.count }}</div>
@@ -145,6 +145,139 @@
     </div>
     {% endif %}
 </div>
+
+{# ── Modale "Emesse reale" — mostra le righe del mese cliccato ── #}
+<div id="er-modal" class="er-modal" aria-hidden="true">
+    <div class="er-modal-backdrop" data-er-close></div>
+    <div class="er-modal-dialog" role="dialog" aria-modal="true">
+        <div class="er-modal-header">
+            <h2 class="er-modal-title">Fatture emesse reale — <span id="er-modal-period">—</span></h2>
+            <button type="button" class="er-modal-close" data-er-close aria-label="Chiudi">×</button>
+        </div>
+        <div class="er-modal-body">
+            {% set periods = [
+                { key: 'cur',  rows: emessRealCurRows,  total: emessRealCurRowsTotal  },
+                { key: 'prev', rows: emessRealPrevRows, total: emessRealPrevRowsTotal }
+            ] %}
+            {% for p in periods %}
+                <div class="er-rows" data-er-rows="{{ p.key }}" style="display:none;">
+                    {% if p.rows is empty %}
+                        <p class="er-empty">Nessuna fattura emessa nel periodo.</p>
+                    {% else %}
+                        <div style="overflow-x:auto;">
+                            <table class="er-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Numero</th>
+                                        <th>Cliente</th>
+                                        <th>Cantiere</th>
+                                        <th>Descrizione</th>
+                                        <th class="right">Imponibile</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for r in p.rows %}
+                                    <tr>
+                                        <td style="white-space:nowrap;">{{ r.data ? r.data|date('d/m/Y') : '—' }}</td>
+                                        <td style="white-space:nowrap;">
+                                            {% if r.tm_anno and r.tm_numdoc %}
+                                                {{ r.tm_numdoc }}/{{ r.tm_anno }}
+                                            {% else %}
+                                                <span style="opacity:.5;">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ r.nome_cliente ?: '—' }}</td>
+                                        <td>{{ r.nome_cantiere ?: '—' }}</td>
+                                        <td style="max-width:380px;">{{ r.descrizione ?: '—' }}</td>
+                                        <td class="right">€ {{ (r.totale_imponibile ?? 0)|number_format(2, ',', '.') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="5" class="right" style="font-weight:600;">Totale</td>
+                                        <td class="right" style="font-weight:600;">
+                                            € {{ p.total|number_format(2, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style nonce="{{ cspNonce }}">
+.bc-stat-clickable { transition: transform .12s ease, box-shadow .12s ease; }
+.bc-stat-clickable:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.06); }
+
+.er-modal { position: fixed; inset: 0; display: none; z-index: 1000; }
+.er-modal.is-open { display: block; }
+.er-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
+.er-modal-dialog {
+    position: relative; max-width: 1100px; width: calc(100% - 32px);
+    margin: 40px auto; background: #fff; border-radius: 12px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.35); overflow: hidden;
+}
+.er-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid #e2e8f0;
+}
+.er-modal-title { font-size: 16px; font-weight: 600; margin: 0; color: #0f172a; }
+.er-modal-close {
+    background: transparent; border: 0; font-size: 26px; line-height: 1;
+    color: #64748b; cursor: pointer; padding: 4px 8px;
+}
+.er-modal-close:hover { color: #0f172a; }
+.er-modal-body { padding: 16px 20px; max-height: 70vh; overflow-y: auto; }
+.er-empty { color: #64748b; text-align: center; padding: 32px 0; margin: 0; }
+.er-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.er-table thead th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
+.er-table tbody td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+.er-table tbody tr:hover { background: #f8fafc; }
+.er-table .right, .er-table thead th.right { text-align: right; }
+.er-table tfoot td { padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+</style>
+
+<script nonce="{{ cspNonce }}">
+(function () {
+    var modal      = document.getElementById('er-modal');
+    if (!modal) return;
+    var titleSpan  = document.getElementById('er-modal-period');
+    var rowGroups  = modal.querySelectorAll('[data-er-rows]');
+
+    function openFor(period, label) {
+        titleSpan.textContent = label || '';
+        rowGroups.forEach(function (g) {
+            g.style.display = (g.getAttribute('data-er-rows') === period) ? '' : 'none';
+        });
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+    }
+
+    function close() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+
+    document.querySelectorAll('.bc-stat-clickable').forEach(function (card) {
+        card.addEventListener('click', function () {
+            openFor(card.getAttribute('data-er-period'), card.getAttribute('data-er-label'));
+        });
+    });
+
+    modal.querySelectorAll('[data-er-close]').forEach(function (el) {
+        el.addEventListener('click', close);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') close();
+    });
+})();
+</script>
 
 </div>
 {% endblock %}

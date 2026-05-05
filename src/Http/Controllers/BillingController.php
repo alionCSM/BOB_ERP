@@ -69,14 +69,29 @@ final class BillingController
         $prevYear    = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
         $prevMonth   = $thisMonth === 1 ? 12            : $thisMonth - 1;
 
-        $emessRealCur  = ['count' => 0, 'imponibile' => 0.0];
-        $emessRealPrev = ['count' => 0, 'imponibile' => 0.0];
+        $emessRealCur     = ['count' => 0, 'imponibile' => 0.0];
+        $emessRealPrev    = ['count' => 0, 'imponibile' => 0.0];
+        $emessRealCurRows  = [];
+        $emessRealPrevRows = [];
         try {
-            $yardBilling   = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
-            $emessRealCur  = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
-            $emessRealPrev = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
+            $yardBilling       = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+            $emessRealCur      = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
+            $emessRealPrev     = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
+            $emessRealCurRows  = $yardBilling->getEmesseRowsForMonth($thisYear, $thisMonth);
+            $emessRealPrevRows = $yardBilling->getEmesseRowsForMonth($prevYear, $prevMonth);
         } catch (\Throwable $e) {
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
+        }
+
+        // Authoritative footer totals computed in PHP — independent of the
+        // Yard aggregate query above. If they disagree, something's off.
+        $emessRealCurRowsTotal  = 0.0;
+        foreach ($emessRealCurRows as $r) {
+            $emessRealCurRowsTotal += (float)($r['totale_imponibile'] ?? 0);
+        }
+        $emessRealPrevRowsTotal = 0.0;
+        foreach ($emessRealPrevRows as $r) {
+            $emessRealPrevRowsTotal += (float)($r['totale_imponibile'] ?? 0);
         }
 
         $emessRealCurLabel  = $monthLabels[$thisMonth - 1] . ' ' . $thisYear;
@@ -84,7 +99,9 @@ final class BillingController
 
         Response::view('billing/clients.html.twig', $request, compact(
             'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
-            'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel'
+            'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
+            'emessRealCurRows', 'emessRealPrevRows',
+            'emessRealCurRowsTotal', 'emessRealPrevRowsTotal'
         ));
     }
 
