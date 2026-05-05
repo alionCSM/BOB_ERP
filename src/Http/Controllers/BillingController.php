@@ -60,8 +60,31 @@ final class BillingController
         $totEuroDa     = array_sum(array_column($clients, 'da_emettere_euro_yr'));
         $totEuroEm     = array_sum(array_column($clients, 'emesse_euro_yr'));
 
+        // "Emesse reale" pulled from Yard (SQL Server) for the current and
+        // previous month. Defensive try/catch — if Yard is unreachable we
+        // still want the page to render, just with zeros.
+        $monthLabels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+        $thisYear    = (int)date('Y');
+        $thisMonth   = (int)date('n');
+        $prevYear    = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
+        $prevMonth   = $thisMonth === 1 ? 12            : $thisMonth - 1;
+
+        $emessRealCur  = ['count' => 0, 'imponibile' => 0.0];
+        $emessRealPrev = ['count' => 0, 'imponibile' => 0.0];
+        try {
+            $yardBilling   = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+            $emessRealCur  = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
+            $emessRealPrev = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
+        } catch (\Throwable $e) {
+            error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
+        }
+
+        $emessRealCurLabel  = $monthLabels[$thisMonth - 1] . ' ' . $thisYear;
+        $emessRealPrevLabel = $monthLabels[$prevMonth - 1] . ' ' . $prevYear;
+
         Response::view('billing/clients.html.twig', $request, compact(
-            'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear'
+            'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
+            'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel'
         ));
     }
 
