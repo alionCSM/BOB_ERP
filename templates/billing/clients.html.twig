@@ -211,7 +211,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ cspNonce }}">
 .bc-stat-clickable { transition: transform .12s ease, box-shadow .12s ease; }
 .bc-stat-clickable:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.06); }
 
@@ -243,7 +243,7 @@
 .er-table tfoot td { padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
 </style>
 
-<script>
+<script nonce="{{ cspNonce }}">
 (function () {
     var modal      = document.getElementById('er-modal');
     if (!modal) return;
