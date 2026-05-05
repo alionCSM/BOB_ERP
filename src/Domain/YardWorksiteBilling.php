@@ -108,6 +108,39 @@ class YardWorksiteBilling
     }
 
     /**
+     * Totali "emesse reale" (Yard) per un mese.
+     * Filtra su emessa=1 e obsoleto=0, sulla colonna data del brogliaccio.
+     *
+     * @return array{count:int, imponibile:float}
+     */
+    public function getEmesseTotalsForMonth(int $year, int $month): array
+    {
+        $start = sprintf('%04d-%02d-01', $year, $month);
+        // First day of next month, exclusive upper bound — works at year boundary
+        $nextYear  = $month === 12 ? $year + 1 : $year;
+        $nextMonth = $month === 12 ? 1         : $month + 1;
+        $endExcl   = sprintf('%04d-%02d-01', $nextYear, $nextMonth);
+
+        $stmt = $this->conn->prepare("
+            SELECT
+                COUNT(*)                          AS cnt,
+                COALESCE(SUM(totale_imponibile),0) AS tot
+            FROM dbo.CNT_cantieri_brogliacci
+            WHERE emessa = 1
+              AND obsoleto = 0
+              AND data >= :start
+              AND data <  :endExcl
+        ");
+        $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['cnt' => 0, 'tot' => 0];
+
+        return [
+            'count'      => (int)   $row['cnt'],
+            'imponibile' => (float) $row['tot'],
+        ];
+    }
+
+    /**
      * Segna come obsoleto un record di CNT_cantieri_brogliacci.
      */
     public function softDeleteBrogliaccio(int $id): void

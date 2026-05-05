@@ -28,11 +28,22 @@
 
 {# ── Stats Row ── #}
 <div class="bc-stats">
+    {# Emesse reale — mese corrente (da YARD) #}
     <div class="bc-stat">
-        <div class="bc-stat-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,.4);"></div>
+        <div class="bc-stat-dot" style="background:#0ea5e9;box-shadow:0 0 6px rgba(14,165,233,.4);"></div>
         <div>
-            <div class="bc-stat-value">{{ clients|length }}</div>
-            <div class="bc-stat-label">Clienti</div>
+            <div class="bc-stat-value" style="color:#0284c7;">{{ emessRealCur.count }}</div>
+            <div class="bc-stat-sub">€ {{ emessRealCur.imponibile|number_format(2, ',', '.') }}</div>
+            <div class="bc-stat-label">Emesse reale <span style="opacity:.55;font-size:10px;">({{ emessRealCurLabel }})</span></div>
+        </div>
+    </div>
+    {# Emesse reale — mese precedente (da YARD) #}
+    <div class="bc-stat">
+        <div class="bc-stat-dot" style="background:#6366f1;box-shadow:0 0 6px rgba(99,102,241,.4);"></div>
+        <div>
+            <div class="bc-stat-value" style="color:#4f46e5;">{{ emessRealPrev.count }}</div>
+            <div class="bc-stat-sub">€ {{ emessRealPrev.imponibile|number_format(2, ',', '.') }}</div>
+            <div class="bc-stat-label">Emesse reale <span style="opacity:.55;font-size:10px;">({{ emessRealPrevLabel }})</span></div>
         </div>
     </div>
     <div class="bc-stat">
