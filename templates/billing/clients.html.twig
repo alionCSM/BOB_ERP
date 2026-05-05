@@ -156,42 +156,67 @@
         </div>
         <div class="er-modal-body">
             {% set periods = [
-                { key: 'cur',  rows: emessRealCurRows,  total: emessRealCurRowsTotal  },
-                { key: 'prev', rows: emessRealPrevRows, total: emessRealPrevRowsTotal }
+                { key: 'cur',  fatture: emessRealCurFatture,  total: emessRealCurRowsTotal  },
+                { key: 'prev', fatture: emessRealPrevFatture, total: emessRealPrevRowsTotal }
             ] %}
             {% for p in periods %}
                 <div class="er-rows" data-er-rows="{{ p.key }}" style="display:none;">
-                    {% if p.rows is empty %}
+                    {% if p.fatture is empty %}
                         <p class="er-empty">Nessuna fattura emessa nel periodo.</p>
                     {% else %}
                         <div style="overflow-x:auto;">
-                            <table class="er-table">
+                            <table class="er-table er-fatture-table">
                                 <thead>
                                     <tr>
+                                        <th style="width:32px;"></th>
                                         <th>Data</th>
                                         <th>Numero</th>
                                         <th>Cliente</th>
-                                        <th>Cantiere</th>
-                                        <th>Descrizione</th>
+                                        <th class="center">Voci</th>
                                         <th class="right">Imponibile</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for r in p.rows %}
-                                    <tr>
-                                        <td style="white-space:nowrap;">{{ r.data ? r.data|date('d/m/Y') : '—' }}</td>
-                                        <td style="white-space:nowrap;">
-                                            {% if r.tm_anno and r.tm_numdoc %}
-                                                {{ r.tm_numdoc }}/{{ r.tm_anno }}
-                                            {% else %}
-                                                <span style="opacity:.5;">—</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ r.nome_cliente ?: '—' }}</td>
-                                        <td>{{ r.nome_cantiere ?: '—' }}</td>
-                                        <td style="max-width:380px;">{{ r.descrizione ?: '—' }}</td>
-                                        <td class="right">€ {{ (r.totale_imponibile ?? 0)|number_format(2, ',', '.') }}</td>
-                                    </tr>
+                                    {% for f in p.fatture %}
+                                        <tr class="er-fattura-row" data-er-toggle="{{ p.key }}-{{ loop.index }}">
+                                            <td class="er-toggle-cell">
+                                                <span class="er-chevron">▸</span>
+                                            </td>
+                                            <td style="white-space:nowrap;">{{ f.data ? f.data|date('d/m/Y') : '—' }}</td>
+                                            <td style="white-space:nowrap; font-weight:600;">{{ f.numero_label }}</td>
+                                            <td>
+                                                {% if f.clienti is empty %}
+                                                    —
+                                                {% else %}
+                                                    {{ f.clienti|join(', ') }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="center">{{ f.rows|length }}</td>
+                                            <td class="right" style="font-weight:600;">€ {{ f.totale|number_format(2, ',', '.') }}</td>
+                                        </tr>
+                                        <tr class="er-fattura-detail" data-er-detail="{{ p.key }}-{{ loop.index }}" style="display:none;">
+                                            <td></td>
+                                            <td colspan="5" style="padding:0;">
+                                                <table class="er-detail-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Cantiere</th>
+                                                            <th>Descrizione</th>
+                                                            <th class="right">Imponibile</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for r in f.rows %}
+                                                        <tr>
+                                                            <td>{{ r.nome_cantiere ?: '—' }}</td>
+                                                            <td style="max-width:520px;">{{ r.descrizione ?: '—' }}</td>
+                                                            <td class="right">€ {{ (r.totale_imponibile ?? 0)|number_format(2, ',', '.') }}</td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
                                     {% endfor %}
                                 </tbody>
                                 <tfoot>
@@ -241,6 +266,20 @@
 .er-table tbody tr:hover { background: #f8fafc; }
 .er-table .right, .er-table thead th.right { text-align: right; }
 .er-table tfoot td { padding: 10px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+.er-table .center, .er-table thead th.center { text-align: center; }
+
+.er-fattura-row { cursor: pointer; }
+.er-toggle-cell { width: 32px; }
+.er-chevron { display: inline-block; transition: transform .15s ease; color: #64748b; font-size: 11px; }
+.er-fattura-row.is-open .er-chevron { transform: rotate(90deg); color: #0f172a; }
+
+.er-fattura-detail td { background: #f8fafc; }
+.er-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 8px 0; }
+.er-detail-table thead th { background: transparent; color: #64748b; font-weight: 500; padding: 6px 10px; border-bottom: 1px dashed #cbd5e1; text-align: left; }
+.er-detail-table thead th.right { text-align: right; }
+.er-detail-table tbody td { padding: 6px 10px; border-bottom: 1px dashed #e2e8f0; }
+.er-detail-table tbody tr:last-child td { border-bottom: 0; }
+.er-detail-table .right { text-align: right; }
 </style>
 
 <script nonce="{{ cspNonce }}">
@@ -275,6 +314,17 @@
     });
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') close();
+    });
+
+    // Toggle expansion of a single fattura row → its detail row
+    modal.querySelectorAll('.er-fattura-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+            var key = row.getAttribute('data-er-toggle');
+            var detail = modal.querySelector('[data-er-detail="' + key + '"]');
+            if (!detail) return;
+            var open = row.classList.toggle('is-open');
+            detail.style.display = open ? '' : 'none';
+        });
     });
 })();
 </script>
