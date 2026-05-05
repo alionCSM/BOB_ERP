@@ -83,13 +83,25 @@ final class BillingController
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
         }
 
+        // Authoritative footer totals computed in PHP — independent of the
+        // Yard aggregate query above. If they disagree, something's off.
+        $emessRealCurRowsTotal  = 0.0;
+        foreach ($emessRealCurRows as $r) {
+            $emessRealCurRowsTotal += (float)($r['totale_imponibile'] ?? 0);
+        }
+        $emessRealPrevRowsTotal = 0.0;
+        foreach ($emessRealPrevRows as $r) {
+            $emessRealPrevRowsTotal += (float)($r['totale_imponibile'] ?? 0);
+        }
+
         $emessRealCurLabel  = $monthLabels[$thisMonth - 1] . ' ' . $thisYear;
         $emessRealPrevLabel = $monthLabels[$prevMonth - 1] . ' ' . $prevYear;
 
         Response::view('billing/clients.html.twig', $request, compact(
             'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
             'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
-            'emessRealCurRows', 'emessRealPrevRows'
+            'emessRealCurRows', 'emessRealPrevRows',
+            'emessRealCurRowsTotal', 'emessRealPrevRowsTotal'
         ));
     }
 

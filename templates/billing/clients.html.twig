@@ -156,8 +156,8 @@
         </div>
         <div class="er-modal-body">
             {% set periods = [
-                { key: 'cur',  rows: emessRealCurRows  },
-                { key: 'prev', rows: emessRealPrevRows }
+                { key: 'cur',  rows: emessRealCurRows,  total: emessRealCurRowsTotal  },
+                { key: 'prev', rows: emessRealPrevRows, total: emessRealPrevRowsTotal }
             ] %}
             {% for p in periods %}
                 <div class="er-rows" data-er-rows="{{ p.key }}" style="display:none;">
@@ -198,7 +198,7 @@
                                     <tr>
                                         <td colspan="5" class="right" style="font-weight:600;">Totale</td>
                                         <td class="right" style="font-weight:600;">
-                                            € {{ p.rows|reduce((acc, r) => acc + (r.totale_imponibile ?? 0), 0)|number_format(2, ',', '.') }}
+                                            € {{ p.total|number_format(2, ',', '.') }}
                                         </td>
                                     </tr>
                                 </tfoot>
