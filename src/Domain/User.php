@@ -511,6 +511,47 @@ class User {
         return !empty($this->permissions[$module]);
     }
 
+    /**
+     * Centralised "can this user see prezzi/costi/importi?" check.
+     *
+     * Backed by the `view_prices` permission in bb_user_permissions.
+     * Superadmin (id 1) bypasses the permission table.
+     */
+    public function canSeePrices(): bool
+    {
+        if ((int)$this->id === 1) {
+            return true;
+        }
+        // Lazy-load if needed
+        if (empty($this->permissions)) {
+            $this->loadPermissions();
+        }
+        return !empty($this->permissions['view_prices']);
+    }
+
+    /**
+     * Usernames currently granted view_prices (used by the AI system
+     * prompt). Returns a deduplicated list including superadmin id=1.
+     *
+     * @return string[]
+     */
+    public static function usernamesWithPriceAccess(PDO $conn): array
+    {
+        $stmt = $conn->query("
+            SELECT u.username
+            FROM   bb_users u
+            WHERE  u.id = 1
+               OR  EXISTS (
+                       SELECT 1 FROM bb_user_permissions p
+                       WHERE  p.user_id = u.id
+                         AND  p.module  = 'view_prices'
+                         AND  p.allowed = 1
+                   )
+            ORDER BY u.username ASC
+        ");
+        return array_values(array_filter($stmt->fetchAll(PDO::FETCH_COLUMN)));
+    }
+
 
     public function savePermissions(array $data): void
     {

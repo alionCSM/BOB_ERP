@@ -80,8 +80,7 @@ final class WorksitesController
 
         $auth              = $GLOBALS['authenticated_user'] ?? [];
         $currentUsername   = $auth['username'] ?? '';
-        $usersWithPriceAccess = ['alion', 'laura', 'osman', 'elena', 'ermal'];
-        $canSeePrices      = in_array($currentUsername, $usersWithPriceAccess, true);
+        $canSeePrices      = $request->user() ? $request->user()->canSeePrices() : false;
 
         $companyFilter = ($companyId != 1) ? "AND w.company_id = " . (int)$companyId : "";
         $contractField = ($companyId == 1) ? 'w.total_offer' : 'w.ext_total_offer';
@@ -649,10 +648,10 @@ final class WorksitesController
         $dateList     = $this->attendanceRepo->getDatesByWorksite($worksite_id);
         $dateListCons = $this->attendanceRepo->getDatesConsByWorksite($worksite_id);
 
-        // Price access
+        // Price access (centralised in bb_user_permissions.view_prices)
         $currentUsername      = $auth['username'] ?? '';
-        $usersWithPriceAccess = ['alion', 'laura', 'osman', 'elena', 'ermal'];
-        $canSeePrices         = in_array($currentUsername, $usersWithPriceAccess, true);
+        $canSeePrices         = $request->user() ? $request->user()->canSeePrices() : false;
+        $usersWithPriceAccess = \User::usernamesWithPriceAccess($this->conn);
 
         // Users
         $allUsers      = $this->userRepo->getAssignableUsers();
@@ -2205,9 +2204,8 @@ final class WorksitesController
             }
         }
 
-        $usersWithPriceAccess = ['alion', 'laura', 'osman', 'elena', 'ermal'];
         $currentUsername      = (string)($auth['username'] ?? '');
-        $canSeePrices         = in_array($currentUsername, $usersWithPriceAccess, true);
+        $canSeePrices         = $request->user() ? $request->user()->canSeePrices() : false;
 
         // Rate limit
         $limiter = new \RateLimiter($this->conn, 20, 10);
