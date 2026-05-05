@@ -60,35 +60,45 @@ final class BillingController
         $totEuroDa     = array_sum(array_column($clients, 'da_emettere_euro_yr'));
         $totEuroEm     = array_sum(array_column($clients, 'emesse_euro_yr'));
 
-        // "Emesse reale" pulled from Yard (SQL Server) for the selected month
-        // and the month before it. The selected month comes from the
-        // ?month=YYYY-MM picker; default is the current month.
+        // "Emesse reale" cards always show current + previous month from Yard
+        // (SQL Server). A separate ?month=YYYY-MM query param drives a
+        // third "picked" dataset used to open the modal on demand.
         $monthLabels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
+        $thisYear   = (int)date('Y');
+        $thisMonth  = (int)date('n');
+        $prevYear   = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
+        $prevMonth  = $thisMonth === 1 ? 12            : $thisMonth - 1;
+
+        // Optional picked month (validated). Null when not provided / invalid.
+        $pickedYear  = null;
+        $pickedMonth = null;
         $selMonthRaw = (string)($request->get('month') ?? '');
         if (preg_match('/^(\d{4})-(\d{2})$/', $selMonthRaw, $m)
             && (int)$m[2] >= 1 && (int)$m[2] <= 12
             && (int)$m[1] >= 2000 && (int)$m[1] <= 2100) {
-            $thisYear  = (int)$m[1];
-            $thisMonth = (int)$m[2];
-        } else {
-            $thisYear  = (int)date('Y');
-            $thisMonth = (int)date('n');
+            $pickedYear  = (int)$m[1];
+            $pickedMonth = (int)$m[2];
         }
-        $selectedMonth = sprintf('%04d-%02d', $thisYear, $thisMonth);
-        $prevYear      = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
-        $prevMonth     = $thisMonth === 1 ? 12            : $thisMonth - 1;
 
         $emessRealCur     = ['count' => 0, 'imponibile' => 0.0];
         $emessRealPrev    = ['count' => 0, 'imponibile' => 0.0];
         $emessRealCurRows  = [];
         $emessRealPrevRows = [];
+        $emessRealPickedRows = [];
         try {
             $yardBilling       = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
             $emessRealCur      = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
             $emessRealPrev     = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
             $emessRealCurRows  = $yardBilling->getEmesseRowsForMonth($thisYear, $thisMonth);
             $emessRealPrevRows = $yardBilling->getEmesseRowsForMonth($prevYear, $prevMonth);
+            // Only query for the picked month if it's not the same as one
+            // of the always-loaded months — saves an extra round trip.
+            if ($pickedYear !== null
+                && !($pickedYear === $thisYear && $pickedMonth === $thisMonth)
+                && !($pickedYear === $prevYear && $pickedMonth === $prevMonth)) {
+                $emessRealPickedRows = $yardBilling->getEmesseRowsForMonth($pickedYear, $pickedMonth);
+            }
         } catch (\Throwable $e) {
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
         }
@@ -145,8 +155,9 @@ final class BillingController
             return $groups;
         };
 
-        $emessRealCurFatture  = $groupFn($emessRealCurRows);
-        $emessRealPrevFatture = $groupFn($emessRealPrevRows);
+        $emessRealCurFatture    = $groupFn($emessRealCurRows);
+        $emessRealPrevFatture   = $groupFn($emessRealPrevRows);
+        $emessRealPickedFatture = $pickedYear !== null ? $groupFn($emessRealPickedRows) : [];
 
         // Authoritative footer totals computed in PHP — independent of the
         // Yard aggregate query above. If they disagree, something's off.
@@ -158,9 +169,21 @@ final class BillingController
         foreach ($emessRealPrevRows as $r) {
             $emessRealPrevRowsTotal += (float)($r['totale_imponibile'] ?? 0);
         }
+        $emessRealPickedRowsTotal = 0.0;
+        foreach ($emessRealPickedRows as $r) {
+            $emessRealPickedRowsTotal += (float)($r['totale_imponibile'] ?? 0);
+        }
 
         $emessRealCurLabel  = $monthLabels[$thisMonth - 1] . ' ' . $thisYear;
         $emessRealPrevLabel = $monthLabels[$prevMonth - 1] . ' ' . $prevYear;
+        $emessRealPickedLabel = $pickedYear !== null
+            ? $monthLabels[$pickedMonth - 1] . ' ' . $pickedYear
+            : null;
+        $pickedMonthQuery = $pickedYear !== null
+            ? sprintf('%04d-%02d', $pickedYear, $pickedMonth)
+            : null;
+        // Default value for the picker input (today)
+        $defaultPickerValue = sprintf('%04d-%02d', $thisYear, $thisMonth);
 
         Response::view('billing/clients.html.twig', $request, compact(
             'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
@@ -168,7 +191,8 @@ final class BillingController
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
             'emessRealCurFatture', 'emessRealPrevFatture',
-            'selectedMonth'
+            'emessRealPickedFatture', 'emessRealPickedRowsTotal',
+            'emessRealPickedLabel', 'pickedMonthQuery', 'defaultPickerValue'
         ));
     }
 

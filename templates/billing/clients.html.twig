@@ -26,18 +26,19 @@
     </div>
 </div>
 
-{# ── Period picker (controls only the emesse-reale cards below) ── #}
+{# ── Apri dettaglio emesse-reale per un mese specifico (apre solo la modale) ── #}
 <form method="GET" action="/billing/clients" class="bc-period-picker">
     <label for="bc-month" class="bc-period-label">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Periodo emesse reale
+        Apri dettaglio emesse di un altro mese
     </label>
-    <input type="month" id="bc-month" name="month" value="{{ selectedMonth }}" class="bc-period-input" max="{{ "now"|date("Y-m") }}">
-    <button type="submit" class="bc-period-btn">Applica</button>
-    {% if selectedMonth != "now"|date("Y-m") %}
-        <a href="/billing/clients" class="bc-period-reset">Mese corrente</a>
-    {% endif %}
+    <input type="month" id="bc-month" name="month" value="{{ pickedMonthQuery ?: defaultPickerValue }}" class="bc-period-input" max="{{ "now"|date("Y-m") }}">
+    <button type="submit" class="bc-period-btn">Apri dettaglio</button>
 </form>
+{% if pickedMonthQuery %}
+    {# Tells the modal JS to auto-open with the picked dataset #}
+    <span id="er-picked-marker" data-label="{{ emessRealPickedLabel }}" hidden></span>
+{% endif %}
 
 {# ── Stats Row ── #}
 <div class="bc-stats">
@@ -45,18 +46,20 @@
     <div class="bc-stat bc-stat-clickable" data-er-period="cur" data-er-label="{{ emessRealCurLabel }}" style="cursor:pointer;">
         <div class="bc-stat-dot" style="background:#0ea5e9;box-shadow:0 0 6px rgba(14,165,233,.4);"></div>
         <div>
+            <div class="er-period-pill er-period-pill-cur">{{ emessRealCurLabel }}</div>
             <div class="bc-stat-value" style="color:#0284c7;">{{ emessRealCur.count }}</div>
             <div class="bc-stat-sub">€ {{ emessRealCur.imponibile|number_format(2, ',', '.') }}</div>
-            <div class="bc-stat-label">Emesse reale <span style="opacity:.55;font-size:10px;">({{ emessRealCurLabel }})</span></div>
+            <div class="bc-stat-label">Emesse reale</div>
         </div>
     </div>
     {# Emesse reale — mese precedente (da YARD) — cliccabile, apre modale #}
     <div class="bc-stat bc-stat-clickable" data-er-period="prev" data-er-label="{{ emessRealPrevLabel }}" style="cursor:pointer;">
         <div class="bc-stat-dot" style="background:#6366f1;box-shadow:0 0 6px rgba(99,102,241,.4);"></div>
         <div>
+            <div class="er-period-pill er-period-pill-prev">{{ emessRealPrevLabel }}</div>
             <div class="bc-stat-value" style="color:#4f46e5;">{{ emessRealPrev.count }}</div>
             <div class="bc-stat-sub">€ {{ emessRealPrev.imponibile|number_format(2, ',', '.') }}</div>
-            <div class="bc-stat-label">Emesse reale <span style="opacity:.55;font-size:10px;">({{ emessRealPrevLabel }})</span></div>
+            <div class="bc-stat-label">Emesse reale</div>
         </div>
     </div>
     <div class="bc-stat">
@@ -169,8 +172,9 @@
         </div>
         <div class="er-modal-body">
             {% set periods = [
-                { key: 'cur',  fatture: emessRealCurFatture,  total: emessRealCurRowsTotal  },
-                { key: 'prev', fatture: emessRealPrevFatture, total: emessRealPrevRowsTotal }
+                { key: 'cur',    fatture: emessRealCurFatture,    total: emessRealCurRowsTotal    },
+                { key: 'prev',   fatture: emessRealPrevFatture,   total: emessRealPrevRowsTotal   },
+                { key: 'picked', fatture: emessRealPickedFatture, total: emessRealPickedRowsTotal }
             ] %}
             {% for p in periods %}
                 <div class="er-rows" data-er-rows="{{ p.key }}" style="display:none;">
@@ -272,6 +276,16 @@
 .bc-stat-clickable { transition: transform .12s ease, box-shadow .12s ease; }
 .bc-stat-clickable:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.06); }
 
+/* Period pill — calls out the month/year on each emesse-reale card */
+.er-period-pill {
+    display: inline-block;
+    font-size: 12px; font-weight: 700; letter-spacing: .3px;
+    padding: 3px 10px; border-radius: 999px;
+    margin-bottom: 6px; text-transform: uppercase;
+}
+.er-period-pill-cur  { background: #e0f2fe; color: #0369a1; }
+.er-period-pill-prev { background: #e0e7ff; color: #4338ca; }
+
 .er-modal { position: fixed; inset: 0; display: none; z-index: 1000; }
 .er-modal.is-open { display: block; }
 .er-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
@@ -358,6 +372,14 @@
             detail.style.display = open ? '' : 'none';
         });
     });
+
+    // If a ?month=YYYY-MM picked dataset is present, auto-open the modal
+    // showing it. Driven by a server-rendered hidden marker so we don't
+    // re-parse the URL client side.
+    var pickedMarker = document.getElementById('er-picked-marker');
+    if (pickedMarker) {
+        openFor('picked', pickedMarker.getAttribute('data-label') || '');
+    }
 })();
 </script>
 
