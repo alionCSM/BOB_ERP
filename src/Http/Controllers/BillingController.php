@@ -60,14 +60,24 @@ final class BillingController
         $totEuroDa     = array_sum(array_column($clients, 'da_emettere_euro_yr'));
         $totEuroEm     = array_sum(array_column($clients, 'emesse_euro_yr'));
 
-        // "Emesse reale" pulled from Yard (SQL Server) for the current and
-        // previous month. Defensive try/catch — if Yard is unreachable we
-        // still want the page to render, just with zeros.
+        // "Emesse reale" pulled from Yard (SQL Server) for the selected month
+        // and the month before it. The selected month comes from the
+        // ?month=YYYY-MM picker; default is the current month.
         $monthLabels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        $thisYear    = (int)date('Y');
-        $thisMonth   = (int)date('n');
-        $prevYear    = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
-        $prevMonth   = $thisMonth === 1 ? 12            : $thisMonth - 1;
+
+        $selMonthRaw = (string)($request->get('month') ?? '');
+        if (preg_match('/^(\d{4})-(\d{2})$/', $selMonthRaw, $m)
+            && (int)$m[2] >= 1 && (int)$m[2] <= 12
+            && (int)$m[1] >= 2000 && (int)$m[1] <= 2100) {
+            $thisYear  = (int)$m[1];
+            $thisMonth = (int)$m[2];
+        } else {
+            $thisYear  = (int)date('Y');
+            $thisMonth = (int)date('n');
+        }
+        $selectedMonth = sprintf('%04d-%02d', $thisYear, $thisMonth);
+        $prevYear      = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
+        $prevMonth     = $thisMonth === 1 ? 12            : $thisMonth - 1;
 
         $emessRealCur     = ['count' => 0, 'imponibile' => 0.0];
         $emessRealPrev    = ['count' => 0, 'imponibile' => 0.0];
@@ -157,7 +167,8 @@ final class BillingController
             'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
-            'emessRealCurFatture', 'emessRealPrevFatture'
+            'emessRealCurFatture', 'emessRealPrevFatture',
+            'selectedMonth'
         ));
     }
 
