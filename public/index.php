@@ -198,7 +198,8 @@ if ($uri === '/ordini-aziende' || str_starts_with($uri, '/ordini-aziende/')) {
            ->get('/ordini-aziende/{id}',           [OrdiniAziendeController::class, 'show'])
            ->get('/ordini-aziende/{id}/edit',      [OrdiniAziendeController::class, 'edit'])
            ->post('/ordini-aziende/{id}/update',   [OrdiniAziendeController::class, 'update'])
-           ->post('/ordini-aziende/{id}/delete',   [OrdiniAziendeController::class, 'destroy']);
+           ->post('/ordini-aziende/{id}/delete',   [OrdiniAziendeController::class, 'destroy'])
+           ->get('/ordini-aziende/{id}/pdf',       [OrdiniAziendeController::class, 'pdf']);
 
     $router->dispatch($request, $container);
 }
