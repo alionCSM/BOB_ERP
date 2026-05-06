@@ -27,12 +27,30 @@
 </div>
 
 {# ── Apri dettaglio emesse-reale per un mese specifico (apre solo la modale, via AJAX) ── #}
+{# Two native <select>s instead of <input type=month> for cross-browser parity (Safari desktop) #}
+{% set _ymParts  = defaultPickerValue|split('-') %}
+{% set _ymYear   = _ymParts[0] + 0 %}
+{% set _ymMonth  = _ymParts[1] + 0 %}
+{% set _curYear  = "now"|date("Y") + 0 %}
+{% set _monthsIt = {
+    1:'Gennaio', 2:'Febbraio', 3:'Marzo', 4:'Aprile', 5:'Maggio', 6:'Giugno',
+    7:'Luglio', 8:'Agosto', 9:'Settembre', 10:'Ottobre', 11:'Novembre', 12:'Dicembre'
+} %}
 <form id="bc-picker-form" class="bc-period-picker">
-    <label for="bc-month" class="bc-period-label">
+    <label class="bc-period-label">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Apri dettaglio emesse di un altro mese
     </label>
-    <input type="month" id="bc-month" name="month" value="{{ defaultPickerValue }}" class="bc-period-input" max="{{ "now"|date("Y-m") }}" required>
+    <select id="bc-pick-month" name="bc-pick-month" class="bc-period-input" required>
+        {% for n, label in _monthsIt %}
+            <option value="{{ '%02d'|format(n) }}"{{ n == _ymMonth ? ' selected' : '' }}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select id="bc-pick-year" name="bc-pick-year" class="bc-period-input" required>
+        {% for y in (_curYear)..(_curYear - 5) %}
+            <option value="{{ y }}"{{ y == _ymYear ? ' selected' : '' }}>{{ y }}</option>
+        {% endfor %}
+    </select>
     <button type="submit" class="bc-period-btn">Apri dettaglio</button>
 </form>
 
@@ -388,9 +406,20 @@
     if (pickerForm && pickedPanel) {
         pickerForm.addEventListener('submit', function (e) {
             e.preventDefault();
-            var monthInput = document.getElementById('bc-month');
-            var ym = (monthInput && monthInput.value) || '';
-            if (!/^\d{4}-\d{2}$/.test(ym)) return;
+            var ySel = document.getElementById('bc-pick-year');
+            var mSel = document.getElementById('bc-pick-month');
+            var y = ySel ? ySel.value : '';
+            var mm = mSel ? mSel.value : '';
+            if (!/^\d{4}$/.test(y) || !/^\d{2}$/.test(mm)) return;
+            var ym = y + '-' + mm;
+
+            // Don't request a future month — Yard wouldn't have data
+            var now = new Date();
+            var nowYm = now.getFullYear() + '-' + ('0' + (now.getMonth() + 1)).slice(-2);
+            if (ym > nowYm) {
+                alert('Il mese selezionato è nel futuro.');
+                return;
+            }
 
             var label = monthLabelIt(ym);
             if (pickerBtn) { pickerBtn.disabled = true; pickerBtn.textContent = 'Caricamento…'; }
