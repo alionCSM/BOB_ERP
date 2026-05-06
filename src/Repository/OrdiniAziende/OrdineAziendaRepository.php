@@ -37,7 +37,7 @@ final class OrdineAziendaRepository
         $sql = "
             SELECT
                 o.id, o.azienda_id, o.anno, o.mese,
-                o.order_number, o.order_date, o.total,
+                o.order_number, o.order_date, o.total, o.iva_percentage,
                 o.descrizione, o.note, o.created_at,
                 c.name AS azienda_name, c.codice AS azienda_codice
             FROM bb_ordini_aziende o
@@ -172,9 +172,9 @@ final class OrdineAziendaRepository
     {
         $stmt = $this->conn->prepare("
             INSERT INTO bb_ordini_aziende
-                (azienda_id, anno, mese, order_number, order_date, total, descrizione, note, created_by)
+                (azienda_id, anno, mese, order_number, order_date, total, iva_percentage, descrizione, note, created_by)
             VALUES
-                (:aid, :anno, :mese, :num, :data, :total, :descr, :note, :uid)
+                (:aid, :anno, :mese, :num, :data, :total, :iva, :descr, :note, :uid)
         ");
         $stmt->execute([
             ':aid'   => (int)$data['azienda_id'],
@@ -183,6 +183,7 @@ final class OrdineAziendaRepository
             ':num'   => (string)$data['order_number'],
             ':data'  => (string)$data['order_date'],
             ':total' => (float)($data['total'] ?? 0),
+            ':iva'   => (float)($data['iva_percentage'] ?? 22),
             ':descr' => $data['descrizione'] ?? null,
             ':note'  => $data['note'] ?? null,
             ':uid'   => $data['created_by'] ?? null,
@@ -194,13 +195,14 @@ final class OrdineAziendaRepository
     {
         $stmt = $this->conn->prepare("
             UPDATE bb_ordini_aziende SET
-                azienda_id  = :aid,
-                anno        = :anno,
-                mese        = :mese,
-                order_date  = :data,
-                total       = :total,
-                descrizione = :descr,
-                note        = :note
+                azienda_id     = :aid,
+                anno           = :anno,
+                mese           = :mese,
+                order_date     = :data,
+                total          = :total,
+                iva_percentage = :iva,
+                descrizione    = :descr,
+                note           = :note
             WHERE id = :id
         ");
         $stmt->execute([
@@ -210,6 +212,7 @@ final class OrdineAziendaRepository
             ':mese'  => (int)$data['mese'],
             ':data'  => (string)$data['order_date'],
             ':total' => (float)($data['total'] ?? 0),
+            ':iva'   => (float)($data['iva_percentage'] ?? 22),
             ':descr' => $data['descrizione'] ?? null,
             ':note'  => $data['note'] ?? null,
         ]);
