@@ -135,11 +135,10 @@ final class OrdineAziendaRepository
 
         $lines = ["Periodo: {$label}", '', 'Cantieri:'];
         foreach ($cantieri as $r) {
-            $code  = trim((string)($r['worksite_code'] ?? ''));
-            $name  = trim((string)($r['worksite_name'] ?? ''));
-            $gg    = (float)($r['presenze_gg'] ?? 0);
-            $left  = $code !== '' ? "[{$code}] {$name}" : $name;
-            $lines[] = '- ' . $left . ' — ' . rtrim(rtrim(number_format($gg, 2, ',', '.'), '0'), ',') . ' gg';
+            $code = trim((string)($r['worksite_code'] ?? ''));
+            $name = trim((string)($r['worksite_name'] ?? ''));
+            $left = $code !== '' ? "[{$code}] {$name}" : $name;
+            $lines[] = '- ' . $left;
         }
         return implode("\n", $lines);
     }
