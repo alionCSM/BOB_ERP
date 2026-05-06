@@ -15,9 +15,24 @@ $dotenv->load();
 // hard fail if required env vars missing
 \App\Infrastructure\Config::validate();
 if (session_status() === PHP_SESSION_NONE) {
-    ini_set('session.cookie_httponly', '1');
-    ini_set('session.cookie_secure',   '1');
-    ini_set('session.cookie_samesite', 'Strict');
+    // Distinct cookie name — avoids collisions with sibling subdomains that
+    // also run PHP and set PHPSESSID at the parent domain (e.g. gest.csmontaggi.it).
+    // Without this, the browser sends two PHPSESSID cookies on every request
+    // and PHP picks one arbitrarily, occasionally swapping BOB's session for
+    // a foreign one and breaking CSRF validation.
+    session_name('BOB_SESSID');
+
+    // Pin the cookie to the current host (host-only) so a future domain
+    // cookie set on .csmontaggi.it can't override us silently.
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path'     => '/',
+        'domain'   => '',           // host-only
+        'secure'   => true,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     session_start();
