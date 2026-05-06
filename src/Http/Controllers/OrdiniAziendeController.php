@@ -235,13 +235,11 @@ final class OrdiniAziendeController
                      'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
         $periodLabel = $monthsIt[(int)$ordine['mese'] - 1] . ' ' . $ordine['anno'];
 
-        // Inline logos as data URLs. PNGs with alpha render badly in DomPDF
-        // (the colours come out flat/missing) — flatten to JPEG over white
-        // before embedding. JPGs pass through.
+        // Inline header logo as a data URL. PNGs with alpha render badly in
+        // DomPDF (colours come out flat/missing); fileToDataUri() flattens
+        // PNGs to white-background JPEG before embedding so colours render.
         $logoTop    = APP_ROOT . '/includes/template/dist/images/Consorzio-Soluzione-Montaggi_Logotype.jpg';
-        $logoBottom = APP_ROOT . '/includes/template/dist/images/csmontaggi_logo.png';
-        $logoTopSrc    = $this->fileToDataUri($logoTop);
-        $logoBottomSrc = $this->fileToDataUri($logoBottom);
+        $logoTopSrc = $this->fileToDataUri($logoTop);
 
         $imponibile = (float)$ordine['total'];
         $ivaPerc    = (float)($ordine['iva_percentage'] ?? 22);
@@ -257,7 +255,6 @@ final class OrdiniAziendeController
             'ivaFmt'         => number_format($ivaAmount,  2, ',', '.'),
             'totaleDocFmt'   => number_format($totaleDoc,  2, ',', '.'),
             'logoTopSrc'     => $logoTopSrc,
-            'logoBottomSrc'  => $logoBottomSrc,
         ]);
 
         $options = new \Dompdf\Options();

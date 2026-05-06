@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Ordine {{ ordine.order_number }}</title>
     <style>
-        @page { margin-top: 175px; margin-bottom: 40px; margin-left: 40px; margin-right: 40px; }
+        @page { margin-top: 175px; margin-bottom: 60px; margin-left: 40px; margin-right: 40px; }
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #1f2937; margin: 0; }
 
@@ -20,11 +20,8 @@
         .hdr-order-num { font-size: 13px; font-weight: bold; color: #ffffff; }
         .hdr-date-badge { font-size: 10px; color: #ffffff; border: 1px solid rgba(255,255,255,0.5); padding: 3px 10px; }
 
-        footer { position: fixed; bottom: -90px; left: 0; right: 0; height: 90px; border-top: 2px solid #1e3a5f; padding-top: 8px; }
-        .ftr-table { width: 100%; border-collapse: collapse; }
-        .ftr-logo-cell { width: 40%; vertical-align: middle; }
-        .ftr-logo-cell img { width: 130px; }
-        .ftr-sign-cell { width: 60%; text-align: right; vertical-align: bottom; font-size: 9px; color: #9ca3af; padding-bottom: 4px; }
+        footer { position: fixed; bottom: -50px; left: 0; right: 0; height: 50px; border-top: 1px solid #e5e7eb; padding-top: 8px; }
+        .ftr-text { font-size: 9px; color: #9ca3af; text-align: right; }
 
         .content { margin-top: 8px; }
 
@@ -95,14 +92,7 @@
 </header>
 
 <footer>
-    <table class="ftr-table">
-        <tr>
-            <td class="ftr-logo-cell">
-                {% if logoBottomSrc %}<img src="{{ logoBottomSrc }}" alt="CSM">{% endif %}
-            </td>
-            <td class="ftr-sign-cell">Documento generato automaticamente da BOB · {{ "now"|date('d/m/Y H:i') }}</td>
-        </tr>
-    </table>
+    <div class="ftr-text">Documento generato automaticamente da BOB · {{ "now"|date('d/m/Y H:i') }}</div>
 </footer>
 
 <div class="content">
