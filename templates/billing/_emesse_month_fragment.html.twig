@@ -1,0 +1,69 @@
+{# Standalone HTML fragment for AJAX injection into the er-modal "picked" panel.
+   Receives: fatture (grouped), total (float), label (string). #}
+{% if fatture is empty %}
+    <p class="er-empty">Nessuna fattura emessa nel periodo.</p>
+{% else %}
+        <div style="overflow-x:auto;">
+            <table class="er-table er-fatture-table">
+                <thead>
+                    <tr>
+                        <th style="width:32px;"></th>
+                        <th>Data</th>
+                        <th>Numero</th>
+                        <th>Cliente</th>
+                        <th class="center">Voci</th>
+                        <th class="right">Imponibile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in fatture %}
+                        <tr class="er-fattura-row" data-er-toggle="picked-{{ loop.index }}">
+                            <td class="er-toggle-cell">
+                                <span class="er-chevron">▸</span>
+                            </td>
+                            <td style="white-space:nowrap;">{{ f.data ? f.data|date('d/m/Y') : '—' }}</td>
+                            <td style="white-space:nowrap; font-weight:600;">{{ f.numero_label }}</td>
+                            <td>
+                                {% if f.clienti is empty %}
+                                    —
+                                {% else %}
+                                    {{ f.clienti|join(', ') }}
+                                {% endif %}
+                            </td>
+                            <td class="center">{{ f.rows|length }}</td>
+                            <td class="right" style="font-weight:600;">€ {{ f.totale|number_format(2, ',', '.') }}</td>
+                        </tr>
+                        <tr class="er-fattura-detail" data-er-detail="picked-{{ loop.index }}" style="display:none;">
+                            <td></td>
+                            <td colspan="5" style="padding:0;">
+                                <table class="er-detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Cantiere</th>
+                                            <th>Descrizione</th>
+                                            <th class="right">Imponibile</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for r in f.rows %}
+                                        <tr>
+                                            <td>{{ r.nome_cantiere ?: '—' }}</td>
+                                            <td style="max-width:520px;">{{ r.descrizione ?: '—' }}</td>
+                                            <td class="right">€ {{ (r.totale_imponibile ?? 0)|number_format(2, ',', '.') }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="5" class="right" style="font-weight:600;">Totale</td>
+                        <td class="right" style="font-weight:600;">€ {{ total|number_format(2, ',', '.') }}</td>
+                    </tr>
+            </tfoot>
+        </table>
+    </div>
+{% endif %}

@@ -258,8 +258,8 @@ final class ApiController
             Response::json([]);
         }
 
-        $usersWithPriceAccess = ['alion', 'laura', 'osman', 'elena', 'ermal'];
-        $canSeePrices = in_array((string)($auth['username'] ?? ''), $usersWithPriceAccess, true);
+        // Price visibility lives in the `view_prices` permission
+        $canSeePrices = $request->user() ? $request->user()->canSeePrices() : false;
 
         $select = "SELECT w.id, w.worksite_code, w.name AS worksite_name, w.order_number, w.order_date,
                           w.location, w.total_offer, w.ext_total_offer, w.status,

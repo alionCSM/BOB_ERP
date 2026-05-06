@@ -26,19 +26,15 @@
     </div>
 </div>
 
-{# ── Apri dettaglio emesse-reale per un mese specifico (apre solo la modale) ── #}
-<form method="GET" action="/billing/clients" class="bc-period-picker">
+{# ── Apri dettaglio emesse-reale per un mese specifico (apre solo la modale, via AJAX) ── #}
+<form id="bc-picker-form" class="bc-period-picker">
     <label for="bc-month" class="bc-period-label">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Apri dettaglio emesse di un altro mese
     </label>
-    <input type="month" id="bc-month" name="month" value="{{ pickedMonthQuery ?: defaultPickerValue }}" class="bc-period-input" max="{{ "now"|date("Y-m") }}">
+    <input type="month" id="bc-month" name="month" value="{{ defaultPickerValue }}" class="bc-period-input" max="{{ "now"|date("Y-m") }}" required>
     <button type="submit" class="bc-period-btn">Apri dettaglio</button>
 </form>
-{% if pickedMonthQuery %}
-    {# Tells the modal JS to auto-open with the picked dataset #}
-    <span id="er-picked-marker" data-label="{{ emessRealPickedLabel }}" hidden></span>
-{% endif %}
 
 {# ── Stats Row ── #}
 <div class="bc-stats">
@@ -172,10 +168,11 @@
         </div>
         <div class="er-modal-body">
             {% set periods = [
-                { key: 'cur',    fatture: emessRealCurFatture,    total: emessRealCurRowsTotal    },
-                { key: 'prev',   fatture: emessRealPrevFatture,   total: emessRealPrevRowsTotal   },
-                { key: 'picked', fatture: emessRealPickedFatture, total: emessRealPickedRowsTotal }
+                { key: 'cur',  fatture: emessRealCurFatture,  total: emessRealCurRowsTotal  },
+                { key: 'prev', fatture: emessRealPrevFatture, total: emessRealPrevRowsTotal }
             ] %}
+            {# AJAX-injected panel for the picker (rendered server-side as a fragment) #}
+            <div id="er-picked-panel" data-er-rows="picked" style="display:none;"></div>
             {% for p in periods %}
                 <div class="er-rows" data-er-rows="{{ p.key }}" style="display:none;">
                     {% if p.fatture is empty %}
@@ -362,23 +359,62 @@
         if (e.key === 'Escape') close();
     });
 
-    // Toggle expansion of a single fattura row → its detail row
-    modal.querySelectorAll('.er-fattura-row').forEach(function (row) {
-        row.addEventListener('click', function () {
-            var key = row.getAttribute('data-er-toggle');
-            var detail = modal.querySelector('[data-er-detail="' + key + '"]');
-            if (!detail) return;
-            var open = row.classList.toggle('is-open');
-            detail.style.display = open ? '' : 'none';
-        });
+    // Toggle expansion of a single fattura row → its detail row.
+    // Delegated so dynamically-injected AJAX rows work too.
+    modal.addEventListener('click', function (e) {
+        var row = e.target.closest('.er-fattura-row');
+        if (!row || !modal.contains(row)) return;
+        var key = row.getAttribute('data-er-toggle');
+        var detail = modal.querySelector('[data-er-detail="' + key + '"]');
+        if (!detail) return;
+        var open = row.classList.toggle('is-open');
+        detail.style.display = open ? '' : 'none';
     });
 
-    // If a ?month=YYYY-MM picked dataset is present, auto-open the modal
-    // showing it. Driven by a server-rendered hidden marker so we don't
-    // re-parse the URL client side.
-    var pickedMarker = document.getElementById('er-picked-marker');
-    if (pickedMarker) {
-        openFor('picked', pickedMarker.getAttribute('data-label') || '');
+    // Picker form → fetch fragment, inject into picked panel, open modal
+    var pickerForm = document.getElementById('bc-picker-form');
+    var pickerBtn  = pickerForm ? pickerForm.querySelector('button[type=submit]') : null;
+    var pickedPanel = document.getElementById('er-picked-panel');
+
+    function monthLabelIt(ym) {
+        var labels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+        var p = (ym || '').split('-');
+        if (p.length !== 2) return ym;
+        var idx = parseInt(p[1], 10) - 1;
+        if (idx < 0 || idx > 11) return ym;
+        return labels[idx] + ' ' + p[0];
+    }
+
+    if (pickerForm && pickedPanel) {
+        pickerForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var monthInput = document.getElementById('bc-month');
+            var ym = (monthInput && monthInput.value) || '';
+            if (!/^\d{4}-\d{2}$/.test(ym)) return;
+
+            var label = monthLabelIt(ym);
+            if (pickerBtn) { pickerBtn.disabled = true; pickerBtn.textContent = 'Caricamento…'; }
+            pickedPanel.innerHTML = '<p class="er-empty">Caricamento…</p>';
+            openFor('picked', label);
+
+            fetch('/billing/clients/emesse-month?month=' + encodeURIComponent(ym), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
+            .then(function (html) {
+                pickedPanel.innerHTML = html;
+            })
+            .catch(function (err) {
+                pickedPanel.innerHTML = '<p class="er-empty">Errore caricamento: ' + (err && err.message ? err.message : 'sconosciuto') + '</p>';
+            })
+            .finally(function () {
+                if (pickerBtn) { pickerBtn.disabled = false; pickerBtn.textContent = 'Apri dettaglio'; }
+            });
+        });
     }
 })();
 </script>

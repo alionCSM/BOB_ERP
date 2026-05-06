@@ -11,7 +11,8 @@ use App\Service\RateLimiter;
 
 class AiSqlController
 {
-    public const USERS_WITH_PRICE_ACCESS = ['alion', 'laura', 'osman', 'elena', 'ermal'];
+    // NB: price visibility is now managed via the `view_prices` permission
+    // in bb_user_permissions; use User::canSeePrices() / User::usernamesWithPriceAccess().
 
     // Only these users (plus user id 1) may use the AI module. The feature
     // executes LLM-generated SQL; access must stay narrow until that surface
@@ -142,15 +143,17 @@ class AiSqlController
             $allowedModules = $permStmt->fetchAll(\PDO::FETCH_COLUMN);
         }
 
+        // Price visibility now lives in the bb_user_permissions table under
+        // the `view_prices` key. Pull it via the User helper, then build the
+        // authorised-username list dynamically for the AI system prompt.
         $userContext = [
             'user_id'          => $userId,
             'username'         => $username,
             'full_name'        => $fullName,
             'is_superadmin'    => $isSuperAdmin,
             'allowed_modules'  => $allowedModules, // null = all, array = specific list
-            'can_see_prices'   => $isSuperAdmin
-                || in_array($username, self::USERS_WITH_PRICE_ACCESS, true),
-            'price_access_list'=> self::USERS_WITH_PRICE_ACCESS,
+            'can_see_prices'   => $user->canSeePrices(),
+            'price_access_list'=> \User::usernamesWithPriceAccess($this->conn),
         ];
 
         // ── Ask AI ────────────────────────────────────────────────────────────

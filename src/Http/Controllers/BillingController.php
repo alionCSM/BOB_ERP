@@ -61,8 +61,9 @@ final class BillingController
         $totEuroEm     = array_sum(array_column($clients, 'emesse_euro_yr'));
 
         // "Emesse reale" cards always show current + previous month from Yard
-        // (SQL Server). A separate ?month=YYYY-MM query param drives a
-        // third "picked" dataset used to open the modal on demand.
+        // (SQL Server). The picker triggers an AJAX fetch (see
+        // emesseMonthFragment below) — no page reload, no ?month query param
+        // needed on this action.
         $monthLabels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
         $thisYear   = (int)date('Y');
@@ -70,35 +71,16 @@ final class BillingController
         $prevYear   = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
         $prevMonth  = $thisMonth === 1 ? 12            : $thisMonth - 1;
 
-        // Optional picked month (validated). Null when not provided / invalid.
-        $pickedYear  = null;
-        $pickedMonth = null;
-        $selMonthRaw = (string)($request->get('month') ?? '');
-        if (preg_match('/^(\d{4})-(\d{2})$/', $selMonthRaw, $m)
-            && (int)$m[2] >= 1 && (int)$m[2] <= 12
-            && (int)$m[1] >= 2000 && (int)$m[1] <= 2100) {
-            $pickedYear  = (int)$m[1];
-            $pickedMonth = (int)$m[2];
-        }
-
         $emessRealCur     = ['count' => 0, 'imponibile' => 0.0];
         $emessRealPrev    = ['count' => 0, 'imponibile' => 0.0];
         $emessRealCurRows  = [];
         $emessRealPrevRows = [];
-        $emessRealPickedRows = [];
         try {
             $yardBilling       = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
             $emessRealCur      = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
             $emessRealPrev     = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
             $emessRealCurRows  = $yardBilling->getEmesseRowsForMonth($thisYear, $thisMonth);
             $emessRealPrevRows = $yardBilling->getEmesseRowsForMonth($prevYear, $prevMonth);
-            // Only query for the picked month if it's not the same as one
-            // of the always-loaded months — saves an extra round trip.
-            if ($pickedYear !== null
-                && !($pickedYear === $thisYear && $pickedMonth === $thisMonth)
-                && !($pickedYear === $prevYear && $pickedMonth === $prevMonth)) {
-                $emessRealPickedRows = $yardBilling->getEmesseRowsForMonth($pickedYear, $pickedMonth);
-            }
         } catch (\Throwable $e) {
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
         }
@@ -157,7 +139,6 @@ final class BillingController
 
         $emessRealCurFatture    = $groupFn($emessRealCurRows);
         $emessRealPrevFatture   = $groupFn($emessRealPrevRows);
-        $emessRealPickedFatture = $pickedYear !== null ? $groupFn($emessRealPickedRows) : [];
 
         // Authoritative footer totals computed in PHP — independent of the
         // Yard aggregate query above. If they disagree, something's off.
@@ -169,19 +150,9 @@ final class BillingController
         foreach ($emessRealPrevRows as $r) {
             $emessRealPrevRowsTotal += (float)($r['totale_imponibile'] ?? 0);
         }
-        $emessRealPickedRowsTotal = 0.0;
-        foreach ($emessRealPickedRows as $r) {
-            $emessRealPickedRowsTotal += (float)($r['totale_imponibile'] ?? 0);
-        }
 
         $emessRealCurLabel  = $monthLabels[$thisMonth - 1] . ' ' . $thisYear;
         $emessRealPrevLabel = $monthLabels[$prevMonth - 1] . ' ' . $prevYear;
-        $emessRealPickedLabel = $pickedYear !== null
-            ? $monthLabels[$pickedMonth - 1] . ' ' . $pickedYear
-            : null;
-        $pickedMonthQuery = $pickedYear !== null
-            ? sprintf('%04d-%02d', $pickedYear, $pickedMonth)
-            : null;
         // Default value for the picker input (today)
         $defaultPickerValue = sprintf('%04d-%02d', $thisYear, $thisMonth);
 
@@ -191,9 +162,81 @@ final class BillingController
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
             'emessRealCurFatture', 'emessRealPrevFatture',
-            'emessRealPickedFatture', 'emessRealPickedRowsTotal',
-            'emessRealPickedLabel', 'pickedMonthQuery', 'defaultPickerValue'
+            'defaultPickerValue'
         ));
+    }
+
+    // ── GET /billing/clients/emesse-month?month=YYYY-MM (HTML fragment) ───────
+
+    public function emesseMonthFragment(Request $request): never
+    {
+        $monthLabels = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+
+        $raw = (string)($request->get('month') ?? '');
+        if (!preg_match('/^(\d{4})-(\d{2})$/', $raw, $m)
+            || (int)$m[2] < 1 || (int)$m[2] > 12
+            || (int)$m[1] < 2000 || (int)$m[1] > 2100) {
+            Response::error('Mese non valido', 400);
+        }
+        $year  = (int)$m[1];
+        $month = (int)$m[2];
+
+        $rows = [];
+        try {
+            $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+            $rows = $yardBilling->getEmesseRowsForMonth($year, $month);
+        } catch (\Throwable $e) {
+            error_log('[BillingController::emesseMonthFragment] Yard unreachable: ' . $e->getMessage());
+        }
+
+        // Same grouping logic as clientList (kept inline rather than extracted
+        // because the partial template lives only here).
+        $groups = [];
+        foreach ($rows as $r) {
+            $anno = (int)($r['tm_anno'] ?? 0);
+            $num  = (int)($r['tm_numdoc'] ?? 0);
+            $key  = ($anno > 0 && $num > 0) ? ($anno . '-' . $num) : 'senza-numero';
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'tm_anno'            => $anno,
+                    'tm_numdoc'          => $num,
+                    'numero_label'       => ($anno > 0 && $num > 0) ? ($num . '/' . $anno) : 'Senza numero',
+                    'data'               => $r['data'] ?? null,
+                    'clienti'            => [],
+                    'cliente_principale' => (string)($r['nome_cliente'] ?? ''),
+                    'totale'             => 0.0,
+                    'rows'               => [],
+                ];
+            }
+            $g =& $groups[$key];
+            if (!empty($r['data']) && (empty($g['data']) || $r['data'] > $g['data'])) {
+                $g['data'] = $r['data'];
+            }
+            $cliente = (string)($r['nome_cliente'] ?? '');
+            if ($cliente !== '' && !in_array($cliente, $g['clienti'], true)) {
+                $g['clienti'][] = $cliente;
+            }
+            $g['totale'] += (float)($r['totale_imponibile'] ?? 0);
+            $g['rows'][]  = $r;
+            unset($g);
+        }
+        usort($groups, function ($a, $b) {
+            $c = strcasecmp($a['cliente_principale'] ?: 'zzz', $b['cliente_principale'] ?: 'zzz');
+            if ($c !== 0) return $c;
+            if ($a['tm_anno'] !== $b['tm_anno']) return $a['tm_anno'] <=> $b['tm_anno'];
+            return $a['tm_numdoc'] <=> $b['tm_numdoc'];
+        });
+
+        $total = 0.0;
+        foreach ($rows as $r) { $total += (float)($r['totale_imponibile'] ?? 0); }
+
+        $label = $monthLabels[$month - 1] . ' ' . $year;
+
+        Response::view('billing/_emesse_month_fragment.html.twig', $request, [
+            'fatture' => $groups,
+            'total'   => $total,
+            'label'   => $label,
+        ]);
     }
 
     // ── Per-client billing: detail (da emettere + emesse paginated) ───────────
