@@ -1,0 +1,108 @@
+{% extends "layout/base.html.twig" %}
+
+{% block content %}
+<div class="oa-page" style="padding:20px; max-width:900px; margin:0 auto;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div>
+            <h1 style="font-size:22px; font-weight:700; margin:0;">Nuovo Ordine</h1>
+            <p style="color:#64748b; margin:4px 0 0;">Numero preview: <strong>{{ orderNumberPreview }}</strong> (assegnato al salvataggio)</p>
+        </div>
+        <a href="/ordini-aziende" style="color:#475569; text-decoration:none;">← Torna alla lista</a>
+    </div>
+
+    {# Step 1 — pick azienda + period and reload to prefill descrizione #}
+    <form method="GET" action="/ordini-aziende/create"
+          style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px;">
+        <h3 style="font-size:14px; font-weight:600; margin:0 0 12px;">1. Seleziona azienda e periodo</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:1; min-width:240px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Azienda</label>
+                <select name="azienda_id" required style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <option value="">— scegli —</option>
+                    {% for a in aziende %}
+                        <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
+                            {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Mese</label>
+                {% set monthsIt = {1:'Gennaio',2:'Febbraio',3:'Marzo',4:'Aprile',5:'Maggio',6:'Giugno',7:'Luglio',8:'Agosto',9:'Settembre',10:'Ottobre',11:'Novembre',12:'Dicembre'} %}
+                <select name="mese" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    {% for n, label in monthsIt %}
+                        <option value="{{ n }}"{{ n == mese ? ' selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Anno</label>
+                <select name="anno" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    {% for y in years %}
+                        <option value="{{ y }}"{{ y == anno ? ' selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" style="height:38px; padding:0 16px; border:0; border-radius:6px; background:#6366f1; color:#fff; font-size:13px; font-weight:500; cursor:pointer;">
+                Carica cantieri
+            </button>
+        </div>
+    </form>
+
+    {# Step 2 — confirm + save (only when an azienda is picked) #}
+    {% if aziendaId %}
+        <form method="POST" action="/ordini-aziende"
+              style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+            <input type="hidden" name="azienda_id" value="{{ aziendaId }}">
+            <input type="hidden" name="anno"       value="{{ anno }}">
+            <input type="hidden" name="mese"       value="{{ mese }}">
+
+            <h3 style="font-size:14px; font-weight:600; margin:0 0 12px;">2. Compila ordine</h3>
+
+            <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px; padding:10px; margin-bottom:14px; font-size:13px;">
+                <strong>{{ aziendaName }}</strong> · {{ cantieri|length }} cantieri trovati nel periodo
+            </div>
+
+            <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:200px;">
+                    <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Data ordine *</label>
+                    <input type="date" name="order_date" required value="{{ "now"|date("Y-m-d") }}"
+                           style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+                <div style="flex:1; min-width:200px;">
+                    <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Totale (€) *</label>
+                    <input type="text" name="total" required placeholder="0,00" inputmode="decimal"
+                           style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Descrizione (precompilata, modificabile)</label>
+                <textarea name="descrizione" rows="10"
+                          style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:ui-monospace, monospace; font-size:12px;">{{ descrizione }}</textarea>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Note</label>
+                <textarea name="note" rows="3"
+                          style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></textarea>
+            </div>
+
+            <div style="text-align:right;">
+                <a href="/ordini-aziende" style="margin-right:12px; color:#64748b; text-decoration:none;">Annulla</a>
+                <button type="submit"
+                        style="background:#16a34a; color:#fff; padding:10px 20px; border:0; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">
+                    Salva ordine
+                </button>
+            </div>
+        </form>
+    {% else %}
+        <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:10px; padding:30px; text-align:center; color:#64748b;">
+            Seleziona un'azienda e un periodo per continuare.
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

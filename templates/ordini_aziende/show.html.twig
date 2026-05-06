@@ -1,0 +1,60 @@
+{% extends "layout/base.html.twig" %}
+
+{% block content %}
+<div class="oa-page" style="padding:20px; max-width:900px; margin:0 auto;">
+
+    {% set monthsIt = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'] %}
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div>
+            <p style="color:#64748b; margin:0; font-size:13px;">
+                <a href="/ordini-aziende" style="color:#64748b; text-decoration:none;">Ordini Aziende</a>
+                <span style="opacity:.5; margin:0 6px;">›</span>
+                {{ ordine.order_number }}
+            </p>
+            <h1 style="font-size:22px; font-weight:700; margin:6px 0 0;">{{ ordine.order_number }}</h1>
+        </div>
+        <a href="/ordini-aziende/{{ ordine.id }}/edit"
+           style="background:#6366f1; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none; font-weight:500; font-size:13px;">
+            Modifica
+        </a>
+    </div>
+
+    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
+            <div>
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Azienda</div>
+                <div style="font-weight:600; margin-top:2px;">{{ ordine.azienda_name }}</div>
+                {% if ordine.azienda_codice %}
+                    <div style="color:#64748b; font-size:12px;">{{ ordine.azienda_codice }}</div>
+                {% endif %}
+            </div>
+            <div>
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Periodo</div>
+                <div style="font-weight:600; margin-top:2px;">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</div>
+            </div>
+            <div>
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Data ordine</div>
+                <div style="font-weight:600; margin-top:2px;">{{ ordine.order_date|date('d/m/Y') }}</div>
+            </div>
+            <div>
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Totale</div>
+                <div style="font-weight:700; margin-top:2px; color:#16a34a; font-size:18px;">€ {{ ordine.total|number_format(2, ',', '.') }}</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">Descrizione</div>
+            <pre style="background:#f8fafc; padding:12px; border-radius:6px; font-family:ui-monospace, monospace; font-size:12px; white-space:pre-wrap; margin:0;">{{ ordine.descrizione ?: '—' }}</pre>
+        </div>
+
+        {% if ordine.note %}
+            <div>
+                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">Note</div>
+                <div style="background:#fef9c3; padding:10px 12px; border-radius:6px; font-size:13px;">{{ ordine.note }}</div>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

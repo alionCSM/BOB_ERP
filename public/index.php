@@ -180,6 +180,29 @@ if ($uri === '/ordini' || str_starts_with($uri, '/ordini/')) {
     $router->dispatch($request, $container);
 }
 
+if ($uri === '/ordini-aziende' || str_starts_with($uri, '/ordini-aziende/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    require_once APP_ROOT . '/src/Http/Controllers/OrdiniAziendeController.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $repo       = new \App\Repository\OrdiniAziende\OrdineAziendaRepository($connection);
+    $controller = new OrdiniAziendeController($connection, $repo);
+    $container->set(OrdiniAziendeController::class, fn() => $controller);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/ordini-aziende',                [OrdiniAziendeController::class, 'index'])
+           ->get('/ordini-aziende/create',         [OrdiniAziendeController::class, 'create'])
+           ->post('/ordini-aziende',               [OrdiniAziendeController::class, 'store'])
+           ->get('/ordini-aziende/{id}',           [OrdiniAziendeController::class, 'show'])
+           ->get('/ordini-aziende/{id}/edit',      [OrdiniAziendeController::class, 'edit'])
+           ->post('/ordini-aziende/{id}/update',   [OrdiniAziendeController::class, 'update'])
+           ->post('/ordini-aziende/{id}/delete',   [OrdiniAziendeController::class, 'destroy']);
+
+    $router->dispatch($request, $container);
+}
+
 if ($uri === '/users' || str_starts_with($uri, '/users/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);
