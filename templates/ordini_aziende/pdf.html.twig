@@ -37,11 +37,27 @@
         .recipient-name { font-size: 12px; font-weight: bold; color: #1e3a5f; margin-bottom: 4px; }
         .recipient-meta { font-size: 9px; color: #6b7280; }
 
-        .descr-box { border: 1px solid #e5e7eb; background: #f9fafb; padding: 12px 14px; margin-bottom: 14px; }
-        .descr-title { font-size: 10px; font-weight: bold; color: #1e3a5f; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-        .descr-body { font-size: 10px; color: #1f2937; white-space: pre-wrap; line-height: 1.55; font-family: 'Courier New', monospace; }
+        .descr-box {
+            border: 1px solid #e5e7eb; background: #f9fafb;
+            padding: 12px 14px; margin-bottom: 14px;
+            page-break-inside: auto;
+        }
+        .descr-title {
+            font-size: 10px; font-weight: bold; color: #1e3a5f;
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;
+            page-break-after: avoid;
+        }
+        .descr-body {
+            font-size: 10px; color: #1f2937;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            line-height: 1.55;
+            font-family: 'Courier New', monospace;
+            page-break-inside: auto;
+        }
 
-        .totals-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 14px; }
+        .totals-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 14px; page-break-inside: avoid; }
         .totals-table td { padding: 7px 10px; }
         .totals-table .lbl { font-size: 10px; color: #4b5563; text-align: right; }
         .totals-table .val { font-size: 11px; color: #1f2937; text-align: right; width: 100px; }
@@ -60,10 +76,10 @@
                 {% if logoTopSrc %}<img src="{{ logoTopSrc }}" alt="Consorzio">{% endif %}
             </td>
             <td class="hdr-info-cell">
-                <strong>Consorzio Soluzione Montaggi</strong>
-                Via Trento, 16/A — 30030 Salzano (VE)<br>
-                P.IVA / C.F. 04244320278<br>
-                amministrazione@consorziosoluzionemontaggi.it
+                <strong>CS Montaggi</strong>
+                Via Bruno Tosarelli, 322 — 40055 Villanova di Castenaso (BO)<br>
+                P.IVA 03584711208<br>
+                info@csmontaggi.it
             </td>
         </tr>
     </table>

@@ -235,8 +235,10 @@ final class OrdiniAziendeController
                      'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
         $periodLabel = $monthsIt[(int)$ordine['mese'] - 1] . ' ' . $ordine['anno'];
 
-        // Inline logos as data URLs so DomPDF doesn't need remote_enabled
-        $logoTop    = APP_ROOT . '/includes/template/dist/images/Consorzio Soluzione Montaggi_Logo.png';
+        // Inline logos as data URLs. PNGs with alpha render badly in DomPDF
+        // (the colours come out flat/missing) — flatten to JPEG over white
+        // before embedding. JPGs pass through.
+        $logoTop    = APP_ROOT . '/includes/template/dist/images/Consorzio-Soluzione-Montaggi_Logotype.jpg';
         $logoBottom = APP_ROOT . '/includes/template/dist/images/csmontaggi_logo.png';
         $logoTopSrc    = $this->fileToDataUri($logoTop);
         $logoBottomSrc = $this->fileToDataUri($logoBottom);
@@ -287,7 +289,18 @@ final class OrdiniAziendeController
         if (!is_file($path) || !is_readable($path)) {
             return null;
         }
-        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        // PNGs with alpha are rendered badly by DomPDF (colours flatten). If
+        // GD is available, composite onto white and re-encode as JPEG so
+        // colours come through cleanly.
+        if ($ext === 'png' && function_exists('imagecreatefrompng') && function_exists('imagejpeg')) {
+            $jpeg = $this->pngToWhiteJpeg($path);
+            if ($jpeg !== null) {
+                return 'data:image/jpeg;base64,' . base64_encode($jpeg);
+            }
+        }
+
         $mime = match ($ext) {
             'png'        => 'image/png',
             'jpg', 'jpeg'=> 'image/jpeg',
@@ -298,5 +311,26 @@ final class OrdiniAziendeController
         $bytes = @file_get_contents($path);
         if ($bytes === false) return null;
         return 'data:' . $mime . ';base64,' . base64_encode($bytes);
+    }
+
+    /**
+     * Composite a PNG over a white background and return JPEG bytes.
+     */
+    private function pngToWhiteJpeg(string $path): ?string
+    {
+        $src = @imagecreatefrompng($path);
+        if (!$src) return null;
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $out = imagecreatetruecolor($w, $h);
+        $white = imagecolorallocate($out, 255, 255, 255);
+        imagefilledrectangle($out, 0, 0, $w, $h, $white);
+        imagecopy($out, $src, 0, 0, 0, 0, $w, $h);
+        ob_start();
+        imagejpeg($out, null, 92);
+        $jpeg = ob_get_clean();
+        imagedestroy($src);
+        imagedestroy($out);
+        return $jpeg ?: null;
     }
 }
