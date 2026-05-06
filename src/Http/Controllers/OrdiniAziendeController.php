@@ -214,4 +214,77 @@ final class OrdiniAziendeController
         }
         Response::redirect('/ordini-aziende');
     }
+
+    // ── GET /ordini-aziende/{id}/pdf ──────────────────────────────────────────
+
+    public function pdf(Request $request): never
+    {
+        require_once APP_ROOT . '/vendor/autoload.php';
+
+        $id = $request->intParam('id');
+        $ordine = $this->repo->findById($id);
+        if (!$ordine) {
+            Response::error('Ordine non trovato.', 404);
+        }
+
+        $monthsIt = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                     'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+        $periodLabel = $monthsIt[(int)$ordine['mese'] - 1] . ' ' . $ordine['anno'];
+
+        // Inline logos as data URLs so DomPDF doesn't need remote_enabled
+        $logoTop    = APP_ROOT . '/includes/template/dist/images/Consorzio Soluzione Montaggi_Logo.png';
+        $logoBottom = APP_ROOT . '/includes/template/dist/images/csmontaggi_logo.png';
+        $logoTopSrc    = $this->fileToDataUri($logoTop);
+        $logoBottomSrc = $this->fileToDataUri($logoBottom);
+
+        $renderer = new \App\View\TwigRenderer(null);
+        $html = $renderer->render('ordini_aziende/pdf.html.twig', [
+            'ordine'        => $ordine,
+            'periodLabel'   => $periodLabel,
+            'totaleFmt'     => number_format((float)$ordine['total'], 2, ',', '.'),
+            'logoTopSrc'    => $logoTopSrc,
+            'logoBottomSrc' => $logoBottomSrc,
+        ]);
+
+        $options = new \Dompdf\Options();
+        $options->setIsRemoteEnabled(true);
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        // Page numbers in the footer area
+        $canvas    = $dompdf->getCanvas();
+        $w         = $canvas->get_width();
+        $h         = $canvas->get_height();
+        $font      = $dompdf->getFontMetrics()->getFont('Helvetica', 'normal');
+        $text      = 'Pagina {PAGE_NUM} di {PAGE_COUNT}';
+        $textWidth = $dompdf->getFontMetrics()->getTextWidth($text, $font, 7);
+        $canvas->page_text(($w - $textWidth) / 1.7, $h - 22, $text, $font, 7, [0.4, 0.4, 0.4]);
+
+        $safeAzienda = preg_replace('/[^A-Za-z0-9_]+/', '_', (string)($ordine['azienda_name'] ?? 'Azienda'));
+        $filename = $ordine['order_number'] . '_' . $safeAzienda . '.pdf';
+
+        header('X-Frame-Options: SAMEORIGIN');
+        $dompdf->stream($filename, ['Attachment' => false]);
+        exit;
+    }
+
+    private function fileToDataUri(string $path): ?string
+    {
+        if (!is_file($path) || !is_readable($path)) {
+            return null;
+        }
+        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'png'        => 'image/png',
+            'jpg', 'jpeg'=> 'image/jpeg',
+            'gif'        => 'image/gif',
+            'svg'        => 'image/svg+xml',
+            default      => 'application/octet-stream',
+        };
+        $bytes = @file_get_contents($path);
+        if ($bytes === false) return null;
+        return 'data:' . $mime . ';base64,' . base64_encode($bytes);
+    }
 }

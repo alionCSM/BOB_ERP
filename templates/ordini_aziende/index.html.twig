@@ -1,84 +1,108 @@
-{% extends "layout/base.html.twig" %}
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_list.css">
+{% endblock %}
 
 {% block content %}
-<div class="oa-page" style="padding:20px;">
+{% set monthsIt = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'] %}
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <div>
-            <h1 style="font-size:22px; font-weight:700; margin:0;">Ordini Aziende</h1>
-            <p style="color:#64748b; margin:4px 0 0;">Tracking ordini per aziende non consorziate</p>
+<div class="col-page">
+
+  {# Hero #}
+  <div class="col-hero">
+    <div class="col-hero-left">
+      <div class="col-hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      </div>
+      <div>
+        <div class="col-hero-row">
+          <h1 class="col-hero-title">Ordini Aziende</h1>
+          <span class="col-hero-count">{{ ordini|length }}</span>
         </div>
-        <a href="/ordini-aziende/create" class="btn btn-primary"
-           style="background:#6366f1; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none; font-weight:500; font-size:13px;">
-            + Nuovo ordine
-        </a>
+        <p class="col-hero-sub">Tracking ordini per aziende non consorziate</p>
+      </div>
     </div>
+    <div class="col-hero-actions">
+      <a href="/ordini-aziende/create" class="col-btn-new">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Nuovo Ordine
+      </a>
+    </div>
+  </div>
 
-    {% if app_session_success ?? '' %}
-        <div style="background:#dcfce7; color:#166534; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:13px;">{{ app_session_success }}</div>
+  {% if app_session_success ?? '' %}
+    <div class="col-alert col-alert-success">{{ app_session_success }}</div>
+  {% endif %}
+  {% if app_session_error ?? '' %}
+    <div class="col-alert col-alert-error">{{ app_session_error }}</div>
+  {% endif %}
+
+  {# Filters #}
+  <form method="GET" action="/ordini-aziende" class="col-tabs" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+      <label class="form-label" style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.4px;">Anno</label>
+      <select name="year" class="form-control" style="height:34px; min-width:110px;">
+        {% for y in years %}
+          <option value="{{ y }}"{{ y == year ? ' selected' : '' }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label" style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.4px;">Azienda</label>
+      <select name="azienda_id" class="form-control" style="height:34px; min-width:240px;">
+        <option value="">— tutte —</option>
+        {% for a in aziende %}
+          <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
+            {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary" style="height:34px;">Filtra</button>
+  </form>
+
+  {# Table #}
+  <div class="col-table-wrap">
+    {% if ordini is empty %}
+      <div class="col-alert" style="text-align:center; padding:30px; color:#64748b;">Nessun ordine registrato per il periodo selezionato.</div>
+    {% else %}
+    <table class="col-table">
+      <thead>
+        <tr>
+          <th>N. Ordine</th>
+          <th>Data</th>
+          <th>Azienda</th>
+          <th>Periodo</th>
+          <th>Totale</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in ordini %}
+        <tr>
+          <td><a href="/ordini-aziende/{{ o.id }}" class="col-link-num">{{ o.order_number }}</a></td>
+          <td class="col-date">{{ o.order_date|date('d/m/Y') }}</td>
+          <td class="col-dest">{{ o.azienda_name }}{% if o.azienda_codice %} <span style="opacity:.55;">({{ o.azienda_codice }})</span>{% endif %}</td>
+          <td>{{ monthsIt[o.mese - 1] }} {{ o.anno }}</td>
+          <td class="col-total">{{ o.total|number_format(2, ',', '.')|replace({',00': ''}) }} €</td>
+          <td class="col-actions">
+            <a href="/ordini-aziende/{{ o.id }}" class="col-action-btn" title="Visualizza">
+              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </a>
+            <a href="/ordini-aziende/{{ o.id }}/edit" class="col-action-btn" title="Modifica">
+              <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </a>
+            <a href="/ordini-aziende/{{ o.id }}/pdf" target="_blank" class="col-action-btn" title="Scarica PDF">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     {% endif %}
-
-    <form method="GET" action="/ordini-aziende"
-          style="display:flex; gap:10px; align-items:flex-end; margin-bottom:16px; padding:12px; background:#fff; border:1px solid #e2e8f0; border-radius:10px;">
-        <div>
-            <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Anno</label>
-            <select name="year" style="height:34px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                {% for y in years %}
-                    <option value="{{ y }}"{{ y == year ? ' selected' : '' }}>{{ y }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div>
-            <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Azienda</label>
-            <select name="azienda_id" style="height:34px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px; min-width:220px;">
-                <option value="">— tutte —</option>
-                {% for a in aziende %}
-                    <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
-                        {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <button type="submit"
-                style="height:34px; padding:0 14px; border:0; border-radius:6px; background:#6366f1; color:#fff; font-size:13px; font-weight:500; cursor:pointer;">
-            Filtra
-        </button>
-    </form>
-
-    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
-        {% if ordini is empty %}
-            <div style="padding:40px; text-align:center; color:#64748b;">Nessun ordine registrato.</div>
-        {% else %}
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                <thead style="background:#f1f5f9; color:#475569;">
-                    <tr>
-                        <th style="text-align:left; padding:10px;">N. Ordine</th>
-                        <th style="text-align:left; padding:10px;">Data</th>
-                        <th style="text-align:left; padding:10px;">Azienda</th>
-                        <th style="text-align:center; padding:10px;">Periodo</th>
-                        <th style="text-align:right; padding:10px;">Totale</th>
-                        <th style="padding:10px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% set monthsIt = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'] %}
-                {% for o in ordini %}
-                    <tr style="border-top:1px solid #f1f5f9;">
-                        <td style="padding:10px; font-weight:600;">{{ o.order_number }}</td>
-                        <td style="padding:10px;">{{ o.order_date|date('d/m/Y') }}</td>
-                        <td style="padding:10px;">{{ o.azienda_name }}{% if o.azienda_codice %} <span style="color:#94a3b8;">({{ o.azienda_codice }})</span>{% endif %}</td>
-                        <td style="padding:10px; text-align:center;">{{ monthsIt[o.mese - 1] }} {{ o.anno }}</td>
-                        <td style="padding:10px; text-align:right;">€ {{ o.total|number_format(2, ',', '.') }}</td>
-                        <td style="padding:10px; text-align:right;">
-                            <a href="/ordini-aziende/{{ o.id }}" style="color:#6366f1; text-decoration:none; margin-right:10px;">Apri</a>
-                            <a href="/ordini-aziende/{{ o.id }}/edit" style="color:#475569; text-decoration:none;">Modifica</a>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        {% endif %}
-    </div>
+  </div>
 
 </div>
 {% endblock %}

@@ -1,108 +1,126 @@
-{% extends "layout/base.html.twig" %}
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_form.css">
+{% endblock %}
 
 {% block content %}
-<div class="oa-page" style="padding:20px; max-width:900px; margin:0 auto;">
+{% set monthsIt = {1:'Gennaio',2:'Febbraio',3:'Marzo',4:'Aprile',5:'Maggio',6:'Giugno',7:'Luglio',8:'Agosto',9:'Settembre',10:'Ottobre',11:'Novembre',12:'Dicembre'} %}
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <div>
-            <h1 style="font-size:22px; font-weight:700; margin:0;">Nuovo Ordine</h1>
-            <p style="color:#64748b; margin:4px 0 0;">Numero preview: <strong>{{ orderNumberPreview }}</strong> (assegnato al salvataggio)</p>
-        </div>
-        <a href="/ordini-aziende" style="color:#475569; text-decoration:none;">← Torna alla lista</a>
+<div class="cof-page">
+
+  {# Hero #}
+  <div class="cof-hero">
+    <div class="cof-hero-left">
+      <div class="cof-hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      </div>
+      <div class="cof-hero-info">
+        <h1 class="cof-hero-title">Nuovo Ordine Azienda</h1>
+        <p class="cof-hero-sub">Numero preview: <strong>{{ orderNumberPreview }}</strong> · assegnato al salvataggio</p>
+      </div>
     </div>
+    <a href="/ordini-aziende" class="cof-btn-back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Annulla
+    </a>
+  </div>
 
-    {# Step 1 — pick azienda + period and reload to prefill descrizione #}
-    <form method="GET" action="/ordini-aziende/create"
-          style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:16px;">
-        <h3 style="font-size:14px; font-weight:600; margin:0 0 12px;">1. Seleziona azienda e periodo</h3>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-            <div style="flex:1; min-width:240px;">
-                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Azienda</label>
-                <select name="azienda_id" required style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                    <option value="">— scegli —</option>
-                    {% for a in aziende %}
-                        <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
-                            {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Mese</label>
-                {% set monthsIt = {1:'Gennaio',2:'Febbraio',3:'Marzo',4:'Aprile',5:'Maggio',6:'Giugno',7:'Luglio',8:'Agosto',9:'Settembre',10:'Ottobre',11:'Novembre',12:'Dicembre'} %}
-                <select name="mese" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                    {% for n, label in monthsIt %}
-                        <option value="{{ n }}"{{ n == mese ? ' selected' : '' }}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Anno</label>
-                <select name="anno" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                    {% for y in years %}
-                        <option value="{{ y }}"{{ y == anno ? ' selected' : '' }}>{{ y }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <button type="submit" style="height:38px; padding:0 16px; border:0; border-radius:6px; background:#6366f1; color:#fff; font-size:13px; font-weight:500; cursor:pointer;">
-                Carica cantieri
-            </button>
+  {# Step 1 — pick azienda + period (GET reload) #}
+  <form method="GET" action="/ordini-aziende/create" class="cof-card">
+    <div class="cof-card-header">
+      <h3 class="cof-card-title">1. Azienda e periodo</h3>
+    </div>
+    <div class="cof-card-body">
+      <div class="cof-grid-3" style="display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:12px; align-items:flex-end;">
+        <div class="cof-field">
+          <label class="cof-label">Azienda *</label>
+          <select name="azienda_id" required class="cof-input">
+            <option value="">— scegli azienda non consorziata —</option>
+            {% for a in aziende %}
+              <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
+                {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
+              </option>
+            {% endfor %}
+          </select>
         </div>
+        <div class="cof-field">
+          <label class="cof-label">Mese</label>
+          <select name="mese" class="cof-input">
+            {% for n, label in monthsIt %}
+              <option value="{{ n }}"{{ n == mese ? ' selected' : '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="cof-field">
+          <label class="cof-label">Anno</label>
+          <select name="anno" class="cof-input">
+            {% for y in years %}
+              <option value="{{ y }}"{{ y == anno ? ' selected' : '' }}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="cof-btn-primary">Carica cantieri</button>
+      </div>
+    </div>
+  </form>
+
+  {# Step 2 — confirm + save #}
+  {% if aziendaId %}
+    <form method="POST" action="/ordini-aziende" class="cof-card">
+      <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+      <input type="hidden" name="azienda_id" value="{{ aziendaId }}">
+      <input type="hidden" name="anno"       value="{{ anno }}">
+      <input type="hidden" name="mese"       value="{{ mese }}">
+
+      <div class="cof-card-header">
+        <h3 class="cof-card-title">2. Compila ordine</h3>
+        <span class="cof-card-meta">{{ aziendaName }} · {{ cantieri|length }} cantieri trovati nel periodo</span>
+      </div>
+
+      <div class="cof-card-body">
+        <div class="cof-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div class="cof-field">
+            <label class="cof-label">Data ordine *</label>
+            <input type="date" name="order_date" required value="{{ "now"|date("Y-m-d") }}" class="cof-input">
+          </div>
+          <div class="cof-field">
+            <label class="cof-label">Totale (€) *</label>
+            <input type="text" name="total" required placeholder="0,00" inputmode="decimal" class="cof-input">
+          </div>
+        </div>
+
+        <div class="cof-field" style="margin-top:14px;">
+          <label class="cof-label">Descrizione (precompilata, modificabile)</label>
+          <textarea name="descrizione" rows="11" class="cof-input cof-textarea-mono">{{ descrizione }}</textarea>
+        </div>
+
+        <div class="cof-field" style="margin-top:14px;">
+          <label class="cof-label">Note</label>
+          <textarea name="note" rows="3" class="cof-input"></textarea>
+        </div>
+      </div>
+
+      <div class="cof-card-footer">
+        <a href="/ordini-aziende" class="cof-btn-ghost">Annulla</a>
+        <button type="submit" class="cof-btn-primary">
+          <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+          Salva ordine
+        </button>
+      </div>
     </form>
-
-    {# Step 2 — confirm + save (only when an azienda is picked) #}
-    {% if aziendaId %}
-        <form method="POST" action="/ordini-aziende"
-              style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
-            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-            <input type="hidden" name="azienda_id" value="{{ aziendaId }}">
-            <input type="hidden" name="anno"       value="{{ anno }}">
-            <input type="hidden" name="mese"       value="{{ mese }}">
-
-            <h3 style="font-size:14px; font-weight:600; margin:0 0 12px;">2. Compila ordine</h3>
-
-            <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px; padding:10px; margin-bottom:14px; font-size:13px;">
-                <strong>{{ aziendaName }}</strong> · {{ cantieri|length }} cantieri trovati nel periodo
-            </div>
-
-            <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
-                <div style="flex:1; min-width:200px;">
-                    <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Data ordine *</label>
-                    <input type="date" name="order_date" required value="{{ "now"|date("Y-m-d") }}"
-                           style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                </div>
-                <div style="flex:1; min-width:200px;">
-                    <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Totale (€) *</label>
-                    <input type="text" name="total" required placeholder="0,00" inputmode="decimal"
-                           style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
-                </div>
-            </div>
-
-            <div style="margin-bottom:14px;">
-                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Descrizione (precompilata, modificabile)</label>
-                <textarea name="descrizione" rows="10"
-                          style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:ui-monospace, monospace; font-size:12px;">{{ descrizione }}</textarea>
-            </div>
-
-            <div style="margin-bottom:14px;">
-                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Note</label>
-                <textarea name="note" rows="3"
-                          style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></textarea>
-            </div>
-
-            <div style="text-align:right;">
-                <a href="/ordini-aziende" style="margin-right:12px; color:#64748b; text-decoration:none;">Annulla</a>
-                <button type="submit"
-                        style="background:#16a34a; color:#fff; padding:10px 20px; border:0; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">
-                    Salva ordine
-                </button>
-            </div>
-        </form>
-    {% else %}
-        <div style="background:#fff; border:1px dashed #cbd5e1; border-radius:10px; padding:30px; text-align:center; color:#64748b;">
-            Seleziona un'azienda e un periodo per continuare.
-        </div>
-    {% endif %}
+  {% else %}
+    <div class="cof-card">
+      <div class="cof-card-body" style="text-align:center; color:#64748b; padding:40px 20px;">
+        Seleziona un'azienda e un periodo per continuare.
+      </div>
+    </div>
+  {% endif %}
 
 </div>
+
+<style nonce="{{ cspNonce }}">
+.cof-textarea-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 12px; }
+.cof-card-meta { color:#64748b; font-size:12px; }
+</style>
 {% endblock %}

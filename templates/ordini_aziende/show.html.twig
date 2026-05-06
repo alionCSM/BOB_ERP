@@ -1,60 +1,88 @@
-{% extends "layout/base.html.twig" %}
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_list.css">
+<link rel="stylesheet" href="/assets/css/views/ordini/ordini_form.css">
+<link rel="stylesheet" href="/assets/css/views/ordini/ordine_show.css">
+{% endblock %}
 
 {% block content %}
-<div class="oa-page" style="padding:20px; max-width:900px; margin:0 auto;">
+{% set monthsIt = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'] %}
 
-    {% set monthsIt = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'] %}
+<div class="cos-page">
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <div>
-            <p style="color:#64748b; margin:0; font-size:13px;">
-                <a href="/ordini-aziende" style="color:#64748b; text-decoration:none;">Ordini Aziende</a>
-                <span style="opacity:.5; margin:0 6px;">›</span>
-                {{ ordine.order_number }}
-            </p>
-            <h1 style="font-size:22px; font-weight:700; margin:6px 0 0;">{{ ordine.order_number }}</h1>
+  {# Hero #}
+  <div class="cos-hero">
+    <div class="cos-hero-left">
+      <div class="cos-hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+      </div>
+      <div class="cos-hero-info">
+        <div class="cos-hero-row">
+          <h1 class="cos-hero-title">Ordine {{ ordine.order_number }}</h1>
         </div>
-        <a href="/ordini-aziende/{{ ordine.id }}/edit"
-           style="background:#6366f1; color:#fff; padding:10px 16px; border-radius:6px; text-decoration:none; font-weight:500; font-size:13px;">
-            Modifica
-        </a>
+        <p class="cos-hero-sub">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          {{ ordine.azienda_name }}
+          <span class="cos-hero-sep">·</span>
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          {{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}
+        </p>
+      </div>
+    </div>
+    <div class="cos-hero-actions">
+      <a href="/ordini-aziende" class="cos-btn-action">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Lista
+      </a>
+      <a href="/ordini-aziende/{{ ordine.id }}/pdf" target="_blank" class="cos-btn-action cos-btn-pdf">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Scarica PDF
+      </a>
+      <a href="/ordini-aziende/{{ ordine.id }}/edit" class="cos-btn-edit">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        Modifica
+      </a>
+    </div>
+  </div>
+
+  <div class="cos-grid">
+    <div class="cos-left">
+      <div class="cos-card">
+        <div class="cos-card-title">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Riepilogo
+        </div>
+        <table class="cos-info-table" style="width:100%; border-collapse:collapse;">
+          <tr><td style="padding:6px 0; color:#64748b;">N. Ordine</td><td style="padding:6px 0; font-weight:600;">{{ ordine.order_number }}</td></tr>
+          <tr><td style="padding:6px 0; color:#64748b;">Data ordine</td><td style="padding:6px 0;">{{ ordine.order_date|date('d/m/Y') }}</td></tr>
+          <tr><td style="padding:6px 0; color:#64748b;">Azienda</td><td style="padding:6px 0;">{{ ordine.azienda_name }}{% if ordine.azienda_codice %} <span style="color:#94a3b8;">({{ ordine.azienda_codice }})</span>{% endif %}</td></tr>
+          <tr><td style="padding:6px 0; color:#64748b;">Periodo</td><td style="padding:6px 0;">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</td></tr>
+          <tr><td style="padding:6px 0; color:#64748b;">Totale</td><td style="padding:6px 0; font-weight:700; color:#16a34a; font-size:16px;">€ {{ ordine.total|number_format(2, ',', '.') }}</td></tr>
+        </table>
+      </div>
+
+      {% if ordine.note %}
+      <div class="cos-card">
+        <div class="cos-card-title">
+          <svg viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Note
+        </div>
+        <div style="background:#fef9c3; padding:10px 12px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{{ ordine.note }}</div>
+      </div>
+      {% endif %}
     </div>
 
-    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Azienda</div>
-                <div style="font-weight:600; margin-top:2px;">{{ ordine.azienda_name }}</div>
-                {% if ordine.azienda_codice %}
-                    <div style="color:#64748b; font-size:12px;">{{ ordine.azienda_codice }}</div>
-                {% endif %}
-            </div>
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Periodo</div>
-                <div style="font-weight:600; margin-top:2px;">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</div>
-            </div>
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Data ordine</div>
-                <div style="font-weight:600; margin-top:2px;">{{ ordine.order_date|date('d/m/Y') }}</div>
-            </div>
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px;">Totale</div>
-                <div style="font-weight:700; margin-top:2px; color:#16a34a; font-size:18px;">€ {{ ordine.total|number_format(2, ',', '.') }}</div>
-            </div>
+    <div class="cos-right">
+      <div class="cos-card">
+        <div class="cos-card-title">
+          <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Descrizione cantieri
         </div>
-
-        <div style="margin-bottom:14px;">
-            <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">Descrizione</div>
-            <pre style="background:#f8fafc; padding:12px; border-radius:6px; font-family:ui-monospace, monospace; font-size:12px; white-space:pre-wrap; margin:0;">{{ ordine.descrizione ?: '—' }}</pre>
-        </div>
-
-        {% if ordine.note %}
-            <div>
-                <div style="font-size:11px; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;">Note</div>
-                <div style="background:#fef9c3; padding:10px 12px; border-radius:6px; font-size:13px;">{{ ordine.note }}</div>
-            </div>
-        {% endif %}
+        <pre style="background:#f8fafc; padding:14px; border-radius:6px; font-family:ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size:12px; white-space:pre-wrap; margin:0; color:#1e293b;">{{ ordine.descrizione ?: '—' }}</pre>
+      </div>
     </div>
+  </div>
 
 </div>
 {% endblock %}
