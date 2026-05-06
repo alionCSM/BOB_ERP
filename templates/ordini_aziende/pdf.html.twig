@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Ordine {{ ordine.order_number }}</title>
     <style>
-        @page { margin-top: 175px; margin-bottom: 60px; margin-left: 40px; margin-right: 40px; }
+        @page { margin-top: 175px; margin-bottom: 40px; margin-left: 40px; margin-right: 40px; }
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #1f2937; margin: 0; }
 
@@ -73,7 +73,7 @@
                 {% if logoTopSrc %}<img src="{{ logoTopSrc }}" alt="Consorzio">{% endif %}
             </td>
             <td class="hdr-info-cell">
-                <strong>CS Montaggi</strong>
+                <strong>Consorzio Soluzione Montaggi</strong>
                 Via Bruno Tosarelli, 322 — 40055 Villanova di Castenaso (BO)<br>
                 P.IVA 03584711208<br>
                 info@csmontaggi.it
@@ -91,9 +91,7 @@
     </div>
 </header>
 
-<footer>
-    <div class="ftr-text">Documento generato automaticamente da BOB · {{ "now"|date('d/m/Y H:i') }}</div>
-</footer>
+<footer></footer>
 
 <div class="content">
 
@@ -143,10 +141,6 @@
         {{ ordine.note|nl2br }}
     </div>
     {% endif %}
-
-    <div class="accept-note">
-        Decorsi 2 giorni dal ricevimento del presente senza obiezioni o richieste, l'ordine si intende accettato in ogni sua parte.
-    </div>
 
 </div>
 
