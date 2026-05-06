@@ -11,31 +11,40 @@
 
   {# Hero #}
   <div class="cof-hero">
-    <div class="cof-hero-left">
-      <div class="cof-hero-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    <div class="cof-hero-content">
+      <div class="cof-hero-left">
+        <div class="cof-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </div>
+        <div class="cof-hero-info">
+          <h1 class="cof-hero-title">Nuovo Ordine Azienda</h1>
+          <p class="cof-hero-sub">Numero preview: <strong>{{ orderNumberPreview }}</strong> · assegnato al salvataggio</p>
+        </div>
       </div>
-      <div class="cof-hero-info">
-        <h1 class="cof-hero-title">Nuovo Ordine Azienda</h1>
-        <p class="cof-hero-sub">Numero preview: <strong>{{ orderNumberPreview }}</strong> · assegnato al salvataggio</p>
+      <div class="cof-hero-actions">
+        <a href="/ordini-aziende" class="cof-btn-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Annulla
+        </a>
       </div>
     </div>
-    <a href="/ordini-aziende" class="cof-btn-back">
-      <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-      Annulla
-    </a>
   </div>
 
-  {# Step 1 — pick azienda + period (GET reload) #}
-  <form method="GET" action="/ordini-aziende/create" class="cof-card">
-    <div class="cof-card-header">
-      <h3 class="cof-card-title">1. Azienda e periodo</h3>
-    </div>
-    <div class="cof-card-body">
-      <div class="cof-grid-3" style="display:grid; grid-template-columns:2fr 1fr 1fr auto; gap:12px; align-items:flex-end;">
-        <div class="cof-field">
-          <label class="cof-label">Azienda *</label>
-          <select name="azienda_id" required class="cof-input">
+  {% if app_session_error ?? '' %}
+    <div class="cof-alert cof-alert-error">{{ app_session_error }}</div>
+  {% endif %}
+
+  {# ── Step 1: pick azienda + period (GET reload to prefill cantieri) ── #}
+  <form method="GET" action="/ordini-aziende/create">
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Azienda e periodo
+      </div>
+      <div class="cof-grid-2">
+        <div class="cof-field cof-field-span2">
+          <label for="oa-azienda">Azienda <span class="req">*</span></label>
+          <select name="azienda_id" id="oa-azienda" required>
             <option value="">— scegli azienda non consorziata —</option>
             {% for a in aziende %}
               <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
@@ -45,82 +54,86 @@
           </select>
         </div>
         <div class="cof-field">
-          <label class="cof-label">Mese</label>
-          <select name="mese" class="cof-input">
+          <label for="oa-mese">Mese</label>
+          <select name="mese" id="oa-mese">
             {% for n, label in monthsIt %}
               <option value="{{ n }}"{{ n == mese ? ' selected' : '' }}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="cof-field">
-          <label class="cof-label">Anno</label>
-          <select name="anno" class="cof-input">
+          <label for="oa-anno">Anno</label>
+          <select name="anno" id="oa-anno">
             {% for y in years %}
               <option value="{{ y }}"{{ y == anno ? ' selected' : '' }}>{{ y }}</option>
             {% endfor %}
           </select>
         </div>
-        <button type="submit" class="cof-btn-primary">Carica cantieri</button>
+      </div>
+      <div class="cof-form-actions" style="justify-content:flex-end;">
+        <button type="submit" class="cof-btn-submit">
+          <svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          Carica cantieri
+        </button>
       </div>
     </div>
   </form>
 
-  {# Step 2 — confirm + save #}
+  {# ── Step 2: confirm + save (only after picker submitted) ── #}
   {% if aziendaId %}
-    <form method="POST" action="/ordini-aziende" class="cof-card">
+    <form method="POST" action="/ordini-aziende">
       <input type="hidden" name="_csrf" value="{{ csrfToken }}">
       <input type="hidden" name="azienda_id" value="{{ aziendaId }}">
       <input type="hidden" name="anno"       value="{{ anno }}">
       <input type="hidden" name="mese"       value="{{ mese }}">
 
-      <div class="cof-card-header">
-        <h3 class="cof-card-title">2. Compila ordine</h3>
-        <span class="cof-card-meta">{{ aziendaName }} · {{ cantieri|length }} cantieri trovati nel periodo</span>
-      </div>
+      <div class="cof-section">
+        <div class="cof-section-title">
+          <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Dati ordine — {{ aziendaName }} · {{ cantieri|length }} cantieri nel periodo
+        </div>
 
-      <div class="cof-card-body">
-        <div class="cof-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="cof-grid-2">
           <div class="cof-field">
-            <label class="cof-label">Data ordine *</label>
-            <input type="date" name="order_date" required value="{{ "now"|date("Y-m-d") }}" class="cof-input">
+            <label for="oa-date">Data ordine <span class="req">*</span></label>
+            <input type="date" name="order_date" id="oa-date" required value="{{ "now"|date("Y-m-d") }}">
           </div>
           <div class="cof-field">
-            <label class="cof-label">Totale (€) *</label>
-            <input type="text" name="total" required placeholder="0,00" inputmode="decimal" class="cof-input">
+            <label for="oa-total">Totale (€) <span class="req">*</span></label>
+            <input type="text" name="total" id="oa-total" required placeholder="0,00" inputmode="decimal">
           </div>
-        </div>
-
-        <div class="cof-field" style="margin-top:14px;">
-          <label class="cof-label">Descrizione (precompilata, modificabile)</label>
-          <textarea name="descrizione" rows="11" class="cof-input cof-textarea-mono">{{ descrizione }}</textarea>
-        </div>
-
-        <div class="cof-field" style="margin-top:14px;">
-          <label class="cof-label">Note</label>
-          <textarea name="note" rows="3" class="cof-input"></textarea>
+          <div class="cof-field cof-field-span2">
+            <label for="oa-descr">Descrizione (precompilata, modificabile)</label>
+            <textarea name="descrizione" id="oa-descr" rows="11" class="oa-mono">{{ descrizione }}</textarea>
+          </div>
+          <div class="cof-field cof-field-span2">
+            <label for="oa-note">Note</label>
+            <textarea name="note" id="oa-note" rows="3"></textarea>
+          </div>
         </div>
       </div>
 
-      <div class="cof-card-footer">
-        <a href="/ordini-aziende" class="cof-btn-ghost">Annulla</a>
-        <button type="submit" class="cof-btn-primary">
+      <div class="cof-form-actions">
+        <a href="/ordini-aziende" class="cof-btn-cancel">Annulla</a>
+        <button type="submit" class="cof-btn-submit">
           <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
           Salva ordine
         </button>
       </div>
     </form>
   {% else %}
-    <div class="cof-card">
-      <div class="cof-card-body" style="text-align:center; color:#64748b; padding:40px 20px;">
-        Seleziona un'azienda e un periodo per continuare.
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        In attesa di selezione
       </div>
+      <p style="color:#64748b; padding:6px 4px 2px; margin:0;">Seleziona un'azienda e un periodo per continuare.</p>
     </div>
   {% endif %}
 
 </div>
 
 <style nonce="{{ cspNonce }}">
-.cof-textarea-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 12px; }
-.cof-card-meta { color:#64748b; font-size:12px; }
+.oa-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace !important; font-size: 12px !important; }
 </style>
 {% endblock %}

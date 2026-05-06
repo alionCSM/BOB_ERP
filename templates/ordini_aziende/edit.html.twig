@@ -9,37 +9,42 @@
 
 <div class="cof-page">
 
-  {# Hero #}
   <div class="cof-hero">
-    <div class="cof-hero-left">
-      <div class="cof-hero-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    <div class="cof-hero-content">
+      <div class="cof-hero-left">
+        <div class="cof-hero-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div class="cof-hero-info">
+          <h1 class="cof-hero-title">Modifica Ordine {{ ordine.order_number }}</h1>
+          <p class="cof-hero-sub">{{ ordine.azienda_name }} · {{ monthsIt[ordine.mese] }} {{ ordine.anno }}</p>
+        </div>
       </div>
-      <div class="cof-hero-info">
-        <h1 class="cof-hero-title">Modifica Ordine {{ ordine.order_number }}</h1>
-        <p class="cof-hero-sub">{{ ordine.azienda_name }}</p>
+      <div class="cof-hero-actions">
+        <a href="/ordini-aziende/{{ ordine.id }}" class="cof-btn-back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          Torna al dettaglio
+        </a>
       </div>
-    </div>
-    <div class="cof-hero-actions">
-      <a href="/ordini-aziende/{{ ordine.id }}" class="cof-btn-back">
-        <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Torna al dettaglio
-      </a>
     </div>
   </div>
 
-  <form method="POST" action="/ordini-aziende/{{ ordine.id }}/update" class="cof-card">
+  {% if app_session_error ?? '' %}
+    <div class="cof-alert cof-alert-error">{{ app_session_error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/ordini-aziende/{{ ordine.id }}/update">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-    <div class="cof-card-header">
-      <h3 class="cof-card-title">Dati ordine</h3>
-    </div>
-
-    <div class="cof-card-body">
-      <div class="cof-grid" style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px;">
-        <div class="cof-field">
-          <label class="cof-label">Azienda *</label>
-          <select name="azienda_id" required class="cof-input">
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Azienda e periodo
+      </div>
+      <div class="cof-grid-2">
+        <div class="cof-field cof-field-span2">
+          <label for="oa-azienda">Azienda <span class="req">*</span></label>
+          <select name="azienda_id" id="oa-azienda" required>
             {% for a in aziende %}
               <option value="{{ a.id }}"{{ a.id == ordine.azienda_id ? ' selected' : '' }}>
                 {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
@@ -48,62 +53,68 @@
           </select>
         </div>
         <div class="cof-field">
-          <label class="cof-label">Mese</label>
-          <select name="mese" class="cof-input">
+          <label for="oa-mese">Mese</label>
+          <select name="mese" id="oa-mese">
             {% for n, label in monthsIt %}
               <option value="{{ n }}"{{ n == ordine.mese ? ' selected' : '' }}>{{ label }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="cof-field">
-          <label class="cof-label">Anno</label>
-          <select name="anno" class="cof-input">
+          <label for="oa-anno">Anno</label>
+          <select name="anno" id="oa-anno">
             {% for y in years %}
               <option value="{{ y }}"{{ y == ordine.anno ? ' selected' : '' }}>{{ y }}</option>
             {% endfor %}
           </select>
         </div>
       </div>
+    </div>
 
-      <div class="cof-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px;">
-        <div class="cof-field">
-          <label class="cof-label">Data ordine *</label>
-          <input type="date" name="order_date" required value="{{ ordine.order_date }}" class="cof-input">
-        </div>
-        <div class="cof-field">
-          <label class="cof-label">Totale (€) *</label>
-          <input type="text" name="total" required value="{{ ordine.total|number_format(2, ',', '.') }}" inputmode="decimal" class="cof-input">
-        </div>
+    <div class="cof-section">
+      <div class="cof-section-title">
+        <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Dati ordine
       </div>
 
-      <div class="cof-field" style="margin-top:14px;">
-        <label class="cof-label" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>Descrizione</span>
-          <button type="button" id="oa-refresh-descr" class="cof-btn-ghost" style="font-size:11px; padding:4px 10px;">
-            ↻ Rigenera dai cantieri attuali
-          </button>
-        </label>
-        <textarea id="oa-descr" name="descrizione" rows="11" class="cof-input cof-textarea-mono">{{ ordine.descrizione }}</textarea>
-      </div>
+      <div class="cof-grid-2">
+        <div class="cof-field">
+          <label for="oa-date">Data ordine <span class="req">*</span></label>
+          <input type="date" name="order_date" id="oa-date" required value="{{ ordine.order_date }}">
+        </div>
+        <div class="cof-field">
+          <label for="oa-total">Totale (€) <span class="req">*</span></label>
+          <input type="text" name="total" id="oa-total" required value="{{ ordine.total|number_format(2, ',', '.') }}" inputmode="decimal">
+        </div>
 
-      <div class="cof-field" style="margin-top:14px;">
-        <label class="cof-label">Note</label>
-        <textarea name="note" rows="3" class="cof-input">{{ ordine.note }}</textarea>
+        <div class="cof-field cof-field-span2">
+          <label for="oa-descr">
+            Descrizione
+            <button type="button" id="oa-refresh-descr" class="oa-inline-btn">↻ Rigenera dai cantieri attuali</button>
+          </label>
+          <textarea name="descrizione" id="oa-descr" rows="11" class="oa-mono">{{ ordine.descrizione }}</textarea>
+        </div>
+
+        <div class="cof-field cof-field-span2">
+          <label for="oa-note">Note</label>
+          <textarea name="note" id="oa-note" rows="3">{{ ordine.note }}</textarea>
+        </div>
       </div>
     </div>
 
-    <div class="cof-card-footer" style="display:flex; justify-content:space-between; align-items:center;">
-      <button type="button" id="oa-delete-btn" class="cof-btn-ghost" style="color:#b91c1c; border-color:#fecaca;">
+    <div class="cof-form-actions">
+      <button type="button" id="oa-delete-btn" class="cof-btn-delete">
+        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
         Elimina ordine
       </button>
-      <button type="submit" class="cof-btn-primary">
+      <a href="/ordini-aziende/{{ ordine.id }}" class="cof-btn-cancel">Annulla</a>
+      <button type="submit" class="cof-btn-submit">
         <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
         Salva modifiche
       </button>
     </div>
   </form>
 
-  {# Hidden delete form (triggered from the button above) #}
   <form id="oa-delete-form" method="POST" action="/ordini-aziende/{{ ordine.id }}/delete" style="display:none;">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
   </form>
@@ -112,7 +123,14 @@
 </div>
 
 <style nonce="{{ cspNonce }}">
-.cof-textarea-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 12px; }
+.oa-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace !important; font-size: 12px !important; }
+.oa-inline-btn {
+    background: transparent; border: 1px solid #cbd5e1; color: #475569;
+    font-size: 11px; padding: 3px 9px; border-radius: 4px; cursor: pointer;
+    margin-left: 10px; font-weight: 500;
+}
+.oa-inline-btn:hover { background: #f1f5f9; }
+.cof-field label { display: flex; align-items: center; }
 </style>
 
 <script nonce="{{ cspNonce }}">
@@ -127,11 +145,11 @@
         });
     }
 
-    var delBtn = document.getElementById('oa-delete-btn');
+    var delBtn  = document.getElementById('oa-delete-btn');
     var delForm = document.getElementById('oa-delete-form');
     if (delBtn && delForm) {
         delBtn.addEventListener('click', function () {
-            if (confirm('Eliminare l\'ordine {{ ordine.order_number }}? L\'operazione è irreversibile.')) {
+            if (confirm("Eliminare l'ordine {{ ordine.order_number }}? L'operazione è irreversibile.")) {
                 delForm.submit();
             }
         });

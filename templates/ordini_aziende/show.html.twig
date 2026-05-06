@@ -3,6 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/ordini/ordini_list.css">
 <link rel="stylesheet" href="/assets/css/views/ordini/ordini_form.css">
+<link rel="stylesheet" href="/assets/css/views/offers/offer_show.css">
 <link rel="stylesheet" href="/assets/css/views/ordini/ordine_show.css">
 {% endblock %}
 
@@ -46,20 +47,44 @@
     </div>
   </div>
 
+  {% if app_session_success ?? '' %}
+    <div class="cof-alert cof-alert-success" style="margin-bottom:16px;">{{ app_session_success }}</div>
+  {% endif %}
+
   <div class="cos-grid">
+
+    {# Left column: details #}
     <div class="cos-left">
       <div class="cos-card">
         <div class="cos-card-title">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           Riepilogo
         </div>
-        <table class="cos-info-table" style="width:100%; border-collapse:collapse;">
-          <tr><td style="padding:6px 0; color:#64748b;">N. Ordine</td><td style="padding:6px 0; font-weight:600;">{{ ordine.order_number }}</td></tr>
-          <tr><td style="padding:6px 0; color:#64748b;">Data ordine</td><td style="padding:6px 0;">{{ ordine.order_date|date('d/m/Y') }}</td></tr>
-          <tr><td style="padding:6px 0; color:#64748b;">Azienda</td><td style="padding:6px 0;">{{ ordine.azienda_name }}{% if ordine.azienda_codice %} <span style="color:#94a3b8;">({{ ordine.azienda_codice }})</span>{% endif %}</td></tr>
-          <tr><td style="padding:6px 0; color:#64748b;">Periodo</td><td style="padding:6px 0;">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</td></tr>
-          <tr><td style="padding:6px 0; color:#64748b;">Totale</td><td style="padding:6px 0; font-weight:700; color:#16a34a; font-size:16px;">€ {{ ordine.total|number_format(2, ',', '.') }}</td></tr>
-        </table>
+        <div class="cos-details">
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">N. Ordine</div>
+            <div class="cos-detail-value"><strong>{{ ordine.order_number }}</strong></div>
+          </div>
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">Data ordine</div>
+            <div class="cos-detail-value">{{ ordine.order_date|date('d/m/Y') }}</div>
+          </div>
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">Azienda</div>
+            <div class="cos-detail-value">
+              {{ ordine.azienda_name }}
+              {% if ordine.azienda_codice %}<span style="color:#94a3b8;"> ({{ ordine.azienda_codice }})</span>{% endif %}
+            </div>
+          </div>
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">Periodo</div>
+            <div class="cos-detail-value">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</div>
+          </div>
+          <div class="cos-detail-row cos-detail-total">
+            <div class="cos-detail-label">Totale</div>
+            <div class="cos-detail-value">€ {{ ordine.total|number_format(2, ',', '.') }}</div>
+          </div>
+        </div>
       </div>
 
       {% if ordine.note %}
@@ -68,21 +93,33 @@
           <svg viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Note
         </div>
-        <div style="background:#fef9c3; padding:10px 12px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{{ ordine.note }}</div>
+        <div class="cos-internal-note">{{ ordine.note|nl2br }}</div>
       </div>
       {% endif %}
     </div>
 
+    {# Right column: descrizione cantieri #}
     <div class="cos-right">
       <div class="cos-card">
         <div class="cos-card-title">
           <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Descrizione cantieri
+          Descrizione cantieri del periodo
         </div>
-        <pre style="background:#f8fafc; padding:14px; border-radius:6px; font-family:ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size:12px; white-space:pre-wrap; margin:0; color:#1e293b;">{{ ordine.descrizione ?: '—' }}</pre>
+        <pre class="oa-descr-pre">{{ ordine.descrizione ?: '—' }}</pre>
       </div>
     </div>
+
   </div>
 
 </div>
+
+<style nonce="{{ cspNonce }}">
+.oa-descr-pre {
+    background: #f8fafc; padding: 14px;
+    border-radius: 8px; border: 1px solid #e2e8f0;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 12px; white-space: pre-wrap; word-break: break-word;
+    margin: 0; color: #1e293b; line-height: 1.55;
+}
+</style>
 {% endblock %}
