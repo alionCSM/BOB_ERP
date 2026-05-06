@@ -1,0 +1,109 @@
+{% extends "layout/base.html.twig" %}
+
+{% block content %}
+<div class="oa-page" style="padding:20px; max-width:900px; margin:0 auto;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div>
+            <h1 style="font-size:22px; font-weight:700; margin:0;">Modifica Ordine {{ ordine.order_number }}</h1>
+            <p style="color:#64748b; margin:4px 0 0;">{{ ordine.azienda_name }}</p>
+        </div>
+        <div>
+            <a href="/ordini-aziende/{{ ordine.id }}" style="color:#475569; text-decoration:none; margin-right:14px;">← Annulla</a>
+        </div>
+    </div>
+
+    {% set monthsIt = {1:'Gennaio',2:'Febbraio',3:'Marzo',4:'Aprile',5:'Maggio',6:'Giugno',7:'Luglio',8:'Agosto',9:'Settembre',10:'Ottobre',11:'Novembre',12:'Dicembre'} %}
+
+    <form method="POST" action="/ordini-aziende/{{ ordine.id }}/update"
+          style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:240px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Azienda *</label>
+                <select name="azienda_id" required style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    {% for a in aziende %}
+                        <option value="{{ a.id }}"{{ a.id == ordine.azienda_id ? ' selected' : '' }}>
+                            {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Mese</label>
+                <select name="mese" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    {% for n, label in monthsIt %}
+                        <option value="{{ n }}"{{ n == ordine.mese ? ' selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Anno</label>
+                <select name="anno" style="height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+                    {% for y in years %}
+                        <option value="{{ y }}"{{ y == ordine.anno ? ' selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Data ordine *</label>
+                <input type="date" name="order_date" required value="{{ ordine.order_date }}"
+                       style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+            <div style="flex:1; min-width:200px;">
+                <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Totale (€) *</label>
+                <input type="text" name="total" required value="{{ ordine.total|number_format(2, ',', '.') }}" inputmode="decimal"
+                       style="width:100%; height:38px; padding:0 10px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#64748b; margin-bottom:4px;">
+                <span>Descrizione</span>
+                <button type="button" id="oa-refresh-descr" style="background:transparent; border:1px solid #cbd5e1; padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; color:#475569;">
+                    ↻ Rigenera dai cantieri attuali
+                </button>
+            </label>
+            <textarea id="oa-descr" name="descrizione" rows="10"
+                      style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:ui-monospace, monospace; font-size:12px;">{{ ordine.descrizione }}</textarea>
+        </div>
+
+        <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:#64748b; margin-bottom:4px;">Note</label>
+            <textarea name="note" rows="3" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">{{ ordine.note }}</textarea>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <form method="POST" action="/ordini-aziende/{{ ordine.id }}/delete" onsubmit="return confirm('Eliminare l'ordine {{ ordine.order_number }}?');">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <button type="submit" style="background:#fee2e2; color:#b91c1c; border:0; padding:8px 14px; border-radius:6px; font-size:12px; cursor:pointer;">
+                    Elimina ordine
+                </button>
+            </form>
+            <button type="submit"
+                    style="background:#16a34a; color:#fff; padding:10px 20px; border:0; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer;">
+                Salva modifiche
+            </button>
+        </div>
+    </form>
+
+    <textarea id="oa-descr-preview" hidden>{{ descrizionePreview }}</textarea>
+</div>
+
+<script nonce="{{ cspNonce }}">
+(function () {
+    var btn = document.getElementById('oa-refresh-descr');
+    var ta  = document.getElementById('oa-descr');
+    var src = document.getElementById('oa-descr-preview');
+    if (!btn || !ta || !src) return;
+    btn.addEventListener('click', function () {
+        if (!confirm('Sostituire la descrizione corrente con la lista cantieri attuale?')) return;
+        ta.value = src.value;
+    });
+})();
+</script>
+{% endblock %}

@@ -120,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 $mvcModuleMap = [
     '/offers'         => 'offers',
     '/ordini'         => 'worksites',
+    '/ordini-aziende' => 'ordini_aziende',
     '/billing'        => 'billing',
     '/attendance'     => 'attendance',
     '/bookings'       => 'bookings',

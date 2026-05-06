@@ -108,7 +108,7 @@
 
         {# ── ORDINI ── #}
         {% if user.canAccess('ordini') %}
-            {% set ordiniActive = currentPath starts with '/ordini' %}
+            {% set ordiniActive = currentPath == '/ordini' or currentPath starts with '/ordini/' %}
             <li>
                 <a href="javascript:;" class="side-menu {{ ordiniActive ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="clipboard-list"></i></div>
@@ -119,6 +119,24 @@
                 <ul class="{{ ordiniActive ? 'side-menu__sub-open' : '' }}">
                     <li><a href="/ordini/create" class="side-menu {{ currentPath == '/ordini/create' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="plus"></i></div><div class="side-menu__title">Nuovo Ordine</div></a></li>
                     <li><a href="/ordini" class="side-menu {{ currentPath == '/ordini' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="list"></i></div><div class="side-menu__title">Lista Ordini</div></a></li>
+                </ul>
+            </li>
+            <li class="side-nav__devider my-6"></li>
+        {% endif %}
+
+        {# ── ORDINI AZIENDE (non consorziate) ── #}
+        {% if user.canAccess('ordini_aziende') %}
+            {% set ordiniAzActive = currentPath starts with '/ordini-aziende' %}
+            <li>
+                <a href="javascript:;" class="side-menu {{ ordiniAzActive ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="briefcase"></i></div>
+                    <div class="side-menu__title">Ordini Aziende
+                        <div class="side-menu__sub-icon {{ ordiniAzActive ? 'transform rotate-180' : '' }}"><i data-lucide="chevron-down"></i></div>
+                    </div>
+                </a>
+                <ul class="{{ ordiniAzActive ? 'side-menu__sub-open' : '' }}">
+                    <li><a href="/ordini-aziende/create" class="side-menu {{ currentPath == '/ordini-aziende/create' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="plus"></i></div><div class="side-menu__title">Nuovo Ordine</div></a></li>
+                    <li><a href="/ordini-aziende" class="side-menu {{ currentPath == '/ordini-aziende' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="list"></i></div><div class="side-menu__title">Lista Ordini</div></a></li>
                 </ul>
             </li>
             <li class="side-nav__devider my-6"></li>
