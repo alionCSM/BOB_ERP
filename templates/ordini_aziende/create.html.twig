@@ -45,7 +45,7 @@
         <div class="cof-field cof-field-span2">
           <label for="oa-azienda">Azienda <span class="req">*</span></label>
           <select name="azienda_id" id="oa-azienda" required>
-            <option value="">— scegli azienda non consorziata —</option>
+            <option value="">— scegli azienda —</option>
             {% for a in aziende %}
               <option value="{{ a.id }}"{{ a.id == aziendaId ? ' selected' : '' }}>
                 {{ a.name }}{% if a.codice %} ({{ a.codice }}){% endif %}
@@ -99,11 +99,24 @@
             <input type="date" name="order_date" id="oa-date" required value="{{ "now"|date("Y-m-d") }}">
           </div>
           <div class="cof-field">
-            <label for="oa-total">Totale (€) <span class="req">*</span></label>
+            <label for="oa-total">Imponibile (€) <span class="req">*</span></label>
             <input type="text" name="total" id="oa-total" required placeholder="0,00" inputmode="decimal">
           </div>
+          <div class="cof-field">
+            <label for="oa-iva">IVA</label>
+            <select name="iva_percentage" id="oa-iva">
+              <option value="0">Nessuna IVA (0%)</option>
+              <option value="4">IVA 4%</option>
+              <option value="10">IVA 10%</option>
+              <option value="22" selected>IVA 22%</option>
+            </select>
+          </div>
+          <div class="cof-field">
+            <label>Totale documento</label>
+            <div id="oa-total-doc" class="oa-total-doc-display">€ 0,00</div>
+          </div>
           <div class="cof-field cof-field-span2">
-            <label for="oa-descr">Descrizione (precompilata, modificabile)</label>
+            <label for="oa-descr">Descrizione (precompilata)</label>
             <textarea name="descrizione" id="oa-descr" rows="11" class="oa-mono">{{ descrizione }}</textarea>
           </div>
           <div class="cof-field cof-field-span2">
@@ -135,5 +148,36 @@
 
 <style nonce="{{ cspNonce }}">
 .oa-mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace !important; font-size: 12px !important; }
+.oa-total-doc-display {
+    height: 38px; line-height: 38px; padding: 0 12px;
+    background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px;
+    color: #16a34a; font-weight: 700; font-size: 14px;
+}
 </style>
+<script nonce="{{ cspNonce }}">
+(function () {
+    var totEl = document.getElementById('oa-total');
+    var ivaEl = document.getElementById('oa-iva');
+    var docEl = document.getElementById('oa-total-doc');
+    if (!totEl || !ivaEl || !docEl) return;
+
+    function parseIt(s) {
+        s = (s || '').toString().trim().replace(/\./g, '').replace(',', '.');
+        var n = parseFloat(s);
+        return isFinite(n) ? n : 0;
+    }
+    function fmt(n) {
+        return n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function recalc() {
+        var imp = parseIt(totEl.value);
+        var iva = parseFloat(ivaEl.value) || 0;
+        var doc = imp + (imp * iva / 100);
+        docEl.textContent = '€ ' + fmt(doc);
+    }
+    totEl.addEventListener('input', recalc);
+    ivaEl.addEventListener('change', recalc);
+    recalc();
+})();
+</script>
 {% endblock %}

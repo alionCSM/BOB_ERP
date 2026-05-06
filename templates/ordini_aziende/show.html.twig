@@ -80,9 +80,21 @@
             <div class="cos-detail-label">Periodo</div>
             <div class="cos-detail-value">{{ monthsIt[ordine.mese - 1] }} {{ ordine.anno }}</div>
           </div>
+          {% set ivaPerc   = ordine.iva_percentage|default(22) + 0 %}
+          {% set imponibile = ordine.total + 0 %}
+          {% set ivaAmount = (imponibile * ivaPerc / 100)|round(2) %}
+          {% set totaleDoc = imponibile + ivaAmount %}
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">Imponibile</div>
+            <div class="cos-detail-value">€ {{ imponibile|number_format(2, ',', '.') }}</div>
+          </div>
+          <div class="cos-detail-row">
+            <div class="cos-detail-label">IVA {{ ivaPerc|number_format(0, ',', '.') }}%</div>
+            <div class="cos-detail-value">€ {{ ivaAmount|number_format(2, ',', '.') }}</div>
+          </div>
           <div class="cos-detail-row cos-detail-total">
-            <div class="cos-detail-label">Totale</div>
-            <div class="cos-detail-value">€ {{ ordine.total|number_format(2, ',', '.') }}</div>
+            <div class="cos-detail-label">Totale documento</div>
+            <div class="cos-detail-value">€ {{ totaleDoc|number_format(2, ',', '.') }}</div>
           </div>
         </div>
       </div>

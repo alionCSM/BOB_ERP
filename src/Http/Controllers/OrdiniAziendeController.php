@@ -83,6 +83,7 @@ final class OrdiniAziendeController
         $mese      = (int)($_POST['mese'] ?? 0);
         $orderDate = trim((string)($_POST['order_date'] ?? ''));
         $rawTotal  = trim((string)($_POST['total'] ?? '0'));
+        $iva       = (float)($_POST['iva_percentage'] ?? 22);
         $descr     = (string)($_POST['descrizione'] ?? '');
         $note      = trim((string)($_POST['note'] ?? '')) ?: null;
 
@@ -101,15 +102,16 @@ final class OrdiniAziendeController
         $orderNumber = $this->repo->nextOrderNumber($anno);
 
         $newId = $this->repo->insert([
-            'azienda_id'   => $aziendaId,
-            'anno'         => $anno,
-            'mese'         => $mese,
-            'order_number' => $orderNumber,
-            'order_date'   => $orderDate,
-            'total'        => $total,
-            'descrizione'  => $descr,
-            'note'         => $note,
-            'created_by'   => $userId,
+            'azienda_id'     => $aziendaId,
+            'anno'           => $anno,
+            'mese'           => $mese,
+            'order_number'   => $orderNumber,
+            'order_date'     => $orderDate,
+            'total'          => $total,
+            'iva_percentage' => $iva,
+            'descrizione'    => $descr,
+            'note'           => $note,
+            'created_by'     => $userId,
         ]);
 
         $_SESSION['success'] = "Ordine {$orderNumber} creato.";
@@ -174,6 +176,7 @@ final class OrdiniAziendeController
         $mese      = (int)($_POST['mese'] ?? 0);
         $orderDate = trim((string)($_POST['order_date'] ?? ''));
         $rawTotal  = trim((string)($_POST['total'] ?? '0'));
+        $iva       = (float)($_POST['iva_percentage'] ?? 22);
         $descr     = (string)($_POST['descrizione'] ?? '');
         $note      = trim((string)($_POST['note'] ?? '')) ?: null;
 
@@ -189,13 +192,14 @@ final class OrdiniAziendeController
         $total = (float)str_replace(['.', ','], ['', '.'], $rawTotal);
 
         $this->repo->update($id, [
-            'azienda_id'  => $aziendaId,
-            'anno'        => $anno,
-            'mese'        => $mese,
-            'order_date'  => $orderDate,
-            'total'       => $total,
-            'descrizione' => $descr,
-            'note'        => $note,
+            'azienda_id'     => $aziendaId,
+            'anno'           => $anno,
+            'mese'           => $mese,
+            'order_date'     => $orderDate,
+            'total'          => $total,
+            'iva_percentage' => $iva,
+            'descrizione'    => $descr,
+            'note'           => $note,
         ]);
 
         $_SESSION['success'] = 'Ordine aggiornato.';
@@ -237,13 +241,21 @@ final class OrdiniAziendeController
         $logoTopSrc    = $this->fileToDataUri($logoTop);
         $logoBottomSrc = $this->fileToDataUri($logoBottom);
 
+        $imponibile = (float)$ordine['total'];
+        $ivaPerc    = (float)($ordine['iva_percentage'] ?? 22);
+        $ivaAmount  = round($imponibile * $ivaPerc / 100, 2);
+        $totaleDoc  = round($imponibile + $ivaAmount, 2);
+
         $renderer = new \App\View\TwigRenderer(null);
         $html = $renderer->render('ordini_aziende/pdf.html.twig', [
-            'ordine'        => $ordine,
-            'periodLabel'   => $periodLabel,
-            'totaleFmt'     => number_format((float)$ordine['total'], 2, ',', '.'),
-            'logoTopSrc'    => $logoTopSrc,
-            'logoBottomSrc' => $logoBottomSrc,
+            'ordine'         => $ordine,
+            'periodLabel'    => $periodLabel,
+            'ivaPerc'        => $ivaPerc,
+            'imponibileFmt'  => number_format($imponibile, 2, ',', '.'),
+            'ivaFmt'         => number_format($ivaAmount,  2, ',', '.'),
+            'totaleDocFmt'   => number_format($totaleDoc,  2, ',', '.'),
+            'logoTopSrc'     => $logoTopSrc,
+            'logoBottomSrc'  => $logoBottomSrc,
         ]);
 
         $options = new \Dompdf\Options();
