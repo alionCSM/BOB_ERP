@@ -141,14 +141,19 @@ final class WorksiteMarginService
 </p>
 </div></body></html>';
 
+        // Recipient depends on environment: shared ops mailbox in prod,
+        // personal mailbox on dev/staging so test runs don't spam the team.
+        $isProd    = (new \App\Infrastructure\Config())->isProduction();
+        $recipient = $isProd ? 'info@csmontaggi.it' : 'alion@csmontaggi.it';
+
         try {
             $this->mailer->setSender('alerts');
             $mail = $this->mailer->getMailer();
-            $mail->addAddress('info@csmontaggi.it');
-            $mail->Subject = 'BOB – Cantieri a rischio (In corso)';
+            $mail->addAddress($recipient);
+            $mail->Subject = ($isProd ? 'BOB' : 'BOB DEV') . ' – Cantieri a rischio (In corso)';
             $mail->Body    = $body;
             $mail->send();
-            echo "Email sent.\n";
+            echo "Email sent to {$recipient}.\n";
         } catch (\Throwable $e) {
             echo 'Email error: ' . $e->getMessage() . "\n";
         }
