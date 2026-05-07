@@ -1,38 +1,73 @@
-<div style="page-break-after: always; text-align: center; padding-top: 60px; font-family: 'Helvetica', 'Arial', sans-serif;">
+<div style="page-break-after: always; font-family: 'Helvetica', 'Arial', sans-serif; position: relative; min-height: 1000px; margin: -20px;">
 
-  <img src="logo-bob.png" alt="BOB" style="width: 180px; margin-bottom: 28px;" />
+  <!-- Banda navy in alto -->
+  <div style="background: #1e3a5f; height: 14px; margin-bottom: 0;"></div>
 
-  <div style="font-size: 62px; font-weight: 800; letter-spacing: -2px; color: #1e293b; line-height: 1; margin-bottom: 8px;">BOB</div>
-  <div style="font-size: 22px; font-weight: 400; color: #475569; letter-spacing: 1px; margin-bottom: 40px;">Manuale di Sistema</div>
+  <!-- Banda accent indigo -->
+  <div style="background: #6366f1; height: 4px;"></div>
 
-  <div style="width: 80px; height: 3px; background: #1e3a5f; margin: 0 auto 40px auto;"></div>
-
-  <div style="font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 50px;">
-    Documento tecnico-funzionale<br/>
-    del gestionale operativo
+  <!-- Etichetta documento -->
+  <div style="text-align: right; padding: 18px 36px 0 0; font-size: 10px; letter-spacing: 3px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">
+    Documentazione Tecnica · Anno 2026
   </div>
 
-  <img src="logo-consorzio.jpg" alt="Consorzio Soluzione Montaggi" style="width: 320px; margin-bottom: 60px;" />
+  <!-- Sezione hero con logo BOB e titolo -->
+  <div style="text-align: center; padding: 60px 40px 30px 40px;">
+    <img src="logo-bob.png" alt="BOB" style="width: 160px; margin-bottom: 36px;" />
 
-  <div style="margin-top: 80px; font-size: 12px; color: #475569; line-height: 1.9;">
-    <table style="margin: 0 auto; border-collapse: collapse;">
+    <div style="font-size: 86px; font-weight: 900; letter-spacing: -4px; color: #1e3a5f; line-height: 0.95; margin-bottom: 12px;">BOB</div>
+
+    <div style="font-size: 14px; font-weight: 600; letter-spacing: 6px; color: #6366f1; text-transform: uppercase; margin-bottom: 24px;">Manuale di Sistema</div>
+
+    <!-- Linea decorativa con punto centrale -->
+    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin: 28px 0;">
+      <div style="width: 60px; height: 1px; background: #cbd5e1;"></div>
+      <div style="width: 6px; height: 6px; background: #6366f1; border-radius: 50%;"></div>
+      <div style="width: 60px; height: 1px; background: #cbd5e1;"></div>
+    </div>
+
+    <div style="font-size: 16px; color: #475569; font-weight: 400; line-height: 1.7; max-width: 480px; margin: 0 auto;">
+      Documento tecnico-funzionale del gestionale operativo
+      <br />
+      <span style="color: #94a3b8; font-size: 13px;">— per uso interno del Consorzio —</span>
+    </div>
+  </div>
+
+  <!-- Sezione cliente con logo Consorzio -->
+  <div style="text-align: center; padding: 50px 40px 30px 40px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; margin-top: 50px;">
+    <div style="font-size: 10px; letter-spacing: 3px; color: #94a3b8; text-transform: uppercase; margin-bottom: 18px;">Predisposto per</div>
+    <img src="logo-consorzio.jpg" alt="Consorzio Soluzione Montaggi" style="width: 360px; max-width: 90%;" />
+    <div style="font-size: 11px; color: #64748b; margin-top: 12px;">Via Bruno Tosarelli 322 · 40055 Villanova di Castenaso (BO) · P.IVA 03584711208</div>
+  </div>
+
+  <!-- Sezione metadati -->
+  <div style="padding: 40px 40px 30px 40px;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
       <tr>
-        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Versione</td>
-        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">1.0</td>
-      </tr>
-      <tr>
-        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Data</td>
-        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">7 maggio 2026</td>
-      </tr>
-      <tr>
-        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Riferimento</td>
-        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">BOB v2.x</td>
-      </tr>
-      <tr>
-        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Sviluppato da</td>
-        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">Alion</td>
+        <td style="padding: 12px 16px; border-left: 3px solid #6366f1; background: #fff;">
+          <div style="color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-size: 9px; margin-bottom: 4px;">Versione</div>
+          <div style="color: #0f172a; font-weight: 700; font-size: 14px;">1.0</div>
+        </td>
+        <td style="padding: 12px 16px; border-left: 3px solid #6366f1; background: #fff;">
+          <div style="color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-size: 9px; margin-bottom: 4px;">Data</div>
+          <div style="color: #0f172a; font-weight: 700; font-size: 14px;">7 maggio 2026</div>
+        </td>
+        <td style="padding: 12px 16px; border-left: 3px solid #6366f1; background: #fff;">
+          <div style="color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-size: 9px; margin-bottom: 4px;">Applicativo</div>
+          <div style="color: #0f172a; font-weight: 700; font-size: 14px;">BOB v2.x</div>
+        </td>
+        <td style="padding: 12px 16px; border-left: 3px solid #6366f1; background: #fff;">
+          <div style="color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; font-size: 9px; margin-bottom: 4px;">Sviluppato da</div>
+          <div style="color: #0f172a; font-weight: 700; font-size: 14px;">Alion</div>
+        </td>
       </tr>
     </table>
+  </div>
+
+  <!-- Footer cover page -->
+  <div style="position: absolute; bottom: 0; left: 0; right: 0;">
+    <div style="background: #6366f1; height: 4px;"></div>
+    <div style="background: #1e3a5f; height: 14px;"></div>
   </div>
 
 </div>
