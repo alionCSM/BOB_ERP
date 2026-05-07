@@ -347,13 +347,13 @@ La tab Statistiche calcola in tempo reale **margine** e **andamento economico** 
 
 | Voce | Sorgente | Logica |
 |---|---|---|
-| **Presenze nostri** | `bb_presenze` (operai dipendenti + consorziate non gestite direttamente) | Giornata intera = 1, mezza = 0,5; valorizzazione a **€ 230 / giornata equivalente**. *Eccezione:* se sull'azienda dell'operaio esiste già un ordine formale per il cantiere, la presenza non viene conteggiata (per evitare doppio costo: l'ordine assorbe già la voce). |
-| **Presenze consorziate** | `bb_presenze_consorziate` (consorziate gestite direttamente) | Quantità × `costo_unitario` per riga. |
-| **Pasti nostri** | Pasti dipendenti + consorziate non gestite | Conteggio dei pranzi/cene flag "Loro" valorizzati a tariffa interna. |
-| **Pasti consorziate** | Pasti delle consorziate gestite direttamente | Stesso meccanismo, scopo distinto. |
-| **Mezzi sollevamento** | Assegnazioni mezzi al cantiere | Da modulo Mezzi. |
-| **Ordini** | `bb_ordini` (ordini consorziate) + ordini aziende | Somma totali ordini. |
-| **Hotel / alloggi** | `bb_bookings` + `bb_booking_periods` | Periodi × persone × prezzo persona. |
+| **Presenze nostri** | `bb_presenze` (dipendenti CSM e tutto ciò che non è gestito al singolo operaio) | Giornata intera = 1, mezza = 0,5. Valorizzazione: **€ 230 per giornata equivalente**. *Eccezione anti-doppio-conteggio:* se sull'azienda dell'operaio esiste già un ordine formale (`bb_ordini`) per quel cantiere, la presenza non viene conteggiata — l'ordine assorbe già la voce. |
+| **Presenze consorziate** | `bb_presenze_consorziate` (solo consorziate gestite direttamente) | Per ogni riga: `quantita × costo_unitario`. Stessa eccezione anti-doppio-conteggio della voce precedente, per `azienda_id`. |
+| **Pasti nostri** | `bb_presenze` colonne `pranzo` e `cena` | Per ogni presenza: pranzo/cena `Noi` → prezzo memorizzato sulla presenza; pranzo/cena `Loro` → tariffa fissa **€ 10** a pasto. Esclusione anti-doppio-conteggio come sopra. |
+| **Pasti consorziate** | `bb_presenze_consorziate` colonna `pasti` | Somma diretta del valore già memorizzato. |
+| **Mezzi sollevamento** | `bb_worksite_lifting` | Tipo "Una Tantum" → `costo_giornaliero × quantità`. Tipo continuativo → conteggio dei giorni distinti di presenza dal `data_inizio` del mezzo, moltiplicato per costo giornaliero e quantità. |
+| **Ordini** | `bb_ordini` | Somma di tutti i totali ordini consorziata sul cantiere. |
+| **Hotel / alloggi** | `bb_bookings` + `bb_booking_periods` | Per ciascun periodo: giorni × persone × `prezzo_persona`. |
 
 **Ricavi:**
 
@@ -392,28 +392,73 @@ L'accettazione di un'offerta porta alla generazione di un cantiere collegato.
 **Path:** `/billing` e `/billing/clients`
 **Permesso:** `billing`
 
-Modulo per il monitoraggio delle fatture verso clienti.
+Modulo che gestisce l'intero ciclo di vita delle fatture verso i clienti, dalla preparazione in BOB fino alla verifica dello stato reale in Yard/Business.
 
-**Sezione "Cantieri Movimentati":** elenca i cantieri con presenze nel mese selezionato e mostra:
-- Importo offerta + extra.
-- Fatturato (somma fatture emessa=1).
-- Residuo da fatturare.
-- Stato fatturazione reale (Yard).
+#### Ciclo di vita di una fattura
 
-**Sezione "Fatture per Cliente":** raggruppa le fatture per cliente con KPI:
-- **Emesse reale (mese corrente)** — fatture emesse in Yard nel mese corrente, con drill-down dettagliato.
-- **Emesse reale (mese precedente)** — confronto periodo.
-- **Da emettere YTD** — fatture programmate ma non ancora emesse.
-- **Emesse YTD** — fatture emesse anno corrente.
+```
+1. Preparazione         → riga in bb_billing (emessa = 0)
+2. Push a Yard          → bb_billing.yard_id valorizzato; brogliaccio creato in CNT_cantieri_brogliacci
+3. Emissione in Business → Yard contrassegna la voce come emessa = 1
+4. Sync verso BOB        → bb_billing.emessa allineato (cron + on-demand)
+```
 
-Il selettore mese permette di consultare il dettaglio di qualsiasi mese passato attraverso un modale che raggruppa le voci di brogliaccio (Yard) per numero fattura, mostrando per ciascuna fattura i cantieri toccati e il dettaglio delle voci.
+Su una fattura in BOB sono memorizzati: `worksite_id`, `data`, `numero`, `totale_imponibile`, `aliquota_iva`, `articolo_id`, `iva_id`, `descrizione`. Quando l'operatore conferma, BOB chiama `YardWorksiteBilling::insertToBrogliaccio()` che crea la voce contabile in SQL Server e restituisce un `yard_id` salvato in `bb_billing`. Da quel momento il record è "agganciato" al sistema contabile.
+
+#### Sezione "Cantieri Movimentati" — `/billing`
+
+Vista mensile orientata alla **produzione fatture**. Elenca i cantieri che hanno avuto presenze nel mese selezionato con:
+
+- Importo contratto (`total_offer`) ed extra accumulati.
+- Fatturato anno corrente (somma `bb_billing.emessa = 1`).
+- Residuo teorico da fatturare = (contratto + extra) − fatturato emesso.
+- Stato fatturazione **reale** (Yard) per riconciliazione.
+- Pulsanti rapidi: nuovo brogliaccio, vai al cantiere, esporta Excel del periodo.
+
+L'operatore tipicamente apre questa sezione a fine mese, identifica i cantieri da fatturare e prepara i brogliacci.
+
+#### Sezione "Fatture per Cliente" — `/billing/clients`
+
+Vista aggregata orientata al **monitoraggio**. Per ciascun cliente:
+
+- Numero fatture **da emettere** YTD e relativo importo.
+- Numero fatture **emesse** YTD e relativo importo.
+
+Sopra la lista, quattro card di sintesi:
+
+| Card | Cosa mostra | Sorgente |
+|---|---|---|
+| **Emesse reale (mese corrente)** | Conteggio + imponibile delle fatture realmente emesse in Yard nel mese corrente | Yard `CNT_cantieri_brogliacci.emessa = 1` |
+| **Emesse reale (mese precedente)** | Stesso del precedente, mese passato | Yard |
+| **Da emettere YTD** | Fatture in `bb_billing` con `emessa = 0`, anno corrente | BOB |
+| **Emesse YTD** | Fatture in `bb_billing` con `emessa = 1`, anno corrente | BOB |
+
+Le card "Emesse reale" sono **cliccabili**: aprono un modale che elenca le fatture del mese, raggruppate per numero documento. Per ogni fattura sono visibili i cantieri toccati e il dettaglio delle voci. Un selettore Anno/Mese consente di consultare qualsiasi periodo passato (la richiesta è AJAX e non ricarica la pagina).
+
+#### Riconciliazione BOB ↔ Yard
+
+Il flag `emessa` in BOB e quello reale in Yard possono divergere temporaneamente (es. la fattura è stata emessa in Business ma BOB non ha ancora ricevuto il sync). Per tenere i due sistemi allineati:
+
+- Un cron orario (`yard_worksite_status_check.php`) sincronizza i flag.
+- All'apertura di `/billing` o `/billing/clients` viene chiamato `syncEmessaForClient()` o `syncEmessaFromYardForMovedWorksites()` come refresh on-demand.
+- L'operatore vede in interfaccia la differenza e può intervenire.
+
+#### Dettaglio cliente — `/billing/client/{id}`
+
+Pagina di drill-down sul singolo cliente con:
+- **Tab "Da emettere"**: lista delle fatture in attesa di emissione, con possibilità di modificarle o emetterle.
+- **Tab "Emesse"**: storico paginato delle fatture emesse, con link al brogliaccio Yard.
+- **Statistiche annuali**: totali per anno (emesse + da emettere) per analisi.
+- **Esportazione Excel** delle fatture da emettere per condivisione con la contabilità.
 
 ### 5.5 Pagamenti consorziate
 
 **Path:** `/fatturazione/consorziate`
 **Permesso:** `billing`
 
-Modulo dedicato alla gestione dei pagamenti verso le aziende consorziate.
+Modulo di **tracciamento** dei pagamenti verso le aziende consorziate. È importante chiarire la natura del modulo:
+
+> **Nota.** I pagamenti registrati in BOB hanno **scopo gestionale e di reportistica interna**. BOB non emette bonifici, non si interfaccia con sistemi bancari, non genera flussi SEPA e non ha integrazione contabile diretta. La registrazione qui serve solo a **sapere quanto è stato pagato a chi e per cosa**, da confrontare con i totali che la contabilità (Business) ha effettivamente liquidato.
 
 **Schermata principale:** elenca tutte le consorziate con totali aggregati storici (presenze, costo, pagato).
 
@@ -455,6 +500,8 @@ Genera PDF intestato e numerato in modo sequenziale annuale.
 **Permesso:** `ordini_aziende`
 
 Modulo dedicato agli ordini emessi ad **aziende non consorziate** (fornitori, prestatori di manodopera esterni).
+
+> **Nota.** Anche questo modulo, come Pagamenti consorziate, è di **tracciamento gestionale**: produce il documento d'ordine in PDF (utilizzabile per invio cartaceo/PEC) e tiene memoria storica, ma non ha effetti contabili automatici.
 
 **Caratteristiche distintive rispetto agli ordini consorziata:**
 - Un ordine per (azienda, mese) — non per singolo cantiere.
@@ -930,35 +977,49 @@ Le anomalie sono visualizzate anche in dashboard come notifiche, con possibilit�
                        │
                        ▼
               ┌────────────────┐         ┌──────────────────┐
-              │    CANTIERE    │◄────────│  EXTRA / SAL     │
+              │    CANTIERE    │◄────────│      EXTRA       │
               └────────┬───────┘         └──────────────────┘
                        │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-  ┌──────────┐ ┌──────────────┐ ┌──────────────┐
-  │ PRESENZE │ │  PRESENZE    │ │  PRESENZE    │
-  │  CSM     │ │ CONSORZIATE  │ │ AZIENDE NON  │
-  │          │ │              │ │ CONSORZIATE  │
-  └──────────┘ └──────┬───────┘ └──────┬───────┘
-                      │                │
-                      ▼                ▼
-              ┌──────────────┐ ┌──────────────────┐
-              │   ORDINE     │ │  ORDINE AZIENDA  │
-              │ CONSORZIATA  │ │   (mensile)      │
-              └──────┬───────┘ └──────┬───────────┘
-                     │                │
-                     ▼                ▼
-              ┌──────────────┐ ┌──────────────────┐
-              │ PAGAMENTO    │ │   PAGAMENTO      │
-              │ CONSORZIATA  │ │   AZIENDA        │
-              └──────────────┘ └──────────────────┘
-
+                       │ esecuzione lavori
                        │
+        ┌──────────────┴──────────────┐
+        ▼                             ▼
+  ┌──────────────────┐        ┌────────────────────────┐
+  │   bb_presenze    │        │ bb_presenze_consorziate│
+  │ (dipendenti CSM, │        │ (consorziate gestite   │
+  │  + tutto ciò che │        │  direttamente, con     │
+  │  non è gestito a │        │  tracciamento operai)  │
+  │  livello operaio)│        │                        │
+  └──────────┬───────┘        └────────────┬───────────┘
+             │                             │
+             ▼                             ▼
+   ┌──────────────────┐          ┌──────────────────────┐
+   │  ORDINE AZIENDA  │          │ ORDINE CONSORZIATA   │
+   │ (mensile, totale)│          │ (per cantiere, voci) │
+   └─────────┬────────┘          └──────────┬───────────┘
+             │                             │
+             ▼                             ▼
+   ┌──────────────────┐          ┌──────────────────────┐
+   │  PAGAMENTO ext.  │          │ PAGAMENTO CONSORZIATA│
+   │   (tracking)     │          │  (tracking)          │
+   └──────────────────┘          └──────────────────────┘
+
+                       ▼ (in parallelo, lato ricavi)
+              ┌────────────────┐
+              │   bb_billing   │ ← preparazione fattura in BOB
+              └────────┬───────┘
+                       │ scrittura
                        ▼
-              ┌────────────────┐         ┌──────────────────┐
-              │  FATTURA       │────────►│   YARD (SQL)     │
-              │  CLIENTE       │  sync   │  brogliaccio     │
-              └────────────────┘         └──────────────────┘
+              ┌────────────────┐
+              │ Yard SQL Server│ ← middleware
+              │ (brogliaccio)  │
+              └────────┬───────┘
+                       │ propagazione
+                       ▼
+              ┌────────────────┐
+              │    BUSINESS    │ ← gestionale contabile
+              │ (fattura reale)│
+              └────────────────┘
 ```
 
 ### 11.2 Validità documenti operaio (default applicativo)
@@ -1059,7 +1120,7 @@ BOB AI - Anomalie
 | Numero ordine consorziata | Numerico sequenziale gestito dal modulo Ordini | — |
 | Numero ordine azienda | `OA_YYYY_NNNN` (sequenza per anno, zero-padded) | `OA_2026_0008` |
 | Numero fattura cliente | Assegnato lato Yard / Business (contabilità) | — |
-| Codice cantiere | Inserito manualmente dall'operatore in fase di creazione | a discrezione |
+| Codice cantiere | `C{YY}-{NNN}` generato automaticamente alla creazione (sequenza per anno) | `C26-042` |
 
 ---
 
