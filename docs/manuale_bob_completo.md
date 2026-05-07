@@ -50,9 +50,11 @@
 
 ### 1.1 Cos'è BOB
 
-**BOB** è il gestionale operativo sviluppato internamente per il **Consorzio Soluzione Montaggi** e per la società operativa **CS Montaggi** (P.IVA 03584711208 — Via Bruno Tosarelli 322, 40055 Villanova di Castenaso BO). L'applicativo nasce per coprire l'intero ciclo operativo dell'attività di montaggi industriali, dalla preventivazione fino alla fatturazione e al pagamento delle consorziate.
+**BOB** è il gestionale operativo sviluppato internamente per il **Consorzio Soluzione Montaggi** (sede legale: Via Bruno Tosarelli 322, 40055 Villanova di Castenaso BO — P.IVA 03584711208), spesso indicato in forma abbreviata come **CS Montaggi**. Le due denominazioni si riferiscono alla stessa entità giuridica.
 
-BOB **non sostituisce** il sistema contabile (denominato internamente *Yard*, basato su SQL Server). I due sistemi coesistono in modo sinergico: BOB è il livello operativo, Yard è il livello contabile-amministrativo. La comunicazione fra i due è gestita tramite sincronizzazione bidirezionale dei dati di fatturazione.
+L'applicativo copre l'intero ciclo operativo dell'attività di montaggi industriali, dalla preventivazione al pagamento delle consorziate.
+
+**BOB non sostituisce il sistema contabile.** La contabilità ufficiale dell'azienda risiede in **Business** (gestionale di contabilità di terzi, sviluppato esternamente). Fra BOB e Business si interpone **Yard** (database SQL Server), che svolge il ruolo di *middleware*: BOB scrive i dati di fatturazione in Yard, Yard li propaga a Business. Le fatture sono emesse formalmente da Business, non da BOB né da Yard.
 
 ### 1.2 Obiettivi del sistema
 
@@ -80,7 +82,7 @@ BOB **non sostituisce** il sistema contabile (denominato internamente *Yard*, ba
 | Framework | Custom MVC su pattern leggero | Routing, middleware e DI container interni |
 | Templating | **Twig 3.x** | Auto-escape HTML; nonce CSP per script inline |
 | Persistenza primaria | **MySQL 8.x** (database `bob_csm`) | Tutto il dato operativo |
-| Persistenza accessoria | **SQL Server** (Yard) | Lettura stato fatturazione + scrittura brogliacci |
+| Persistenza accessoria | **SQL Server** (Yard, middleware verso Business) | Lettura stato fatturazione + scrittura brogliacci |
 | ORM / Query layer | PDO + Repository pattern | Nessun ORM full-fledged |
 | Migrazioni schema | **Phinx 0.16** | File sotto `db/migrations/` |
 | Frontend | Tailwind / Midone admin theme + Vanilla JS | Nessun framework SPA |
@@ -168,14 +170,24 @@ Il database `bob_csm` ospita oltre 50 tabelle. Le principali sono:
 
 ### 3.1 Inquadramento giuridico-operativo
 
-CS Montaggi è la società operativa che fattura ai clienti. Il **Consorzio Soluzione Montaggi** è l'aggregato giuridico cui aderiscono diverse imprese partner ("**consorziate**"), che mettono a disposizione personale specializzato per i cantieri di montaggio. Il modello operativo prevede:
+Il **Consorzio Soluzione Montaggi** (CS Montaggi) è l'entità che fattura al cliente finale. Al consorzio aderiscono diverse imprese partner ("**consorziate**") che mettono a disposizione personale specializzato per i cantieri di montaggio.
 
-1. CS Montaggi acquisisce la commessa dal cliente attraverso un'**offerta**.
+Internamente la base aziende è suddivisa in tre categorie operative, distinte attraverso flag e tabelle dedicate:
+
+| Categoria | Cosa gestisce BOB |
+|---|---|
+| **Consorziate gestite direttamente** | Tracciamento al singolo operaio: presenze, costi, pasti, alloggi, ordini formali e pagamenti dettagliati. |
+| **Consorziate non gestite direttamente** | Solo totali aggregati: importo dell'ordine emesso e pagamento, senza tracciamento delle persone presenti in cantiere. |
+| **Aziende non consorziate** | Fornitori esterni (manodopera, servizi). Un ordine mensile di sintesi che riepiloga i cantieri toccati. |
+
+Il modello operativo standard prevede:
+
+1. Acquisizione commessa attraverso un'**offerta**.
 2. La commessa diventa un **cantiere** con un proprio importo contrattuale.
-3. Sul cantiere lavorano operai dipendenti CS Montaggi, operai delle consorziate, e talvolta personale di **aziende non consorziate** (fornitori esterni di manodopera o servizi).
-4. CS Montaggi **fattura il cliente** secondo SAL o consuntivo.
-5. CS Montaggi **emette ordini** alle consorziate (per le quote di loro competenza) e alle aziende non consorziate (per servizi resi).
-6. CS Montaggi **paga** consorziate e aziende secondo gli ordini emessi, dedotte eventuali spese a loro carico.
+3. Sul cantiere lavorano operai dipendenti CS Montaggi, operai delle consorziate, e personale di aziende non consorziate.
+4. CS Montaggi **fattura il cliente** secondo SAL o consuntivo (passando dal flusso BOB → Yard → Business).
+5. CS Montaggi **emette ordini** alle consorziate (per le quote di competenza) e alle aziende non consorziate (per servizi resi).
+6. CS Montaggi **paga** consorziate e aziende secondo gli ordini emessi, dedotte eventuali spese a loro carico (vitto/alloggio).
 
 ### 3.2 Flusso ricavi (verso clienti)
 
@@ -187,12 +199,15 @@ Cantiere (bb_worksites) — total_offer
 Presenze (bb_presenze + bb_presenze_consorziate)
    ↓ (eventuali integrazioni di scope)
 Extra (bb_extra)
-   ↓ (emissione)
-Fatture (bb_billing) → emessa flag (BOB)
-                    → emessa_reale (Yard, contabilità)
+   ↓ (preparazione fattura in BOB)
+bb_billing (BOB) — flag emessa
+   ↓ (push a Yard)
+CNT_cantieri_brogliacci (Yard, SQL Server)
+   ↓ (sync di Yard verso Business)
+Fattura emessa in Business (gestionale contabile ufficiale)
 ```
 
-Il valore della fattura emessa "reale" risiede nel sistema **Yard** (tabella `CNT_cantieri_brogliacci`). BOB legge questa informazione e la mostra accanto al flag interno per consentire il riallineamento.
+La cosiddetta **"emessa reale"** è la presenza della fattura su Yard con flag `emessa=1`, che corrisponde a una fattura ormai propagata e contabilizzata in Business. BOB mostra in interfaccia entrambi gli stati (interno e reale) per consentire il riallineamento operativo: se il flag interno è acceso ma quello reale no, l'amministrazione deve ancora completare l'emissione lato Yard/Business.
 
 ### 3.3 Flusso costi (verso fornitori e consorziate)
 
@@ -313,16 +328,42 @@ Modulo centrale del sistema. Ogni cantiere rappresenta una commessa accettata da
 - `Chiuso` — lavori completati e fatturazione conclusa.
 
 **Tab presenti nella vista dettaglio cantiere:**
-- **Dati** — anagrafica (cliente, codice cantiere, importo offerta, date di inizio/fine).
+- **Dati** — anagrafica (cliente, codice cantiere, importo offerta, date di inizio/fine, modalità a corpo o a consuntivo).
 - **Presenze** — registrazione giornaliera operai dipendenti e consorziate.
 - **Squadra** — operatori assegnati.
-- **Fatturazione** — fatture emesse (BOB + Yard).
+- **Fatturazione** — fatture emesse (BOB + stato reale Yard/Business).
 - **Extra** — voci aggiuntive fatturabili.
 - **Documenti** — disegni e allegati cantiere.
-- **Statistiche** — margine, costi, ricavi.
+- **Statistiche** — margine, costi, ricavi (dettagliato in §5.2.1).
 - **Versioning** — storico modifiche.
 
-**Attivazione cantiere:** dalla bozza si emette un'email all'amministrazione con link di attivazione che, cliccato, sposta lo stato a "In corso" e crea il record nel sistema Yard.
+**Attivazione cantiere:** dalla bozza si emette un'email all'amministrazione con link di attivazione che, cliccato, sposta lo stato a "In corso" e crea il record nel flusso Yard.
+
+#### 5.2.1 Tab Statistiche — modello dei costi e dei ricavi
+
+La tab Statistiche calcola in tempo reale **margine** e **andamento economico** del cantiere mediante la classe `WorksiteStats`. Le voci sono raggruppate come segue.
+
+**Costi (sette categorie):**
+
+| Voce | Sorgente | Logica |
+|---|---|---|
+| **Presenze nostri** | `bb_presenze` (operai dipendenti + consorziate non gestite direttamente) | Giornata intera = 1, mezza = 0,5; valorizzazione a **€ 230 / giornata equivalente**. *Eccezione:* se sull'azienda dell'operaio esiste già un ordine formale per il cantiere, la presenza non viene conteggiata (per evitare doppio costo: l'ordine assorbe già la voce). |
+| **Presenze consorziate** | `bb_presenze_consorziate` (consorziate gestite direttamente) | Quantità × `costo_unitario` per riga. |
+| **Pasti nostri** | Pasti dipendenti + consorziate non gestite | Conteggio dei pranzi/cene flag "Loro" valorizzati a tariffa interna. |
+| **Pasti consorziate** | Pasti delle consorziate gestite direttamente | Stesso meccanismo, scopo distinto. |
+| **Mezzi sollevamento** | Assegnazioni mezzi al cantiere | Da modulo Mezzi. |
+| **Ordini** | `bb_ordini` (ordini consorziate) + ordini aziende | Somma totali ordini. |
+| **Hotel / alloggi** | `bb_bookings` + `bb_booking_periods` | Periodi × persone × prezzo persona. |
+
+**Ricavi:**
+
+- Cantiere **a corpo** (`is_consuntivo=0`): ricavo = `total_offer` + extra.
+- Cantiere **a consuntivo** (`is_consuntivo=1`): ricavo = lavoratori × `prezzo_persona` + extra.
+
+**Indicatori derivati:**
+- **Andamento** = ricavi totali − costi totali.
+- **Margine percentuale** = andamento ÷ contratto × 100.
+- Cantieri "In corso" con margine **negativo** o **inferiore al 10 %** vengono segnalati nell'email automatica giornaliera "Cantieri a rischio" (vedi §9.2).
 
 ### 5.3 Offerte
 
@@ -689,20 +730,21 @@ Le modifiche allo schema avvengono esclusivamente attraverso **Phinx**:
 
 ## 7. Integrazioni esterne
 
-### 7.1 Yard ERP (SQL Server)
+### 7.1 Catena Yard → Business
 
-Il sistema contabile dell'azienda è basato su SQL Server (database denominato Yard). BOB legge e scrive su due tabelle principali:
+La contabilità ufficiale dell'azienda è gestita da **Business**, gestionale di terzi. BOB non scrive direttamente in Business: scrive in un database SQL Server intermedio chiamato **Yard**, che funge da middleware. È Yard a propagare le voci di brogliaccio verso Business e a riportare a BOB lo stato di emissione effettiva.
 
-- **`CNT_cantieri_brogliacci`** — voci di brogliaccio (precursori delle fatture).
-- Altre tabelle di consultazione (clienti, IVA, articoli).
+**Tabelle Yard utilizzate:**
+- `CNT_cantieri_brogliacci` — voci di brogliaccio (riga di fattura preliminare).
+- Anagrafiche di consultazione (clienti, codici IVA, articoli).
 
-**Interazioni:**
-- Sincronizzazione bidirezionale dello stato `emessa` delle fatture.
-- Inserimento brogliacci alla creazione di una fattura.
-- Aggiornamento brogliacci alla modifica di una fattura.
-- Soft-delete tramite flag `obsoleto=1`.
+**Interazioni BOB ↔ Yard:**
+- Inserimento di una nuova voce brogliaccio quando in BOB si registra una fattura programmata.
+- Aggiornamento del brogliaccio se la fattura BOB viene modificata.
+- Soft-delete (`obsoleto=1`) anziché cancellazione fisica.
+- Lettura del flag `emessa` per determinare lo stato reale di una fattura.
 
-La connessione SQL Server è separata dalla connessione MySQL. In caso di indisponibilità del server SQL, BOB resta operativo (le funzionalità che dipendono da Yard mostrano valori zero o messaggi di indisponibilità).
+**Resilienza:** la connessione SQL Server è separata dalla connessione MySQL. Se Yard è irraggiungibile, BOB resta pienamente operativo: le sezioni che dipendono da Yard mostrano zero o un messaggio di indisponibilità, senza bloccare le altre funzionalità.
 
 ### 7.2 Email (SMTP)
 
@@ -768,23 +810,29 @@ sudo systemctl reload php8-fpm
 
 ### 8.3 Cron jobs
 
-| Script | Frequenza tipica | Funzione |
-|---|---|---|
-| `includes/cron/ai_anomaly_check.php` | giornaliera, mattino | Controlla anomalie e invia digest email per modulo |
-| `includes/services/recalculate_worksite_stats.php` | giornaliera, mattino | Ricalcola margini cantieri e invia alert "cantieri a rischio" |
-| `includes/cron/yard_worksite_status_check.php` | oraria | Sincronizza stato cantieri da Yard |
-| `includes/cron/document_expiry_alerts.php` | giornaliera | Allerta documenti in scadenza |
-| `includes/cron/programmazione_deadline_check.php` | giornaliera | Allerta scadenze programmazione |
+Tutti i job schedulati di BOB partono **alle ore 06:00** della mattina, in modo che le email di sintesi siano già nella casella dei destinatari all'inizio della giornata lavorativa.
 
-I cron utilizzano l'utente di sistema `www-data` o equivalente, con percorso PHP CLI assoluto.
+| Script | Funzione |
+|---|---|
+| `includes/cron/ai_anomaly_check.php` | Controlla anomalie operative e invia digest email per modulo |
+| `includes/services/recalculate_worksite_stats.php` | Ricalcola margini cantieri e invia l'alert "Cantieri a rischio" |
+| `includes/cron/yard_worksite_status_check.php` | Sincronizza stato cantieri da Yard |
+| `includes/cron/document_expiry_alerts.php` | Allerta documenti scaduti o in scadenza |
+| `includes/cron/programmazione_deadline_check.php` | Allerta scadenze programmazione |
+
+I cron utilizzano l'utente di sistema `www-data` (o equivalente in base alla configurazione del server) con percorso PHP CLI assoluto.
 
 ### 8.4 Backup
 
-Politica raccomandata:
-- **Database MySQL**: dump giornaliero completo + binlog incrementale.
-- **Cloud storage** (`/cloud`): rsync giornaliero su NAS/disco esterno.
-- **Yard SQL Server**: backup gestito separatamente dall'IT contabile.
-- **Codice sorgente**: hosting su repository remoto (GitHub).
+Politica attualmente in essere:
+
+- **Backup completo del database MySQL** ogni notte dei giorni feriali alle **ore 23:00**.
+- I dump vengono scritti in una cartella **NFS** dedicata, raggiungibile **esclusivamente dal server di produzione** (l'host non espone la share ad altre macchine, e l'NFS export è limitato al singolo IP).
+- I file aziendali (cartella `cloud/` con documenti e disegni) sono inclusi nello stesso ciclo di backup.
+- Il sistema Yard / Business è gestito separatamente dall'amministrazione contabile, con la propria politica di backup.
+- Il codice sorgente è ospitato su repository remoto (GitHub).
+
+I backup nei weekend non vengono eseguiti perché l'attività di sistema è marginale; l'ultimo backup utile resta quindi quello del venerdì sera, sufficiente a garantire continuità in caso di incidente.
 
 ### 8.5 Versioning applicativo
 
@@ -835,7 +883,8 @@ Le anomalie sono visualizzate anche in dashboard come notifiche, con possibilit�
 | Termine | Definizione |
 |---|---|
 | **BOB** | Acronimo del gestionale (denominazione interna) |
-| **Yard** | Sistema contabile esterno (SQL Server) |
+| **Yard** | Database SQL Server intermedio fra BOB e Business — middleware contabile |
+| **Business** | Gestionale di contabilità ufficiale (terze parti) — emette le fatture reali |
 | **Cantiere** | Commessa attiva su cui si registrano presenze |
 | **Cliente / Committente** | Soggetto a cui CS Montaggi emette fattura |
 | **Consorziata** | Azienda partner del Consorzio Soluzione Montaggi |
@@ -912,35 +961,54 @@ Le anomalie sono visualizzate anche in dashboard come notifiche, con possibilit�
               └────────────────┘         └──────────────────┘
 ```
 
-### 11.2 Tipologie documento operaio
+### 11.2 Validità documenti operaio (default applicativo)
 
-| Categoria | Documento | Validità tipica |
-|---|---|---|
-| Anagrafica | UNILAV | Durata contratto |
-| Anagrafica | CCNL | Aggiornato a CCNL applicato |
-| Personale | Carta d'identità | 10 anni |
-| Personale | Passaporto | 10 anni |
-| Personale | Codice fiscale (tessera sanitaria) | 6 anni |
-| Personale | Permesso di soggiorno | Variabile |
-| Personale | Patente di guida | 10 anni (B), 5 anni (C/D) |
-| Sanità | Visita medica / Idoneità sanitaria | Annuale o biennale (dipende da DVR) |
-| Sicurezza | Formazione generale (4 ore) | 5 anni |
-| Sicurezza | Formazione specifica (4/8/12 ore) | 5 anni |
-| Sicurezza | Formazione preposto | 5 anni |
-| Sicurezza | Formazione DPI 3a categoria | Variabile |
-| Macchine | Patentino PLE / Gru / Muletto | 5 anni |
+Defaults precompilati al caricamento di un nuovo documento operaio (definiti in `public/assets/js/views/documents/documenti_aziendali.js`). L'operatore può sempre sovrascrivere il valore.
 
-### 11.3 Tipologie documento azienda
-
-| Documento | Validità tipica |
+| Tipologia documento | Validità default |
 |---|---|
+| Verbale consegna DPI | 12 mesi |
+| Visita medica | 12 mesi |
+| Formazione sicurezza | 60 mesi (5 anni) |
+| Lavori in quota DPI | 60 mesi |
+| Piattaforma (PLE) | 60 mesi |
+| Carrello elevatore | 60 mesi |
+| Braccio telescopico | 60 mesi |
+| Preposto | 24 mesi |
+| Antincendio | 60 mesi |
+| Primo soccorso | 36 mesi |
+| Gru a torre | 60 mesi |
+| Gru mobile | 60 mesi |
+| Saldatura | 60 mesi |
+
+Per documenti senza una scadenza fissa (UNILAV a tempo indeterminato, documenti del legale rappresentante) il campo scadenza ammette i valori speciali `INDETERMINATO` o `LEGALE RAPPRESENTANTE`, esclusi dagli avvisi di scadenza.
+
+### 11.3 Validità documenti azienda (default applicativo)
+
+Defaults precompilati al caricamento di un nuovo documento aziendale (definiti in `public/assets/js/views/companies/company_details.js`).
+
+| Tipologia documento | Validità default |
+|---|---|
+| RLS (Rappresentante Lavoratori Sicurezza) | Senza scadenza fissa (31/12/2099) |
+| RSPP (Responsabile Servizio Prevenzione Protezione) | Senza scadenza fissa |
+| Attestato RSPP | 60 mesi |
+| Attestato RLS | 12 mesi |
+| DVR (Documento Valutazione Rischi) | Senza scadenza fissa |
+| Visura camerale | 6 mesi |
+| Patente a crediti | Senza scadenza fissa |
+| Nomina primo soccorso | 12 mesi |
+| Nomina medico competente | Senza scadenza fissa |
+| Nomina preposto | 12 mesi |
+| Nomina antincendio | 12 mesi |
 | DURC | 4 mesi |
-| Visura camerale | Aggiornamento annuale raccomandato |
-| Polizza RC | Annuale |
-| Iscrizione cassa edile | Variabile |
-| Certificazione SOA | Triennale + revisione quinquennale |
-| POS / DVR | Aggiornamento al variare delle condizioni |
-| Statuto / Atto costitutivo | Permanente |
+| DOMA | 12 mesi |
+| Dichiarazione possesso requisiti tecnico-professionali | 12 mesi |
+| Dichiarazione informazione e formazione | 12 mesi |
+| Dichiarazione conformità attrezzature | 12 mesi |
+| Dichiarazione art. 14 | 12 mesi |
+| Assicurazione | 12 mesi |
+
+I documenti senza scadenza vengono memorizzati con data fittizia `31/12/2099` per uniformità tecnica; l'interfaccia mostra "nessuna scadenza fissa" e gli avvisi non li includono mai.
 
 ### 11.4 Riepilogo permessi disponibili
 
@@ -986,11 +1054,12 @@ BOB AI - Anomalie
 
 | Documento | Formato | Esempio |
 |---|---|---|
-| Numero offerta | Sequenziale annuale | `45/2026` |
-| Numero ordine consorziata | Sequenziale annuale | `127/2026` |
-| Numero ordine azienda | `OA_YYYY_NNNN` | `OA_2026_0008` |
-| Numero fattura cliente | Sequenziale Yard | gestito da contabilità |
-| Codice cantiere | Operatore-definito | `2026-MILANO-001` |
+| Numero offerta | `N.YY` (sequenza per anno, anno a due cifre) | `42.26` |
+| Revisione offerta | `N.YY R<k>` (revisioni successive di un'offerta esistente) | `42.26 R1`, `42.26 R2` |
+| Numero ordine consorziata | Numerico sequenziale gestito dal modulo Ordini | — |
+| Numero ordine azienda | `OA_YYYY_NNNN` (sequenza per anno, zero-padded) | `OA_2026_0008` |
+| Numero fattura cliente | Assegnato lato Yard / Business (contabilità) | — |
+| Codice cantiere | Inserito manualmente dall'operatore in fase di creazione | a discrezione |
 
 ---
 
