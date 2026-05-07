@@ -144,7 +144,7 @@ final class WorksiteMarginService
         try {
             $this->mailer->setSender('alerts');
             $mail = $this->mailer->getMailer();
-            $mail->addAddress('alion@csmontaggi.it');
+            $mail->addAddress('info@csmontaggi.it');
             $mail->Subject = 'BOB – Cantieri a rischio (In corso)';
             $mail->Body    = $body;
             $mail->send();
