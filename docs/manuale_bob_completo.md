@@ -1,14 +1,54 @@
+<div style="page-break-after: always; text-align: center; padding-top: 60px; font-family: 'Helvetica', 'Arial', sans-serif;">
+
+  <img src="../includes/template/dist/images/logo.png" alt="BOB" style="width: 180px; margin-bottom: 28px;" />
+
+  <div style="font-size: 62px; font-weight: 800; letter-spacing: -2px; color: #1e293b; line-height: 1; margin-bottom: 8px;">BOB</div>
+  <div style="font-size: 22px; font-weight: 400; color: #475569; letter-spacing: 1px; margin-bottom: 40px;">Manuale di Sistema</div>
+
+  <div style="width: 80px; height: 3px; background: #1e3a5f; margin: 0 auto 40px auto;"></div>
+
+  <div style="font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 50px;">
+    Documento tecnico-funzionale<br/>
+    del gestionale operativo
+  </div>
+
+  <img src="../includes/template/dist/images/Consorzio-Soluzione-Montaggi_Logotype.jpg" alt="Consorzio Soluzione Montaggi" style="width: 320px; margin-bottom: 60px;" />
+
+  <div style="margin-top: 80px; font-size: 12px; color: #475569; line-height: 1.9;">
+    <table style="margin: 0 auto; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Versione</td>
+        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">1.0</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Data</td>
+        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">7 maggio 2026</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Riferimento</td>
+        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">BOB v2.x</td>
+      </tr>
+      <tr>
+        <td style="padding: 4px 14px; text-align: right; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-size: 10px;">Sviluppato da</td>
+        <td style="padding: 4px 14px; text-align: left; color: #1e293b; font-weight: 600;">Alion</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+
 # BOB — Manuale di Sistema
 
-**Gestionale operativo del Consorzio Soluzione Montaggi / CS Montaggi**
+**Gestionale operativo del Consorzio Soluzione Montaggi (CS Montaggi)**
 
 *Documento tecnico-funzionale*
 
 ---
 
 **Versione documento:** 1.0
-**Data:** 2026-05-07
+**Data:** 7 maggio 2026
 **Riferimento applicativo:** BOB v2.x
+**Sviluppato da:** Alion
 
 ---
 
