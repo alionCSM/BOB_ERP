@@ -1044,8 +1044,15 @@ class AnomalyCheckerService
                 <p>Ogni mattina do uno sguardo al gestionale e se vedo qualcosa che potrebbe esserti sfuggito te lo segno, cos&igrave; non ti tocca tenere tutto a mente tu. Niente cose noiose: ti scrivo solo quando serve davvero.</p>
                 <p>Cominciamo:</p>';
         } else {
+            // Opener: BOB AI lo genera fresco per ogni email così non
+            // sembra un copia-incolla quando ne ricevi 3-4 nello stesso
+            // giro. Fallback alla frase statica se LLM non disponibile.
+            $totalCnt = count($findings) + $moreCount;
+            $opener   = $this->generateOpener($moduleLabel, $totalCnt, $firstName)
+                       ?? $this->dailyOpener($moduleLabel, $totalCnt);
+
             $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
-                <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
+                <p>' . $opener . '</p>';
         }
 
         // Header badge
@@ -1463,6 +1470,67 @@ class AnomalyCheckerService
             }
         }
         unset($f);
+    }
+
+    /**
+     * Chiede a BOB AI di scrivere l'apertura dell'email del giorno per un
+     * dato modulo. Cambia formulazione di email in email così non sembra
+     * una macchina che ripete sempre la stessa frase. Ritorna null se
+     * l'LLM non è disponibile o produce qualcosa di anomalo (in quel caso
+     * il chiamante usa la frase statica di fallback).
+     */
+    private function generateOpener(string $moduleLabel, int $count, string $userFirstName): ?string
+    {
+        if (!$this->ai) {
+            return null;
+        }
+
+        $systemPrompt = <<<PROMPT
+Sei BOB, l'assistente del gestionale BOB.
+
+Devi scrivere UNA frase (max 22 parole) che apra una email di segnalazioni
+di anomalie a un collega. Tono: amichevole, da pari, MAI da manager.
+
+Regole:
+- Scrivi in italiano.
+- Niente saluto (il saluto e' gia' stato scritto prima).
+- Devi presentare il fatto che hai trovato N segnalazioni nel modulo
+  indicato, in modo naturale e variato.
+- Mai imperativi tipo "guarda" / "controlla" / "vedi". Niente "devi".
+- Niente conteggi precisi se gia' compaiono altrove. Tu puoi dire "ho
+  visto qualche cosa", "ho notato alcune voci", ecc.
+- Niente emoji, niente formattazione, niente virgolette esterne.
+- Output: solo la frase, niente prefissi/firme.
+PROMPT;
+
+        $userPrompt = "Modulo: {$moduleLabel}\n"
+            . "Numero segnalazioni: {$count}\n"
+            . "Destinatario: {$userFirstName}\n\n"
+            . "Scrivi l'apertura della email.";
+
+        $result = $this->ai->chat([
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user',   'content' => $userPrompt],
+        ]);
+
+        if (!($result['ok'] ?? false)) {
+            return null;
+        }
+
+        $text = trim((string)($result['response'] ?? ''));
+        if ($text === '') return null;
+
+        // Stesse pulizie di generateHistoryNote
+        $text = trim($text, "\"'“”«»‹›\n\r\t ");
+        $text = preg_replace('/^(Apertura|Frase|Risposta|BOB)\s*:\s*/iu', '', $text) ?? $text;
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+        $wordCount = str_word_count($text, 0, "àèéìòùÀÈÉÌÒÙ'");
+        if ($wordCount < 4 || $wordCount > 35 || mb_strlen($text) > 240) {
+            return null;
+        }
+
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
     /**
