@@ -287,6 +287,7 @@ class AnomalyCheckerService
             WHERE wd.scadenza IS NOT NULL
               AND wd.scadenza != ''
               AND wr.active = 'Y'
+              AND wr.removed = 'N'
               AND COALESCE(wd.nascondere, 'N') != 'Y'
             HAVING scadenza_norm IS NOT NULL AND scadenza_norm < CURDATE()
             ORDER BY days_expired DESC
@@ -327,7 +328,6 @@ class AnomalyCheckerService
             WHERE cd.scadenza IS NOT NULL
               AND cd.scadenza != ''
               AND c.active = 1
-              AND c.consorziata = 1
             HAVING scadenza_norm IS NOT NULL AND scadenza_norm < CURDATE()
             ORDER BY days_expired DESC
         ");
@@ -355,7 +355,6 @@ class AnomalyCheckerService
             LEFT JOIN bb_company_documents cd ON cd.company_id = c.id
             WHERE cd.id IS NULL
               AND c.active = 1
-              AND c.consorziata = 1
             ORDER BY c.name
         ");
         $stmt->execute();
@@ -363,7 +362,7 @@ class AnomalyCheckerService
         if (!empty($noDocs)) {
             $names = array_map(fn($c) => "  - {$c['name']}", $noDocs);
             $this->addFinding('documenti', 'warning', 'anomaly_documenti',
-                "Ci sono " . count($noDocs) . " aziende consorziate che non hanno ancora nessun documento caricato:\n" . implode("\n", $names),
+                "Ci sono " . count($noDocs) . " aziende che non hanno ancora nessun documento caricato:\n" . implode("\n", $names),
                 ['count' => count($noDocs)]
             );
         }
@@ -387,6 +386,7 @@ class AnomalyCheckerService
             WHERE wd.scadenza IS NOT NULL
               AND wd.scadenza != ''
               AND wr.active = 'Y'
+              AND wr.removed = 'N'
               AND COALESCE(wd.nascondere, 'N') != 'Y'
             HAVING scadenza_norm IS NOT NULL
                AND scadenza_norm BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
@@ -421,7 +421,6 @@ class AnomalyCheckerService
             WHERE cd.scadenza IS NOT NULL
               AND cd.scadenza != ''
               AND c.active = 1
-              AND c.consorziata = 1
             HAVING scadenza_norm IS NOT NULL
                AND scadenza_norm BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
             ORDER BY scadenza_norm ASC
