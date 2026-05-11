@@ -850,7 +850,8 @@ class AnomalyCheckerService
             $aiMessage = trim($aiMessage);
             if (!empty($aiMessage)) {
                 $this->addFinding('ai_summary', 'info', '_admin',
-                    "🤖 **Riassunto AI:**\n\n{$aiMessage}"
+                    "🤖 **Riassunto AI:**\n\n{$aiMessage}",
+                    []
                 );
             }
         } else {
