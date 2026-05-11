@@ -955,12 +955,13 @@ class AnomalyCheckerService
     private function addFinding(string $module, string $severity, string $permission, string $message, array $data): void
     {
         $this->findings[] = [
-            'module'     => $module,
-            'severity'   => $severity,
-            'permission' => $permission,
-            'message'    => $message,
-            'data'       => $data,
-            'timestamp'  => $this->today,
+            'module'       => $module,
+            'severity'     => $severity,
+            'permission'   => $permission,
+            'anomaly_type' => $permission, // alias: il "permesso" è anche il "tipo" della anomalia
+            'message'      => $message,
+            'data'         => $data,
+            'timestamp'    => $this->today,
         ];
     }
 
@@ -1598,11 +1599,14 @@ PROMPT;
 
     private function checkRecurringAnomalies(): void
     {
-        // Find anomaly types that appear 3+ times in last 14 days for same worksite
+        // Find anomaly types that appear 3+ times in last 14 days for same worksite.
+        // worksite_name è aggregato con MAX per essere compatibile con
+        // sql_mode=only_full_group_by (MySQL 8). Il nome è lo stesso per
+        // worksite_id, quindi MAX restituisce semplicemente quel valore.
         $stmt = $this->conn->prepare("
             SELECT
                 ah.worksite_id,
-                ah.worksite_name,
+                MAX(ah.worksite_name) AS worksite_name,
                 ah.anomaly_type,
                 COUNT(*) AS occurrence_count,
                 MIN(ah.run_date) AS first_occurrence,
@@ -1631,11 +1635,12 @@ PROMPT;
 
     private function checkEscalatingSeverity(): void
     {
-        // Find worksites that went from warning → alert in last 7 days
+        // Find worksites that went from warning → alert in last 7 days.
+        // worksite_name aggregato con MAX per only_full_group_by (MySQL 8).
         $stmt = $this->conn->prepare("
             SELECT
                 ah.worksite_id,
-                ah.worksite_name,
+                MAX(ah.worksite_name) AS worksite_name,
                 ah.anomaly_type,
                 MIN(CASE WHEN ah.severity = 'warning' THEN ah.run_date END) AS first_warning,
                 MIN(CASE WHEN ah.severity = 'alert' THEN ah.run_date END) AS first_alert,
