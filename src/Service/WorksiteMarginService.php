@@ -127,28 +127,46 @@ final class WorksiteMarginService
     {
         $baseUrl = rtrim($this->appUrl, '/') . '/worksites/';
 
+        $countNeg  = count($riskNegative);
+        $countLow  = count($riskLowMargin);
+        $totalRisk = $countNeg + $countLow;
+        $isProd    = (new \App\Infrastructure\Config())->isProduction();
+
         $body = '
-<html><body style="margin:0;padding:20px;background:#f6f7f9;">
-<div style="max-width:950px;margin:auto;background:#fff;padding:20px;border-radius:6px;">
-<h2 style="margin-top:0;color:#111;">⚠️ BOB – Cantieri a rischio (In corso)</h2>
-<p style="color:#555;">Data: ' . date('d/m/Y H:i') . '</p>
-<h3 style="color:#c0392b;">❌ Margine negativo</h3>
-' . $this->buildTable($riskNegative, '#c0392b', $baseUrl) . '
-<h3 style="color:#e67e22;margin-top:30px;">⚠️ Margine inferiore al 10%</h3>
-' . $this->buildTable($riskLowMargin, '#e67e22', $baseUrl) . '
-<p style="margin-top:30px;font-size:11px;color:#888;">
-    Email generata automaticamente da BOB – solo cantieri <strong>In corso</strong>.
-</p>
+<html><body style="margin:0;padding:20px;background:#f6f7f9;font-family:Arial,sans-serif;">
+<div style="max-width:950px;margin:auto;background:#fff;padding:24px;border-radius:8px;">
+  <p style="font-size:15px;color:#1e293b;margin:0 0 8px;">Buongiorno!</p>
+  <p style="color:#334155;margin:0 0 18px;">Ho dato il solito sguardo ai cantieri "In corso" e ci sono un paio di cose che volevo segnalarti, magari erano sfuggite:</p>
+
+  ' . ($countNeg > 0 ? '
+  <h3 style="color:#b45309;margin:24px 0 8px;">Margine negativo &mdash; ' . $countNeg . '</h3>
+  ' . $this->buildTable($riskNegative, '#b45309', $baseUrl) : '') . '
+
+  ' . ($countLow > 0 ? '
+  <h3 style="color:#d97706;margin:32px 0 8px;">Margine sotto il 10% &mdash; ' . $countLow . '</h3>
+  ' . $this->buildTable($riskLowMargin, '#d97706', $baseUrl) : '') . '
+
+  <p style="margin-top:32px;color:#64748b;font-size:14px;">Se ti serve una mano a capirci qualcosa son qui.</p>
+  <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">&mdash; BOB</p>
 </div></body></html>';
+
+        // Recipient depends on environment: shared ops mailbox in prod,
+        // personal mailbox on dev/staging so test runs don't spam the team.
+        $recipient = $isProd ? 'info@csmontaggi.it' : 'alion@csmontaggi.it';
+
+        // Subject amichevole — "ho visto" invece di "da rivedere"
+        $word    = $totalRisk === 1 ? 'cantiere' : 'cantieri';
+        $prefix  = $isProd ? 'BOB' : 'BOB DEV';
+        $subject = "{$prefix} · margini cantieri: {$totalRisk} {$word} che ho visto";
 
         try {
             $this->mailer->setSender('alerts');
             $mail = $this->mailer->getMailer();
-            $mail->addAddress('alion@csmontaggi.it');
-            $mail->Subject = 'BOB – Cantieri a rischio (In corso)';
+            $mail->addAddress($recipient);
+            $mail->Subject = $subject;
             $mail->Body    = $body;
             $mail->send();
-            echo "Email sent.\n";
+            echo "Email sent to {$recipient}.\n";
         } catch (\Throwable $e) {
             echo 'Email error: ' . $e->getMessage() . "\n";
         }

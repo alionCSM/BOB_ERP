@@ -47,6 +47,11 @@ class AnomalyCheckerService
         $this->checkSquadre();
         $this->checkStatistiche();
 
+        // Annota ogni finding con la sua storia (quante volte è già apparso e
+        // se la severity è peggiorata). Va fatto PRIMA di loggare lo stato
+        // odierno, altrimenti conta anche quello.
+        $this->enrichFindingsWithHistory();
+
         // Log anomalies to history for trend analysis
         $this->logAnomaliesToHistory();
 
@@ -883,7 +888,7 @@ class AnomalyCheckerService
                         ? $this->buildFirstTimeEmail($firstName, $f['message'])
                         : $this->wrapInHtmlTemplate('Promemoria', '<p style="font-size: 15px; color: #1e293b;">' . nl2br(htmlspecialchars($f['message'], ENT_QUOTES, 'UTF-8')) . '</p>');
 
-                    $this->sendEmailToUser($f['data']['email'], 'BOB AI - Un piccolo promemoria', $body, $userId, 'login');
+                    $this->sendEmailToUser($f['data']['email'], 'BOB · un piccolo promemoria', $body, $userId, 'login');
                     $this->notificationsSent++;
                 }
                 echo "   _direct_user: sent to " . count($findings) . " users\n";
@@ -924,7 +929,7 @@ class AnomalyCheckerService
                 if (!empty($user['email'])) {
                     $this->sendEmailToUser(
                         $user['email'],
-                        "BOB AI - {$moduleLabel}: " . count($findings) . " segnalazioni",
+                        $this->buildSubject($moduleLabel, count($findings), $findings),
                         $body,
                         $userId,
                         $findings[0]['module'],
@@ -1006,39 +1011,39 @@ class AnomalyCheckerService
     private function buildFirstTimeEmail(string $firstName, string $content): string
     {
         return $this->wrapInHtmlTemplate(
-            'Benvenuto!',
+            'Piacere di conoscerti!',
             '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>! 👋</p>
-            <p>Sono <strong>BOB AI</strong>, l\'assistente intelligente del gestionale BOB.</p>
-            <p>Il mio compito e\' controllare ogni giorno che tutto funzioni correttamente: verifico presenze, documenti, cantieri, mezzi e molto altro.
-            Se trovo qualcosa di strano o che richiede attenzione, te lo segnalo via email cosi\' puoi intervenire subito.</p>
-            <p>Non ti mandero\' spam, solo segnalazioni utili quando serve davvero. 🙂</p>
+            <p>Sono <strong>BOB</strong>, da oggi ci lavoriamo insieme.</p>
+            <p>Ogni mattina do uno sguardo al gestionale e se vedo qualcosa che potrebbe esserti sfuggito te lo segno qui, cos&igrave; non ti tocca tenere tutto a mente tu.</p>
             <div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 16px 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Ecco la prima segnalazione:</p>
+                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Tanto per cominciare:</p>
                 <p style="margin: 0; white-space: pre-line;">' . htmlspecialchars($content, ENT_QUOTES, 'UTF-8') . '</p>
             </div>
-            <p style="color: #64748b;">Se hai domande o qualcosa non ti torna, parlane con il tuo responsabile.</p>
-            <p style="color: #64748b;">Buon lavoro! 🤖</p>'
+            <p style="color: #64748b;">Se ti serve una mano sai dove trovarmi.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">&mdash; BOB</p>'
         );
     }
 
     private function buildEmailBody(string $moduleLabel, array $findings, string $firstName, bool $isFirstTime, int $moreCount = 0): string
     {
         $severityConfig = [
-            'alert'   => ['color' => '#dc2626', 'bg' => '#fef2f2', 'border' => '#fca5a5', 'label' => 'Urgente',      'dot' => '🔴'],
-            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Attenzione',   'dot' => '🟡'],
-            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#93c5fd', 'label' => 'Informazione', 'dot' => '🔵'],
+            'alert'   => ['color' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Importante',  'dot' => '•'],
+            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fde68a', 'label' => 'Promemoria',  'dot' => '•'],
+            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#bfdbfe', 'label' => 'Solo per info','dot' => '•'],
         ];
 
-        // Intro section
+        // Intro section — tono colloquiale, varia a seconda del giorno
+        $greet = $this->greeting();
+        $name  = htmlspecialchars($firstName);
+
         if ($isFirstTime) {
-            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>! 👋</p>
-                <p>Sono <strong>BOB AI</strong>, l\'assistente intelligente del gestionale BOB.</p>
-                <p>Il mio compito e\' controllare ogni giorno che tutto funzioni correttamente: verifico presenze, documenti, cantieri, mezzi e molto altro. Se trovo qualcosa di strano o che richiede attenzione, te lo segnalo via email cosi\' puoi intervenire subito.</p>
-                <p>Non ti mandero\' spam, solo segnalazioni utili quando serve davvero. 🙂</p>
-                <p style="font-weight: 600;">Ecco il primo report:</p>';
+            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . $name . '</strong>! 👋</p>
+                <p>Sono <strong>BOB</strong>, ci lavoro insieme a te d&rsquo;ora in poi.</p>
+                <p>Ogni mattina do uno sguardo al gestionale e se vedo qualcosa che potrebbe esserti sfuggito te lo segno, cos&igrave; non ti tocca tenere tutto a mente tu. Niente cose noiose: ti scrivo solo quando serve davvero.</p>
+                <p>Cominciamo:</p>';
         } else {
-            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>,</p>
-                <p>ecco le segnalazioni di oggi per <strong>' . htmlspecialchars($moduleLabel) . '</strong>:</p>';
+            $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
+                <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
         }
 
         // Header badge
@@ -1060,11 +1065,20 @@ class AnomalyCheckerService
             // If finding has custom HTML (e.g. stats table), append it after the message
             $extraHtml = !empty($f['data']['html']) ? $f['data']['html'] : '';
 
+            // Nota ricorrenza (BOB "ricorda" di averla già segnalata)
+            $historyBadge = '';
+            if (!empty($f['_history_note'])) {
+                $historyBadge = '<div style="background: rgba(0,0,0,0.04); border-radius: 6px; padding: 8px 12px; margin: 0 0 10px; font-size: 12px; color: ' . $cfg['color'] . '; font-style: italic;">'
+                    . $f['_history_note']
+                    . '</div>';
+            }
+
             $cards .= '<div style="background: ' . $cfg['bg'] . '; border: 1px solid ' . $cfg['border'] . '; border-left: 4px solid ' . $cfg['color'] . '; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 12px;">
                 <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
                     <td style="vertical-align: top; width: 30px; font-size: 16px; padding-top: 2px;">' . $cfg['dot'] . '</td>
                     <td>
                         <span style="display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: ' . $cfg['color'] . '; background: white; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;">' . $cfg['label'] . '</span>
+                        ' . $historyBadge . '
                         <p style="margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.6;">' . $message . '</p>
                         ' . $extraHtml . '
                     </td>
@@ -1081,11 +1095,68 @@ class AnomalyCheckerService
             </div>';
         }
 
-        // Footer
-        $footer = '<p style="color: #64748b;">Se qualcosa non ti torna o hai bisogno di una mano, parlane con il tuo responsabile.</p>
-            <p style="color: #64748b;">Buon lavoro! 🤖</p>';
+        // Footer — chiusura amichevole, varia
+        $footer = '<p style="color: #64748b; margin-top: 24px;">' . $this->signOff() . '</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">— BOB 🤖</p>';
 
         return $this->wrapInHtmlTemplate($moduleLabel, $intro . $header . $cards . $attachNote . $footer);
+    }
+
+    /**
+     * Saluto in base all'ora del giorno (i cron girano alle 06:00 quindi tipicamente
+     * "Buongiorno", ma robusto su qualunque orario).
+     */
+    private function greeting(): string
+    {
+        $h = (int)date('G');
+        if ($h < 12) return 'Buongiorno';
+        if ($h < 18) return 'Ciao';
+        return 'Buonasera';
+    }
+
+    /**
+     * Frase di apertura variabile basata su giorno della settimana e numero
+     * di segnalazioni, così l'email non sembra clonata ogni mattina.
+     */
+    private function dailyOpener(string $moduleLabel, int $count): string
+    {
+        $mod = htmlspecialchars($moduleLabel);
+
+        // BOB-collega: ha fatto il giro come ogni mattina e ti aiuta a
+        // non perdere niente. Tono caldo, mai prescrittivo.
+        if ($count === 1) {
+            return "ho fatto il solito controllo stamattina e su <strong>{$mod}</strong> ho visto una cosa &mdash; magari ti era sfuggita, te la segno qui:";
+        }
+        return "ho fatto il solito controllo stamattina e su <strong>{$mod}</strong> ho visto {$count} cose &mdash; magari qualcuna ti era sfuggita, te le segno qui:";
+    }
+
+    /**
+     * Chiusura variabile per non finire sempre con la stessa frase.
+     */
+    private function signOff(): string
+    {
+        $variants = [
+            'Se ti serve una mano sai dove trovarmi.',
+            'Per qualsiasi dubbio, son qui.',
+            'Buona giornata!',
+            'A presto.',
+            'Un saluto, e ci sentiamo domani.',
+            'Buon lavoro!',
+        ];
+        // Stessa frase per tutto il giorno (basata sulla data) — non random a
+        // ogni email, così se ne ricevi più nello stesso giorno non sembra finto.
+        $idx = (int)date('z') % count($variants);
+        return $variants[$idx];
+    }
+
+    /**
+     * Subject email — vario per modulo + conteggio, con emoji discreto.
+     */
+    private function buildSubject(string $moduleLabel, int $count, array $findings): string
+    {
+        // Tono "collega che ti aiuta a non dimenticare le cose".
+        $word = $count === 1 ? 'cosa' : 'cose';
+        return "BOB · {$moduleLabel}: {$count} {$word} che ho visto";
     }
 
     private function sendToAdmin(array $findings): void
@@ -1103,7 +1174,7 @@ class AnomalyCheckerService
             $body = $this->buildEmailBody('Riassunto AI', $findings, $admin['first_name'], $isFirstTime);
 
             if (!empty($admin['email'])) {
-                $this->sendEmailToUser($admin['email'], 'BOB AI - Report Anomalie Giornaliero', $body, (int)$admin['id'], 'ai_summary');
+                $this->sendEmailToUser($admin['email'], 'BOB · riepilogo di oggi', $body, (int)$admin['id'], 'ai_summary');
             }
             $this->notificationsSent++;
         }
@@ -1332,6 +1403,133 @@ class AnomalyCheckerService
     // ═══════════════════════════════════════════
     //  ANOMALY HISTORY LOGGING
     // ═══════════════════════════════════════════
+
+    /**
+     * Per ogni finding di oggi, va a vedere in bb_anomaly_history se la
+     * stessa coppia (worksite_id, anomaly_type) è già apparsa di recente.
+     * Se sì:
+     *   - aggiunge un campo `_history_note` con frase pronta da mostrare
+     *     nell'email ("ti avevo già scritto X giorni fa, è ancora aperta"),
+     *   - se la cosa si ripete molte volte fa salire la severity di un
+     *     livello (info → warning, warning → alert) così l'email passa
+     *     dal blu al giallo al rosso senza intervento umano.
+     */
+    private function enrichFindingsWithHistory(): void
+    {
+        if (empty($this->findings)) return;
+
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) AS cnt,
+                   MIN(run_date) AS first_seen,
+                   MAX(run_date) AS last_seen,
+                   MAX(CASE WHEN severity = 'alert' THEN 1 ELSE 0 END) AS had_alert,
+                   MAX(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) AS had_warning
+            FROM bb_anomaly_history
+            WHERE worksite_id = :wid
+              AND anomaly_type = :type
+              AND run_date < CURDATE()
+              AND run_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+        ");
+
+        foreach ($this->findings as &$f) {
+            $worksiteId = $f['data']['worksite_id'] ?? null;
+            $type       = $f['anomaly_type'] ?? null;
+            if (!$worksiteId || !$type) continue;
+
+            $stmt->execute([':wid' => (int)$worksiteId, ':type' => $type]);
+            $h = $stmt->fetch(PDO::FETCH_ASSOC);
+            $count = (int)($h['cnt'] ?? 0);
+            if ($count === 0) continue;
+
+            $firstSeen = $h['first_seen'] ?? null;
+            $days = 0;
+            if ($firstSeen) {
+                try {
+                    $days = (int)(new \DateTime())->diff(new \DateTime($firstSeen))->days;
+                } catch (\Throwable $e) { $days = 0; }
+            }
+
+            $f['_recurrence'] = ['count' => $count, 'days' => $days];
+
+            // La frase la scrive BOB AI in base ai fatti (conteggio, giorni,
+            // tipo anomalia). Se l'LLM non è disponibile o produce qualcosa
+            // di anomalo, lasciamo la nota vuota — il messaggio originale
+            // basta da solo.
+            $note = $this->generateHistoryNote($count, $days, (string)$type, (string)($f['message'] ?? ''));
+            if ($note !== null) {
+                $f['_history_note'] = $note;
+            }
+        }
+        unset($f);
+    }
+
+    /**
+     * Chiede a BOB AI di scrivere una nota in 1 frase su una segnalazione
+     * che si ripete. Tono di collega gentile, nessuna pressione.
+     * Ritorna null se l'LLM non è disponibile, fallisce, o produce un
+     * output non utilizzabile.
+     */
+    private function generateHistoryNote(int $count, int $days, string $anomalyType, string $messageContext): ?string
+    {
+        if (!$this->ai) {
+            return null;
+        }
+
+        $systemPrompt = <<<PROMPT
+Sei BOB, l'assistente del gestionale BOB. Scrivi UNA frase breve in italiano
+(massimo 18 parole) che accompagna una segnalazione di anomalia ricorrente.
+
+Personalità:
+- Collega amichevole, mai un manager o un CEO.
+- Aiuti l'utente a non dimenticare cose, non lo controlli.
+- Tono pacato, mai allarmista, mai passivo-aggressivo.
+- Non assegni compiti, non dai scadenze, non chiedi giustificazioni.
+- Non citi numeri ("è la 5a volta") — al massimo "da un po'".
+- Niente emoji, niente punti esclamativi.
+
+Output:
+- SOLO la frase, niente prefissi, niente virgolette, niente firma.
+- In italiano, max 18 parole.
+PROMPT;
+
+        $userPrompt = "Situazione:\n"
+            . "- Tipo segnalazione: {$anomalyType}\n"
+            . "- Numero di apparizioni precedenti negli ultimi 14 giorni: {$count}\n"
+            . "- Prima vista: {$days} giorni fa\n"
+            . "- Testo della segnalazione: " . mb_substr($messageContext, 0, 200) . "\n\n"
+            . "Scrivi UNA frase che faccia da 'memoria di BOB' — ricorda all'utente "
+            . "che questa cosa l'hai gi\u{00E0} vista, in tono amichevole.";
+
+        $result = $this->ai->chat([
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user',   'content' => $userPrompt],
+        ]);
+
+        if (!($result['ok'] ?? false)) {
+            return null;
+        }
+
+        $text = trim((string)($result['response'] ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        // Pulizia minima: togli virgolette esterne, prefissi tipo "Frase:" che
+        // certi modelli inseriscono nonostante l'istruzione, accapi multipli.
+        $text = trim($text, "\"'“”«»‹›\n\r\t ");
+        $text = preg_replace('/^(Frase|Risposta|Nota|BOB)\s*:\s*/iu', '', $text) ?? $text;
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+        // Filtro di sicurezza: scarta output troppo lunghi (segno che l'LLM
+        // ha allucinato un paragrafo) o troppo corti per essere utili.
+        $wordCount = str_word_count($text, 0, "àèéìòùÀÈÉÌÒÙ'");
+        if ($wordCount < 3 || $wordCount > 30 || mb_strlen($text) > 200) {
+            return null;
+        }
+
+        // Escape HTML poiché finirà dentro un <div> dell'email
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
 
     private function logAnomaliesToHistory(): void
     {
