@@ -132,45 +132,31 @@ final class WorksiteMarginService
         $totalRisk = $countNeg + $countLow;
         $isProd    = (new \App\Infrastructure\Config())->isProduction();
 
-        // Apertura colloquiale, varia per giorno della settimana
-        $dow = (int)date('w');
-        if ($dow === 1) {
-            $opener = "Buongiorno, prima settimana di controlli e ho già qualcosa da segnalarvi.";
-        } elseif ($dow === 5) {
-            $opener = "Buongiorno, prima del weekend volevo dare un'occhiata ai cantieri sul filo.";
-        } else {
-            $opener = "Buongiorno, ho appena finito di fare i conti sui cantieri attivi.";
-        }
-
         $body = '
 <html><body style="margin:0;padding:20px;background:#f6f7f9;font-family:Arial,sans-serif;">
 <div style="max-width:950px;margin:auto;background:#fff;padding:24px;border-radius:8px;">
-  <p style="font-size:15px;color:#1e293b;margin:0 0 8px;">' . htmlspecialchars($opener) . '</p>
-  <p style="color:#475569;margin:0 0 18px;">Ci sono <strong>' . $totalRisk . '</strong> cantieri "In corso" che meritano uno sguardo:</p>
+  <p style="font-size:15px;color:#1e293b;margin:0 0 8px;">Buongiorno,</p>
+  <p style="color:#475569;margin:0 0 18px;">questi sono i miei appunti di oggi sui cantieri "In corso" (' . $totalRisk . ' in tutto):</p>
 
   ' . ($countNeg > 0 ? '
-  <h3 style="color:#c0392b;margin:24px 0 8px;">❌ ' . $countNeg . ' con margine negativo</h3>
-  <p style="color:#64748b;font-size:13px;margin:0 0 10px;">Qui ci stiamo perdendo soldi — vale la pena guardarli per primi.</p>
-  ' . $this->buildTable($riskNegative, '#c0392b', $baseUrl) : '') . '
+  <h3 style="color:#b45309;margin:24px 0 8px;">Margine negativo &mdash; ' . $countNeg . '</h3>
+  ' . $this->buildTable($riskNegative, '#b45309', $baseUrl) : '') . '
 
   ' . ($countLow > 0 ? '
-  <h3 style="color:#e67e22;margin:32px 0 8px;">⚠️ ' . $countLow . ' con margine sotto il 10%</h3>
-  <p style="color:#64748b;font-size:13px;margin:0 0 10px;">Non in rosso, ma il margine è sottile. Da tenere d\'occhio.</p>
-  ' . $this->buildTable($riskLowMargin, '#e67e22', $baseUrl) : '') . '
+  <h3 style="color:#d97706;margin:32px 0 8px;">Margine sotto il 10% &mdash; ' . $countLow . '</h3>
+  ' . $this->buildTable($riskLowMargin, '#d97706', $baseUrl) : '') . '
 
-  <p style="margin-top:32px;color:#64748b;font-size:14px;">A domani.</p>
-  <p style="margin:4px 0 0;color:#94a3b8;font-size:12px;">— BOB 🤖</p>
+  <p style="margin-top:32px;color:#94a3b8;font-size:12px;">&mdash; BOB</p>
 </div></body></html>';
 
         // Recipient depends on environment: shared ops mailbox in prod,
         // personal mailbox on dev/staging so test runs don't spam the team.
         $recipient = $isProd ? 'info@csmontaggi.it' : 'alion@csmontaggi.it';
 
-        // Subject colloquiale con emoji severity
-        $emoji   = $countNeg > 0 ? '🔴' : '🟡';
+        // Subject neutro
         $word    = $totalRisk === 1 ? 'cantiere' : 'cantieri';
         $prefix  = $isProd ? 'BOB' : 'BOB DEV';
-        $subject = "{$emoji} {$prefix} · {$totalRisk} {$word} da guardare oggi";
+        $subject = "{$prefix} · margini cantieri ({$totalRisk} {$word})";
 
         try {
             $this->mailer->setSender('alerts');

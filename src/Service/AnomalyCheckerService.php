@@ -888,7 +888,7 @@ class AnomalyCheckerService
                         ? $this->buildFirstTimeEmail($firstName, $f['message'])
                         : $this->wrapInHtmlTemplate('Promemoria', '<p style="font-size: 15px; color: #1e293b;">' . nl2br(htmlspecialchars($f['message'], ENT_QUOTES, 'UTF-8')) . '</p>');
 
-                    $this->sendEmailToUser($f['data']['email'], $this->greeting() . ', ho un piccolo promemoria per te 👋', $body, $userId, 'login');
+                    $this->sendEmailToUser($f['data']['email'], 'BOB · un piccolo promemoria', $body, $userId, 'login');
                     $this->notificationsSent++;
                 }
                 echo "   _direct_user: sent to " . count($findings) . " users\n";
@@ -1027,9 +1027,9 @@ class AnomalyCheckerService
     private function buildEmailBody(string $moduleLabel, array $findings, string $firstName, bool $isFirstTime, int $moreCount = 0): string
     {
         $severityConfig = [
-            'alert'   => ['color' => '#dc2626', 'bg' => '#fef2f2', 'border' => '#fca5a5', 'label' => 'Urgente',      'dot' => '🔴'],
-            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Attenzione',   'dot' => '🟡'],
-            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#93c5fd', 'label' => 'Informazione', 'dot' => '🔵'],
+            'alert'   => ['color' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Da vedere', 'dot' => '•'],
+            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fde68a', 'label' => 'Promemoria','dot' => '•'],
+            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#bfdbfe', 'label' => 'Nota',     'dot' => '•'],
         ];
 
         // Intro section — tono colloquiale, varia a seconda del giorno
@@ -1121,25 +1121,15 @@ class AnomalyCheckerService
      */
     private function dailyOpener(string $moduleLabel, int $count): string
     {
-        $dow = (int)date('w'); // 0=dom .. 6=sab
         $mod = htmlspecialchars($moduleLabel);
 
-        // Lunedì: tono "ripartenza"
-        if ($dow === 1) {
-            return $count === 1
-                ? "ho fatto il primo giro della settimana su <strong>{$mod}</strong> e ho trovato una cosa che vale la pena guardare."
-                : "ho fatto il primo giro della settimana su <strong>{$mod}</strong> — ti segno {$count} cose da controllare quando hai un attimo.";
+        // Tono uniforme: BOB ha fatto il suo giro e lascia gli appunti.
+        // Niente "devi", "vediamo di", "quando hai un attimo": sono richieste
+        // implicite mascherate.
+        if ($count === 1) {
+            return "questi sono gli appunti di oggi su <strong>{$mod}</strong>:";
         }
-        // Venerdì: tono "chiudiamo la settimana"
-        if ($dow === 5) {
-            return $count === 1
-                ? "prima del weekend ti segno una cosa su <strong>{$mod}</strong>."
-                : "prima di chiudere la settimana, dai un occhio a queste {$count} cose su <strong>{$mod}</strong>.";
-        }
-        // Resto della settimana
-        return $count === 1
-            ? "stamattina ho visto una segnalazione su <strong>{$mod}</strong>:"
-            : "stamattina sono uscite {$count} cose da guardare su <strong>{$mod}</strong>:";
+        return "questi sono i miei appunti di oggi su <strong>{$mod}</strong> ({$count} voci):";
     }
 
     /**
@@ -1166,17 +1156,9 @@ class AnomalyCheckerService
      */
     private function buildSubject(string $moduleLabel, int $count, array $findings): string
     {
-        // Severity più alta nel batch determina l'emoji
-        $hasAlert   = false;
-        $hasWarning = false;
-        foreach ($findings as $f) {
-            if (($f['severity'] ?? '') === 'alert')   $hasAlert   = true;
-            if (($f['severity'] ?? '') === 'warning') $hasWarning = true;
-        }
-        $emoji = $hasAlert ? '🔴' : ($hasWarning ? '🟡' : '🔵');
-        $word  = $count === 1 ? 'cosa' : 'cose';
-
-        return "{$emoji} BOB · {$moduleLabel}: {$count} {$word} da guardare";
+        // Subject neutro: BOB ha appunti, non manda compiti.
+        $word = $count === 1 ? 'voce' : 'voci';
+        return "BOB · {$moduleLabel} ({$count} {$word})";
     }
 
     private function sendToAdmin(array $findings): void
@@ -1194,7 +1176,7 @@ class AnomalyCheckerService
             $body = $this->buildEmailBody('Riassunto AI', $findings, $admin['first_name'], $isFirstTime);
 
             if (!empty($admin['email'])) {
-                $this->sendEmailToUser($admin['email'], $this->greeting() . ', ecco il riepilogo di oggi ☕', $body, (int)$admin['id'], 'ai_summary');
+                $this->sendEmailToUser($admin['email'], 'BOB · riepilogo di oggi', $body, (int)$admin['id'], 'ai_summary');
             }
             $this->notificationsSent++;
         }
@@ -1471,23 +1453,17 @@ class AnomalyCheckerService
 
             $f['_recurrence'] = ['count' => $count, 'days' => $days];
 
-            // Nota "ricorda di averla già scritta" — tono amichevole, mai
-            // accusatorio. Non alza la severity: lascia decidere alla logica
-            // di business cos'è grave e cos'è no.
+            // Nota "ricorda" — solo informativa, nessuna pressione, nessuna
+            // richiesta implicita di azione. BOB tiene un quaderno, non un
+            // registro di richiami. Le frasi non hanno tempi verbali rivolti
+            // a "tu", solo constatazioni.
             if ($count === 1) {
-                // Seconda apparizione totale
-                $when = $days <= 1 ? 'ieri' : "qualche giorno fa";
-                $f['_history_note'] = "Te l'avevo segnalata {$when}, te la rimetto qui.";
+                $when = $days <= 1 ? 'anche ieri' : 'in questi giorni';
+                $f['_history_note'] = "L'avevo notata {$when}.";
             } elseif ($count <= 3) {
-                $f['_history_note'] = "Ne avevamo parlato qualche giorno fa &mdash; quando hai un attimo.";
+                $f['_history_note'] = "L'ho gi&agrave; vista in qualche giro recente.";
             } else {
-                $f['_history_note'] = "Questa &egrave; in giro da un po'. Se vuoi che smetta di scriverla, dimmi pure.";
-            }
-
-            // Se in passato era warning e ora è alert (peggiorato), accenno
-            // delicato — senza allarmismi.
-            if (($h['had_warning'] ?? 0) && ($f['severity'] === 'alert') && (int)($h['had_alert'] ?? 0) === 0) {
-                $f['_history_note'] = "Questa &egrave; leggermente cambiata rispetto a prima. " . $f['_history_note'];
+                $f['_history_note'] = "&Egrave; nei miei appunti da un po'.";
             }
         }
         unset($f);
