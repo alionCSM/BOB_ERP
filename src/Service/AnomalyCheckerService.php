@@ -1013,23 +1013,23 @@ class AnomalyCheckerService
         return $this->wrapInHtmlTemplate(
             'Piacere di conoscerti!',
             '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>! 👋</p>
-            <p>Sono <strong>BOB</strong>, da oggi mi vedrai spesso in inbox.</p>
-            <p>Ogni mattina faccio il giro del gestionale e controllo che tutto fili: presenze, documenti, cantieri, mezzi. Se trovo qualcosa che vale la pena guardare ti scrivo io. Niente spam, solo cose utili. Promesso. 🙂</p>
+            <p>Sono <strong>BOB</strong>, da oggi ci lavoriamo insieme.</p>
+            <p>Ogni mattina do uno sguardo al gestionale e se vedo qualcosa che potrebbe esserti sfuggito te lo segno qui, cos&igrave; non ti tocca tenere tutto a mente tu.</p>
             <div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 16px 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Una piccola cosa per cominciare:</p>
+                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Tanto per cominciare:</p>
                 <p style="margin: 0; white-space: pre-line;">' . htmlspecialchars($content, ENT_QUOTES, 'UTF-8') . '</p>
             </div>
-            <p style="color: #64748b;">A domani.</p>
-            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">— BOB 🤖</p>'
+            <p style="color: #64748b;">Se ti serve una mano sai dove trovarmi.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">&mdash; BOB</p>'
         );
     }
 
     private function buildEmailBody(string $moduleLabel, array $findings, string $firstName, bool $isFirstTime, int $moreCount = 0): string
     {
         $severityConfig = [
-            'alert'   => ['color' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Da vedere', 'dot' => '•'],
-            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fde68a', 'label' => 'Promemoria','dot' => '•'],
-            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#bfdbfe', 'label' => 'Nota',     'dot' => '•'],
+            'alert'   => ['color' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fcd34d', 'label' => 'Importante',  'dot' => '•'],
+            'warning' => ['color' => '#d97706', 'bg' => '#fffbeb', 'border' => '#fde68a', 'label' => 'Promemoria',  'dot' => '•'],
+            'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#bfdbfe', 'label' => 'Solo per info','dot' => '•'],
         ];
 
         // Intro section — tono colloquiale, varia a seconda del giorno
@@ -1038,10 +1038,9 @@ class AnomalyCheckerService
 
         if ($isFirstTime) {
             $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . $name . '</strong>! 👋</p>
-                <p>Sono <strong>BOB</strong>, da oggi mi vedrai spesso in inbox.</p>
-                <p>Ogni mattina faccio il giro del gestionale e controllo che tutto fili: presenze, documenti, cantieri, mezzi. Se trovo qualcosa che vale la pena guardare ti scrivo io. Niente spam, solo cose utili.</p>
-                <p>Promesso. 🙂</p>
-                <p style="font-weight: 600; margin-top: 18px;">Ecco il primo giro:</p>';
+                <p>Sono <strong>BOB</strong>, ci lavoro insieme a te d&rsquo;ora in poi.</p>
+                <p>Ogni mattina do uno sguardo al gestionale e se vedo qualcosa che potrebbe esserti sfuggito te lo segno, cos&igrave; non ti tocca tenere tutto a mente tu. Niente cose noiose: ti scrivo solo quando serve davvero.</p>
+                <p>Cominciamo:</p>';
         } else {
             $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
                 <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
@@ -1123,13 +1122,12 @@ class AnomalyCheckerService
     {
         $mod = htmlspecialchars($moduleLabel);
 
-        // Tono uniforme: BOB ha fatto il suo giro e lascia gli appunti.
-        // Niente "devi", "vediamo di", "quando hai un attimo": sono richieste
-        // implicite mascherate.
+        // BOB-collega: ha fatto il giro come ogni mattina e ti aiuta a
+        // non perdere niente. Tono caldo, mai prescrittivo.
         if ($count === 1) {
-            return "questi sono gli appunti di oggi su <strong>{$mod}</strong>:";
+            return "ho fatto il solito controllo stamattina e su <strong>{$mod}</strong> ho visto una cosa &mdash; magari ti era sfuggita, te la segno qui:";
         }
-        return "questi sono i miei appunti di oggi su <strong>{$mod}</strong> ({$count} voci):";
+        return "ho fatto il solito controllo stamattina e su <strong>{$mod}</strong> ho visto {$count} cose &mdash; magari qualcuna ti era sfuggita, te le segno qui:";
     }
 
     /**
@@ -1138,12 +1136,12 @@ class AnomalyCheckerService
     private function signOff(): string
     {
         $variants = [
+            'Se ti serve una mano sai dove trovarmi.',
+            'Per qualsiasi dubbio, son qui.',
             'Buona giornata!',
-            'Ci sentiamo domani.',
-            'Se serve una mano, sai dove trovarmi.',
-            'Buon lavoro!',
             'A presto.',
-            'Ti aggiorno domani mattina.',
+            'Un saluto, e ci sentiamo domani.',
+            'Buon lavoro!',
         ];
         // Stessa frase per tutto il giorno (basata sulla data) — non random a
         // ogni email, così se ne ricevi più nello stesso giorno non sembra finto.
@@ -1156,9 +1154,9 @@ class AnomalyCheckerService
      */
     private function buildSubject(string $moduleLabel, int $count, array $findings): string
     {
-        // Subject neutro: BOB ha appunti, non manda compiti.
-        $word = $count === 1 ? 'voce' : 'voci';
-        return "BOB · {$moduleLabel} ({$count} {$word})";
+        // Tono "collega che ti aiuta a non dimenticare le cose".
+        $word = $count === 1 ? 'cosa' : 'cose';
+        return "BOB · {$moduleLabel}: {$count} {$word} che ho visto";
     }
 
     private function sendToAdmin(array $findings): void
@@ -1453,17 +1451,15 @@ class AnomalyCheckerService
 
             $f['_recurrence'] = ['count' => $count, 'days' => $days];
 
-            // Nota "ricorda" — solo informativa, nessuna pressione, nessuna
-            // richiesta implicita di azione. BOB tiene un quaderno, non un
-            // registro di richiami. Le frasi non hanno tempi verbali rivolti
-            // a "tu", solo constatazioni.
+            // Memoria amichevole — come un collega che si ricorda di averla
+            // vista. Nessuna pressione, nessun rimprovero.
             if ($count === 1) {
-                $when = $days <= 1 ? 'anche ieri' : 'in questi giorni';
-                $f['_history_note'] = "L'avevo notata {$when}.";
+                $when = $days <= 1 ? 'anche ieri' : 'qualche giorno fa';
+                $f['_history_note'] = "Mi pare di averla vista {$when}.";
             } elseif ($count <= 3) {
-                $f['_history_note'] = "L'ho gi&agrave; vista in qualche giro recente.";
+                $f['_history_note'] = "Mi sembra ne avessimo gi&agrave; parlato.";
             } else {
-                $f['_history_note'] = "&Egrave; nei miei appunti da un po'.";
+                $f['_history_note'] = "Questa &egrave; sul mio taccuino da un po', se hai un attimo dacci un&rsquo;occhiata.";
             }
         }
         unset($f);
