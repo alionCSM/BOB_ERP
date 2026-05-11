@@ -1043,30 +1043,8 @@ class AnomalyCheckerService
                 <p>Promesso. 🙂</p>
                 <p style="font-weight: 600; margin-top: 18px;">Ecco il primo giro:</p>';
         } else {
-            // Conta i finding ricorrenti per modulare il tono
-            $recurringCount = 0;
-            $heavyRecurring = 0; // 3+ volte
-            foreach ($findings as $f) {
-                if (!empty($f['_recurrence'])) {
-                    $recurringCount++;
-                    if (($f['_recurrence']['count'] ?? 0) >= 3) $heavyRecurring++;
-                }
-            }
-            $total = count($findings) + $moreCount;
-
-            // Tono diverso se molte cose sono ripetute
-            if ($heavyRecurring > 0) {
-                $line = "alcune di queste te le sto segnalando da giorni — vediamo se oggi riusciamo a chiuderle:";
-            } elseif ($recurringCount > 0 && $recurringCount === $total) {
-                $line = "tutte le cose di oggi te le avevo già scritte. Ti ricordo dove sono:";
-            } elseif ($recurringCount > 0) {
-                $line = $this->dailyOpener($moduleLabel, $total) . ' (alcune le avevi già viste)';
-            } else {
-                $line = $this->dailyOpener($moduleLabel, $total);
-            }
-
             $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
-                <p>' . $line . '</p>';
+                <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
         }
 
         // Header badge
@@ -1493,30 +1471,23 @@ class AnomalyCheckerService
 
             $f['_recurrence'] = ['count' => $count, 'days' => $days];
 
-            // Costruisci la frase "history note" e adatta la severity
+            // Nota "ricorda di averla già scritta" — tono amichevole, mai
+            // accusatorio. Non alza la severity: lascia decidere alla logica
+            // di business cos'è grave e cos'è no.
             if ($count === 1) {
                 // Seconda apparizione totale
-                $when = $days <= 1 ? 'ieri' : "{$days} giorni fa";
-                $f['_history_note'] = "Te l'avevo segnalata {$when} ed è ancora qui.";
+                $when = $days <= 1 ? 'ieri' : "qualche giorno fa";
+                $f['_history_note'] = "Te l'avevo segnalata {$when}, te la rimetto qui.";
             } elseif ($count <= 3) {
-                $tot = $count + 1;
-                $f['_history_note'] = "È la <strong>{$tot}ª volta in {$days} giorni</strong> che te la scrivo. Vediamo di chiuderla, eh?";
-                // Bump severity di un livello se è ancora info
-                if (($f['severity'] ?? 'info') === 'info') {
-                    $f['severity'] = 'warning';
-                }
+                $f['_history_note'] = "Ne avevamo parlato qualche giorno fa &mdash; quando hai un attimo.";
             } else {
-                $tot = $count + 1;
-                $f['_history_note'] = "🚨 È la <strong>{$tot}ª volta in {$days} giorni</strong>. Davvero qualcuno se ne può occupare?";
-                // Forza alert: se era info o warning, ora è rosso
-                if (($f['severity'] ?? 'info') !== 'alert') {
-                    $f['severity'] = 'alert';
-                }
+                $f['_history_note'] = "Questa &egrave; in giro da un po'. Se vuoi che smetta di scriverla, dimmi pure.";
             }
 
-            // Se in passato era warning e ora è alert (peggiorato), prepend
-            if (($h['had_warning'] ?? 0) && ($f['severity'] === 'alert') && ($h['had_alert'] ?? 0) == 0) {
-                $f['_history_note'] = "⚠️ La situazione sta peggiorando. " . $f['_history_note'];
+            // Se in passato era warning e ora è alert (peggiorato), accenno
+            // delicato — senza allarmismi.
+            if (($h['had_warning'] ?? 0) && ($f['severity'] === 'alert') && (int)($h['had_alert'] ?? 0) === 0) {
+                $f['_history_note'] = "Questa &egrave; leggermente cambiata rispetto a prima. " . $f['_history_note'];
             }
         }
         unset($f);
