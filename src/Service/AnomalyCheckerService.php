@@ -883,7 +883,7 @@ class AnomalyCheckerService
                         ? $this->buildFirstTimeEmail($firstName, $f['message'])
                         : $this->wrapInHtmlTemplate('Promemoria', '<p style="font-size: 15px; color: #1e293b;">' . nl2br(htmlspecialchars($f['message'], ENT_QUOTES, 'UTF-8')) . '</p>');
 
-                    $this->sendEmailToUser($f['data']['email'], 'BOB AI - Un piccolo promemoria', $body, $userId, 'login');
+                    $this->sendEmailToUser($f['data']['email'], $this->greeting() . ', ho un piccolo promemoria per te 👋', $body, $userId, 'login');
                     $this->notificationsSent++;
                 }
                 echo "   _direct_user: sent to " . count($findings) . " users\n";
@@ -924,7 +924,7 @@ class AnomalyCheckerService
                 if (!empty($user['email'])) {
                     $this->sendEmailToUser(
                         $user['email'],
-                        "BOB AI - {$moduleLabel}: " . count($findings) . " segnalazioni",
+                        $this->buildSubject($moduleLabel, count($findings), $findings),
                         $body,
                         $userId,
                         $findings[0]['module'],
@@ -1006,18 +1006,16 @@ class AnomalyCheckerService
     private function buildFirstTimeEmail(string $firstName, string $content): string
     {
         return $this->wrapInHtmlTemplate(
-            'Benvenuto!',
+            'Piacere di conoscerti!',
             '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>! 👋</p>
-            <p>Sono <strong>BOB AI</strong>, l\'assistente intelligente del gestionale BOB.</p>
-            <p>Il mio compito e\' controllare ogni giorno che tutto funzioni correttamente: verifico presenze, documenti, cantieri, mezzi e molto altro.
-            Se trovo qualcosa di strano o che richiede attenzione, te lo segnalo via email cosi\' puoi intervenire subito.</p>
-            <p>Non ti mandero\' spam, solo segnalazioni utili quando serve davvero. 🙂</p>
+            <p>Sono <strong>BOB</strong>, da oggi mi vedrai spesso in inbox.</p>
+            <p>Ogni mattina faccio il giro del gestionale e controllo che tutto fili: presenze, documenti, cantieri, mezzi. Se trovo qualcosa che vale la pena guardare ti scrivo io. Niente spam, solo cose utili. Promesso. 🙂</p>
             <div style="background: #f8fafc; border-left: 4px solid #3b82f6; padding: 16px 20px; margin: 24px 0; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Ecco la prima segnalazione:</p>
+                <p style="margin: 0; font-weight: 600; color: #1e40af; margin-bottom: 8px;">Una piccola cosa per cominciare:</p>
                 <p style="margin: 0; white-space: pre-line;">' . htmlspecialchars($content, ENT_QUOTES, 'UTF-8') . '</p>
             </div>
-            <p style="color: #64748b;">Se hai domande o qualcosa non ti torna, parlane con il tuo responsabile.</p>
-            <p style="color: #64748b;">Buon lavoro! 🤖</p>'
+            <p style="color: #64748b;">A domani.</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">— BOB 🤖</p>'
         );
     }
 
@@ -1029,16 +1027,19 @@ class AnomalyCheckerService
             'info'    => ['color' => '#2563eb', 'bg' => '#eff6ff', 'border' => '#93c5fd', 'label' => 'Informazione', 'dot' => '🔵'],
         ];
 
-        // Intro section
+        // Intro section — tono colloquiale, varia a seconda del giorno
+        $greet = $this->greeting();
+        $name  = htmlspecialchars($firstName);
+
         if ($isFirstTime) {
-            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>! 👋</p>
-                <p>Sono <strong>BOB AI</strong>, l\'assistente intelligente del gestionale BOB.</p>
-                <p>Il mio compito e\' controllare ogni giorno che tutto funzioni correttamente: verifico presenze, documenti, cantieri, mezzi e molto altro. Se trovo qualcosa di strano o che richiede attenzione, te lo segnalo via email cosi\' puoi intervenire subito.</p>
-                <p>Non ti mandero\' spam, solo segnalazioni utili quando serve davvero. 🙂</p>
-                <p style="font-weight: 600;">Ecco il primo report:</p>';
+            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . $name . '</strong>! 👋</p>
+                <p>Sono <strong>BOB</strong>, da oggi mi vedrai spesso in inbox.</p>
+                <p>Ogni mattina faccio il giro del gestionale e controllo che tutto fili: presenze, documenti, cantieri, mezzi. Se trovo qualcosa che vale la pena guardare ti scrivo io. Niente spam, solo cose utili.</p>
+                <p>Promesso. 🙂</p>
+                <p style="font-weight: 600; margin-top: 18px;">Ecco il primo giro:</p>';
         } else {
-            $intro = '<p style="font-size: 16px; color: #1e293b;">Ciao <strong>' . htmlspecialchars($firstName) . '</strong>,</p>
-                <p>ecco le segnalazioni di oggi per <strong>' . htmlspecialchars($moduleLabel) . '</strong>:</p>';
+            $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
+                <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
         }
 
         // Header badge
@@ -1081,11 +1082,87 @@ class AnomalyCheckerService
             </div>';
         }
 
-        // Footer
-        $footer = '<p style="color: #64748b;">Se qualcosa non ti torna o hai bisogno di una mano, parlane con il tuo responsabile.</p>
-            <p style="color: #64748b;">Buon lavoro! 🤖</p>';
+        // Footer — chiusura amichevole, varia
+        $footer = '<p style="color: #64748b; margin-top: 24px;">' . $this->signOff() . '</p>
+            <p style="color: #94a3b8; font-size: 12px; margin-top: 4px;">— BOB 🤖</p>';
 
         return $this->wrapInHtmlTemplate($moduleLabel, $intro . $header . $cards . $attachNote . $footer);
+    }
+
+    /**
+     * Saluto in base all'ora del giorno (i cron girano alle 06:00 quindi tipicamente
+     * "Buongiorno", ma robusto su qualunque orario).
+     */
+    private function greeting(): string
+    {
+        $h = (int)date('G');
+        if ($h < 12) return 'Buongiorno';
+        if ($h < 18) return 'Ciao';
+        return 'Buonasera';
+    }
+
+    /**
+     * Frase di apertura variabile basata su giorno della settimana e numero
+     * di segnalazioni, così l'email non sembra clonata ogni mattina.
+     */
+    private function dailyOpener(string $moduleLabel, int $count): string
+    {
+        $dow = (int)date('w'); // 0=dom .. 6=sab
+        $mod = htmlspecialchars($moduleLabel);
+
+        // Lunedì: tono "ripartenza"
+        if ($dow === 1) {
+            return $count === 1
+                ? "ho fatto il primo giro della settimana su <strong>{$mod}</strong> e ho trovato una cosa che vale la pena guardare."
+                : "ho fatto il primo giro della settimana su <strong>{$mod}</strong> — ti segno {$count} cose da controllare quando hai un attimo.";
+        }
+        // Venerdì: tono "chiudiamo la settimana"
+        if ($dow === 5) {
+            return $count === 1
+                ? "prima del weekend ti segno una cosa su <strong>{$mod}</strong>."
+                : "prima di chiudere la settimana, dai un occhio a queste {$count} cose su <strong>{$mod}</strong>.";
+        }
+        // Resto della settimana
+        return $count === 1
+            ? "stamattina ho visto una segnalazione su <strong>{$mod}</strong>:"
+            : "stamattina sono uscite {$count} cose da guardare su <strong>{$mod}</strong>:";
+    }
+
+    /**
+     * Chiusura variabile per non finire sempre con la stessa frase.
+     */
+    private function signOff(): string
+    {
+        $variants = [
+            'Buona giornata!',
+            'Ci sentiamo domani.',
+            'Se serve una mano, sai dove trovarmi.',
+            'Buon lavoro!',
+            'A presto.',
+            'Ti aggiorno domani mattina.',
+        ];
+        // Stessa frase per tutto il giorno (basata sulla data) — non random a
+        // ogni email, così se ne ricevi più nello stesso giorno non sembra finto.
+        $idx = (int)date('z') % count($variants);
+        return $variants[$idx];
+    }
+
+    /**
+     * Subject email — vario per modulo + conteggio, con emoji discreto.
+     */
+    private function buildSubject(string $moduleLabel, int $count, array $findings): string
+    {
+        // Severity più alta nel batch determina l'emoji
+        $hasAlert   = false;
+        $hasWarning = false;
+        foreach ($findings as $f) {
+            if (($f['severity'] ?? '') === 'alert')   $hasAlert   = true;
+            if (($f['severity'] ?? '') === 'warning') $hasWarning = true;
+        }
+        $emoji = $hasAlert ? '🔴' : ($hasWarning ? '🟡' : '🔵');
+        $word  = $count === 1 ? 'cosa' : 'cose';
+
+        return "{$emoji} BOB · {$moduleLabel}: {$count} {$word} da guardare";
     }
 
     private function sendToAdmin(array $findings): void
@@ -1103,7 +1180,7 @@ class AnomalyCheckerService
             $body = $this->buildEmailBody('Riassunto AI', $findings, $admin['first_name'], $isFirstTime);
 
             if (!empty($admin['email'])) {
-                $this->sendEmailToUser($admin['email'], 'BOB AI - Report Anomalie Giornaliero', $body, (int)$admin['id'], 'ai_summary');
+                $this->sendEmailToUser($admin['email'], $this->greeting() . ', ecco il riepilogo di oggi ☕', $body, (int)$admin['id'], 'ai_summary');
             }
             $this->notificationsSent++;
         }
