@@ -47,6 +47,11 @@ class AnomalyCheckerService
         $this->checkSquadre();
         $this->checkStatistiche();
 
+        // Annota ogni finding con la sua storia (quante volte è già apparso e
+        // se la severity è peggiorata). Va fatto PRIMA di loggare lo stato
+        // odierno, altrimenti conta anche quello.
+        $this->enrichFindingsWithHistory();
+
         // Log anomalies to history for trend analysis
         $this->logAnomaliesToHistory();
 
@@ -1038,8 +1043,30 @@ class AnomalyCheckerService
                 <p>Promesso. 🙂</p>
                 <p style="font-weight: 600; margin-top: 18px;">Ecco il primo giro:</p>';
         } else {
+            // Conta i finding ricorrenti per modulare il tono
+            $recurringCount = 0;
+            $heavyRecurring = 0; // 3+ volte
+            foreach ($findings as $f) {
+                if (!empty($f['_recurrence'])) {
+                    $recurringCount++;
+                    if (($f['_recurrence']['count'] ?? 0) >= 3) $heavyRecurring++;
+                }
+            }
+            $total = count($findings) + $moreCount;
+
+            // Tono diverso se molte cose sono ripetute
+            if ($heavyRecurring > 0) {
+                $line = "alcune di queste te le sto segnalando da giorni — vediamo se oggi riusciamo a chiuderle:";
+            } elseif ($recurringCount > 0 && $recurringCount === $total) {
+                $line = "tutte le cose di oggi te le avevo già scritte. Ti ricordo dove sono:";
+            } elseif ($recurringCount > 0) {
+                $line = $this->dailyOpener($moduleLabel, $total) . ' (alcune le avevi già viste)';
+            } else {
+                $line = $this->dailyOpener($moduleLabel, $total);
+            }
+
             $intro = '<p style="font-size: 16px; color: #1e293b;">' . $greet . ' <strong>' . $name . '</strong>,</p>
-                <p>' . $this->dailyOpener($moduleLabel, count($findings) + $moreCount) . '</p>';
+                <p>' . $line . '</p>';
         }
 
         // Header badge
@@ -1061,11 +1088,20 @@ class AnomalyCheckerService
             // If finding has custom HTML (e.g. stats table), append it after the message
             $extraHtml = !empty($f['data']['html']) ? $f['data']['html'] : '';
 
+            // Nota ricorrenza (BOB "ricorda" di averla già segnalata)
+            $historyBadge = '';
+            if (!empty($f['_history_note'])) {
+                $historyBadge = '<div style="background: rgba(0,0,0,0.04); border-radius: 6px; padding: 8px 12px; margin: 0 0 10px; font-size: 12px; color: ' . $cfg['color'] . '; font-style: italic;">'
+                    . $f['_history_note']
+                    . '</div>';
+            }
+
             $cards .= '<div style="background: ' . $cfg['bg'] . '; border: 1px solid ' . $cfg['border'] . '; border-left: 4px solid ' . $cfg['color'] . '; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 12px;">
                 <table cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
                     <td style="vertical-align: top; width: 30px; font-size: 16px; padding-top: 2px;">' . $cfg['dot'] . '</td>
                     <td>
                         <span style="display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: ' . $cfg['color'] . '; background: white; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;">' . $cfg['label'] . '</span>
+                        ' . $historyBadge . '
                         <p style="margin: 8px 0 0; color: #334155; font-size: 14px; line-height: 1.6;">' . $message . '</p>
                         ' . $extraHtml . '
                     </td>
@@ -1409,6 +1445,82 @@ class AnomalyCheckerService
     // ═══════════════════════════════════════════
     //  ANOMALY HISTORY LOGGING
     // ═══════════════════════════════════════════
+
+    /**
+     * Per ogni finding di oggi, va a vedere in bb_anomaly_history se la
+     * stessa coppia (worksite_id, anomaly_type) è già apparsa di recente.
+     * Se sì:
+     *   - aggiunge un campo `_history_note` con frase pronta da mostrare
+     *     nell'email ("ti avevo già scritto X giorni fa, è ancora aperta"),
+     *   - se la cosa si ripete molte volte fa salire la severity di un
+     *     livello (info → warning, warning → alert) così l'email passa
+     *     dal blu al giallo al rosso senza intervento umano.
+     */
+    private function enrichFindingsWithHistory(): void
+    {
+        if (empty($this->findings)) return;
+
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) AS cnt,
+                   MIN(run_date) AS first_seen,
+                   MAX(run_date) AS last_seen,
+                   MAX(CASE WHEN severity = 'alert' THEN 1 ELSE 0 END) AS had_alert,
+                   MAX(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) AS had_warning
+            FROM bb_anomaly_history
+            WHERE worksite_id = :wid
+              AND anomaly_type = :type
+              AND run_date < CURDATE()
+              AND run_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+        ");
+
+        foreach ($this->findings as &$f) {
+            $worksiteId = $f['data']['worksite_id'] ?? null;
+            $type       = $f['anomaly_type'] ?? null;
+            if (!$worksiteId || !$type) continue;
+
+            $stmt->execute([':wid' => (int)$worksiteId, ':type' => $type]);
+            $h = $stmt->fetch(PDO::FETCH_ASSOC);
+            $count = (int)($h['cnt'] ?? 0);
+            if ($count === 0) continue;
+
+            $firstSeen = $h['first_seen'] ?? null;
+            $days = 0;
+            if ($firstSeen) {
+                try {
+                    $days = (int)(new \DateTime())->diff(new \DateTime($firstSeen))->days;
+                } catch (\Throwable $e) { $days = 0; }
+            }
+
+            $f['_recurrence'] = ['count' => $count, 'days' => $days];
+
+            // Costruisci la frase "history note" e adatta la severity
+            if ($count === 1) {
+                // Seconda apparizione totale
+                $when = $days <= 1 ? 'ieri' : "{$days} giorni fa";
+                $f['_history_note'] = "Te l'avevo segnalata {$when} ed è ancora qui.";
+            } elseif ($count <= 3) {
+                $tot = $count + 1;
+                $f['_history_note'] = "È la <strong>{$tot}ª volta in {$days} giorni</strong> che te la scrivo. Vediamo di chiuderla, eh?";
+                // Bump severity di un livello se è ancora info
+                if (($f['severity'] ?? 'info') === 'info') {
+                    $f['severity'] = 'warning';
+                }
+            } else {
+                $tot = $count + 1;
+                $f['_history_note'] = "🚨 È la <strong>{$tot}ª volta in {$days} giorni</strong>. Davvero qualcuno se ne può occupare?";
+                // Forza alert: se era info o warning, ora è rosso
+                if (($f['severity'] ?? 'info') !== 'alert') {
+                    $f['severity'] = 'alert';
+                }
+            }
+
+            // Se in passato era warning e ora è alert (peggiorato), prepend
+            if (($h['had_warning'] ?? 0) && ($f['severity'] === 'alert') && ($h['had_alert'] ?? 0) == 0) {
+                $f['_history_note'] = "⚠️ La situazione sta peggiorando. " . $f['_history_note'];
+            }
+        }
+        unset($f);
+    }
 
     private function logAnomaliesToHistory(): void
     {
