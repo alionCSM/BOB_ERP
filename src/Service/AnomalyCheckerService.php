@@ -1451,18 +1451,84 @@ class AnomalyCheckerService
 
             $f['_recurrence'] = ['count' => $count, 'days' => $days];
 
-            // Memoria amichevole — come un collega che si ricorda di averla
-            // vista. Nessuna pressione, nessun rimprovero.
-            if ($count === 1) {
-                $when = $days <= 1 ? 'anche ieri' : 'qualche giorno fa';
-                $f['_history_note'] = "Mi pare di averla vista {$when}.";
-            } elseif ($count <= 3) {
-                $f['_history_note'] = "Mi sembra ne avessimo gi&agrave; parlato.";
-            } else {
-                $f['_history_note'] = "Questa &egrave; sul mio taccuino da un po', se hai un attimo dacci un&rsquo;occhiata.";
+            // La frase la scrive BOB AI in base ai fatti (conteggio, giorni,
+            // tipo anomalia). Se l'LLM non è disponibile o produce qualcosa
+            // di anomalo, lasciamo la nota vuota — il messaggio originale
+            // basta da solo.
+            $note = $this->generateHistoryNote($count, $days, (string)$type, (string)($f['message'] ?? ''));
+            if ($note !== null) {
+                $f['_history_note'] = $note;
             }
         }
         unset($f);
+    }
+
+    /**
+     * Chiede a BOB AI di scrivere una nota in 1 frase su una segnalazione
+     * che si ripete. Tono di collega gentile, nessuna pressione.
+     * Ritorna null se l'LLM non è disponibile, fallisce, o produce un
+     * output non utilizzabile.
+     */
+    private function generateHistoryNote(int $count, int $days, string $anomalyType, string $messageContext): ?string
+    {
+        if (!$this->ai) {
+            return null;
+        }
+
+        $systemPrompt = <<<PROMPT
+Sei BOB, l'assistente del gestionale BOB. Scrivi UNA frase breve in italiano
+(massimo 18 parole) che accompagna una segnalazione di anomalia ricorrente.
+
+Personalità:
+- Collega amichevole, mai un manager o un CEO.
+- Aiuti l'utente a non dimenticare cose, non lo controlli.
+- Tono pacato, mai allarmista, mai passivo-aggressivo.
+- Non assegni compiti, non dai scadenze, non chiedi giustificazioni.
+- Non citi numeri ("è la 5a volta") — al massimo "da un po'".
+- Niente emoji, niente punti esclamativi.
+
+Output:
+- SOLO la frase, niente prefissi, niente virgolette, niente firma.
+- In italiano, max 18 parole.
+PROMPT;
+
+        $userPrompt = "Situazione:\n"
+            . "- Tipo segnalazione: {$anomalyType}\n"
+            . "- Numero di apparizioni precedenti negli ultimi 14 giorni: {$count}\n"
+            . "- Prima vista: {$days} giorni fa\n"
+            . "- Testo della segnalazione: " . mb_substr($messageContext, 0, 200) . "\n\n"
+            . "Scrivi UNA frase che faccia da 'memoria di BOB' — ricorda all'utente "
+            . "che questa cosa l'hai gi\u{00E0} vista, in tono amichevole.";
+
+        $result = $this->ai->chat([
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user',   'content' => $userPrompt],
+        ]);
+
+        if (!($result['ok'] ?? false)) {
+            return null;
+        }
+
+        $text = trim((string)($result['response'] ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        // Pulizia minima: togli virgolette esterne, prefissi tipo "Frase:" che
+        // certi modelli inseriscono nonostante l'istruzione, accapi multipli.
+        $text = trim($text, "\"'“”«»‹›\n\r\t ");
+        $text = preg_replace('/^(Frase|Risposta|Nota|BOB)\s*:\s*/iu', '', $text) ?? $text;
+        $text = preg_replace('/\s+/u', ' ', $text) ?? $text;
+
+        // Filtro di sicurezza: scarta output troppo lunghi (segno che l'LLM
+        // ha allucinato un paragrafo) o troppo corti per essere utili.
+        $wordCount = str_word_count($text, 0, "àèéìòùÀÈÉÌÒÙ'");
+        if ($wordCount < 3 || $wordCount > 30 || mb_strlen($text) > 200) {
+            return null;
+        }
+
+        // Escape HTML poiché finirà dentro un <div> dell'email
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
     private function logAnomaliesToHistory(): void
