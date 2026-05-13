@@ -299,6 +299,10 @@
             fetch('/documents/ai-suggest', { method: 'POST', body: fd })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
+                    // DEBUG temporaneo — guarda DevTools console per capire
+                    // dove cade la pipeline
+                    console.log('[BOB AI suggest] response:', data);
+                    if (data && data.debug) console.log('[BOB AI debug]', data.debug);
                     if (data.error) {
                         setBanner('error', '🤖 BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
