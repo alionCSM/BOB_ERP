@@ -21,3 +21,11 @@
                 color: white;
                 border-color: #3b82f6;
             }
+
+
+            
+            .date-filter-btn.active,
+            .date-filter-btn:active,
+            .date-filter-btn[selected] {
+                background: #3b82f6 !important;
+            }
