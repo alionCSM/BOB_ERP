@@ -37,56 +37,76 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <th class="border p-3 text-center">Azione</th>
         </tr>
         </thead>
+        <?php
+        // Helper di display: ritorna la data in formato dd/mm/YYYY
+        // riconoscendo sia ISO YYYY-MM-DD (storage standard) sia formati
+        // legacy dd/mm/YYYY (vecchi record). I valori speciali tipo
+        // INDETERMINATO restano com'erano.
+        if (!function_exists('wd_format_date_display')) {
+            function wd_format_date_display(?string $raw): string {
+                $raw = trim((string)$raw);
+                if ($raw === '' || $raw === '0000-00-00' || $raw === '00/00/0000') return '';
+                $upper = mb_strtoupper($raw);
+                if (in_array($upper, ['INDETERMINATO', 'INDETERMINATA', 'LEGALE RAPPRESENTANTE', 'SENZA SCADENZA', 'N/A'], true)) {
+                    return $upper;
+                }
+                foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y'] as $fmt) {
+                    $dt = DateTime::createFromFormat($fmt, $raw);
+                    if ($dt && $dt->format($fmt) === $raw) {
+                        return $dt->format('d/m/Y');
+                    }
+                }
+                return $raw;
+            }
+
+            // Per la colonna scadenza colorata: ritorna un timestamp o null
+            // se non è una data parseabile
+            function wd_parse_date_any(?string $raw): ?int {
+                $raw = trim((string)$raw);
+                if ($raw === '') return null;
+                foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y'] as $fmt) {
+                    $dt = DateTime::createFromFormat($fmt, $raw);
+                    if ($dt && $dt->format($fmt) === $raw) {
+                        return $dt->getTimestamp();
+                    }
+                }
+                return null;
+            }
+        }
+        ?>
         <tbody id="document-list">
         <?php if (!empty($documents)): ?>
             <?php foreach ($documents as $doc): ?>
                 <tr>
                     <td class="border p-3 text-left"><?= htmlspecialchars($doc['tipo_documento']) ?></td>
                     <td class="border p-3 text-left">
-                        <?= htmlspecialchars($doc['data_emissione']) ?>
+                        <?= htmlspecialchars(wd_format_date_display($doc['data_emissione'] ?? '')) ?>
                     </td>
                     <td class="border p-3 text-left">
                         <?php
-                        $raw = trim($doc['scadenza']); // valore originale VARCHAR
+                        $raw = trim((string)$doc['scadenza']);
                         $oggi = strtotime(date('Y-m-d'));
-                        $colore = '#6b7280'; // colore grigio default (per "nessuna scadenza")
+                        $colore = '#6b7280';
 
-                        // 1. Se scadenza è vuota o stringa speciale → nessuna scadenza
-                        if ($raw === '' ||
-                                strtolower($raw) === 'indeterminato' ||
-                                strtolower($raw) === 'senza scadenza' ||
-                                strtolower($raw) === 'n/a' ||
-                                $raw === '00/00/0000') {
-
-                            $colore = '#6b7280'; // grigio
-                        }
-// 2. Se è una data valida (dd/mm/YYYY)
-                        elseif (preg_match('/^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$/', $raw)) {
-
-                            $scadenza = DateTime::createFromFormat('d/m/Y', $raw);
-
-                            if ($scadenza !== false) {
-                                $timestamp_scadenza = $scadenza->getTimestamp();
-                                $differenza = ($timestamp_scadenza - $oggi) / 86400;
-
-                                if ($differenza < 0) {
-                                    $colore = '#ef4444'; // rosso
-                                } elseif ($differenza <= 30) {
-                                    $colore = '#CCB000'; // arancione
-                                } else {
-                                    $colore = '#22c55e'; // verde
-                                }
+                        $upperScad = mb_strtoupper($raw);
+                        $specials  = ['', 'INDETERMINATO', 'INDETERMINATA', 'SENZA SCADENZA', 'N/A', '00/00/0000', 'LEGALE RAPPRESENTANTE'];
+                        if (in_array($upperScad, $specials, true)) {
+                            $colore = '#6b7280';
+                        } else {
+                            $ts = wd_parse_date_any($raw);
+                            if ($ts !== null) {
+                                $differenza = ($ts - $oggi) / 86400;
+                                if      ($differenza < 0)  $colore = '#ef4444';
+                                elseif  ($differenza <= 30) $colore = '#CCB000';
+                                else                       $colore = '#22c55e';
                             }
                         }
-// 3. Se è un formato diverso → nessuna scadenza
-                        else {
-                            $colore = '#6b7280'; // grigio
-                        }
 
+                        $scadDisplay = wd_format_date_display($raw);
                         ?>
                         <div class="flex items-center gap-2">
                             <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background-color:<?= $colore ?>;"></span>
-                            <span><?= htmlspecialchars($doc['scadenza']) ?></span>
+                            <span><?= htmlspecialchars($scadDisplay) ?></span>
                         </div>
                     </td>
 
@@ -98,8 +118,8 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <a href="#" class="mx-2 text-yellow-500 wd-edit-btn" title="Modifica"
                            data-doc-id="<?= $doc['id'] ?>"
                            data-doc-type="<?= htmlspecialchars($doc['tipo_documento'], ENT_QUOTES) ?>"
-                           data-doc-emission="<?= htmlspecialchars((string)($doc['data_emissione'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                           data-doc-expiry="<?= htmlspecialchars((string)($doc['scadenza'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                           data-doc-emission="<?= htmlspecialchars(wd_format_date_display($doc['data_emissione'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                           data-doc-expiry="<?= htmlspecialchars(wd_format_date_display($doc['scadenza'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fas fa-edit fa-lg"></i>
                         </a>
 
