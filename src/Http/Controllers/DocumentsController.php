@@ -243,4 +243,51 @@ final class DocumentsController
         readfile($filePath);
         exit;
     }
+
+    /**
+     * POST /documents/ai-suggest
+     * Multipart: file PDF in $_FILES['document_file'].
+     * Risponde JSON con i metadati suggeriti da BOB AI:
+     *   { type, emission, expiry, confidence, note }
+     * Usato dal modal di upload per pre-popolare i campi.
+     */
+    public function aiSuggest(Request $request): never
+    {
+        header('Content-Type: application/json');
+
+        if (empty($_FILES['document_file']['tmp_name']) || !is_uploaded_file($_FILES['document_file']['tmp_name'])) {
+            echo json_encode(['error' => 'file_mancante']);
+            exit;
+        }
+
+        $tmpFile = $_FILES['document_file']['tmp_name'];
+
+        // Verifica MIME (solo PDF — Tesseract gestisce le immagini ma il
+        // flusso normale di upload accetta solo PDF)
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($tmpFile) ?: '';
+        if ($mime !== 'application/pdf') {
+            echo json_encode(['error' => 'formato_non_pdf', 'mime' => $mime]);
+            exit;
+        }
+
+        // Costruisci dipendenze e chiama il service
+        $ollamaUrl = $_ENV['OLLAMA_URL'] ?? '';
+        $model     = $_ENV['MODEL'] ?? '';
+        if (!$ollamaUrl || !$model) {
+            echo json_encode(['error' => 'ai_non_configurata']);
+            exit;
+        }
+
+        try {
+            $ai      = new \App\Service\OllamaClient($ollamaUrl, $model);
+            $mailer  = new \App\Service\Mailer(); // service constructor lo richiede ma non viene usato qui
+            $service = new \App\Service\DocumentVerifierService($this->conn, $ai, $mailer);
+            $result  = $service->suggestForUpload($tmpFile);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            echo json_encode(['error' => 'errore_interno', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\WorkerDocumentTypes;
 use PDO;
 use Throwable;
 
@@ -20,8 +21,14 @@ use Throwable;
  */
 final class DocumentVerifierService
 {
-    /** Tipi di documento monitorati. Espandere qui per aggiungere tipologie. */
-    private const MONITORED_WORKER_TYPES = ['UNILAV', 'Visita medica'];
+    /**
+     * Tipi di documento monitorati: tutti quelli presenti nella tendina del
+     * modal di upload (WorkerDocumentTypes::all).
+     */
+    private function monitoredWorkerTypes(): array
+    {
+        return WorkerDocumentTypes::all();
+    }
 
     /** Soglia minima di confidenza dell'LLM per considerare un mismatch reale. */
     private const MISMATCH_CONFIDENCE_THRESHOLD = 70;
@@ -93,7 +100,8 @@ final class DocumentVerifierService
     /** @return array<int, array<string,mixed>> */
     private function findWorkerDocumentsToVerify(): array
     {
-        $placeholders = implode(',', array_fill(0, count(self::MONITORED_WORKER_TYPES), '?'));
+        $types = $this->monitoredWorkerTypes();
+        $placeholders = implode(',', array_fill(0, count($types), '?'));
         $sql = "
             SELECT
                 wd.id, wd.worker_id, wd.tipo_documento, wd.scadenza, wd.path,
@@ -110,8 +118,115 @@ final class DocumentVerifierService
             ORDER BY wd.id ASC
         ";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute(self::MONITORED_WORKER_TYPES);
+        $stmt->execute($types);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ── Suggerimento al volo per modal di upload ─────────────────────────────
+
+    /**
+     * Analizza un file PDF appena caricato e ritorna i metadati suggeriti:
+     * tipo documento, data emissione, scadenza.
+     *
+     * Pensato per essere chiamato da un endpoint AJAX nel form di upload.
+     *
+     * @return array{type:?string, emission:?string, expiry:?string, confidence:int, note:string}
+     */
+    public function suggestForUpload(string $pdfPath): array
+    {
+        $blank = ['type' => null, 'emission' => null, 'expiry' => null, 'confidence' => 0, 'note' => ''];
+
+        $text = $this->extractText($pdfPath);
+        if (mb_strlen(trim($text)) < 30) {
+            return $blank + ['note' => 'Testo del documento illeggibile.'];
+        }
+
+        $types = $this->monitoredWorkerTypes();
+        $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
+
+        $systemPrompt = <<<PROMPT
+Sei BOB, l'assistente del gestionale BOB. Analizzi il testo grezzo (estratto da PDF, possibile OCR rumoroso) di un documento di un operaio e devi suggerire come dovrebbe essere catalogato.
+
+Devi scegliere il tipo da questo elenco esatto (rispetta maiuscole/minuscole/spazi):
+{$typesList}
+
+Devi rispondere SOLO con un oggetto JSON valido, niente prefisso, niente commenti, niente markdown.
+
+Schema:
+{
+  "tipo_documento": "uno dei valori dell'elenco sopra",
+  "data_emissione": "YYYY-MM-DD oppure stringa vuota",
+  "data_scadenza":  "YYYY-MM-DD oppure 'INDETERMINATO' oppure stringa vuota",
+  "confidenza": 0-100,
+  "note": "breve nota se serve, massimo 150 caratteri"
+}
+
+Regole:
+- Per UNILAV la "data_scadenza" è la data di fine rapporto; se rapporto a tempo indeterminato scrivi "INDETERMINATO".
+- Per documenti permanenti (es. carta d'identità senza scadenza visibile) lascia "data_scadenza" vuota.
+- Se il testo è troppo confuso scegli "Altro" e confidenza bassa.
+- Meglio bassa confidenza che invenzioni.
+PROMPT;
+
+        $userPrompt = "Leggi il testo del documento e suggerisci come catalogarlo.\n\n"
+            . "---\n" . mb_substr($text, 0, self::MAX_TEXT_CHARS) . "\n---";
+
+        $result = $this->ai->chat([
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user',   'content' => $userPrompt],
+        ]);
+        if (!($result['ok'] ?? false)) {
+            return $blank + ['note' => 'BOB AI non disponibile.'];
+        }
+
+        $raw = trim((string)($result['response'] ?? ''));
+        if (preg_match('/\{.*\}/s', $raw, $m)) {
+            $raw = $m[0];
+        }
+        $json = json_decode($raw, true);
+        if (!is_array($json)) {
+            return $blank + ['note' => 'Risposta AI non interpretabile.'];
+        }
+
+        return [
+            'type'       => $this->normalizeType((string)($json['tipo_documento'] ?? '')),
+            'emission'   => $this->normalizeDate((string)($json['data_emissione'] ?? '')),
+            'expiry'     => $this->normalizeExpiry((string)($json['data_scadenza'] ?? '')),
+            'confidence' => max(0, min(100, (int)($json['confidenza'] ?? 0))),
+            'note'       => mb_substr((string)($json['note'] ?? ''), 0, 150),
+        ];
+    }
+
+    private function normalizeType(string $type): ?string
+    {
+        $type = trim($type);
+        if ($type === '' || strcasecmp($type, 'Altro') === 0) return null;
+        // Caso-insensitive match con uno dei tipi conosciuti
+        foreach ($this->monitoredWorkerTypes() as $known) {
+            if (strcasecmp($type, $known) === 0) return $known;
+        }
+        return $type; // fallback: ritorna così com'è, datalist può comunque mostrarlo
+    }
+
+    private function normalizeDate(string $s): ?string
+    {
+        $s = trim($s);
+        if ($s === '') return null;
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y'] as $fmt) {
+            $dt = \DateTime::createFromFormat($fmt, $s);
+            if ($dt && $dt->format($fmt) === $s) {
+                return $dt->format('Y-m-d');
+            }
+        }
+        return null;
+    }
+
+    private function normalizeExpiry(string $s): ?string
+    {
+        $s = trim($s);
+        if ($s === '') return null;
+        if (strcasecmp($s, 'INDETERMINATO') === 0) return 'INDETERMINATO';
+        return $this->normalizeDate($s);
     }
 
     // ── Verifica singolo documento ───────────────────────────────────────────

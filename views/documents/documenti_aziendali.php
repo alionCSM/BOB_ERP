@@ -135,6 +135,23 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-body">
                 <input type="hidden" name="worker_id" value="<?= $workerId ?>">
 
+                <!-- File in cima — BOB legge e suggerisce -->
+                <div class="mb-3">
+                    <label class="form-label" style="font-weight:600;">📎 Carica documento (PDF)</label>
+                    <input type="file" id="document_file" name="document_file" class="form-control" accept="application/pdf" required>
+                </div>
+
+                <!-- Banner BOB suggestion -->
+                <div id="wd-ai-banner" class="wd-ai-banner" style="display:none;">
+                    <div class="wd-ai-icon">🤖</div>
+                    <div class="wd-ai-text">
+                        <strong>BOB sta leggendo il documento…</strong>
+                        <span id="wd-ai-banner-msg">Un secondo, ti suggerisco i campi qui sotto.</span>
+                    </div>
+                </div>
+
+                <hr style="margin:16px 0; border:none; border-top:1px solid #e2e8f0;">
+
                 <div class="mb-3">
                     <label class="form-label">Tipo Documento</label>
                     <input type="text"
@@ -147,21 +164,9 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                            required>
                 </div>
                 <datalist id="document-type-suggestions">
-                    <option value="Documento d'identità">
-                    <option value="Verbale consegna DPI">
-                    <option value="Visita medica">
-                    <option value="Unilav">
-                    <option value="Formazione sicurezza">
-                    <option value="Lavori in quota DPI">
-                    <option value="Piattaforma">
-                    <option value="Carrello elevatore">
-                    <option value="Braccio telescopico">
-                    <option value="Preposto">
-                    <option value="Antincendio">
-                    <option value="Primo soccorso">
-                    <option value="Gru a torre">
-                    <option value="Gru mobile">
-                    <option value="Saldatura">
+                    <?php foreach (\App\Domain\WorkerDocumentTypes::all() as $_type): ?>
+                        <option value="<?= htmlspecialchars($_type, ENT_QUOTES) ?>">
+                    <?php endforeach; ?>
                 </datalist>
                 <div class="mb-3">
                     <label class="form-label">Data Emissione</label>
@@ -172,11 +177,42 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="text" id="wd-upload-expiry" name="expiry_date" class="form-control">
                     <div id="wd-upload-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Carica Documento</label>
-                    <input type="file" id="document_file" name="document_file" class="form-control" accept="application/pdf" required>
-                </div>
             </div>
+
+            <style>
+                .wd-ai-banner {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+                    border: 1px solid #c7d2fe;
+                    border-radius: 8px;
+                    padding: 12px 14px;
+                    margin-top: 12px;
+                }
+                .wd-ai-banner.is-done {
+                    background: linear-gradient(135deg, #d1fae5, #ecfdf5);
+                    border-color: #a7f3d0;
+                }
+                .wd-ai-banner.is-error {
+                    background: #fef2f2;
+                    border-color: #fecaca;
+                }
+                .wd-ai-icon {
+                    font-size: 22px;
+                    line-height: 1;
+                }
+                .wd-ai-text {
+                    flex: 1;
+                    font-size: 13px;
+                    color: #1e293b;
+                    line-height: 1.4;
+                }
+                .wd-ai-text strong { display: block; margin-bottom: 2px; color: #4c1d95; }
+                .wd-ai-banner.is-done .wd-ai-text strong { color: #065f46; }
+                .wd-ai-banner.is-error .wd-ai-text strong { color: #991b1b; }
+                .wd-ai-text span { color: #475569; }
+            </style>
             <div class="modal-footer">
                 <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
                 <button type="submit" class="btn btn-primary">Carica</button>

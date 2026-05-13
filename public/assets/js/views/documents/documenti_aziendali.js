@@ -214,6 +214,92 @@
             .catch(function (err) { console.error(err); });
     });
 
+    // ── BOB AI: suggerimento al cambio file ───────────────────────────────────
+    // Quando l'utente seleziona un PDF, BOB lo legge e prova a pre-compilare
+    // tipo / emissione / scadenza. L'utente può sempre sovrascrivere.
+
+    const fileInput  = document.getElementById('document_file');
+    const banner     = document.getElementById('wd-ai-banner');
+    const bannerMsg  = document.getElementById('wd-ai-banner-msg');
+    const typeInput  = document.getElementById('wd-upload-type');
+    const emisInput  = document.getElementById('wd-upload-emission');
+    const expInput   = document.getElementById('wd-upload-expiry');
+
+    function showBanner(state, msg) {
+        if (!banner) return;
+        banner.style.display = 'flex';
+        banner.classList.remove('is-done', 'is-error');
+        if (state === 'done')  banner.classList.add('is-done');
+        if (state === 'error') banner.classList.add('is-error');
+        if (bannerMsg) bannerMsg.textContent = msg;
+    }
+
+    function bannerHeader(text) {
+        if (!banner) return;
+        const strongEl = banner.querySelector('.wd-ai-text strong');
+        if (strongEl) strongEl.textContent = text;
+    }
+
+    function setIfEmpty(el, value) {
+        if (!el || !value) return false;
+        if (el.value && el.value.trim() !== '') return false; // non sovrascrivere se l'utente ha già scritto
+        el.value = value;
+        // Trigger change così altri listener (es. validity auto-expiry) reagiscono
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
+    }
+
+    function ymdToItalian(s) {
+        // Trasforma "2026-12-31" in "31/12/2026" se l'input non è type=date
+        if (!s || s === 'INDETERMINATO') return s;
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+        return m ? m[3] + '/' + m[2] + '/' + m[1] : s;
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function () {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                if (banner) banner.style.display = 'none';
+                return;
+            }
+
+            bannerHeader('BOB sta leggendo il documento…');
+            showBanner('loading', 'Un secondo, ti suggerisco i campi qui sotto.');
+
+            const fd = new FormData();
+            fd.append('document_file', file);
+
+            fetch('/documents/ai-suggest', { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) {
+                        bannerHeader('BOB non è riuscito a leggere il file');
+                        showBanner('error', 'Compila i campi a mano qui sotto.');
+                        return;
+                    }
+                    const filled = [];
+                    if (data.type && setIfEmpty(typeInput, data.type)) filled.push('tipo');
+                    if (data.emission && setIfEmpty(emisInput, ymdToItalian(data.emission))) filled.push('emissione');
+                    if (data.expiry && setIfEmpty(expInput, ymdToItalian(data.expiry))) filled.push('scadenza');
+
+                    if (filled.length === 0) {
+                        bannerHeader('BOB ha letto il documento');
+                        showBanner('done', 'Non sono riuscito a riconoscere campi utili — controlla a mano.');
+                    } else {
+                        const conf = data.confidence ? ' (confidenza ' + data.confidence + '%)' : '';
+                        bannerHeader('BOB ha pre-compilato ' + filled.join(', ') + conf);
+                        showBanner('done', 'Verifica e correggi se serve — sono solo suggerimenti.');
+                    }
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    bannerHeader('Errore di rete chiamando BOB');
+                    showBanner('error', 'Compila i campi a mano qui sotto.');
+                });
+        });
+    }
+
     // ── Upload form submit ────────────────────────────────────────────────────
 
     const uploadForm = document.getElementById('document-upload-form');
