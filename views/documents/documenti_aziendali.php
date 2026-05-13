@@ -259,6 +259,16 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     border-color: #10b981;
                     background: #ecfdf5;
                 }
+                .wd-dropzone-optional {
+                    /* Modal di modifica: file opzionale, look meno "obbligatorio" */
+                    padding: 14px 16px;
+                    border-color: #e2e8f0;
+                    background: #fafafa;
+                }
+                .wd-dropzone-optional .wd-dropzone-icon { width: 36px; height: 36px; }
+                .wd-dropzone-optional .wd-dropzone-icon svg { width: 18px; height: 18px; }
+                .wd-dropzone-optional .wd-dropzone-text strong { font-weight: 500; color: #64748b; }
+                .wd-dropzone-optional .wd-dropzone-text span { color: #94a3b8; }
                 .wd-dropzone input[type=file] {
                     position: absolute;
                     width: 1px; height: 1px;
@@ -385,40 +395,82 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
      aria-hidden="true"
      data-tw-backdrop="static"
      data-tw-keyboard="false">
-    <div class="modal-dialog">
-        <form id="edit-document-form" enctype="multipart/form-data" class="modal-content">
-            <div class="modal-header">
-                <h2 class="font-medium text-lg">Modifica Documento</h2>
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="edit-document-form" enctype="multipart/form-data" class="modal-content wd-modal">
+            <div class="modal-header wd-modal-header">
+                <div class="wd-modal-header-left">
+                    <div class="wd-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="wd-modal-title">Modifica documento</h2>
+                        <p class="wd-modal-sub">Aggiorna i dati. Se carichi un nuovo PDF, BOB lo legge e suggerisce.</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-tw-dismiss="modal" aria-label="Chiudi"></button>
             </div>
-            <div class="modal-body">
+
+            <div class="modal-body wd-modal-body">
                 <input type="hidden" id="edit-doc-id" name="document_id">
 
-                <div class="mb-3">
-                    <label class="form-label">Tipo Documento</label>
-                    <input type="text" id="edit-doc-type" name="document_type" class="form-control" required>
+                <!-- Dropzone: file opzionale (per sostituire il PDF) -->
+                <label class="wd-dropzone wd-dropzone-optional" for="edit-doc-file">
+                    <div class="wd-dropzone-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <div class="wd-dropzone-text">
+                        <strong id="edit-dropzone-filename">Sostituisci il PDF (opzionale)</strong>
+                        <span>lascia vuoto per tenere il file esistente</span>
+                    </div>
+                    <input type="file" id="edit-doc-file" name="document_file" accept="application/pdf">
+                </label>
+
+                <!-- Banner BOB (solo se l'utente carica un nuovo file) -->
+                <div id="edit-ai-banner" class="wd-ai-banner" style="display:none;">
+                    <img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />
+                    <span id="edit-ai-banner-text">BOB sta leggendo…</span>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Data Emissione</label>
-                    <input type="text" id="edit-doc-date-emission" name="date_emission" class="form-control" required>
-                </div>
+                <div class="wd-fields">
+                    <div class="wd-field">
+                        <label for="edit-doc-type">Tipo documento <span class="wd-req">*</span></label>
+                        <input type="text"
+                               id="edit-doc-type"
+                               name="document_type"
+                               list="document-type-suggestions"
+                               autocomplete="off"
+                               required>
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Scadenza</label>
-                    <input type="text" id="edit-doc-expiry" name="expiry_date" class="form-control">
-                    <div id="wd-edit-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Sostituisci Documento (PDF)</label>
-                    <input type="file" id="edit-doc-file" name="document_file" class="form-control" accept="application/pdf">
-                    <small class="text-slate-500">Lascia vuoto se non vuoi sostituire il file esistente</small>
+                    <div class="wd-field-row">
+                        <div class="wd-field">
+                            <label for="edit-doc-date-emission">Data emissione <span class="wd-req">*</span></label>
+                            <input type="text" id="edit-doc-date-emission" name="date_emission" placeholder="gg/mm/aaaa" required>
+                        </div>
+                        <div class="wd-field">
+                            <label for="edit-doc-expiry">Scadenza</label>
+                            <input type="text" id="edit-doc-expiry" name="expiry_date" placeholder="gg/mm/aaaa o INDETERMINATO">
+                            <div id="wd-edit-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
+
+            <div class="modal-footer wd-modal-footer">
                 <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
-                <button type="submit" class="btn btn-primary">Salva Modifiche</button>
+                <button type="submit" class="btn btn-primary wd-btn-submit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right:6px;">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Salva modifiche
+                </button>
             </div>
         </form>
     </div>

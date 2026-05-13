@@ -217,120 +217,116 @@
     // ── BOB AI: suggerimento al cambio file ───────────────────────────────────
     // Quando l'utente seleziona un PDF, BOB lo legge e prova a pre-compilare
     // tipo / emissione / scadenza. L'utente può sempre sovrascrivere.
-
-    const fileInput  = document.getElementById('document_file');
-    const banner     = document.getElementById('wd-ai-banner');
-    const bannerText = document.getElementById('wd-ai-banner-text');
-    const typeInput  = document.getElementById('wd-upload-type');
-    const emisInput  = document.getElementById('wd-upload-emission');
-    const expInput   = document.getElementById('wd-upload-expiry');
-
-    function setBanner(state, msg) {
-        if (!banner) return;
-        banner.style.display = 'flex';
-        banner.classList.remove('is-loading', 'is-done', 'is-error');
-        if (state === 'loading') banner.classList.add('is-loading');
-        if (state === 'done')    banner.classList.add('is-done');
-        if (state === 'error')   banner.classList.add('is-error');
-        if (bannerText) bannerText.textContent = msg;
-    }
-
-    function setIfEmpty(el, value) {
-        if (!el || !value) return false;
-        if (el.value && el.value.trim() !== '') return false; // non sovrascrivere se l'utente ha già scritto
-        el.value = value;
-        // Trigger change così altri listener (es. validity auto-expiry) reagiscono
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
-    }
+    // Stesso flusso usato sia nel modal di upload sia nel modal di modifica.
 
     function ymdToItalian(s) {
-        // Trasforma "2026-12-31" in "31/12/2026" se l'input non è type=date
         if (!s || s === 'INDETERMINATO') return s;
         const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
         return m ? m[3] + '/' + m[2] + '/' + m[1] : s;
     }
 
-    function tryApply(el, suggested, applied, label) {
-        if (!suggested) return;
-        if (setIfEmpty(el, suggested)) {
-            applied.push(label);
-        } else if ((el.value || '').trim() !== suggested) {
-            // L'utente ha già scritto qualcosa di diverso → offri il valore di BOB
-            // come "chip" cliccabile sotto il campo invece di sovrascrivere
-            renderSuggestionChip(el, suggested, label);
+    function setupAIDocumentReader(config) {
+        var fileInput  = document.getElementById(config.fileId);
+        if (!fileInput) return;
+
+        var banner     = document.getElementById(config.bannerId);
+        var bannerText = document.getElementById(config.bannerTextId);
+        var typeInput  = document.getElementById(config.typeId);
+        var emisInput  = document.getElementById(config.emisId);
+        var expInput   = document.getElementById(config.expId);
+        var dropzone   = fileInput.closest('.wd-dropzone');
+        var fileNameEl = config.fileNameId ? document.getElementById(config.fileNameId) : null;
+        var defaultFilenameLabel = fileNameEl ? fileNameEl.textContent : '';
+
+        function setBanner(state, msg) {
+            if (!banner) return;
+            banner.style.display = 'flex';
+            banner.classList.remove('is-loading', 'is-done', 'is-error');
+            if (state === 'loading') banner.classList.add('is-loading');
+            if (state === 'done')    banner.classList.add('is-done');
+            if (state === 'error')   banner.classList.add('is-error');
+            if (bannerText) bannerText.textContent = msg;
         }
-    }
 
-    function showWorkerNameWarning(data) {
-        var existing = document.getElementById('wd-ai-name-warning');
-        if (existing) existing.remove();
-
-        if (data.worker_match !== false) return; // null o true → niente warning
-        if (!data.worker_in_doc) return;
-
-        var warn = document.createElement('div');
-        warn.id = 'wd-ai-name-warning';
-        warn.className = 'wd-ai-banner is-name-warning';
-        warn.style.marginTop = '8px';
-        warn.innerHTML = '<img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
-                       + '<span>Attenzione: nel documento ho letto <strong></strong>, '
-                       + 'ma stai caricando per un operaio diverso. Verifica.</span>';
-        warn.querySelector('strong').textContent = data.worker_in_doc;
-        if (banner && banner.parentElement) {
-            banner.parentElement.insertBefore(warn, banner.nextSibling);
-        }
-    }
-
-    function renderSuggestionChip(el, suggestedValue, label) {
-        // Pulisci eventuali chip precedenti per questo campo
-        var existing = el.parentElement && el.parentElement.querySelector('.wd-ai-chip');
-        if (existing) existing.remove();
-        var chip = document.createElement('div');
-        chip.className = 'wd-ai-chip';
-        // Wrappiamo il testo in un singolo <span> così il flex layout non
-        // spezza ogni parola con il gap fra mezzo
-        chip.innerHTML = '<img class="wd-ai-chip-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
-                       + '<span class="wd-ai-chip-text">BOB suggerisce <strong></strong> per ' + label
-                       + ' &middot; <a href="#" class="wd-ai-chip-apply">usa</a></span>';
-        chip.querySelector('strong').textContent = suggestedValue;
-        chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
-            e.preventDefault();
-            el.value = suggestedValue;
+        function setIfEmpty(el, value) {
+            if (!el || !value) return false;
+            if (el.value && el.value.trim() !== '') return false;
+            el.value = value;
             el.dispatchEvent(new Event('change', { bubbles: true }));
-            chip.remove();
-        });
-        if (el.parentElement) el.parentElement.appendChild(chip);
-    }
+            return true;
+        }
 
-    const dropzone     = fileInput && fileInput.closest('.wd-dropzone');
-    const fileNameSpan = document.getElementById('wd-dropzone-filename');
+        function renderSuggestionChip(el, suggestedValue, label) {
+            var existing = el.parentElement && el.parentElement.querySelector('.wd-ai-chip');
+            if (existing) existing.remove();
+            var chip = document.createElement('div');
+            chip.className = 'wd-ai-chip';
+            chip.innerHTML = '<img class="wd-ai-chip-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                + '<span class="wd-ai-chip-text">BOB suggerisce <strong></strong> per ' + label
+                + ' &middot; <a href="#" class="wd-ai-chip-apply">usa</a></span>';
+            chip.querySelector('strong').textContent = suggestedValue;
+            chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
+                e.preventDefault();
+                el.value = suggestedValue;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                chip.remove();
+            });
+            if (el.parentElement) el.parentElement.appendChild(chip);
+        }
 
-    if (fileInput) {
+        function tryApply(el, suggested, applied, label) {
+            if (!suggested) return;
+            if (setIfEmpty(el, suggested)) {
+                applied.push(label);
+            } else if ((el.value || '').trim() !== suggested) {
+                renderSuggestionChip(el, suggested, label);
+            }
+        }
+
+        function showWorkerNameWarning(data, scopeId) {
+            var existing = document.getElementById(scopeId + '-name-warning');
+            if (existing) existing.remove();
+            if (data.worker_match !== false) return;
+            if (!data.worker_in_doc) return;
+
+            var warn = document.createElement('div');
+            warn.id = scopeId + '-name-warning';
+            warn.className = 'wd-ai-banner is-name-warning';
+            warn.style.marginTop = '8px';
+            warn.innerHTML = '<img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                + '<span>Attenzione: nel documento ho letto <strong></strong>, '
+                + 'ma stai caricando per un operaio diverso. Verifica.</span>';
+            warn.querySelector('strong').textContent = data.worker_in_doc;
+            if (banner && banner.parentElement) {
+                banner.parentElement.insertBefore(warn, banner.nextSibling);
+            }
+        }
+
         fileInput.addEventListener('change', function () {
-            const file = fileInput.files && fileInput.files[0];
+            var file = fileInput.files && fileInput.files[0];
+
+            // Pulisci stato precedente
+            (config.scopeEl || document).querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
+            var prevWarn = document.getElementById(config.bannerId + '-name-warning');
+            if (prevWarn) prevWarn.remove();
+
             if (!file) {
                 if (banner) banner.style.display = 'none';
                 if (dropzone) dropzone.classList.remove('is-file-selected');
-                if (fileNameSpan) fileNameSpan.textContent = 'Scegli un file PDF';
+                if (fileNameEl) fileNameEl.textContent = defaultFilenameLabel;
                 return;
             }
 
-            // Aggiorna UI dropzone
             if (dropzone) dropzone.classList.add('is-file-selected');
-            if (fileNameSpan) fileNameSpan.textContent = file.name;
-
-            // Pulisci chip e warning precedenti (se l'utente sostituisce il file)
-            document.querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
-            var prevWarn = document.getElementById('wd-ai-name-warning');
-            if (prevWarn) prevWarn.remove();
+            if (fileNameEl) fileNameEl.textContent = file.name;
 
             setBanner('loading', 'BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
 
-            const fd = new FormData();
+            var fd = new FormData();
             fd.append('document_file', file);
-            // Passa worker_id letto dal campo hidden del form così BOB
-            // può controllare se il nome nel documento corrisponde
+
+            // Passa worker_id se disponibile (il campo hidden del form upload
+            // sta sulla stessa pagina e si applica anche al modal di edit)
             var workerIdInput = document.querySelector('#document-upload-form input[name="worker_id"]');
             if (workerIdInput && workerIdInput.value) {
                 fd.append('worker_id', workerIdInput.value);
@@ -343,14 +339,11 @@
                         setBanner('error', 'BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
                     }
-                    const applied = [];
+                    var applied = [];
                     tryApply(typeInput, data.type,                          applied, 'tipo');
                     tryApply(emisInput, ymdToItalian(data.emission || ''),  applied, 'emissione');
                     tryApply(expInput,  ymdToItalian(data.expiry   || ''),  applied, 'scadenza');
 
-                    // Conta quanti BOB aveva pre-compilato in totale (anche
-                    // quelli mostrati come chip perché l'utente aveva già
-                    // digitato qualcosa di diverso)
                     var recognizedCount =
                           (data.type     ? 1 : 0)
                         + (data.emission ? 1 : 0)
@@ -362,7 +355,7 @@
                             : 'Non ho riconosciuto nulla, compila pure a mano.';
                         setBanner('error', hint);
                     } else {
-                        const conf = data.confidence ? ' (' + data.confidence + '%)' : '';
+                        var conf = data.confidence ? ' (' + data.confidence + '%)' : '';
                         if (applied.length === recognizedCount) {
                             setBanner('done', 'Ho pre-compilato ' + applied.join(', ') + conf + ' — verifica e correggi se serve.');
                         } else if (applied.length === 0) {
@@ -372,8 +365,7 @@
                         }
                     }
 
-                    // Alert separato se il nome nel documento non corrisponde all'operaio
-                    showWorkerNameWarning(data);
+                    showWorkerNameWarning(data, config.bannerId);
                 })
                 .catch(function (err) {
                     console.error(err);
@@ -381,6 +373,26 @@
                 });
         });
     }
+
+    // Wiring: modal upload (file obbligatorio) + modal edit (file opzionale)
+    setupAIDocumentReader({
+        fileId:       'document_file',
+        bannerId:     'wd-ai-banner',
+        bannerTextId: 'wd-ai-banner-text',
+        typeId:       'wd-upload-type',
+        emisId:       'wd-upload-emission',
+        expId:        'wd-upload-expiry',
+        fileNameId:   'wd-dropzone-filename',
+    });
+    setupAIDocumentReader({
+        fileId:       'edit-doc-file',
+        bannerId:     'edit-ai-banner',
+        bannerTextId: 'edit-ai-banner-text',
+        typeId:       'edit-doc-type',
+        emisId:       'edit-doc-date-emission',
+        expId:        'edit-doc-expiry',
+        fileNameId:   'edit-dropzone-filename',
+    });
 
     // ── Upload form submit ────────────────────────────────────────────────────
 
