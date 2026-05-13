@@ -170,18 +170,21 @@ Regole:
 - Mai inventare date o nomi non presenti nel testo.
 PROMPT;
 
-        $userPrompt = "Testo del documento:\n\n---\n"
+        // /no_think disattiva la modalità "thinking" di Qwen3: senza questo
+        // il modello consuma centinaia di token in ragionamento interno prima
+        // di rispondere, e con un max_tokens basso resta vuoto.
+        $userPrompt = "/no_think\n\nTesto del documento:\n\n---\n"
             . mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST)
             . "\n---\n\nClassifica il documento secondo lo schema indicato.";
 
-        // max_tokens generoso (la JSON è di ~120 char ma alcuni modelli
-        // padding lo spazio). Temperatura bassa per output deterministico.
+        // Niente max_tokens: con thinking spento la JSON che esce è breve
+        // e non vale la pena rischiare cut-off.
         $result = $this->ai->chat(
             [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user',   'content' => $userPrompt],
             ],
-            ['temperature' => 0.1, 'max_tokens' => 400]
+            ['temperature' => 0.1]
         );
         if (!($result['ok'] ?? false)) {
             error_log("[DocumentVerifier] LLM call failed: " . ($result['error'] ?? 'unknown'));
@@ -422,7 +425,7 @@ Regole:
 - Sii rigoroso: meglio bassa confidenza che invenzioni.
 PROMPT;
 
-        $userPrompt = "Documento dichiarato come:\n"
+        $userPrompt = "/no_think\n\nDocumento dichiarato come:\n"
             . "- Tipo: {$declaredType}\n"
             . "- Operaio: {$declaredName}\n"
             . "- Scadenza dichiarata: {$declaredExpiry}\n\n"
