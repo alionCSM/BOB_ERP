@@ -138,8 +138,9 @@ final class DocumentVerifierService
     /**
      * @param string  $pdfPath    Path al file PDF caricato
      * @param ?string $workerName Nome operaio per cui si sta caricando (per controllo coerenza)
+     * @param ?string $fileName   Nome originale del file (spesso contiene indizi tipo "Visita_Mario_Rossi_scad_31-12-2027.pdf")
      */
-    public function suggestForUpload(string $pdfPath, ?string $workerName = null): array
+    public function suggestForUpload(string $pdfPath, ?string $workerName = null, ?string $fileName = null): array
     {
         $blank = [
             'type' => null, 'emission' => null, 'expiry' => null,
@@ -153,36 +154,69 @@ final class DocumentVerifierService
             return $blank + ['note' => "Testo del documento illeggibile."];
         }
 
+        // Estrai indizi euristici dal testo (date) — aiuta il modello quando
+        // l'OCR è rumoroso o quando ci sono molte date nel doc e bisogna
+        // scegliere quale è emissione/scadenza
+        $datesFound = $this->extractDateHints($text);
+
         $types = $this->monitoredWorkerTypes();
         $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
 
         $workerLine = $workerName
-            ? "\n\nL'utente sta caricando questo documento per l'operaio: \"{$workerName}\". Verifica se il nome dell'operaio rilevato nel testo corrisponde."
+            ? "\n\nIl documento è caricato per l'operaio: \"{$workerName}\". Verifica se nel testo c'è un nome che corrisponde."
             : '';
 
-        // Prompt più conciso del verifier notturno ma con istruzioni chiare —
-        // il modello senza contesto smette di rispondere bene.
+        // Prompt sistema con esempi few-shot per i tipi più comuni
         $systemPrompt = <<<PROMPT
-Sei un classificatore di documenti italiani per operai. Ricevi il testo grezzo (possibilmente OCR rumoroso) di un documento e devi estrarre alcune informazioni.
+Sei un classificatore esperto di documenti italiani del settore edile/montaggi industriali. Il testo che ricevi viene da PDF nativi o da OCR — può essere rumoroso, frammentato, con caratteri sbagliati.
 
-Il tipo deve essere uno di questi valori esatti (rispetta maiuscole/minuscole):
+Estrai questi campi:
+- tipo_documento (uno dei valori sotto, rispetta maiuscole/minuscole)
+- data_emissione (YYYY-MM-DD oppure stringa vuota)
+- data_scadenza (YYYY-MM-DD oppure "INDETERMINATO" per UNILAV indeterminato oppure stringa vuota)
+- nome_operaio (cognome e nome rilevato, stringa vuota se non chiaro)
+- confidenza (0-100)
+
+Tipi possibili:
 {$typesList}
 
-Rispondi SOLO con un oggetto JSON valido, niente prefisso né commenti né markdown:
-{"tipo_documento":"<uno dei valori sopra>","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","nome_operaio":"<nome cognome rilevato o stringa vuota>","confidenza":0-100}{$workerLine}
+Frasi tipiche per riconoscere i tipi:
+- Unilav → "comunicazione obbligatoria", "assunzione", "cessazione", "modello UNILAV", codice fiscale + datore di lavoro
+- Visita medica → "idoneità sanitaria", "medico competente", "idoneo alla mansione", "sorveglianza sanitaria"
+- Documento d'identità → "Carta d'identità", "RPC ITALIANA", "REPUBBLICA ITALIANA", numero documento + foto
+- Formazione sicurezza → "attestato formazione", "D.Lgs 81/08", "rischio basso/medio/alto", ore di formazione
+- Patente → "patente di guida", categorie B/C/D/E, "MIT", motorizzazione
+- Carrello elevatore / Piattaforma / Gru / Braccio telescopico / Saldatura → "attestato di abilitazione", "Accordo Stato-Regioni", ore corso
+- Preposto / Antincendio / Primo soccorso / Lavori in quota DPI → "designazione", "incarico", "rischio incendio", "DPI III categoria"
+- Verbale consegna DPI → "consegna dispositivi protezione individuale", lista DPI
 
-Regole:
-- "data_emissione" e "data_scadenza" possono essere stringa vuota se non rilevabili.
-- Per UNILAV a tempo indeterminato la data_scadenza è "INDETERMINATO".
-- Se non sei sicuro del tipo, scegli "Altro" e abbassa la confidenza.
-- "nome_operaio" è il nome della persona menzionata nel documento (es. "Mario Rossi"). Vuoto se non rilevabile.
-- Mai inventare date o nomi non presenti nel testo.
+Regole assolute:
+- Rispondi SOLO con un oggetto JSON, niente altro testo intorno.
+- Se hai più date nel documento: la prima cronologicamente è in genere l'emissione, la seconda la scadenza. MA verifica con etichette tipo "emesso il", "valido fino al", "data scadenza", "data rilascio", "data corso".
+- Per visita medica: emissione = data della visita; scadenza = data prossima visita.
+- Mai inventare nomi o date assenti dal testo.
+- Se il testo è troppo confuso scegli "Altro" e confidenza < 40.
+
+Schema risposta:
+{"tipo_documento":"...","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","nome_operaio":"...","confidenza":0-100}{$workerLine}
 PROMPT;
 
-        // /no_think disattiva la modalità "thinking" di Qwen3: senza questo
-        // il modello consuma centinaia di token in ragionamento interno prima
-        // di rispondere, e con un max_tokens basso resta vuoto.
-        $userPrompt = "/no_think\n\nTesto del documento:\n\n---\n"
+        // User prompt arricchito con filename e date trovate via regex
+        $hintsBlock = '';
+        if ($fileName) {
+            $hintsBlock .= "Nome file originale: \"{$fileName}\" (può contenere indizi su tipo/persona/scadenza).\n";
+        }
+        if (!empty($datesFound)) {
+            $hintsBlock .= "Date trovate nel testo (formato originale): " . implode(', ', $datesFound) . "\n";
+        }
+        if ($hintsBlock !== '') {
+            $hintsBlock = "Indizi pre-estratti:\n" . $hintsBlock . "\n";
+        }
+
+        // /no_think disattiva la modalità "thinking" di Qwen3
+        $userPrompt = "/no_think\n\n"
+            . $hintsBlock
+            . "Testo del documento:\n\n---\n"
             . mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST)
             . "\n---\n\nClassifica il documento secondo lo schema indicato.";
 
@@ -235,6 +269,37 @@ PROMPT;
             'worker_in_doc'=> $workerInDoc !== '' ? $workerInDoc : null,
             'worker_match' => $workerMatch,
         ];
+    }
+
+    /**
+     * Estrae candidate-date dal testo grezzo. Aiuta il modello quando l'OCR
+     * spezza le date o quando ce ne sono molte ed è difficile capire quale
+     * è emissione vs scadenza.
+     *
+     * Riconosce: dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, yyyy-mm-dd,
+     * "31 dicembre 2026", "31 dic 2026".
+     *
+     * @return string[] elenco di date trovate nel formato originale, deduplicate
+     */
+    private function extractDateHints(string $text): array
+    {
+        $patterns = [
+            // dd separator mm separator yyyy (con separatori vari)
+            '/\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/',
+            // yyyy-mm-dd
+            '/\b(\d{4}-\d{2}-\d{2})\b/',
+            // "31 dicembre 2026" (con mesi italiani)
+            '/\b(\d{1,2}\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)\.?\s+\d{4})\b/iu',
+        ];
+        $found = [];
+        foreach ($patterns as $p) {
+            if (preg_match_all($p, $text, $matches)) {
+                foreach ($matches[1] as $m) {
+                    $found[trim($m)] = true;
+                }
+            }
+        }
+        return array_slice(array_keys($found), 0, 8); // top 8 max, niente spam
     }
 
     private function normalizeType(string $type): ?string

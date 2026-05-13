@@ -291,11 +291,16 @@ final class DocumentsController
             $workerName = $st->fetchColumn() ?: null;
         }
 
+        // Nome file originale — utile come indizio (spesso "Visita_Rossi_scad_31-12-2027.pdf")
+        $origName = (string)($_FILES['document_file']['name'] ?? '');
+        // Tronca per sicurezza prima di mandarlo all'LLM
+        $origName = mb_substr($origName, 0, 200);
+
         try {
             $ai      = new \App\Service\OllamaClient($ollamaUrl, $model);
             $mailer  = new \App\Service\Mailer(); // service constructor lo richiede ma non viene usato qui
             $service = new \App\Service\DocumentVerifierService($this->conn, $ai, $mailer);
-            $result  = $service->suggestForUpload($tmpFile, $workerName);
+            $result  = $service->suggestForUpload($tmpFile, $workerName, $origName ?: null);
             echo json_encode($result);
         } catch (\Throwable $e) {
             echo json_encode(['error' => 'errore_interno', 'message' => $e->getMessage()]);

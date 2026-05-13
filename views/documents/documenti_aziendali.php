@@ -337,7 +337,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 .wd-ai-banner.is-done    { background: #ecfdf5; border-left-color: #10b981; }
                 .wd-ai-banner.is-error   { background: #fef2f2; border-left-color: #ef4444; }
                 .wd-ai-banner.is-name-warning { background: #fef2f2; border-left-color: #ef4444; }
-                .wd-ai-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
+                .wd-ai-icon { width: 24px; height: 24px; object-fit: contain; flex-shrink: 0; }
                 @keyframes wdAiShimmer {
                     0%, 100% { background-position: 0% 0%; }
                     50%      { background-position: -100% 0%; }
@@ -358,8 +358,8 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     line-height: 1.4;
                 }
                 .wd-ai-chip-icon {
-                    width: 14px;
-                    height: 14px;
+                    width: 18px;
+                    height: 18px;
                     object-fit: contain;
                     flex-shrink: 0;
                 }
