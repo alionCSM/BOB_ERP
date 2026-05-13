@@ -137,8 +137,10 @@ final class DocumentVerifierService
         $blank = ['type' => null, 'emission' => null, 'expiry' => null, 'confidence' => 0, 'note' => ''];
 
         $text = $this->extractText($pdfPath);
-        if (mb_strlen(trim($text)) < 30) {
-            return $blank + ['note' => 'Testo del documento illeggibile.'];
+        $textLen = mb_strlen(trim($text));
+        error_log("[DocumentVerifier] suggestForUpload: extracted_text_len={$textLen}");
+        if ($textLen < 30) {
+            return $blank + ['note' => "Testo illeggibile (estratti {$textLen} char). Verifica che poppler-utils e tesseract-ocr-ita siano installati sul server."];
         }
 
         $types = $this->monitoredWorkerTypes();
@@ -176,17 +178,21 @@ PROMPT;
             ['role' => 'user',   'content' => $userPrompt],
         ]);
         if (!($result['ok'] ?? false)) {
-            return $blank + ['note' => 'BOB AI non disponibile.'];
+            error_log("[DocumentVerifier] LLM call failed: " . ($result['error'] ?? 'unknown'));
+            return $blank + ['note' => 'BOB AI non disponibile (' . ($result['error'] ?? 'errore') . ').'];
         }
 
         $raw = trim((string)($result['response'] ?? ''));
+        error_log("[DocumentVerifier] LLM raw response (first 300 chars): " . mb_substr($raw, 0, 300));
         if (preg_match('/\{.*\}/s', $raw, $m)) {
             $raw = $m[0];
         }
         $json = json_decode($raw, true);
         if (!is_array($json)) {
-            return $blank + ['note' => 'Risposta AI non interpretabile.'];
+            error_log("[DocumentVerifier] JSON parse failed. Raw: " . $raw);
+            return $blank + ['note' => 'Risposta AI non interpretabile (vedi log server).'];
         }
+        error_log("[DocumentVerifier] LLM parsed: tipo='" . ($json['tipo_documento'] ?? '') . "' confidenza=" . ($json['confidenza'] ?? '-'));
 
         return [
             'type'       => $this->normalizeType((string)($json['tipo_documento'] ?? '')),

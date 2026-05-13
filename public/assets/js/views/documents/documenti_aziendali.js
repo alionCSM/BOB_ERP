@@ -284,8 +284,11 @@
                     if (data.expiry && setIfEmpty(expInput, ymdToItalian(data.expiry))) filled.push('scadenza');
 
                     if (filled.length === 0) {
-                        bannerHeader('BOB ha letto il documento');
-                        showBanner('done', 'Non sono riuscito a riconoscere campi utili — controlla a mano.');
+                        bannerHeader('BOB ha letto il documento ma non ha riconosciuto nulla');
+                        var hint = data.note && data.note.trim() !== ''
+                            ? data.note
+                            : 'Compila i campi a mano.';
+                        showBanner('error', hint);
                     } else {
                         const conf = data.confidence ? ' (confidenza ' + data.confidence + '%)' : '';
                         bannerHeader('BOB ha pre-compilato ' + filled.join(', ') + conf);
