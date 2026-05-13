@@ -51,7 +51,10 @@
         var d = parseDate(emissionStr);
         if (!d) return '';
         d.setMonth(d.getMonth() + validity.months);
-        d.setDate(d.getDate() - 1);        
+         // Do not subtract 1 day for Verbale consegna DPI
+         if (docType !== 'Verbale consegna DPI') {
+           d.setDate(d.getDate() - 1);
+        }      
         return formatDDMMYYYY(d);
     }
 

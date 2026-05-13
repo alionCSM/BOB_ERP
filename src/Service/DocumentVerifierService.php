@@ -166,6 +166,26 @@ final class DocumentVerifierService
             ? "\n\nIl documento è caricato per l'operaio: \"{$workerName}\". Verifica se nel testo c'è un nome che corrisponde."
             : '';
 
+        // Esempi few-shot (testo realistico → JSON atteso). Su modelli piccoli
+        // questi guidano per imitazione molto meglio delle sole regole.
+        $fewShot = <<<'FEW'
+Esempio 1 — UNILAV a tempo indeterminato:
+  Input: "Modello Unilav - Comunicazione obbligatoria di assunzione. Lavoratore: ROSSI MARIO (CF RSSMRA80A01H501Z). Datore: ACME SRL. Data inizio rapporto: 15/03/2026. Tipo contratto: Tempo indeterminato."
+  Output: {"tipo_documento":"Unilav","data_emissione":"2026-03-15","data_scadenza":"INDETERMINATO","nome_operaio":"Rossi Mario","confidenza":92}
+
+Esempio 2 — Visita medica:
+  Input: "GIUDIZIO DI IDONEITÀ ALLA MANSIONE - Sorveglianza sanitaria D.Lgs 81/08. Lavoratore: VERDI ANNA. Data visita: 12 febbraio 2026. Idoneo alla mansione. Prossima visita: 12/02/2027. Dott. Bianchi - Medico competente."
+  Output: {"tipo_documento":"Visita medica","data_emissione":"2026-02-12","data_scadenza":"2027-02-12","nome_operaio":"Verdi Anna","confidenza":94}
+
+Esempio 3 — Attestato carrello elevatore:
+  Input: "Attestato di abilitazione - Carrello elevatore semovente. Accordo Stato-Regioni 22/02/2012. Corso 12 ore. Allievo: BIANCHI LUCA. Rilasciato il 03/04/2024. Validità 5 anni."
+  Output: {"tipo_documento":"Carrello elevatore","data_emissione":"2024-04-03","data_scadenza":"2029-04-03","nome_operaio":"Bianchi Luca","confidenza":88}
+
+Esempio 4 — testo confuso/non riconoscibile:
+  Input: "Pagina 1 di 2 — fattura n. 247/2025 — Acme SRL — importo 1.230,00 EUR"
+  Output: {"tipo_documento":"Altro","data_emissione":"","data_scadenza":"","nome_operaio":"","confidenza":15}
+FEW;
+
         // Prompt sistema con esempi few-shot per i tipi più comuni
         $systemPrompt = <<<PROMPT
 Sei un classificatore esperto di documenti italiani del settore edile/montaggi industriali. Il testo che ricevi viene da PDF nativi o da OCR — può essere rumoroso, frammentato, con caratteri sbagliati.
@@ -192,12 +212,14 @@ Frasi tipiche per riconoscere i tipi:
 
 Regole assolute:
 - Rispondi SOLO con un oggetto JSON, niente altro testo intorno.
-- Se hai più date nel documento: la prima cronologicamente è in genere l'emissione, la seconda la scadenza. MA verifica con etichette tipo "emesso il", "valido fino al", "data scadenza", "data rilascio", "data corso".
+- Se hai più date: la prima cronologicamente è in genere l'emissione, la seconda la scadenza. Etichette utili: "emesso il", "valido fino al", "data scadenza", "data rilascio", "data corso".
 - Per visita medica: emissione = data della visita; scadenza = data prossima visita.
 - Mai inventare nomi o date assenti dal testo.
 - Se il testo è troppo confuso scegli "Altro" e confidenza < 40.
 
-Schema risposta:
+{$fewShot}
+
+Schema risposta (un solo oggetto JSON, niente altro):
 {"tipo_documento":"...","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","nome_operaio":"...","confidenza":0-100}{$workerLine}
 PROMPT;
 
@@ -220,14 +242,18 @@ PROMPT;
             . mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST)
             . "\n---\n\nClassifica il documento secondo lo schema indicato.";
 
-        // Niente max_tokens: con thinking spento la JSON che esce è breve
-        // e non vale la pena rischiare cut-off.
+        // Forziamo JSON mode (OpenAI-compatible) così il modello piccolo
+        // non sgarra il formato. Se il server non lo supporta, lo ignora
+        // silenziosamente. Temperature bassa per output deterministico.
         $result = $this->ai->chat(
             [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user',   'content' => $userPrompt],
             ],
-            ['temperature' => 0.1]
+            [
+                'temperature' => 0.1,
+                'response_format' => ['type' => 'json_object'],
+            ]
         );
         if (!($result['ok'] ?? false)) {
             return $blank + ['note' => 'BOB AI non disponibile.'];
