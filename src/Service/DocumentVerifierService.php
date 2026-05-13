@@ -135,9 +135,17 @@ final class DocumentVerifierService
      *
      * @return array{type:?string, emission:?string, expiry:?string, confidence:int, note:string}
      */
-    public function suggestForUpload(string $pdfPath): array
+    /**
+     * @param string  $pdfPath    Path al file PDF caricato
+     * @param ?string $workerName Nome operaio per cui si sta caricando (per controllo coerenza)
+     */
+    public function suggestForUpload(string $pdfPath, ?string $workerName = null): array
     {
-        $blank = ['type' => null, 'emission' => null, 'expiry' => null, 'confidence' => 0, 'note' => ''];
+        $blank = [
+            'type' => null, 'emission' => null, 'expiry' => null,
+            'confidence' => 0, 'note' => '',
+            'worker_match' => null, 'worker_in_doc' => null,
+        ];
 
         $text = $this->extractText($pdfPath);
         $textLen = mb_strlen(trim($text));
@@ -148,21 +156,26 @@ final class DocumentVerifierService
         $types = $this->monitoredWorkerTypes();
         $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
 
+        $workerLine = $workerName
+            ? "\n\nL'utente sta caricando questo documento per l'operaio: \"{$workerName}\". Verifica se il nome dell'operaio rilevato nel testo corrisponde."
+            : '';
+
         // Prompt più conciso del verifier notturno ma con istruzioni chiare —
         // il modello senza contesto smette di rispondere bene.
         $systemPrompt = <<<PROMPT
-Sei un classificatore di documenti italiani per operai. Ricevi il testo grezzo (possibilmente OCR rumoroso) di un documento e devi estrarre tre informazioni: tipo, data di emissione, data di scadenza.
+Sei un classificatore di documenti italiani per operai. Ricevi il testo grezzo (possibilmente OCR rumoroso) di un documento e devi estrarre alcune informazioni.
 
 Il tipo deve essere uno di questi valori esatti (rispetta maiuscole/minuscole):
 {$typesList}
 
 Rispondi SOLO con un oggetto JSON valido, niente prefisso né commenti né markdown:
-{"tipo_documento":"<uno dei valori sopra>","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","confidenza":0-100}
+{"tipo_documento":"<uno dei valori sopra>","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","nome_operaio":"<nome cognome rilevato o stringa vuota>","confidenza":0-100}{$workerLine}
 
 Regole:
 - "data_emissione" e "data_scadenza" possono essere stringa vuota se non rilevabili.
 - Per UNILAV a tempo indeterminato la data_scadenza è "INDETERMINATO".
 - Se non sei sicuro del tipo, scegli "Altro" e abbassa la confidenza.
+- "nome_operaio" è il nome della persona menzionata nel documento (es. "Mario Rossi"). Vuoto se non rilevabile.
 - Mai inventare date o nomi non presenti nel testo.
 PROMPT;
 
@@ -195,12 +208,32 @@ PROMPT;
             return $blank + ['note' => 'Risposta AI non interpretabile.'];
         }
 
+        $type     = $this->normalizeType((string)($json['tipo_documento'] ?? ''));
+        $emission = $this->normalizeDate((string)($json['data_emissione'] ?? ''));
+        $expiry   = $this->normalizeExpiry((string)($json['data_scadenza'] ?? ''));
+
+        // Se il tipo non è riconosciuto (Altro / sconosciuto), non possiamo
+        // garantire che le date estratte siano coerenti col documento atteso
+        // → meglio non suggerire nulla che suggerire date sbagliate.
+        if ($type === null) {
+            $emission = null;
+            $expiry   = null;
+        }
+
+        $workerInDoc = trim((string)($json['nome_operaio'] ?? ''));
+        $workerMatch = null;
+        if ($workerName !== null && $workerName !== '' && $workerInDoc !== '') {
+            $workerMatch = $this->namesLooseMatch($workerName, $workerInDoc);
+        }
+
         return [
-            'type'       => $this->normalizeType((string)($json['tipo_documento'] ?? '')),
-            'emission'   => $this->normalizeDate((string)($json['data_emissione'] ?? '')),
-            'expiry'     => $this->normalizeExpiry((string)($json['data_scadenza'] ?? '')),
-            'confidence' => max(0, min(100, (int)($json['confidenza'] ?? 0))),
-            'note'       => mb_substr((string)($json['note'] ?? ''), 0, 150),
+            'type'         => $type,
+            'emission'     => $emission,
+            'expiry'       => $expiry,
+            'confidence'   => max(0, min(100, (int)($json['confidenza'] ?? 0))),
+            'note'         => mb_substr((string)($json['note'] ?? ''), 0, 150),
+            'worker_in_doc'=> $workerInDoc !== '' ? $workerInDoc : null,
+            'worker_match' => $workerMatch,
         ];
     }
 

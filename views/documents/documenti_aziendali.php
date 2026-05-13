@@ -126,56 +126,196 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
      aria-hidden="true"
      data-tw-backdrop="static"
      data-tw-keyboard="false">
-    <div class="modal-dialog">
-        <form id="document-upload-form" enctype="multipart/form-data" class="modal-content">
-            <div class="modal-header">
-                <h2 class="font-medium text-lg">Carica Nuovo Documento</h2>
+    <div class="modal-dialog modal-dialog-centered">
+        <form id="document-upload-form" enctype="multipart/form-data" class="modal-content wd-modal">
+            <!-- Header con icona + sottotitolo -->
+            <div class="modal-header wd-modal-header">
+                <div class="wd-modal-header-left">
+                    <div class="wd-modal-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="wd-modal-title">Nuovo documento</h2>
+                        <p class="wd-modal-sub">Carica un PDF — BOB ti aiuta a compilare i campi</p>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-tw-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+
+            <div class="modal-body wd-modal-body">
                 <input type="hidden" name="worker_id" value="<?= $workerId ?>">
 
-                <!-- File in cima — BOB legge e suggerisce -->
-                <div class="mb-3">
-                    <label class="form-label" style="font-weight:600;">📎 Carica documento (PDF)</label>
-                    <input type="file" id="document_file" name="document_file" class="form-control" accept="application/pdf" required>
-                </div>
+                <!-- Dropzone-style file input -->
+                <label class="wd-dropzone" for="document_file">
+                    <div class="wd-dropzone-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <div class="wd-dropzone-text">
+                        <strong id="wd-dropzone-filename">Scegli un file PDF</strong>
+                        <span>oppure trascinalo qui</span>
+                    </div>
+                    <input type="file" id="document_file" name="document_file" accept="application/pdf" required>
+                </label>
 
-                <!-- Banner BOB suggestion (compatto, non blocca l'utente) -->
+                <!-- Banner BOB (compatto, sotto la dropzone) -->
                 <div id="wd-ai-banner" class="wd-ai-banner" style="display:none;">
                     <img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />
-                    <span id="wd-ai-banner-text">BOB sta leggendo… puoi compilare anche tu nel frattempo.</span>
+                    <span id="wd-ai-banner-text">BOB sta leggendo…</span>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Tipo Documento</label>
-                    <input type="text"
-                           id="wd-upload-type"
-                           name="document_type"
-                           class="form-control"
-                           placeholder="Tipo documento..."
-                           list="document-type-suggestions"
-                           autocomplete="off"
-                           required>
+                <!-- Campi metadata -->
+                <div class="wd-fields">
+                    <div class="wd-field">
+                        <label for="wd-upload-type">Tipo documento <span class="wd-req">*</span></label>
+                        <input type="text"
+                               id="wd-upload-type"
+                               name="document_type"
+                               placeholder="Es. Visita medica, Unilav, Patente…"
+                               list="document-type-suggestions"
+                               autocomplete="off"
+                               required>
+                    </div>
+                    <datalist id="document-type-suggestions">
+                        <?php foreach (\App\Domain\WorkerDocumentTypes::all() as $_type): ?>
+                            <option value="<?= htmlspecialchars($_type, ENT_QUOTES) ?>">
+                        <?php endforeach; ?>
+                    </datalist>
+
+                    <div class="wd-field-row">
+                        <div class="wd-field">
+                            <label for="wd-upload-emission">Data emissione <span class="wd-req">*</span></label>
+                            <input type="text" id="wd-upload-emission" name="date_emission" placeholder="gg/mm/aaaa" required>
+                        </div>
+                        <div class="wd-field">
+                            <label for="wd-upload-expiry">Scadenza</label>
+                            <input type="text" id="wd-upload-expiry" name="expiry_date" placeholder="gg/mm/aaaa o INDETERMINATO">
+                            <div id="wd-upload-expiry-hint" style="display:none;"></div>
+                        </div>
+                    </div>
                 </div>
-                <datalist id="document-type-suggestions">
-                    <?php foreach (\App\Domain\WorkerDocumentTypes::all() as $_type): ?>
-                        <option value="<?= htmlspecialchars($_type, ENT_QUOTES) ?>">
-                    <?php endforeach; ?>
-                </datalist>
-                <div class="mb-3">
-                    <label class="form-label">Data Emissione</label>
-                    <input type="text" id="wd-upload-emission" name="date_emission" class="form-control" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Scadenza</label>
-                    <input type="text" id="wd-upload-expiry" name="expiry_date" class="form-control">
-                    <div id="wd-upload-expiry-hint" style="display:none;font-size:12px;color:#94a3b8;margin-top:4px;"></div>
-                </div>
+            </div>
+
+            <div class="modal-footer wd-modal-footer">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
+                <button type="submit" class="btn btn-primary wd-btn-submit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right:6px;">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Carica documento
+                </button>
             </div>
 
             <style>
-                /* Banner BOB compatto: 1 riga, niente "muro" visivo fra file e campi */
+                /* ── Modal restyle ───────────────────────────────────────── */
+                .wd-modal { border-radius: 14px; overflow: hidden; }
+                .wd-modal-header {
+                    background: linear-gradient(135deg, #fafafa 0%, #f5f3ff 100%);
+                    border-bottom: 1px solid #e2e8f0;
+                    padding: 18px 22px;
+                    align-items: flex-start;
+                }
+                .wd-modal-header-left { display: flex; gap: 14px; align-items: center; flex: 1; }
+                .wd-modal-icon {
+                    width: 38px; height: 38px; flex-shrink: 0;
+                    background: #ede9fe;
+                    border-radius: 10px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: #6d28d9;
+                }
+                .wd-modal-icon svg { width: 20px; height: 20px; }
+                .wd-modal-title { font-size: 17px; font-weight: 600; margin: 0; color: #0f172a; }
+                .wd-modal-sub { font-size: 12px; color: #64748b; margin: 2px 0 0; }
+
+                .wd-modal-body { padding: 22px; }
+
+                /* Dropzone */
+                .wd-dropzone {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 18px 18px;
+                    border: 2px dashed #cbd5e1;
+                    border-radius: 10px;
+                    background: #f8fafc;
+                    cursor: pointer;
+                    transition: all .15s ease;
+                    margin: 0;
+                }
+                .wd-dropzone:hover {
+                    border-color: #8b5cf6;
+                    background: #f5f3ff;
+                }
+                .wd-dropzone.is-file-selected {
+                    border-style: solid;
+                    border-color: #10b981;
+                    background: #ecfdf5;
+                }
+                .wd-dropzone input[type=file] {
+                    position: absolute;
+                    width: 1px; height: 1px;
+                    opacity: 0;
+                }
+                .wd-dropzone-icon {
+                    width: 42px; height: 42px; flex-shrink: 0;
+                    background: #fff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    display: flex; align-items: center; justify-content: center;
+                    color: #64748b;
+                }
+                .wd-dropzone-icon svg { width: 22px; height: 22px; }
+                .wd-dropzone.is-file-selected .wd-dropzone-icon { color: #059669; border-color: #a7f3d0; }
+                .wd-dropzone-text { display: flex; flex-direction: column; }
+                .wd-dropzone-text strong { color: #0f172a; font-size: 14px; font-weight: 600; }
+                .wd-dropzone-text span { color: #64748b; font-size: 12px; margin-top: 2px; }
+
+                /* Fields */
+                .wd-fields { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+                .wd-field { display: flex; flex-direction: column; gap: 6px; }
+                .wd-field label {
+                    font-size: 12px; font-weight: 500; color: #475569;
+                    text-transform: uppercase; letter-spacing: .4px;
+                }
+                .wd-field input {
+                    height: 38px;
+                    padding: 0 12px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 7px;
+                    font-size: 14px;
+                    color: #0f172a;
+                    background: #fff;
+                    transition: border-color .12s ease;
+                }
+                .wd-field input:focus {
+                    outline: 2px solid rgba(99,102,241,.18);
+                    border-color: #6366f1;
+                }
+                .wd-field input::placeholder { color: #94a3b8; }
+                .wd-field-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 14px;
+                }
+                .wd-req { color: #ef4444; }
+
+                /* Footer */
+                .wd-modal-footer {
+                    border-top: 1px solid #e2e8f0;
+                    padding: 14px 22px;
+                    background: #fafafa;
+                }
+                .wd-btn-submit { display: inline-flex; align-items: center; }
+
+                /* Banner BOB compatto */
                 .wd-ai-banner {
                     display: flex;
                     align-items: center;
@@ -183,38 +323,27 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     background: #f5f3ff;
                     border-left: 3px solid #8b5cf6;
                     border-radius: 4px;
-                    padding: 6px 10px;
-                    margin: -4px 0 12px 0;
+                    padding: 7px 10px;
+                    margin-top: 10px;
                     font-size: 12px;
                     color: #475569;
                     line-height: 1.4;
                 }
                 .wd-ai-banner.is-loading {
-                    /* effetto "shimmer" leggero per dire che sto leggendo */
                     background: linear-gradient(90deg, #f5f3ff 0%, #ede9fe 50%, #f5f3ff 100%);
                     background-size: 200% 100%;
                     animation: wdAiShimmer 1.6s ease-in-out infinite;
                 }
-                .wd-ai-banner.is-done {
-                    background: #ecfdf5;
-                    border-left-color: #10b981;
-                }
-                .wd-ai-banner.is-error {
-                    background: #fef2f2;
-                    border-left-color: #ef4444;
-                }
-                .wd-ai-icon {
-                    width: 18px;
-                    height: 18px;
-                    object-fit: contain;
-                    flex-shrink: 0;
-                }
+                .wd-ai-banner.is-done    { background: #ecfdf5; border-left-color: #10b981; }
+                .wd-ai-banner.is-error   { background: #fef2f2; border-left-color: #ef4444; }
+                .wd-ai-banner.is-name-warning { background: #fef2f2; border-left-color: #ef4444; }
+                .wd-ai-icon { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
                 @keyframes wdAiShimmer {
                     0%, 100% { background-position: 0% 0%; }
                     50%      { background-position: -100% 0%; }
                 }
 
-                /* Chip suggerimento sotto al campo quando l'utente aveva già scritto */
+                /* Chip suggerimento sotto al campo */
                 .wd-ai-chip {
                     font-size: 11px;
                     color: #6d28d9;
@@ -222,7 +351,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     border: 1px dashed #c4b5fd;
                     border-radius: 4px;
                     padding: 4px 8px;
-                    margin-top: 4px;
+                    margin-top: 6px;
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
@@ -237,10 +366,6 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 }
                 .wd-ai-chip-apply:hover { color: #4c1d95; }
             </style>
-            <div class="modal-footer">
-                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
-                <button type="submit" class="btn btn-primary">Carica</button>
-            </div>
         </form>
     </div>
 </div>

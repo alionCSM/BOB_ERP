@@ -262,6 +262,26 @@
         }
     }
 
+    function showWorkerNameWarning(data) {
+        var existing = document.getElementById('wd-ai-name-warning');
+        if (existing) existing.remove();
+
+        if (data.worker_match !== false) return; // null o true → niente warning
+        if (!data.worker_in_doc) return;
+
+        var warn = document.createElement('div');
+        warn.id = 'wd-ai-name-warning';
+        warn.className = 'wd-ai-banner is-name-warning';
+        warn.style.marginTop = '8px';
+        warn.innerHTML = '<img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                       + '<span>Attenzione: nel documento ho letto <strong></strong>, '
+                       + 'ma stai caricando per un operaio diverso. Verifica.</span>';
+        warn.querySelector('strong').textContent = data.worker_in_doc;
+        if (banner && banner.parentElement) {
+            banner.parentElement.insertBefore(warn, banner.nextSibling);
+        }
+    }
+
     function renderSuggestionChip(el, suggestedValue, label) {
         // Pulisci eventuali chip precedenti per questo campo
         var existing = el.parentElement && el.parentElement.querySelector('.wd-ai-chip');
@@ -281,21 +301,38 @@
         if (el.parentElement) el.parentElement.appendChild(chip);
     }
 
+    const dropzone     = fileInput && fileInput.closest('.wd-dropzone');
+    const fileNameSpan = document.getElementById('wd-dropzone-filename');
+
     if (fileInput) {
         fileInput.addEventListener('change', function () {
             const file = fileInput.files && fileInput.files[0];
             if (!file) {
                 if (banner) banner.style.display = 'none';
+                if (dropzone) dropzone.classList.remove('is-file-selected');
+                if (fileNameSpan) fileNameSpan.textContent = 'Scegli un file PDF';
                 return;
             }
 
-            // Pulisci chip precedenti (se l'utente sostituisce il file)
+            // Aggiorna UI dropzone
+            if (dropzone) dropzone.classList.add('is-file-selected');
+            if (fileNameSpan) fileNameSpan.textContent = file.name;
+
+            // Pulisci chip e warning precedenti (se l'utente sostituisce il file)
             document.querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
+            var prevWarn = document.getElementById('wd-ai-name-warning');
+            if (prevWarn) prevWarn.remove();
 
             setBanner('loading', 'BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
 
             const fd = new FormData();
             fd.append('document_file', file);
+            // Passa worker_id letto dal campo hidden del form così BOB
+            // può controllare se il nome nel documento corrisponde
+            var workerIdInput = document.querySelector('#document-upload-form input[name="worker_id"]');
+            if (workerIdInput && workerIdInput.value) {
+                fd.append('worker_id', workerIdInput.value);
+            }
 
             fetch('/documents/ai-suggest', { method: 'POST', body: fd })
                 .then(function (r) { return r.json(); })
@@ -332,6 +369,9 @@
                             setBanner('done', 'Ho aggiunto ' + applied.join(', ') + conf + '. Gli altri suggerimenti sono sotto ai campi.');
                         }
                     }
+
+                    // Alert separato se il nome nel documento non corrisponde all'operaio
+                    showWorkerNameWarning(data);
                 })
                 .catch(function (err) {
                     console.error(err);

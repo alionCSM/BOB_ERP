@@ -279,11 +279,23 @@ final class DocumentsController
             exit;
         }
 
+        // Worker context (per il controllo nome operaio)
+        $workerName = null;
+        $workerId   = (int)($_POST['worker_id'] ?? 0);
+        if ($workerId > 0) {
+            $st = $this->conn->prepare(
+                "SELECT TRIM(CONCAT(COALESCE(last_name,''), ' ', COALESCE(first_name,''))) AS n
+                 FROM bb_workers WHERE id = :id LIMIT 1"
+            );
+            $st->execute([':id' => $workerId]);
+            $workerName = $st->fetchColumn() ?: null;
+        }
+
         try {
             $ai      = new \App\Service\OllamaClient($ollamaUrl, $model);
             $mailer  = new \App\Service\Mailer(); // service constructor lo richiede ma non viene usato qui
             $service = new \App\Service\DocumentVerifierService($this->conn, $ai, $mailer);
-            $result  = $service->suggestForUpload($tmpFile);
+            $result  = $service->suggestForUpload($tmpFile, $workerName);
             echo json_encode($result);
         } catch (\Throwable $e) {
             echo json_encode(['error' => 'errore_interno', 'message' => $e->getMessage()]);
