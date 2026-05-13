@@ -19,13 +19,20 @@ class WorkerDocumentUploadValidator
 
         $workerId = (int)$post['worker_id'];
         $docType = trim((string)$post['document_type']);
-        $dateEmission = trim((string)$post['date_emission']);
-        $expiryDate = trim((string)($post['expiry_date'] ?? ''));
-        $expiryDate = $expiryDate !== '' ? $expiryDate : null;
+        $rawEmission = trim((string)$post['date_emission']);
+        $rawExpiry   = trim((string)($post['expiry_date'] ?? ''));
 
-        if ($workerId <= 0 || $docType === '' || $dateEmission === '') {
+        if ($workerId <= 0 || $docType === '' || $rawEmission === '') {
             throw new InvalidArgumentException('Parametri non validi.');
         }
+
+        // Normalizza date: italiano dd/mm/yyyy -> ISO YYYY-MM-DD per colonna DATE.
+        // Per la scadenza ammetti i valori speciali INDETERMINATO etc.
+        $dateEmission = DateNormalizer::toIso($rawEmission);
+        if ($dateEmission === null) {
+            throw new InvalidArgumentException("Data emissione non valida: \"{$rawEmission}\". Usa formato gg/mm/aaaa.");
+        }
+        $expiryDate = $rawExpiry !== '' ? DateNormalizer::toIsoOrSpecial($rawExpiry) : null;
 
         $file = $files['document_file'];
         $finfo = new \finfo(FILEINFO_MIME_TYPE);

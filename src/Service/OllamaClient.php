@@ -27,15 +27,18 @@ class OllamaClient
     /**
      * Send a multi-turn conversation as an array of messages.
      * Each message: ['role' => 'system'|'user'|'assistant', 'content' => '...']
+     *
+     * $options: opzionali, sovrascrivono i default. Es:
+     *   ['temperature' => 0.1, 'max_tokens' => 200]
      */
-    public function chat(array $messages): array {
+    public function chat(array $messages, array $options = []): array {
         try {
-            $payload = [
+            $payload = array_merge([
                 'model' => $this->model,
                 'messages' => $messages,
                 'temperature' => 0.2,
                 'stream' => false
-            ];
+            ], $options);
             $ch = curl_init($this->url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,

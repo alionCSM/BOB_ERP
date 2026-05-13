@@ -10,12 +10,7 @@
                 if (selectedDate === 'all') {
                     selectedDates.clear();
                     rows.forEach(row => row.style.display = '');
-                    buttons.forEach(b => {
-                        b.style.backgroundColor = 'white';
-                        b.style.color = '#333';
-                        b.style.borderColor = '#ccc';
-                        b.style.fontWeight = 'normal';
-                    });
+                    buttons.forEach(b => b.classList.remove('active'));
                     return;
                 }
 
@@ -32,17 +27,7 @@
 
                 buttons.forEach(b => {
                     const date = b.getAttribute('data-filter-date');
-                    if (selectedDates.has(date)) {
-                        b.style.backgroundColor = '#3b82f6';
-                        b.style.color = 'white';
-                        b.style.borderColor = '#3b82f6';
-                        b.style.fontWeight = 'bold';
-                    } else {
-                        b.style.backgroundColor = 'white';
-                        b.style.color = '#333';
-                        b.style.borderColor = '#ccc';
-                        b.style.fontWeight = 'normal';
-                    }
+                    b.classList.toggle('active', selectedDates.has(date));
                 });
 
                 if (selectedDates.size === 0) {

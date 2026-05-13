@@ -46,12 +46,15 @@
                d.getFullYear();
     }
 
-    function calcExpiry(emissionStr, validity) {
+    function calcExpiry(emissionStr, validity, docType) {
         if (validity.never) return '31/12/2099';
         var d = parseDate(emissionStr);
         if (!d) return '';
         d.setMonth(d.getMonth() + validity.months);
-        d.setDate(d.getDate() - 1);        
+         // Do not subtract 1 day for Verbale consegna DPI
+         if (docType !== 'Verbale consegna DPI') {
+           d.setDate(d.getDate() - 1);
+        }      
         return formatDDMMYYYY(d);
     }
 
@@ -78,7 +81,7 @@
                 if (hintEl) { hintEl.textContent = ''; hintEl.style.display = 'none'; }
                 return;
             }
-            var result = calcExpiry(emission, validity);
+            var result = calcExpiry(emission, validity, type);
             if (!result) {
                 if (hintEl) { hintEl.textContent = ''; hintEl.style.display = 'none'; }
                 return;
@@ -212,6 +215,215 @@
                 }
             })
             .catch(function (err) { console.error(err); });
+    });
+
+    // ── BOB AI: suggerimento al cambio file ───────────────────────────────────
+    // Quando l'utente seleziona un PDF, BOB lo legge e prova a pre-compilare
+    // tipo / emissione / scadenza. L'utente può sempre sovrascrivere.
+    // Stesso flusso usato sia nel modal di upload sia nel modal di modifica.
+
+    function ymdToItalian(s) {
+        if (!s || s === 'INDETERMINATO') return s;
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+        return m ? m[3] + '/' + m[2] + '/' + m[1] : s;
+    }
+
+    function setupAIDocumentReader(config) {
+        var fileInput  = document.getElementById(config.fileId);
+        if (!fileInput) return;
+
+        var banner     = document.getElementById(config.bannerId);
+        var bannerText = document.getElementById(config.bannerTextId);
+        var typeInput  = document.getElementById(config.typeId);
+        var emisInput  = document.getElementById(config.emisId);
+        var expInput   = document.getElementById(config.expId);
+        var dropzone   = fileInput.closest('.wd-dropzone');
+        var fileNameEl = config.fileNameId ? document.getElementById(config.fileNameId) : null;
+        var defaultFilenameLabel = fileNameEl ? fileNameEl.textContent : '';
+
+        // AbortController: ci permette di annullare la chiamata AI se
+        // l'utente preme "Carica" prima che BOB finisca di leggere
+        var currentAbort = null;
+
+        // Se il form che contiene questo file viene submitato, annulla l'AI
+        var hostForm = fileInput.closest('form');
+        if (hostForm) {
+            hostForm.addEventListener('submit', function () {
+                if (currentAbort) {
+                    currentAbort.abort();
+                    currentAbort = null;
+                    if (banner) banner.style.display = 'none';
+                }
+            });
+        }
+
+        function setBanner(state, msg) {
+            if (!banner) return;
+            banner.style.display = 'flex';
+            banner.classList.remove('is-loading', 'is-done', 'is-error');
+            if (state === 'loading') banner.classList.add('is-loading');
+            if (state === 'done')    banner.classList.add('is-done');
+            if (state === 'error')   banner.classList.add('is-error');
+            if (bannerText) bannerText.textContent = msg;
+        }
+
+        function setIfEmpty(el, value) {
+            if (!el || !value) return false;
+            if (el.value && el.value.trim() !== '') return false;
+            el.value = value;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        }
+
+        function renderSuggestionChip(el, suggestedValue, label) {
+            var existing = el.parentElement && el.parentElement.querySelector('.wd-ai-chip');
+            if (existing) existing.remove();
+            var chip = document.createElement('div');
+            chip.className = 'wd-ai-chip';
+            chip.innerHTML = '<img class="wd-ai-chip-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                + '<span class="wd-ai-chip-text">BOB suggerisce <strong></strong> per ' + label
+                + ' &middot; <a href="#" class="wd-ai-chip-apply">usa</a></span>';
+            chip.querySelector('strong').textContent = suggestedValue;
+            chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
+                e.preventDefault();
+                el.value = suggestedValue;
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                chip.remove();
+            });
+            if (el.parentElement) el.parentElement.appendChild(chip);
+        }
+
+        function tryApply(el, suggested, applied, label) {
+            if (!suggested) return;
+            if (setIfEmpty(el, suggested)) {
+                applied.push(label);
+            } else if ((el.value || '').trim() !== suggested) {
+                renderSuggestionChip(el, suggested, label);
+            }
+        }
+
+        function showWorkerNameWarning(data, scopeId) {
+            var existing = document.getElementById(scopeId + '-name-warning');
+            if (existing) existing.remove();
+            if (data.worker_match !== false) return;
+            if (!data.worker_in_doc) return;
+
+            var warn = document.createElement('div');
+            warn.id = scopeId + '-name-warning';
+            warn.className = 'wd-ai-banner is-name-warning';
+            warn.style.marginTop = '8px';
+            warn.innerHTML = '<img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                + '<span>Attenzione: nel documento ho letto <strong></strong>, '
+                + 'ma stai caricando per un operaio diverso. Verifica.</span>';
+            warn.querySelector('strong').textContent = data.worker_in_doc;
+            if (banner && banner.parentElement) {
+                banner.parentElement.insertBefore(warn, banner.nextSibling);
+            }
+        }
+
+        fileInput.addEventListener('change', function () {
+            var file = fileInput.files && fileInput.files[0];
+
+            // Pulisci stato precedente
+            (config.scopeEl || document).querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
+            var prevWarn = document.getElementById(config.bannerId + '-name-warning');
+            if (prevWarn) prevWarn.remove();
+
+            if (!file) {
+                if (banner) banner.style.display = 'none';
+                if (dropzone) dropzone.classList.remove('is-file-selected');
+                if (fileNameEl) fileNameEl.textContent = defaultFilenameLabel;
+                return;
+            }
+
+            if (dropzone) dropzone.classList.add('is-file-selected');
+            if (fileNameEl) fileNameEl.textContent = file.name;
+
+            setBanner('loading', 'BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
+
+            var fd = new FormData();
+            fd.append('document_file', file);
+
+            // Passa worker_id se disponibile (il campo hidden del form upload
+            // sta sulla stessa pagina e si applica anche al modal di edit)
+            var workerIdInput = document.querySelector('#document-upload-form input[name="worker_id"]');
+            if (workerIdInput && workerIdInput.value) {
+                fd.append('worker_id', workerIdInput.value);
+            }
+
+            // Abort di eventuali chiamate AI precedenti, e crea un controller
+            // per questa chiamata in modo da poter essere abortita al submit
+            if (currentAbort) currentAbort.abort();
+            currentAbort = new AbortController();
+
+            fetch('/documents/ai-suggest', {
+                method: 'POST',
+                body: fd,
+                signal: currentAbort.signal
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    currentAbort = null;
+                    if (data.error) {
+                        setBanner('error', 'BOB non è riuscito a leggere il file — compila pure a mano.');
+                        return;
+                    }
+                    var applied = [];
+                    tryApply(typeInput, data.type,                          applied, 'tipo');
+                    tryApply(emisInput, ymdToItalian(data.emission || ''),  applied, 'emissione');
+                    tryApply(expInput,  ymdToItalian(data.expiry   || ''),  applied, 'scadenza');
+
+                    var recognizedCount =
+                          (data.type     ? 1 : 0)
+                        + (data.emission ? 1 : 0)
+                        + (data.expiry   ? 1 : 0);
+
+                    if (recognizedCount === 0) {
+                        var hint = data.note && data.note.trim() !== ''
+                            ? data.note
+                            : 'Non ho riconosciuto nulla, compila pure a mano.';
+                        setBanner('error', hint);
+                    } else {
+                        var conf = data.confidence ? ' (' + data.confidence + '%)' : '';
+                        if (applied.length === recognizedCount) {
+                            setBanner('done', 'Ho pre-compilato ' + applied.join(', ') + conf + ' — verifica e correggi se serve.');
+                        } else if (applied.length === 0) {
+                            setBanner('done', 'Avevi già compilato, ti lascio i miei suggerimenti sotto ai campi.');
+                        } else {
+                            setBanner('done', 'Ho aggiunto ' + applied.join(', ') + conf + '. Gli altri suggerimenti sono sotto ai campi.');
+                        }
+                    }
+
+                    showWorkerNameWarning(data, config.bannerId);
+                })
+                .catch(function (err) {
+                    currentAbort = null;
+                    // L'aborto è normale (il form è stato submitato): silenzio
+                    if (err && err.name === 'AbortError') return;
+                    console.error(err);
+                    setBanner('error', 'Errore di rete — compila pure a mano.');
+                });
+        });
+    }
+
+    // Wiring: modal upload (file obbligatorio) + modal edit (file opzionale)
+    setupAIDocumentReader({
+        fileId:       'document_file',
+        bannerId:     'wd-ai-banner',
+        bannerTextId: 'wd-ai-banner-text',
+        typeId:       'wd-upload-type',
+        emisId:       'wd-upload-emission',
+        expId:        'wd-upload-expiry',
+        fileNameId:   'wd-dropzone-filename',
+    });
+    setupAIDocumentReader({
+        fileId:       'edit-doc-file',
+        bannerId:     'edit-ai-banner',
+        bannerTextId: 'edit-ai-banner-text',
+        typeId:       'edit-doc-type',
+        emisId:       'edit-doc-date-emission',
+        expId:        'edit-doc-expiry',
+        fileNameId:   'edit-dropzone-filename',
     });
 
     // ── Upload form submit ────────────────────────────────────────────────────

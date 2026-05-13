@@ -40,12 +40,16 @@ try {
     $db   = new Database();
     $conn = $db->connect();
 
-    $ollamaUrl = $_ENV['OLLAMA_URL'] ?? '';
-    $model     = $_ENV['MODEL'] ?? '';
+    // Endpoint LLM dedicato alla lettura documenti (es. modello più piccolo/
+    // veloce). Cade su OLLAMA_URL/MODEL se DOC_CHECK_URL/DOC_CHECK_MODEL
+    // non sono settate.
+    $ollamaUrl = $_ENV['DOC_CHECK_URL']   ?? ($_ENV['OLLAMA_URL'] ?? '');
+    $model     = $_ENV['DOC_CHECK_MODEL'] ?? ($_ENV['MODEL']      ?? '');
     if (!$ollamaUrl || !$model) {
-        echo "OLLAMA_URL/MODEL mancanti in .env. Esco.\n";
+        echo "DOC_CHECK_URL/MODEL (o OLLAMA_URL/MODEL come fallback) mancanti in .env. Esco.\n";
         exit(2);
     }
+    echo "Using LLM endpoint: {$model} @ {$ollamaUrl}\n";
     $ai = new OllamaClient($ollamaUrl, $model);
 
     if (empty($_ENV['MAIL_HOST'])) {

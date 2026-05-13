@@ -1502,7 +1502,7 @@ Regole:
 - Output: solo la frase, niente prefissi/firme.
 PROMPT;
 
-        $userPrompt = "Modulo: {$moduleLabel}\n"
+        $userPrompt = "/no_think\n\nModulo: {$moduleLabel}\n"
             . "Numero segnalazioni: {$count}\n"
             . "Destinatario: {$userFirstName}\n\n"
             . "Scrivi l'apertura della email.";
@@ -1561,7 +1561,7 @@ Output:
 - In italiano, max 18 parole.
 PROMPT;
 
-        $userPrompt = "Situazione:\n"
+        $userPrompt = "/no_think\n\nSituazione:\n"
             . "- Tipo segnalazione: {$anomalyType}\n"
             . "- Numero di apparizioni precedenti negli ultimi 14 giorni: {$count}\n"
             . "- Prima vista: {$days} giorni fa\n"

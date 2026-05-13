@@ -23,12 +23,21 @@ class WorkerDocumentUpdateValidator
             }
         }
 
+        $rawEmission = trim((string)($post['date_emission'] ?? ''));
+        $rawExpiry   = trim((string)($post['expiry_date']   ?? ''));
+
+        $dateEmission = $rawEmission !== '' ? DateNormalizer::toIso($rawEmission) : null;
+        if ($rawEmission !== '' && $dateEmission === null) {
+            throw new InvalidArgumentException("Data emissione non valida: \"{$rawEmission}\". Usa formato gg/mm/aaaa.");
+        }
+        $expiryDate = $rawExpiry !== '' ? DateNormalizer::toIsoOrSpecial($rawExpiry) : null;
+
         return [
-            'document_id' => (int)$post['document_id'],
+            'document_id'   => (int)$post['document_id'],
             'document_type' => trim((string)($post['document_type'] ?? '')),
-            'date_emission' => trim((string)($post['date_emission'] ?? '')),
-            'expiry_date' => trim((string)($post['expiry_date'] ?? '')) ?: null,
-            'file' => $file,
+            'date_emission' => $dateEmission,
+            'expiry_date'   => $expiryDate,
+            'file'          => $file,
         ];
     }
 }

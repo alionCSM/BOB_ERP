@@ -243,4 +243,78 @@ final class DocumentsController
         readfile($filePath);
         exit;
     }
+
+    /**
+     * POST /documents/ai-suggest
+     * Multipart: file PDF in $_FILES['document_file'].
+     * Risponde JSON con i metadati suggeriti da BOB AI:
+     *   { type, emission, expiry, confidence, note }
+     * Usato dal modal di upload per pre-popolare i campi.
+     */
+    public function aiSuggest(Request $request): never
+    {
+        header('Content-Type: application/json');
+
+        // Rilascia subito il lock della sessione: la chiamata Ollama può
+        // durare 5-15 secondi, e finché la sessione resta aperta PHP serializza
+        // tutte le altre richieste dello stesso utente (es. il submit del
+        // form di upload resta in coda fino al ritorno di questa funzione).
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
+        if (empty($_FILES['document_file']['tmp_name']) || !is_uploaded_file($_FILES['document_file']['tmp_name'])) {
+            echo json_encode(['error' => 'file_mancante']);
+            exit;
+        }
+
+        $tmpFile = $_FILES['document_file']['tmp_name'];
+
+        // Verifica MIME (solo PDF — Tesseract gestisce le immagini ma il
+        // flusso normale di upload accetta solo PDF)
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime  = $finfo->file($tmpFile) ?: '';
+        if ($mime !== 'application/pdf') {
+            echo json_encode(['error' => 'formato_non_pdf', 'mime' => $mime]);
+            exit;
+        }
+
+        // Per la lettura documenti usa un endpoint LLM dedicato se configurato
+        // (es. un modello più piccolo/veloce). Cade su OLLAMA_URL/MODEL se
+        // DOC_CHECK_URL/DOC_CHECK_MODEL non sono settate in .env.
+        $ollamaUrl = $_ENV['DOC_CHECK_URL']   ?? ($_ENV['OLLAMA_URL'] ?? '');
+        $model     = $_ENV['DOC_CHECK_MODEL'] ?? ($_ENV['MODEL']      ?? '');
+        if (!$ollamaUrl || !$model) {
+            echo json_encode(['error' => 'ai_non_configurata']);
+            exit;
+        }
+
+        // Worker context (per il controllo nome operaio)
+        $workerName = null;
+        $workerId   = (int)($_POST['worker_id'] ?? 0);
+        if ($workerId > 0) {
+            $st = $this->conn->prepare(
+                "SELECT TRIM(CONCAT(COALESCE(last_name,''), ' ', COALESCE(first_name,''))) AS n
+                 FROM bb_workers WHERE id = :id LIMIT 1"
+            );
+            $st->execute([':id' => $workerId]);
+            $workerName = $st->fetchColumn() ?: null;
+        }
+
+        // Nome file originale — utile come indizio (spesso "Visita_Rossi_scad_31-12-2027.pdf")
+        $origName = (string)($_FILES['document_file']['name'] ?? '');
+        // Tronca per sicurezza prima di mandarlo all'LLM
+        $origName = mb_substr($origName, 0, 200);
+
+        try {
+            $ai      = new \App\Service\OllamaClient($ollamaUrl, $model);
+            $mailer  = new \App\Service\Mailer(); // service constructor lo richiede ma non viene usato qui
+            $service = new \App\Service\DocumentVerifierService($this->conn, $ai, $mailer);
+            $result  = $service->suggestForUpload($tmpFile, $workerName, $origName ?: null);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            echo json_encode(['error' => 'errore_interno', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 }

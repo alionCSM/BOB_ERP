@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Domain\WorkerDocumentTypes;
 use PDO;
 use Throwable;
 
@@ -20,8 +21,14 @@ use Throwable;
  */
 final class DocumentVerifierService
 {
-    /** Tipi di documento monitorati. Espandere qui per aggiungere tipologie. */
-    private const MONITORED_WORKER_TYPES = ['UNILAV', 'Visita medica'];
+    /**
+     * Tipi di documento monitorati: tutti quelli presenti nella tendina del
+     * modal di upload (WorkerDocumentTypes::all).
+     */
+    private function monitoredWorkerTypes(): array
+    {
+        return WorkerDocumentTypes::all();
+    }
 
     /** Soglia minima di confidenza dell'LLM per considerare un mismatch reale. */
     private const MISMATCH_CONFIDENCE_THRESHOLD = 70;
@@ -32,8 +39,11 @@ final class DocumentVerifierService
     /** Numero massimo di pagine PDF da analizzare per documento. */
     private const MAX_PAGES = 2;
 
-    /** Numero massimo di caratteri di testo da inviare a Ollama. */
+    /** Numero massimo di caratteri di testo da inviare a Ollama (verifica notturna). */
     private const MAX_TEXT_CHARS = 6000;
+
+    /** Caratteri per il suggerimento al volo (più stretto -> più veloce). */
+    private const MAX_TEXT_CHARS_SUGGEST = 2500;
 
     private PDO $conn;
     private OllamaClient $ai;
@@ -93,7 +103,8 @@ final class DocumentVerifierService
     /** @return array<int, array<string,mixed>> */
     private function findWorkerDocumentsToVerify(): array
     {
-        $placeholders = implode(',', array_fill(0, count(self::MONITORED_WORKER_TYPES), '?'));
+        $types = $this->monitoredWorkerTypes();
+        $placeholders = implode(',', array_fill(0, count($types), '?'));
         $sql = "
             SELECT
                 wd.id, wd.worker_id, wd.tipo_documento, wd.scadenza, wd.path,
@@ -110,8 +121,243 @@ final class DocumentVerifierService
             ORDER BY wd.id ASC
         ";
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute(self::MONITORED_WORKER_TYPES);
+        $stmt->execute($types);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ── Suggerimento al volo per modal di upload ─────────────────────────────
+
+    /**
+     * Analizza un file PDF appena caricato e ritorna i metadati suggeriti:
+     * tipo documento, data emissione, scadenza.
+     *
+     * Pensato per essere chiamato da un endpoint AJAX nel form di upload.
+     *
+     * @return array{type:?string, emission:?string, expiry:?string, confidence:int, note:string}
+     */
+    /**
+     * @param string  $pdfPath    Path al file PDF caricato
+     * @param ?string $workerName Nome operaio per cui si sta caricando (per controllo coerenza)
+     * @param ?string $fileName   Nome originale del file (spesso contiene indizi tipo "Visita_Mario_Rossi_scad_31-12-2027.pdf")
+     */
+    public function suggestForUpload(string $pdfPath, ?string $workerName = null, ?string $fileName = null): array
+    {
+        $blank = [
+            'type' => null, 'emission' => null, 'expiry' => null,
+            'confidence' => 0, 'note' => '',
+            'worker_match' => null, 'worker_in_doc' => null,
+        ];
+
+        $text = $this->extractText($pdfPath);
+        $textLen = mb_strlen(trim($text));
+        if ($textLen < 30) {
+            return $blank + ['note' => "Testo del documento illeggibile."];
+        }
+
+        // Estrai indizi euristici dal testo (date) — aiuta il modello quando
+        // l'OCR è rumoroso o quando ci sono molte date nel doc e bisogna
+        // scegliere quale è emissione/scadenza
+        $datesFound = $this->extractDateHints($text);
+
+        $types = $this->monitoredWorkerTypes();
+        $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
+
+        $workerLine = $workerName
+            ? "\n\nIl documento è caricato per l'operaio: \"{$workerName}\". Verifica se nel testo c'è un nome che corrisponde."
+            : '';
+
+        // Esempi few-shot (testo realistico → JSON atteso). Su modelli piccoli
+        // questi guidano per imitazione molto meglio delle sole regole.
+        $fewShot = <<<'FEW'
+Esempio 1 — UNILAV a tempo indeterminato:
+  Input: "Modello Unilav - Comunicazione obbligatoria di assunzione. Lavoratore: ROSSI MARIO (CF RSSMRA80A01H501Z). Datore: ACME SRL. Data inizio rapporto: 15/03/2026. Tipo contratto: Tempo indeterminato."
+  Output: {"tipo_documento":"Unilav","data_emissione":"2026-03-15","data_scadenza":"INDETERMINATO","nome_operaio":"Rossi Mario","confidenza":92}
+
+Esempio 2 — Visita medica:
+  Input: "GIUDIZIO DI IDONEITÀ ALLA MANSIONE - Sorveglianza sanitaria D.Lgs 81/08. Lavoratore: VERDI ANNA. Data visita: 12 febbraio 2026. Idoneo alla mansione. Prossima visita: 12/02/2027. Dott. Bianchi - Medico competente."
+  Output: {"tipo_documento":"Visita medica","data_emissione":"2026-02-12","data_scadenza":"2027-02-12","nome_operaio":"Verdi Anna","confidenza":94}
+
+Esempio 3 — Attestato carrello elevatore:
+  Input: "Attestato di abilitazione - Carrello elevatore semovente. Accordo Stato-Regioni 22/02/2012. Corso 12 ore. Allievo: BIANCHI LUCA. Rilasciato il 03/04/2024. Validità 5 anni."
+  Output: {"tipo_documento":"Carrello elevatore","data_emissione":"2024-04-03","data_scadenza":"2029-04-03","nome_operaio":"Bianchi Luca","confidenza":88}
+
+Esempio 4 — testo confuso/non riconoscibile:
+  Input: "Pagina 1 di 2 — fattura n. 247/2025 — Acme SRL — importo 1.230,00 EUR"
+  Output: {"tipo_documento":"Altro","data_emissione":"","data_scadenza":"","nome_operaio":"","confidenza":15}
+FEW;
+
+        // Prompt sistema con esempi few-shot per i tipi più comuni
+        $systemPrompt = <<<PROMPT
+Sei un classificatore esperto di documenti italiani del settore edile/montaggi industriali. Il testo che ricevi viene da PDF nativi o da OCR — può essere rumoroso, frammentato, con caratteri sbagliati.
+
+Estrai questi campi:
+- tipo_documento (uno dei valori sotto, rispetta maiuscole/minuscole)
+- data_emissione (YYYY-MM-DD oppure stringa vuota)
+- data_scadenza (YYYY-MM-DD oppure "INDETERMINATO" per UNILAV indeterminato oppure stringa vuota)
+- nome_operaio (cognome e nome rilevato, stringa vuota se non chiaro)
+- confidenza (0-100)
+
+Tipi possibili:
+{$typesList}
+
+Frasi tipiche per riconoscere i tipi:
+- Unilav → "comunicazione obbligatoria", "assunzione", "cessazione", "modello UNILAV", codice fiscale + datore di lavoro
+- Visita medica → "idoneità sanitaria", "medico competente", "idoneo alla mansione", "sorveglianza sanitaria"
+- Documento d'identità → "Carta d'identità", "RPC ITALIANA", "REPUBBLICA ITALIANA", numero documento + foto
+- Formazione sicurezza → "attestato formazione", "D.Lgs 81/08", "rischio basso/medio/alto", ore di formazione
+- Patente → "patente di guida", categorie B/C/D/E, "MIT", motorizzazione
+- Carrello elevatore / Piattaforma / Gru / Braccio telescopico / Saldatura → "attestato di abilitazione", "Accordo Stato-Regioni", ore corso
+- Preposto / Antincendio / Primo soccorso / Lavori in quota DPI → "designazione", "incarico", "rischio incendio", "DPI III categoria"
+- Verbale consegna DPI → "consegna dispositivi protezione individuale", lista DPI
+
+Regole assolute:
+- Rispondi SOLO con un oggetto JSON, niente altro testo intorno.
+- Se hai più date: la prima cronologicamente è in genere l'emissione, la seconda la scadenza. Etichette utili: "emesso il", "valido fino al", "data scadenza", "data rilascio", "data corso".
+- Per visita medica: emissione = data della visita; scadenza = data prossima visita.
+- Mai inventare nomi o date assenti dal testo.
+- Se il testo è troppo confuso scegli "Altro" e confidenza < 40.
+
+{$fewShot}
+
+Schema risposta (un solo oggetto JSON, niente altro):
+{"tipo_documento":"...","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","nome_operaio":"...","confidenza":0-100}{$workerLine}
+PROMPT;
+
+        // User prompt arricchito con filename e date trovate via regex
+        $hintsBlock = '';
+        if ($fileName) {
+            $hintsBlock .= "Nome file originale: \"{$fileName}\" (può contenere indizi su tipo/persona/scadenza).\n";
+        }
+        if (!empty($datesFound)) {
+            $hintsBlock .= "Date trovate nel testo (formato originale): " . implode(', ', $datesFound) . "\n";
+        }
+        if ($hintsBlock !== '') {
+            $hintsBlock = "Indizi pre-estratti:\n" . $hintsBlock . "\n";
+        }
+
+        // /no_think disattiva la modalità "thinking" di Qwen3
+        $userPrompt = "/no_think\n\n"
+            . $hintsBlock
+            . "Testo del documento:\n\n---\n"
+            . mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST)
+            . "\n---\n\nClassifica il documento secondo lo schema indicato.";
+
+        // Forziamo JSON mode (OpenAI-compatible) così il modello piccolo
+        // non sgarra il formato. Se il server non lo supporta, lo ignora
+        // silenziosamente. Temperature bassa per output deterministico.
+        $result = $this->ai->chat(
+            [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user',   'content' => $userPrompt],
+            ],
+            [
+                'temperature' => 0.1,
+                'response_format' => ['type' => 'json_object'],
+            ]
+        );
+        if (!($result['ok'] ?? false)) {
+            return $blank + ['note' => 'BOB AI non disponibile.'];
+        }
+
+        $raw = trim((string)($result['response'] ?? ''));
+        if (preg_match('/\{.*\}/s', $raw, $m)) {
+            $raw = $m[0];
+        }
+        $json = json_decode($raw, true);
+        if (!is_array($json)) {
+            return $blank + ['note' => 'Risposta AI non interpretabile.'];
+        }
+
+        $type     = $this->normalizeType((string)($json['tipo_documento'] ?? ''));
+        $emission = $this->normalizeDate((string)($json['data_emissione'] ?? ''));
+        $expiry   = $this->normalizeExpiry((string)($json['data_scadenza'] ?? ''));
+
+        // Se il tipo non è riconosciuto (Altro / sconosciuto), non possiamo
+        // garantire che le date estratte siano coerenti col documento atteso
+        // → meglio non suggerire nulla che suggerire date sbagliate.
+        if ($type === null) {
+            $emission = null;
+            $expiry   = null;
+        }
+
+        $workerInDoc = trim((string)($json['nome_operaio'] ?? ''));
+        $workerMatch = null;
+        if ($workerName !== null && $workerName !== '' && $workerInDoc !== '') {
+            $workerMatch = $this->namesLooseMatch($workerName, $workerInDoc);
+        }
+
+        return [
+            'type'         => $type,
+            'emission'     => $emission,
+            'expiry'       => $expiry,
+            'confidence'   => max(0, min(100, (int)($json['confidenza'] ?? 0))),
+            'note'         => mb_substr((string)($json['note'] ?? ''), 0, 150),
+            'worker_in_doc'=> $workerInDoc !== '' ? $workerInDoc : null,
+            'worker_match' => $workerMatch,
+        ];
+    }
+
+    /**
+     * Estrae candidate-date dal testo grezzo. Aiuta il modello quando l'OCR
+     * spezza le date o quando ce ne sono molte ed è difficile capire quale
+     * è emissione vs scadenza.
+     *
+     * Riconosce: dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, yyyy-mm-dd,
+     * "31 dicembre 2026", "31 dic 2026".
+     *
+     * @return string[] elenco di date trovate nel formato originale, deduplicate
+     */
+    private function extractDateHints(string $text): array
+    {
+        $patterns = [
+            // dd separator mm separator yyyy (con separatori vari)
+            '/\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/',
+            // yyyy-mm-dd
+            '/\b(\d{4}-\d{2}-\d{2})\b/',
+            // "31 dicembre 2026" (con mesi italiani)
+            '/\b(\d{1,2}\s+(?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)\.?\s+\d{4})\b/iu',
+        ];
+        $found = [];
+        foreach ($patterns as $p) {
+            if (preg_match_all($p, $text, $matches)) {
+                foreach ($matches[1] as $m) {
+                    $found[trim($m)] = true;
+                }
+            }
+        }
+        return array_slice(array_keys($found), 0, 8); // top 8 max, niente spam
+    }
+
+    private function normalizeType(string $type): ?string
+    {
+        $type = trim($type);
+        if ($type === '' || strcasecmp($type, 'Altro') === 0) return null;
+        // Caso-insensitive match con uno dei tipi conosciuti
+        foreach ($this->monitoredWorkerTypes() as $known) {
+            if (strcasecmp($type, $known) === 0) return $known;
+        }
+        return $type; // fallback: ritorna così com'è, datalist può comunque mostrarlo
+    }
+
+    private function normalizeDate(string $s): ?string
+    {
+        $s = trim($s);
+        if ($s === '') return null;
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y'] as $fmt) {
+            $dt = \DateTime::createFromFormat($fmt, $s);
+            if ($dt && $dt->format($fmt) === $s) {
+                return $dt->format('Y-m-d');
+            }
+        }
+        return null;
+    }
+
+    private function normalizeExpiry(string $s): ?string
+    {
+        $s = trim($s);
+        if ($s === '') return null;
+        if (strcasecmp($s, 'INDETERMINATO') === 0) return 'INDETERMINATO';
+        return $this->normalizeDate($s);
     }
 
     // ── Verifica singolo documento ───────────────────────────────────────────
@@ -288,7 +534,7 @@ Regole:
 - Sii rigoroso: meglio bassa confidenza che invenzioni.
 PROMPT;
 
-        $userPrompt = "Documento dichiarato come:\n"
+        $userPrompt = "/no_think\n\nDocumento dichiarato come:\n"
             . "- Tipo: {$declaredType}\n"
             . "- Operaio: {$declaredName}\n"
             . "- Scadenza dichiarata: {$declaredExpiry}\n\n"

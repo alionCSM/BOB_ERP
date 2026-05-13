@@ -291,6 +291,7 @@ if ($uri === '/documents' || str_starts_with($uri, '/documents/')) {
     $router->post('/documents/{id}/delete',   [DocumentsController::class, 'destroy'])
            ->post('/documents/{id}/update',  [DocumentsController::class, 'update'])
            ->post('/documents/upload',       [DocumentsController::class, 'upload'])
+           ->post('/documents/ai-suggest',   [DocumentsController::class, 'aiSuggest'])
            ->get('/documents/check-mandatory', [DocumentsController::class, 'checkMandatory'])
            ->get('/documents/check-mandatory-company', [DocumentsController::class, 'checkMandatoryCompany'])
            ->get('/documents/expired',       [DocumentsController::class, 'expired'])

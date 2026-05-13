@@ -97,6 +97,18 @@ final class AttendanceController
         $c           = new Worksite($this->conn, (int)$cantiereId);
         $nostri      = $repo->getInternalByWorksiteAndDate((int)$cantiereId, $data);
         $consorziate = $repo->getConsorziateByWorksiteAndDate((int)$cantiereId, $data);
+        foreach ($consorziate as &$c) {
+            $c['quantita'] = (float)str_replace(',', '.', (string)$c['quantita']);
+            $c['costo_unitario'] = (float)str_replace(',', '.', (string)$c['costo_unitario']);
+            $c['pasti'] = (float)str_replace(',', '.', (string)$c['pasti']);
+        }
+        unset($c);
+
+        foreach ($nostri as &$n) {
+            $n['pranzo_prezzo'] = isset($n['pranzo_prezzo']) ? (float)str_replace(',', '.', (string)$n['pranzo_prezzo']) : null;
+            $n['cena_prezzo'] = isset($n['cena_prezzo']) ? (float)str_replace(',', '.', (string)$n['cena_prezzo']) : null;
+        }
+        unset($n);
 
         $pageTitle = 'Modifica Presenze';
         Response::view('attendance/edit.html.twig', $request, compact('cantiereId', 'data', 'c', 'nostri', 'consorziate', 'pageTitle'));
