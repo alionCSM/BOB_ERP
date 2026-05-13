@@ -37,6 +37,15 @@
             tabNostri.classList.remove("tab-active");
         });
 
+        // Auto-select tab based on URL param ?type=consorziata
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('type') === 'consorziata') {
+            secNostri.classList.add("hidden");
+            secCons.classList.remove("hidden");
+            tabNostri.classList.remove("tab-active");
+            tabCons.classList.add("tab-active");
+        }
+
         const selectedValue = "<?php echo $cantiere_id ?? ''; ?>";
 
         new TomSelect("#cantiere", {
