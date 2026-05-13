@@ -143,7 +143,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 <!-- Banner BOB suggestion (compatto, non blocca l'utente) -->
                 <div id="wd-ai-banner" class="wd-ai-banner" style="display:none;">
-                    <span class="wd-ai-icon">🤖</span>
+                    <img class="wd-ai-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />
                     <span id="wd-ai-banner-text">BOB sta leggendo… puoi compilare anche tu nel frattempo.</span>
                 </div>
 
@@ -203,7 +203,12 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     background: #fef2f2;
                     border-left-color: #ef4444;
                 }
-                .wd-ai-icon { font-size: 14px; line-height: 1; }
+                .wd-ai-icon {
+                    width: 18px;
+                    height: 18px;
+                    object-fit: contain;
+                    flex-shrink: 0;
+                }
                 @keyframes wdAiShimmer {
                     0%, 100% { background-position: 0% 0%; }
                     50%      { background-position: -100% 0%; }
@@ -218,8 +223,11 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     border-radius: 4px;
                     padding: 4px 8px;
                     margin-top: 4px;
-                    display: inline-block;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
                 }
+                .wd-ai-chip-icon { width: 14px; height: 14px; object-fit: contain; }
                 .wd-ai-chip strong { color: #4c1d95; font-weight: 600; }
                 .wd-ai-chip-apply {
                     color: #6d28d9;

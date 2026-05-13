@@ -268,7 +268,8 @@
         if (existing) existing.remove();
         var chip = document.createElement('div');
         chip.className = 'wd-ai-chip';
-        chip.innerHTML = '🤖 BOB suggerisce <strong></strong> per ' + label
+        chip.innerHTML = '<img class="wd-ai-chip-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
+                       + ' BOB suggerisce <strong></strong> per ' + label
                        + ' &nbsp;·&nbsp; <a href="#" class="wd-ai-chip-apply">usa</a>';
         chip.querySelector('strong').textContent = suggestedValue;
         chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
@@ -291,7 +292,7 @@
             // Pulisci chip precedenti (se l'utente sostituisce il file)
             document.querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
 
-            setBanner('loading', '🤖 BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
+            setBanner('loading', 'BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
 
             const fd = new FormData();
             fd.append('document_file', file);
@@ -299,12 +300,8 @@
             fetch('/documents/ai-suggest', { method: 'POST', body: fd })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    // DEBUG temporaneo — guarda DevTools console per capire
-                    // dove cade la pipeline
-                    console.log('[BOB AI suggest] response:', data);
-                    if (data && data.debug) console.log('[BOB AI debug]', data.debug);
                     if (data.error) {
-                        setBanner('error', '🤖 BOB non è riuscito a leggere il file — compila pure a mano.');
+                        setBanner('error', 'BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
                     }
                     const applied = [];
@@ -324,21 +321,21 @@
                         var hint = data.note && data.note.trim() !== ''
                             ? data.note
                             : 'Non ho riconosciuto nulla, compila pure a mano.';
-                        setBanner('error', '🤖 ' + hint);
+                        setBanner('error', hint);
                     } else {
                         const conf = data.confidence ? ' (' + data.confidence + '%)' : '';
                         if (applied.length === recognizedCount) {
-                            setBanner('done', '🤖 Ho pre-compilato ' + applied.join(', ') + conf + ' — verifica e correggi se serve.');
+                            setBanner('done', 'Ho pre-compilato ' + applied.join(', ') + conf + ' — verifica e correggi se serve.');
                         } else if (applied.length === 0) {
-                            setBanner('done', '🤖 Avevi già compilato, ti lascio i miei suggerimenti sotto ai campi.');
+                            setBanner('done', 'Avevi già compilato, ti lascio i miei suggerimenti sotto ai campi.');
                         } else {
-                            setBanner('done', '🤖 Ho aggiunto ' + applied.join(', ') + conf + '. Gli altri suggerimenti sono sotto ai campi.');
+                            setBanner('done', 'Ho aggiunto ' + applied.join(', ') + conf + '. Gli altri suggerimenti sono sotto ai campi.');
                         }
                     }
                 })
                 .catch(function (err) {
                     console.error(err);
-                    setBanner('error', '🤖 Errore di rete — compila pure a mano.');
+                    setBanner('error', 'Errore di rete — compila pure a mano.');
                 });
         });
     }
