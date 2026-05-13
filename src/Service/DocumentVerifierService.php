@@ -147,33 +147,38 @@ final class DocumentVerifierService
         }
 
         $types = $this->monitoredWorkerTypes();
-        $typesList = implode(' | ', $types);
+        $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
 
-        // Prompt ultra-snello: poche istruzioni, output JSON breve.
-        // Meno token = risposta più rapida (target ~3-5s anziché 10-15).
+        // Prompt più conciso del verifier notturno ma con istruzioni chiare —
+        // il modello senza contesto smette di rispondere bene.
         $systemPrompt = <<<PROMPT
-Classifica il documento. Risposta SOLO JSON, niente altro.
+Sei un classificatore di documenti italiani per operai. Ricevi il testo grezzo (possibilmente OCR rumoroso) di un documento e devi estrarre tre informazioni: tipo, data di emissione, data di scadenza.
 
-Tipi ammessi: {$typesList} | Altro
+Il tipo deve essere uno di questi valori esatti (rispetta maiuscole/minuscole):
+{$typesList}
 
-Schema:
-{"tipo_documento":"...","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","confidenza":0-100}
+Rispondi SOLO con un oggetto JSON valido, niente prefisso né commenti né markdown:
+{"tipo_documento":"<uno dei valori sopra>","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","confidenza":0-100}
 
-Note:
-- UNILAV a tempo indeterminato: data_scadenza="INDETERMINATO"
-- Se non riconosci: "Altro" e confidenza bassa
-- Niente invenzioni
+Regole:
+- "data_emissione" e "data_scadenza" possono essere stringa vuota se non rilevabili.
+- Per UNILAV a tempo indeterminato la data_scadenza è "INDETERMINATO".
+- Se non sei sicuro del tipo, scegli "Altro" e abbassa la confidenza.
+- Mai inventare date o nomi non presenti nel testo.
 PROMPT;
 
-        $userPrompt = mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST);
+        $userPrompt = "Testo del documento:\n\n---\n"
+            . mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST)
+            . "\n---\n\nClassifica il documento secondo lo schema indicato.";
 
-        // max_tokens basso (la JSON è di ~120 char) + temperatura più stretta
+        // max_tokens generoso (la JSON è di ~120 char ma alcuni modelli
+        // padding lo spazio). Temperatura bassa per output deterministico.
         $result = $this->ai->chat(
             [
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user',   'content' => $userPrompt],
             ],
-            ['temperature' => 0.1, 'max_tokens' => 200]
+            ['temperature' => 0.1, 'max_tokens' => 400]
         );
         if (!($result['ok'] ?? false)) {
             error_log("[DocumentVerifier] LLM call failed: " . ($result['error'] ?? 'unknown'));
