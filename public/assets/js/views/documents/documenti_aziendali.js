@@ -46,7 +46,7 @@
                d.getFullYear();
     }
 
-    function calcExpiry(emissionStr, validity) {
+    function calcExpiry(emissionStr, validity, docType) {
         if (validity.never) return '31/12/2099';
         var d = parseDate(emissionStr);
         if (!d) return '';
@@ -81,7 +81,7 @@
                 if (hintEl) { hintEl.textContent = ''; hintEl.style.display = 'none'; }
                 return;
             }
-            var result = calcExpiry(emission, validity);
+            var result = calcExpiry(emission, validity, type);
             if (!result) {
                 if (hintEl) { hintEl.textContent = ''; hintEl.style.display = 'none'; }
                 return;
