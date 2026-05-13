@@ -288,9 +288,11 @@
         if (existing) existing.remove();
         var chip = document.createElement('div');
         chip.className = 'wd-ai-chip';
+        // Wrappiamo il testo in un singolo <span> così il flex layout non
+        // spezza ogni parola con il gap fra mezzo
         chip.innerHTML = '<img class="wd-ai-chip-icon" src="/includes/template/dist/images/logo.png" alt="BOB" />'
-                       + ' BOB suggerisce <strong></strong> per ' + label
-                       + ' &nbsp;·&nbsp; <a href="#" class="wd-ai-chip-apply">usa</a>';
+                       + '<span class="wd-ai-chip-text">BOB suggerisce <strong></strong> per ' + label
+                       + ' &middot; <a href="#" class="wd-ai-chip-apply">usa</a></span>';
         chip.querySelector('strong').textContent = suggestedValue;
         chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
             e.preventDefault();

@@ -350,19 +350,27 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     background: #f5f3ff;
                     border: 1px dashed #c4b5fd;
                     border-radius: 4px;
-                    padding: 4px 8px;
+                    padding: 5px 9px;
                     margin-top: 6px;
-                    display: inline-flex;
+                    display: flex;
                     align-items: center;
-                    gap: 6px;
+                    gap: 8px;
+                    line-height: 1.4;
                 }
-                .wd-ai-chip-icon { width: 14px; height: 14px; object-fit: contain; }
-                .wd-ai-chip strong { color: #4c1d95; font-weight: 600; }
+                .wd-ai-chip-icon {
+                    width: 14px;
+                    height: 14px;
+                    object-fit: contain;
+                    flex-shrink: 0;
+                }
+                .wd-ai-chip-text { flex: 1; min-width: 0; }
+                .wd-ai-chip strong { color: #4c1d95; font-weight: 600; white-space: nowrap; }
                 .wd-ai-chip-apply {
                     color: #6d28d9;
                     text-decoration: underline;
                     cursor: pointer;
                     font-weight: 500;
+                    white-space: nowrap;
                 }
                 .wd-ai-chip-apply:hover { color: #4c1d95; }
             </style>
