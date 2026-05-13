@@ -208,6 +208,26 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     0%, 100% { background-position: 0% 0%; }
                     50%      { background-position: -100% 0%; }
                 }
+
+                /* Chip suggerimento sotto al campo quando l'utente aveva già scritto */
+                .wd-ai-chip {
+                    font-size: 11px;
+                    color: #6d28d9;
+                    background: #f5f3ff;
+                    border: 1px dashed #c4b5fd;
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    margin-top: 4px;
+                    display: inline-block;
+                }
+                .wd-ai-chip strong { color: #4c1d95; font-weight: 600; }
+                .wd-ai-chip-apply {
+                    color: #6d28d9;
+                    text-decoration: underline;
+                    cursor: pointer;
+                    font-weight: 500;
+                }
+                .wd-ai-chip-apply:hover { color: #4c1d95; }
             </style>
             <div class="modal-footer">
                 <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>

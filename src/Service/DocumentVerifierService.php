@@ -39,8 +39,11 @@ final class DocumentVerifierService
     /** Numero massimo di pagine PDF da analizzare per documento. */
     private const MAX_PAGES = 2;
 
-    /** Numero massimo di caratteri di testo da inviare a Ollama. */
+    /** Numero massimo di caratteri di testo da inviare a Ollama (verifica notturna). */
     private const MAX_TEXT_CHARS = 6000;
+
+    /** Caratteri per il suggerimento al volo (più stretto -> più veloce). */
+    private const MAX_TEXT_CHARS_SUGGEST = 2500;
 
     private PDO $conn;
     private OllamaClient $ai;
@@ -144,39 +147,34 @@ final class DocumentVerifierService
         }
 
         $types = $this->monitoredWorkerTypes();
-        $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
+        $typesList = implode(' | ', $types);
 
+        // Prompt ultra-snello: poche istruzioni, output JSON breve.
+        // Meno token = risposta più rapida (target ~3-5s anziché 10-15).
         $systemPrompt = <<<PROMPT
-Sei BOB, l'assistente del gestionale BOB. Analizzi il testo grezzo (estratto da PDF, possibile OCR rumoroso) di un documento di un operaio e devi suggerire come dovrebbe essere catalogato.
+Classifica il documento. Risposta SOLO JSON, niente altro.
 
-Devi scegliere il tipo da questo elenco esatto (rispetta maiuscole/minuscole/spazi):
-{$typesList}
-
-Devi rispondere SOLO con un oggetto JSON valido, niente prefisso, niente commenti, niente markdown.
+Tipi ammessi: {$typesList} | Altro
 
 Schema:
-{
-  "tipo_documento": "uno dei valori dell'elenco sopra",
-  "data_emissione": "YYYY-MM-DD oppure stringa vuota",
-  "data_scadenza":  "YYYY-MM-DD oppure 'INDETERMINATO' oppure stringa vuota",
-  "confidenza": 0-100,
-  "note": "breve nota se serve, massimo 150 caratteri"
-}
+{"tipo_documento":"...","data_emissione":"YYYY-MM-DD","data_scadenza":"YYYY-MM-DD","confidenza":0-100}
 
-Regole:
-- Per UNILAV la "data_scadenza" è la data di fine rapporto; se rapporto a tempo indeterminato scrivi "INDETERMINATO".
-- Per documenti permanenti (es. carta d'identità senza scadenza visibile) lascia "data_scadenza" vuota.
-- Se il testo è troppo confuso scegli "Altro" e confidenza bassa.
-- Meglio bassa confidenza che invenzioni.
+Note:
+- UNILAV a tempo indeterminato: data_scadenza="INDETERMINATO"
+- Se non riconosci: "Altro" e confidenza bassa
+- Niente invenzioni
 PROMPT;
 
-        $userPrompt = "Leggi il testo del documento e suggerisci come catalogarlo.\n\n"
-            . "---\n" . mb_substr($text, 0, self::MAX_TEXT_CHARS) . "\n---";
+        $userPrompt = mb_substr($text, 0, self::MAX_TEXT_CHARS_SUGGEST);
 
-        $result = $this->ai->chat([
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user',   'content' => $userPrompt],
-        ]);
+        // max_tokens basso (la JSON è di ~120 char) + temperatura più stretta
+        $result = $this->ai->chat(
+            [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user',   'content' => $userPrompt],
+            ],
+            ['temperature' => 0.1, 'max_tokens' => 200]
+        );
         if (!($result['ok'] ?? false)) {
             error_log("[DocumentVerifier] LLM call failed: " . ($result['error'] ?? 'unknown'));
             return $blank + ['note' => 'BOB AI non disponibile (' . ($result['error'] ?? 'errore') . ').'];

@@ -251,6 +251,35 @@
         return m ? m[3] + '/' + m[2] + '/' + m[1] : s;
     }
 
+    function tryApply(el, suggested, applied, label) {
+        if (!suggested) return;
+        if (setIfEmpty(el, suggested)) {
+            applied.push(label);
+        } else if ((el.value || '').trim() !== suggested) {
+            // L'utente ha già scritto qualcosa di diverso → offri il valore di BOB
+            // come "chip" cliccabile sotto il campo invece di sovrascrivere
+            renderSuggestionChip(el, suggested, label);
+        }
+    }
+
+    function renderSuggestionChip(el, suggestedValue, label) {
+        // Pulisci eventuali chip precedenti per questo campo
+        var existing = el.parentElement && el.parentElement.querySelector('.wd-ai-chip');
+        if (existing) existing.remove();
+        var chip = document.createElement('div');
+        chip.className = 'wd-ai-chip';
+        chip.innerHTML = '🤖 BOB suggerisce <strong></strong> per ' + label
+                       + ' &nbsp;·&nbsp; <a href="#" class="wd-ai-chip-apply">usa</a>';
+        chip.querySelector('strong').textContent = suggestedValue;
+        chip.querySelector('.wd-ai-chip-apply').addEventListener('click', function (e) {
+            e.preventDefault();
+            el.value = suggestedValue;
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            chip.remove();
+        });
+        if (el.parentElement) el.parentElement.appendChild(chip);
+    }
+
     if (fileInput) {
         fileInput.addEventListener('change', function () {
             const file = fileInput.files && fileInput.files[0];
@@ -258,6 +287,9 @@
                 if (banner) banner.style.display = 'none';
                 return;
             }
+
+            // Pulisci chip precedenti (se l'utente sostituisce il file)
+            document.querySelectorAll('.wd-ai-chip').forEach(c => c.remove());
 
             setBanner('loading', '🤖 BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
 
@@ -271,19 +303,33 @@
                         setBanner('error', '🤖 BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
                     }
-                    const filled = [];
-                    if (data.type && setIfEmpty(typeInput, data.type)) filled.push('tipo');
-                    if (data.emission && setIfEmpty(emisInput, ymdToItalian(data.emission))) filled.push('emissione');
-                    if (data.expiry && setIfEmpty(expInput, ymdToItalian(data.expiry))) filled.push('scadenza');
+                    const applied = [];
+                    tryApply(typeInput, data.type,                          applied, 'tipo');
+                    tryApply(emisInput, ymdToItalian(data.emission || ''),  applied, 'emissione');
+                    tryApply(expInput,  ymdToItalian(data.expiry   || ''),  applied, 'scadenza');
 
-                    if (filled.length === 0) {
+                    // Conta quanti BOB aveva pre-compilato in totale (anche
+                    // quelli mostrati come chip perché l'utente aveva già
+                    // digitato qualcosa di diverso)
+                    var recognizedCount =
+                          (data.type     ? 1 : 0)
+                        + (data.emission ? 1 : 0)
+                        + (data.expiry   ? 1 : 0);
+
+                    if (recognizedCount === 0) {
                         var hint = data.note && data.note.trim() !== ''
                             ? data.note
                             : 'Non ho riconosciuto nulla, compila pure a mano.';
                         setBanner('error', '🤖 ' + hint);
                     } else {
                         const conf = data.confidence ? ' (' + data.confidence + '%)' : '';
-                        setBanner('done', '🤖 Ho pre-compilato ' + filled.join(', ') + conf + ' — verifica e correggi se serve.');
+                        if (applied.length === recognizedCount) {
+                            setBanner('done', '🤖 Ho pre-compilato ' + applied.join(', ') + conf + ' — verifica e correggi se serve.');
+                        } else if (applied.length === 0) {
+                            setBanner('done', '🤖 Avevi già compilato, ti lascio i miei suggerimenti sotto ai campi.');
+                        } else {
+                            setBanner('done', '🤖 Ho aggiunto ' + applied.join(', ') + conf + '. Gli altri suggerimenti sono sotto ai campi.');
+                        }
                     }
                 })
                 .catch(function (err) {
