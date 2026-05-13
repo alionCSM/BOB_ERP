@@ -279,9 +279,11 @@ final class DocumentsController
             exit;
         }
 
-        // Costruisci dipendenze e chiama il service
-        $ollamaUrl = $_ENV['OLLAMA_URL'] ?? '';
-        $model     = $_ENV['MODEL'] ?? '';
+        // Per la lettura documenti usa un endpoint LLM dedicato se configurato
+        // (es. un modello più piccolo/veloce). Cade su OLLAMA_URL/MODEL se
+        // DOC_CHECK_URL/DOC_CHECK_MODEL non sono settate in .env.
+        $ollamaUrl = $_ENV['DOC_CHECK_URL']   ?? ($_ENV['OLLAMA_URL'] ?? '');
+        $model     = $_ENV['DOC_CHECK_MODEL'] ?? ($_ENV['MODEL']      ?? '');
         if (!$ollamaUrl || !$model) {
             echo json_encode(['error' => 'ai_non_configurata']);
             exit;
