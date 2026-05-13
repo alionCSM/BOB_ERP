@@ -141,16 +141,11 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="file" id="document_file" name="document_file" class="form-control" accept="application/pdf" required>
                 </div>
 
-                <!-- Banner BOB suggestion -->
+                <!-- Banner BOB suggestion (compatto, non blocca l'utente) -->
                 <div id="wd-ai-banner" class="wd-ai-banner" style="display:none;">
-                    <div class="wd-ai-icon">🤖</div>
-                    <div class="wd-ai-text">
-                        <strong>BOB sta leggendo il documento…</strong>
-                        <span id="wd-ai-banner-msg">Un secondo, ti suggerisco i campi qui sotto.</span>
-                    </div>
+                    <span class="wd-ai-icon">🤖</span>
+                    <span id="wd-ai-banner-text">BOB sta leggendo… puoi compilare anche tu nel frattempo.</span>
                 </div>
-
-                <hr style="margin:16px 0; border:none; border-top:1px solid #e2e8f0;">
 
                 <div class="mb-3">
                     <label class="form-label">Tipo Documento</label>
@@ -180,38 +175,39 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <style>
+                /* Banner BOB compatto: 1 riga, niente "muro" visivo fra file e campi */
                 .wd-ai-banner {
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    background: linear-gradient(135deg, #ede9fe, #e0e7ff);
-                    border: 1px solid #c7d2fe;
-                    border-radius: 8px;
-                    padding: 12px 14px;
-                    margin-top: 12px;
+                    gap: 8px;
+                    background: #f5f3ff;
+                    border-left: 3px solid #8b5cf6;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                    margin: -4px 0 12px 0;
+                    font-size: 12px;
+                    color: #475569;
+                    line-height: 1.4;
+                }
+                .wd-ai-banner.is-loading {
+                    /* effetto "shimmer" leggero per dire che sto leggendo */
+                    background: linear-gradient(90deg, #f5f3ff 0%, #ede9fe 50%, #f5f3ff 100%);
+                    background-size: 200% 100%;
+                    animation: wdAiShimmer 1.6s ease-in-out infinite;
                 }
                 .wd-ai-banner.is-done {
-                    background: linear-gradient(135deg, #d1fae5, #ecfdf5);
-                    border-color: #a7f3d0;
+                    background: #ecfdf5;
+                    border-left-color: #10b981;
                 }
                 .wd-ai-banner.is-error {
                     background: #fef2f2;
-                    border-color: #fecaca;
+                    border-left-color: #ef4444;
                 }
-                .wd-ai-icon {
-                    font-size: 22px;
-                    line-height: 1;
+                .wd-ai-icon { font-size: 14px; line-height: 1; }
+                @keyframes wdAiShimmer {
+                    0%, 100% { background-position: 0% 0%; }
+                    50%      { background-position: -100% 0%; }
                 }
-                .wd-ai-text {
-                    flex: 1;
-                    font-size: 13px;
-                    color: #1e293b;
-                    line-height: 1.4;
-                }
-                .wd-ai-text strong { display: block; margin-bottom: 2px; color: #4c1d95; }
-                .wd-ai-banner.is-done .wd-ai-text strong { color: #065f46; }
-                .wd-ai-banner.is-error .wd-ai-text strong { color: #991b1b; }
-                .wd-ai-text span { color: #475569; }
             </style>
             <div class="modal-footer">
                 <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>

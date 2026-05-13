@@ -220,24 +220,19 @@
 
     const fileInput  = document.getElementById('document_file');
     const banner     = document.getElementById('wd-ai-banner');
-    const bannerMsg  = document.getElementById('wd-ai-banner-msg');
+    const bannerText = document.getElementById('wd-ai-banner-text');
     const typeInput  = document.getElementById('wd-upload-type');
     const emisInput  = document.getElementById('wd-upload-emission');
     const expInput   = document.getElementById('wd-upload-expiry');
 
-    function showBanner(state, msg) {
+    function setBanner(state, msg) {
         if (!banner) return;
         banner.style.display = 'flex';
-        banner.classList.remove('is-done', 'is-error');
-        if (state === 'done')  banner.classList.add('is-done');
-        if (state === 'error') banner.classList.add('is-error');
-        if (bannerMsg) bannerMsg.textContent = msg;
-    }
-
-    function bannerHeader(text) {
-        if (!banner) return;
-        const strongEl = banner.querySelector('.wd-ai-text strong');
-        if (strongEl) strongEl.textContent = text;
+        banner.classList.remove('is-loading', 'is-done', 'is-error');
+        if (state === 'loading') banner.classList.add('is-loading');
+        if (state === 'done')    banner.classList.add('is-done');
+        if (state === 'error')   banner.classList.add('is-error');
+        if (bannerText) bannerText.textContent = msg;
     }
 
     function setIfEmpty(el, value) {
@@ -264,8 +259,7 @@
                 return;
             }
 
-            bannerHeader('BOB sta leggendo il documento…');
-            showBanner('loading', 'Un secondo, ti suggerisco i campi qui sotto.');
+            setBanner('loading', '🤖 BOB sta leggendo il documento… puoi compilare anche tu nel frattempo.');
 
             const fd = new FormData();
             fd.append('document_file', file);
@@ -274,8 +268,7 @@
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.error) {
-                        bannerHeader('BOB non è riuscito a leggere il file');
-                        showBanner('error', 'Compila i campi a mano qui sotto.');
+                        setBanner('error', '🤖 BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
                     }
                     const filled = [];
@@ -284,21 +277,18 @@
                     if (data.expiry && setIfEmpty(expInput, ymdToItalian(data.expiry))) filled.push('scadenza');
 
                     if (filled.length === 0) {
-                        bannerHeader('BOB ha letto il documento ma non ha riconosciuto nulla');
                         var hint = data.note && data.note.trim() !== ''
                             ? data.note
-                            : 'Compila i campi a mano.';
-                        showBanner('error', hint);
+                            : 'Non ho riconosciuto nulla, compila pure a mano.';
+                        setBanner('error', '🤖 ' + hint);
                     } else {
-                        const conf = data.confidence ? ' (confidenza ' + data.confidence + '%)' : '';
-                        bannerHeader('BOB ha pre-compilato ' + filled.join(', ') + conf);
-                        showBanner('done', 'Verifica e correggi se serve — sono solo suggerimenti.');
+                        const conf = data.confidence ? ' (' + data.confidence + '%)' : '';
+                        setBanner('done', '🤖 Ho pre-compilato ' + filled.join(', ') + conf + ' — verifica e correggi se serve.');
                     }
                 })
                 .catch(function (err) {
                     console.error(err);
-                    bannerHeader('Errore di rete chiamando BOB');
-                    showBanner('error', 'Compila i campi a mano qui sotto.');
+                    setBanner('error', '🤖 Errore di rete — compila pure a mano.');
                 });
         });
     }
