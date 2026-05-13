@@ -255,6 +255,14 @@ final class DocumentsController
     {
         header('Content-Type: application/json');
 
+        // Rilascia subito il lock della sessione: la chiamata Ollama può
+        // durare 5-15 secondi, e finché la sessione resta aperta PHP serializza
+        // tutte le altre richieste dello stesso utente (es. il submit del
+        // form di upload resta in coda fino al ritorno di questa funzione).
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+
         if (empty($_FILES['document_file']['tmp_name']) || !is_uploaded_file($_FILES['document_file']['tmp_name'])) {
             echo json_encode(['error' => 'file_mancante']);
             exit;

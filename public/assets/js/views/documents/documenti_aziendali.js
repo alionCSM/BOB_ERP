@@ -238,6 +238,22 @@
         var fileNameEl = config.fileNameId ? document.getElementById(config.fileNameId) : null;
         var defaultFilenameLabel = fileNameEl ? fileNameEl.textContent : '';
 
+        // AbortController: ci permette di annullare la chiamata AI se
+        // l'utente preme "Carica" prima che BOB finisca di leggere
+        var currentAbort = null;
+
+        // Se il form che contiene questo file viene submitato, annulla l'AI
+        var hostForm = fileInput.closest('form');
+        if (hostForm) {
+            hostForm.addEventListener('submit', function () {
+                if (currentAbort) {
+                    currentAbort.abort();
+                    currentAbort = null;
+                    if (banner) banner.style.display = 'none';
+                }
+            });
+        }
+
         function setBanner(state, msg) {
             if (!banner) return;
             banner.style.display = 'flex';
@@ -332,9 +348,19 @@
                 fd.append('worker_id', workerIdInput.value);
             }
 
-            fetch('/documents/ai-suggest', { method: 'POST', body: fd })
+            // Abort di eventuali chiamate AI precedenti, e crea un controller
+            // per questa chiamata in modo da poter essere abortita al submit
+            if (currentAbort) currentAbort.abort();
+            currentAbort = new AbortController();
+
+            fetch('/documents/ai-suggest', {
+                method: 'POST',
+                body: fd,
+                signal: currentAbort.signal
+            })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
+                    currentAbort = null;
                     if (data.error) {
                         setBanner('error', 'BOB non è riuscito a leggere il file — compila pure a mano.');
                         return;
@@ -368,6 +394,9 @@
                     showWorkerNameWarning(data, config.bannerId);
                 })
                 .catch(function (err) {
+                    currentAbort = null;
+                    // L'aborto è normale (il form è stato submitato): silenzio
+                    if (err && err.name === 'AbortError') return;
                     console.error(err);
                     setBanner('error', 'Errore di rete — compila pure a mano.');
                 });
