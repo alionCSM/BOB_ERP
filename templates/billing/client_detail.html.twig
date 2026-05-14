@@ -150,10 +150,18 @@
             </thead>
             <tbody id="da-emettere-tbody">
             {% for r in daEmettere %}
-            <tr class="da-emettere-row" data-cantiere="{{ r.cantiere|lower }}">
+            <tr class="da-emettere-row {% if r.applied_draft_id %}bd-row-applied{% endif %}" data-cantiere="{{ r.cantiere|lower }}">
                 <td class="bd-muted" style="white-space:nowrap;">{{ r.data }}</td>
                 <td>
                     <a href="/worksites/{{ r.worksite_id }}" class="bd-link">{{ r.cantiere }}</a>
+                    {% if r.applied_draft_id %}
+                    <a href="/billing/client/{{ client.id }}/draft/{{ r.applied_draft_id }}"
+                       class="bd-applied-badge"
+                       title="Modifiche già applicate via bozza — in attesa di emissione fattura su Yard">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        applicata · bozza #{{ r.applied_draft_id }}{% if r.applied_at %} · {{ r.applied_at|date('d/m') }}{% endif %}
+                    </a>
+                    {% endif %}
                 </td>
                 <td class="bd-muted" style="white-space:nowrap;">{{ r.order_number ?? '—' }}</td>
                 <td style="font-size:12px;color:#64748b;">{{ r.descrizione }}</td>

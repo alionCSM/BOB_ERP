@@ -265,6 +265,11 @@ final class BillingRepository
 
     /**
      * All da-emettere rows for a client (emessa = 0).
+     *
+     * Also surfaces, when applicable, the most recent "applicata" draft
+     * (status=fatturata) that touched each row — so the UI can flag rows
+     * that have already been applied and are now waiting on Yard accounting
+     * to flip emessa to 1.
      */
     public function getDaEmettereByClient(int $clientId): array
     {
@@ -273,10 +278,22 @@ final class BillingRepository
                 b.id, b.data, b.descrizione, b.totale_imponibile, b.aliquota_iva,
                 b.emessa, b.yard_id,
                 w.id AS worksite_id, w.name AS cantiere, w.order_number, w.order_date,
-                c.name AS ragione_sociale
+                c.name AS ragione_sociale,
+                applied.applied_draft_id,
+                applied.applied_at
             FROM bb_billing b
             JOIN bb_worksites w ON w.id = b.worksite_id
             JOIN bb_clients   c ON c.id = w.client_id
+            LEFT JOIN (
+                SELECT
+                    l.bb_billing_id,
+                    MAX(d.id)          AS applied_draft_id,
+                    MAX(d.invoice_date) AS applied_at
+                FROM bb_billing_draft_lines l
+                JOIN bb_billing_drafts     d ON d.id = l.draft_id
+                WHERE d.status = 'fatturata' AND l.excluded = 0
+                GROUP BY l.bb_billing_id
+            ) applied ON applied.bb_billing_id = b.id
             WHERE w.client_id = :cid AND b.emessa = 0
             ORDER BY b.data ASC, w.name ASC
         ");
