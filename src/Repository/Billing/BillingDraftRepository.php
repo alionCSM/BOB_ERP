@@ -263,12 +263,27 @@ final class BillingDraftRepository
 
     /**
      * Fetch all draft lines, joined to worksite + client info for display.
+     *
+     * iva_id and original_iva_id use COALESCE with the source bb_billing
+     * row so legacy draft lines (created before the iva_id column was added)
+     * still see the correct IVA in the dropdown instead of falling back to
+     * the first option.
      */
     public function getLinesForDraft(int $draftId): array
     {
         $stmt = $this->conn->prepare("
             SELECT
-                l.*,
+                l.id, l.draft_id, l.bb_billing_id, l.worksite_id,
+                l.data, l.descrizione, l.totale_imponibile, l.aliquota_iva,
+                COALESCE(l.iva_id, b.iva_id) AS iva_id,
+                l.original_data, l.original_descrizione,
+                l.original_totale_imponibile, l.original_aliquota_iva,
+                COALESCE(l.original_iva_id, b.iva_id) AS original_iva_id,
+                l.excluded, l.excluded_reason,
+                l.modified, l.modification_notes,
+                l.display_order,
+                l.yard_sync_status, l.yard_sync_error, l.yard_sync_attempted_at,
+                l.created_at, l.updated_at,
                 w.name         AS cantiere,
                 w.order_number,
                 b.yard_id      AS source_yard_id,

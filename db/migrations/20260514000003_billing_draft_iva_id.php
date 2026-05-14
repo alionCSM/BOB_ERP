@@ -31,5 +31,17 @@ final class BillingDraftIvaId extends AbstractMigration
                 ])
                 ->update();
         }
+
+        // Backfill iva_id on any existing draft lines (e.g. drafts created
+        // before this migration ran) from the source bb_billing row, so
+        // the IVA dropdown in the editor pre-selects the real stored value.
+        $this->execute("
+            UPDATE bb_billing_draft_lines l
+            JOIN bb_billing b ON b.id = l.bb_billing_id
+            SET
+                l.iva_id          = COALESCE(l.iva_id,          b.iva_id),
+                l.original_iva_id = COALESCE(l.original_iva_id, b.iva_id)
+            WHERE l.iva_id IS NULL OR l.original_iva_id IS NULL
+        ");
     }
 }
