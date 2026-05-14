@@ -99,6 +99,8 @@ final class BillingDraftRepository
      */
     public function getLinesWithSourceForWriteback(int $draftId): array
     {
+        // For writeback we want the DRAFT's iva_id (the user's chosen value),
+        // not the bb_billing iva_id (the snapshot from creation time).
         $stmt = $this->conn->prepare("
             SELECT
                 l.id                AS line_id,
@@ -108,11 +110,11 @@ final class BillingDraftRepository
                 l.descrizione,
                 l.totale_imponibile,
                 l.aliquota_iva,
+                COALESCE(l.iva_id, b.iva_id) AS iva_id,
                 l.excluded,
                 l.yard_sync_status,
                 b.yard_id,
                 b.articolo_id       AS bob_articolo_id,
-                b.iva_id,
                 w.name              AS worksite_name,
                 w.yard_worksite_id,
                 c.id                AS client_id,
@@ -143,7 +145,8 @@ final class BillingDraftRepository
                SET data              = :data,
                    descrizione       = :descr,
                    totale_imponibile = :imp,
-                   aliquota_iva      = :iva
+                   aliquota_iva      = :iva,
+                   iva_id            = :ivaid
              WHERE id = :id
         ");
         $stmt->execute([
@@ -151,6 +154,9 @@ final class BillingDraftRepository
             ':descr' => (string)($values['descrizione'] ?? ''),
             ':imp'   => (float)($values['totale_imponibile'] ?? 0),
             ':iva'   => (float)($values['aliquota_iva'] ?? 0),
+            ':ivaid' => isset($values['iva_id']) && $values['iva_id'] !== null
+                            ? (int)$values['iva_id']
+                            : null,
             ':id'    => $bbBillingId,
         ]);
     }
@@ -211,21 +217,29 @@ final class BillingDraftRepository
             return 0;
         }
 
+        // Snapshot also needs iva_id from bb_billing — the getDaEmettereByClient
+        // SELECT doesn't include it, so we read it inline here.
+        $ivaIdStmt = $this->conn->prepare('SELECT iva_id FROM bb_billing WHERE id = :id');
+
         $sql = 'INSERT INTO bb_billing_draft_lines (
                     draft_id, bb_billing_id, worksite_id,
-                    data, descrizione, totale_imponibile, aliquota_iva,
-                    original_data, original_descrizione, original_totale_imponibile, original_aliquota_iva,
+                    data, descrizione, totale_imponibile, aliquota_iva, iva_id,
+                    original_data, original_descrizione, original_totale_imponibile, original_aliquota_iva, original_iva_id,
                     display_order
                 ) VALUES (
                     :draft_id, :bb_id, :worksite_id,
-                    :data, :descr, :imp, :iva,
-                    :odata, :odescr, :oimp, :oiva,
+                    :data, :descr, :imp, :iva, :ivaid,
+                    :odata, :odescr, :oimp, :oiva, :oivaid,
                     :ord
                 )';
         $stmt = $this->conn->prepare($sql);
 
         $count = 0;
         foreach ($billingRows as $i => $r) {
+            $ivaIdStmt->execute([':id' => (int)$r['id']]);
+            $ivaId = $ivaIdStmt->fetchColumn();
+            $ivaId = ($ivaId !== false && $ivaId !== null) ? (int)$ivaId : null;
+
             $stmt->execute([
                 ':draft_id'     => $draftId,
                 ':bb_id'        => (int)$r['id'],
@@ -234,10 +248,12 @@ final class BillingDraftRepository
                 ':descr'        => $r['descrizione'] ?? '',
                 ':imp'          => (float)($r['totale_imponibile'] ?? 0),
                 ':iva'          => (float)($r['aliquota_iva'] ?? 0),
+                ':ivaid'        => $ivaId,
                 ':odata'        => $r['data'] ?: null,
                 ':odescr'       => $r['descrizione'] ?? '',
                 ':oimp'         => (float)($r['totale_imponibile'] ?? 0),
                 ':oiva'         => (float)($r['aliquota_iva'] ?? 0),
+                ':oivaid'       => $ivaId,
                 ':ord'          => $i,
             ]);
             $count++;
@@ -300,7 +316,7 @@ final class BillingDraftRepository
         if (empty($fields)) {
             return;
         }
-        $allowed = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva'];
+        $allowed = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva', 'iva_id'];
         $sets    = [];
         $params  = [':id' => $lineId, ':mod' => $modified ? 1 : 0];
         foreach ($fields as $col => $val) {

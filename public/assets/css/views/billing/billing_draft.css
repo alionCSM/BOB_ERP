@@ -352,6 +352,23 @@
 }
 .bd-cell-input.bd-cell-number { text-align: right; font-variant-numeric: tabular-nums; }
 .bd-cell-input.bd-cell-date   { font-variant-numeric: tabular-nums; }
+
+/* Select cell (IVA) — looks like an input but with a chevron */
+select.bd-cell-input.bd-cell-select {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    padding-right: 24px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%2364748b' d='M3 4l3 3 3-3z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 12px;
+}
+select.bd-cell-input.bd-cell-select:disabled {
+    cursor: not-allowed;
+    color: #475569;
+    opacity: 1;
+}
 .bd-cell-input::placeholder    { color: #cbd5e1; }
 .bd-cell-input:hover:not(:focus):not([readonly]) {
     background: #f8fafc;

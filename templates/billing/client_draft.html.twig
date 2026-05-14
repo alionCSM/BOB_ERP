@@ -178,7 +178,7 @@
                 <th style="width:180px;">Cantiere</th>
                 <th>Descrizione</th>
                 <th class="right" style="width:140px;">Imponibile (€)</th>
-                <th class="right" style="width:80px;">IVA %</th>
+                <th style="width:200px;">IVA</th>
                 <th class="center" style="width:120px;">Stato</th>
                 <th class="center" style="width:60px;"></th>
             </tr>
@@ -219,13 +219,14 @@
                            {% if not isEditable %}readonly{% endif %}>
                 </td>
 
-                <td class="bd-cell-iva right">
-                    <input type="text"
-                           class="bd-cell-input bd-cell-number"
-                           data-field="aliquota_iva"
-                           value="{{ l.aliquota_iva|number_format(2, ',', '.') }}"
-                           data-raw="{{ l.aliquota_iva }}"
-                           {% if not isEditable %}readonly{% endif %}>
+                <td class="bd-cell-iva">
+                    <select class="bd-cell-input bd-cell-select"
+                            data-field="iva_id"
+                            {% if not isEditable %}disabled{% endif %}>
+                        {% for vid, vdesc in vatCodes %}
+                            <option value="{{ vid }}" {% if vid == l.iva_id %}selected{% endif %}>{{ vdesc }}</option>
+                        {% endfor %}
+                    </select>
                 </td>
 
                 <td class="center bd-cell-status">
@@ -300,5 +301,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/billing/billing_draft.js?v=5"></script>
+<script src="/assets/js/views/billing/billing_draft.js?v=6"></script>
 {% endblock %}

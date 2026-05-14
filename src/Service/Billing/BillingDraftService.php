@@ -323,7 +323,7 @@ final class BillingDraftService
     private const EDITABLE_STATUSES = ['bozza'];
 
     /** Whitelist of columns the inline editor can write. */
-    private const EDITABLE_FIELDS = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva'];
+    private const EDITABLE_FIELDS = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva', 'iva_id'];
 
     /**
      * Update a single field on a draft line. Returns the updated line +
@@ -345,12 +345,26 @@ final class BillingDraftService
 
         $value = $this->normalizeValue($field, $rawValue);
 
-        // Compute new merged values for the modified-flag calculation
-        $newLine          = $line;
-        $newLine[$field]  = $value;
-        $modified         = $this->isLineModified($newLine);
+        // When the user picks a new iva_id from the dropdown, derive the
+        // corresponding aliquota_iva from bb_billing_vat_codes so the two
+        // stay in sync (mirrors what the cantiere saveBilling does).
+        $fieldsToWrite = [$field => $value];
+        if ($field === 'iva_id' && $value !== null) {
+            $pct = $this->billing->getVatPercentageById((int)$value);
+            if ($pct === null) {
+                throw new InvalidArgumentException("Codice IVA non trovato (id={$value}).");
+            }
+            $fieldsToWrite['aliquota_iva'] = $pct;
+        }
 
-        $this->drafts->updateLineFields($lineId, [$field => $value], $modified);
+        // Compute new merged values for the modified-flag calculation
+        $newLine = $line;
+        foreach ($fieldsToWrite as $k => $v) {
+            $newLine[$k] = $v;
+        }
+        $modified = $this->isLineModified($newLine);
+
+        $this->drafts->updateLineFields($lineId, $fieldsToWrite, $modified);
 
         $totals  = $this->drafts->computeTotals((int)$line['draft_id']);
         $updated = $this->drafts->findLineById($lineId);
@@ -433,6 +447,14 @@ final class BillingDraftService
                     );
                 }
                 return $n;
+
+            case 'iva_id':
+                $s = trim((string)$raw);
+                if ($s === '') return null;
+                if (!ctype_digit($s)) {
+                    throw new InvalidArgumentException("ID IVA non valido: '{$raw}'");
+                }
+                return (int)$s;
         }
         return $raw;
     }
@@ -455,6 +477,9 @@ final class BillingDraftService
             return true;
         }
         if (abs((float)$line['aliquota_iva'] - (float)$line['original_aliquota_iva']) > $eps) {
+            return true;
+        }
+        if ((int)($line['iva_id'] ?? 0) !== (int)($line['original_iva_id'] ?? 0)) {
             return true;
         }
         return false;
@@ -500,6 +525,7 @@ final class BillingDraftService
             'yard_summary' => $draft['status'] === 'fatturata'
                 ? $this->drafts->getYardSyncSummary($draftId)
                 : null,
+            'vat_codes' => $this->billing->getVatCodes(),
         ];
     }
 

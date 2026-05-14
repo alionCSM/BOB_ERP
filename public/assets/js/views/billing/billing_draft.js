@@ -155,14 +155,23 @@
     if (isEditable) {
         tbody.addEventListener('blur', function (e) {
             var t = e.target;
-            if (t && t.classList && t.classList.contains('bd-cell-input')) {
+            if (t && t.classList && t.classList.contains('bd-cell-input') && t.tagName !== 'SELECT') {
                 handleCellCommit(t);
             }
         }, true);
 
+        // Selects commit on change rather than blur (better UX for dropdowns)
+        tbody.addEventListener('change', function (e) {
+            var t = e.target;
+            if (t && t.tagName === 'SELECT' && t.classList.contains('bd-cell-input')) {
+                handleCellCommit(t);
+            }
+        });
+
         tbody.addEventListener('keydown', function (e) {
             var t = e.target;
             if (!t || !t.classList || !t.classList.contains('bd-cell-input')) return;
+            if (t.tagName === 'SELECT') return;
             if (e.key === 'Enter') {
                 e.preventDefault();
                 t.blur();

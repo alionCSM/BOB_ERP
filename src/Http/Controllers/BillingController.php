@@ -367,6 +367,7 @@ final class BillingController
             'totals'        => $view['totals'],
             'newRowsCount'  => $view['new_rows_count'],
             'yardSummary'   => $view['yard_summary'] ?? null,
+            'vatCodes'      => $view['vat_codes'] ?? [],
         ]);
     }
 
