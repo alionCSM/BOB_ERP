@@ -97,3 +97,100 @@
 @media (max-width: 768px) {
     .bd-draft-totals { flex-direction: column; }
 }
+
+/* ── Editable table cells ───────────────────────── */
+.bd-table-editable td { padding: 4px 6px; vertical-align: middle; }
+.bd-table-editable .bd-cell-cantiere { padding-left: 12px; }
+
+.bd-cell-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #0f172a;
+    font-family: inherit;
+    transition: background .12s ease, border-color .12s ease;
+}
+.bd-cell-input.bd-cell-number { text-align: right; font-variant-numeric: tabular-nums; }
+.bd-cell-input.bd-cell-date   { font-variant-numeric: tabular-nums; }
+.bd-cell-input::placeholder    { color: #cbd5e1; }
+.bd-cell-input:hover:not(:focus):not([readonly]) {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+.bd-cell-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139,92,246,.15);
+}
+.bd-cell-input[readonly] { color: #475569; cursor: not-allowed; }
+
+.bd-cell-input.bd-cell-success {
+    background: #dcfce7;
+    border-color: #86efac;
+    animation: bd-cell-flash .7s ease;
+}
+.bd-cell-input.bd-cell-error {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+@keyframes bd-cell-flash {
+    0%   { background: #bbf7d0; }
+    100% { background: transparent; }
+}
+
+/* Modified-row tint (yellow stripe on left) */
+.bd-row-modified td { background: #fffbeb; }
+.bd-row-modified td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+
+/* Excluded rows: red bg + strikethrough inputs */
+.bd-row-excluded .bd-cell-input { text-decoration: line-through; opacity: .65; }
+.bd-row-excluded .bd-cell-input:focus { text-decoration: none; opacity: 1; }
+
+/* Exclude button */
+.bd-exclude-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all .12s ease;
+}
+.bd-exclude-btn:hover { color: #ef4444; border-color: #fca5a5; background: #fef2f2; }
+.bd-exclude-btn svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+.bd-row-excluded .bd-exclude-btn { color: #16a34a; border-color: #86efac; background: #dcfce7; }
+.bd-row-excluded .bd-exclude-btn:hover { background: #bbf7d0; }
+
+/* ── Save indicator (fourth tile in totals row) ─── */
+.bd-save-indicator-card { max-width: 240px; }
+.bd-save-indicator {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+.bd-save-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #94a3b8;
+    flex-shrink: 0;
+}
+.bd-save-text { font-weight: 500; }
+.bd-save-indicator.is-saving  .bd-save-dot { background: #f59e0b; animation: bd-pulse 1s ease-in-out infinite; }
+.bd-save-indicator.is-saving  .bd-save-text { color: #b45309; }
+.bd-save-indicator.is-saved   .bd-save-dot { background: #22c55e; }
+.bd-save-indicator.is-saved   .bd-save-text { color: #15803d; }
+.bd-save-indicator.is-error   .bd-save-dot { background: #ef4444; }
+.bd-save-indicator.is-error   .bd-save-text { color: #b91c1c; }
+@keyframes bd-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.4); opacity: .6; }
+}

@@ -370,6 +370,75 @@ final class BillingController
     }
 
     /**
+     * POST /billing/draft-lines/{id}/update — inline-edit a single field.
+     * JSON body: { field: "data"|"descrizione"|"totale_imponibile"|"aliquota_iva",
+     *              value: <string|number> }
+     * Returns JSON: { ok, line, totals, modified } or { ok:false, error }.
+     */
+    public function updateDraftLine(Request $request): never
+    {
+        $lineId = $request->intParam('id');
+        if (!$lineId) {
+            Response::json(['ok' => false, 'error' => 'Riga non specificata.'], 400);
+        }
+
+        $payload = $this->readJsonBody();
+        $field   = (string)($payload['field'] ?? '');
+        if ($field === '' || !array_key_exists('value', $payload)) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        try {
+            $result = $this->draftService()->updateLineField($lineId, $field, $payload['value']);
+            Response::json([
+                'ok'       => true,
+                'line'     => $result['line'],
+                'totals'   => $result['totals'],
+                'modified' => $result['modified'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * POST /billing/draft-lines/{id}/exclude — toggle the excluded flag.
+     * JSON body: { excluded: bool, reason?: string }
+     */
+    public function toggleDraftLineExcluded(Request $request): never
+    {
+        $lineId = $request->intParam('id');
+        if (!$lineId) {
+            Response::json(['ok' => false, 'error' => 'Riga non specificata.'], 400);
+        }
+
+        $payload  = $this->readJsonBody();
+        $excluded = (bool)($payload['excluded'] ?? false);
+        $reason   = isset($payload['reason']) ? trim((string)$payload['reason']) : null;
+        if ($reason === '') $reason = null;
+
+        try {
+            $result = $this->draftService()->setLineExcluded($lineId, $excluded, $reason);
+            Response::json([
+                'ok'     => true,
+                'line'   => $result['line'],
+                'totals' => $result['totals'],
+            ]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    private function readJsonBody(): array
+    {
+        $raw = file_get_contents('php://input') ?: '';
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
+    /**
      * POST /billing/client/{clientId}/draft/{draftId}/cancel — cancel a draft.
      */
     public function cancelDraft(Request $request): never

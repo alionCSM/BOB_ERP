@@ -133,6 +133,95 @@ final class BillingDraftRepository
     }
 
     /**
+     * Fetch a single draft line by id, joined to its parent draft (so callers
+     * can verify status / ownership without a second query).
+     */
+    public function findLineById(int $lineId): ?array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT
+                l.*,
+                d.client_id AS draft_client_id,
+                d.status    AS draft_status,
+                w.name      AS cantiere
+            FROM bb_billing_draft_lines l
+            JOIN bb_billing_drafts d ON d.id = l.draft_id
+            JOIN bb_worksites w      ON w.id = l.worksite_id
+            WHERE l.id = :id
+            LIMIT 1
+        ");
+        $stmt->execute([':id' => $lineId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Update editable fields on a line. Caller passes only the columns it
+     * wants to change. Always also sets the modified flag based on the
+     * computed value vs original_*.
+     */
+    public function updateLineFields(int $lineId, array $fields, bool $modified): void
+    {
+        if (empty($fields)) {
+            return;
+        }
+        $allowed = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva'];
+        $sets    = [];
+        $params  = [':id' => $lineId, ':mod' => $modified ? 1 : 0];
+        foreach ($fields as $col => $val) {
+            if (!in_array($col, $allowed, true)) {
+                continue;
+            }
+            $sets[]               = "$col = :$col";
+            $params[":$col"]      = $val;
+        }
+        if (empty($sets)) return;
+
+        $sql = 'UPDATE bb_billing_draft_lines SET ' . implode(', ', $sets) . ', modified = :mod WHERE id = :id';
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+    }
+
+    /**
+     * Toggle the excluded flag (and an optional reason).
+     */
+    public function setLineExcluded(int $lineId, bool $excluded, ?string $reason): void
+    {
+        $stmt = $this->conn->prepare(
+            'UPDATE bb_billing_draft_lines
+                SET excluded = :ex, excluded_reason = :rs
+              WHERE id = :id'
+        );
+        $stmt->execute([
+            ':ex' => $excluded ? 1 : 0,
+            ':rs' => $excluded ? $reason : null,
+            ':id' => $lineId,
+        ]);
+    }
+
+    /**
+     * Compute totals for a draft (sum of imponibile, split by excluded state).
+     */
+    public function computeTotals(int $draftId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN excluded = 0 THEN totale_imponibile END), 0) AS imponibile,
+                COALESCE(SUM(CASE WHEN excluded = 1 THEN totale_imponibile END), 0) AS escluso,
+                COUNT(*) AS lines_count
+            FROM bb_billing_draft_lines
+            WHERE draft_id = :id
+        ");
+        $stmt->execute([':id' => $draftId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        return [
+            'imponibile'  => (float)($row['imponibile'] ?? 0),
+            'escluso'     => (float)($row['escluso']    ?? 0),
+            'lines_count' => (int)($row['lines_count']  ?? 0),
+        ];
+    }
+
+    /**
      * Count of bb_billing rows for this client (emessa=0) that are NOT yet
      * tracked by the draft — i.e. added after draft creation.
      * Used for the "Nuove righe disponibili" banner.

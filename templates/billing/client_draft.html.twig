@@ -55,61 +55,120 @@
 </div>
 {% endif %}
 
-{# ── Totals ── #}
-<div class="bd-draft-totals">
+{# ── Totals (auto-updated by JS) ── #}
+<div class="bd-draft-totals" id="bd-draft-totals">
     <div class="bd-draft-total">
         <div class="bd-draft-total-label">Imponibile fatturabile</div>
-        <div class="bd-draft-total-value success">€ {{ totals.imponibile|number_format(2, ',', '.') }}</div>
+        <div class="bd-draft-total-value success" id="bd-total-imponibile">€ {{ totals.imponibile|number_format(2, ',', '.') }}</div>
     </div>
-    {% if totals.escluso > 0 %}
-    <div class="bd-draft-total">
+    <div class="bd-draft-total" id="bd-total-escluso-card" style="{% if totals.escluso == 0 %}display:none;{% endif %}">
         <div class="bd-draft-total-label">Imponibile escluso</div>
-        <div class="bd-draft-total-value muted">€ {{ totals.escluso|number_format(2, ',', '.') }}</div>
+        <div class="bd-draft-total-value muted" id="bd-total-escluso">€ {{ totals.escluso|number_format(2, ',', '.') }}</div>
     </div>
-    {% endif %}
     <div class="bd-draft-total">
         <div class="bd-draft-total-label">Righe in bozza</div>
         <div class="bd-draft-total-value">{{ lines|length }}</div>
     </div>
+    <div class="bd-draft-total bd-save-indicator-card">
+        <div class="bd-draft-total-label">Stato salvataggio</div>
+        <div class="bd-draft-total-value bd-save-indicator" id="bd-save-indicator">
+            <span class="bd-save-dot"></span>
+            <span class="bd-save-text">Tutte le modifiche salvate</span>
+        </div>
+    </div>
 </div>
 
-{# ── Read-only table (Phase 1 — Phase 2 makes editable) ── #}
+{# ── Editable table (Phase 2) ── #}
+{% set isEditable = draft.status == 'bozza' or draft.status == 'da_modificare' %}
 <div class="bd-section">
     <div class="bd-section-header">
         <h3 class="bd-section-title">
             <span class="bd-section-dot" style="background:#8b5cf6;box-shadow:0 0 5px rgba(139,92,246,.4);"></span>
             Righe in bozza
         </h3>
-        <span class="bd-draft-phase-note">In sola lettura — la modifica inline arriva in Fase 2</span>
+        {% if not isEditable %}
+        <span class="bd-draft-phase-note">In sola lettura (stato: {{ draft.status|replace({'_': ' '}) }})</span>
+        {% else %}
+        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare</span>
+        {% endif %}
     </div>
 
     <div class="bd-table-wrap">
-        <table class="bd-table">
+        <table class="bd-table bd-table-editable" data-editable="{{ isEditable ? '1' : '0' }}">
             <thead>
             <tr>
-                <th>Data</th>
-                <th>Cantiere</th>
+                <th style="width:110px;">Data</th>
+                <th style="width:180px;">Cantiere</th>
                 <th>Descrizione</th>
-                <th class="right">Imponibile (€)</th>
-                <th class="right">IVA %</th>
-                <th class="center">Stato</th>
+                <th class="right" style="width:140px;">Imponibile (€)</th>
+                <th class="right" style="width:80px;">IVA %</th>
+                <th class="center" style="width:120px;">Stato</th>
+                <th class="center" style="width:60px;"></th>
             </tr>
             </thead>
-            <tbody>
+            <tbody id="bd-draft-tbody">
             {% for l in lines %}
-            <tr class="{% if l.excluded %}bd-row-excluded{% endif %}">
-                <td class="bd-muted" style="white-space:nowrap;">{{ l.data }}</td>
-                <td><a href="/worksites/{{ l.worksite_id }}" class="bd-link">{{ l.cantiere }}</a></td>
-                <td style="font-size:12px;color:#64748b;">{{ l.descrizione }}</td>
-                <td class="right">€ {{ l.totale_imponibile|number_format(2, ',', '.') }}</td>
-                <td class="right bd-muted">{{ l.aliquota_iva }}%</td>
+            <tr class="bd-draft-row {% if l.excluded %}bd-row-excluded{% endif %} {% if l.modified %}bd-row-modified{% endif %}"
+                data-line-id="{{ l.id }}"
+                data-excluded="{{ l.excluded ? '1' : '0' }}">
+
+                <td class="bd-cell-data">
+                    <input type="text"
+                           class="bd-cell-input bd-cell-date"
+                           data-field="data"
+                           value="{{ l.data ? l.data|date('d/m/Y') : '' }}"
+                           placeholder="gg/mm/aaaa"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-cantiere">
+                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere }}</a>
+                </td>
+
+                <td class="bd-cell-descrizione">
+                    <input type="text"
+                           class="bd-cell-input"
+                           data-field="descrizione"
+                           value="{{ l.descrizione }}"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-imponibile right">
+                    <input type="text"
+                           class="bd-cell-input bd-cell-number"
+                           data-field="totale_imponibile"
+                           value="{{ l.totale_imponibile|number_format(2, ',', '.') }}"
+                           data-raw="{{ l.totale_imponibile }}"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-iva right">
+                    <input type="text"
+                           class="bd-cell-input bd-cell-number"
+                           data-field="aliquota_iva"
+                           value="{{ l.aliquota_iva|number_format(2, ',', '.') }}"
+                           data-raw="{{ l.aliquota_iva }}"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="center bd-cell-status">
+                    <span class="bd-pill bd-pill-danger"  data-tag="excluded" style="{% if not l.excluded %}display:none;{% endif %}">esclusa</span>
+                    <span class="bd-pill bd-pill-warning" data-tag="modified" style="{% if l.excluded or not l.modified %}display:none;{% endif %}">modificata</span>
+                    <span class="bd-pill bd-pill-muted"   data-tag="clean"    style="{% if l.excluded or l.modified %}display:none;{% endif %}">—</span>
+                </td>
+
                 <td class="center">
-                    {% if l.excluded %}
-                        <span class="bd-pill bd-pill-danger">esclusa</span>
-                    {% elseif l.modified %}
-                        <span class="bd-pill bd-pill-warning">modificata</span>
-                    {% else %}
-                        <span class="bd-pill bd-pill-muted">—</span>
+                    {% if isEditable %}
+                    <button type="button"
+                            class="bd-exclude-btn"
+                            title="{% if l.excluded %}Includi nella fattura{% else %}Escludi dalla fattura{% endif %}"
+                            data-action="toggle-exclude">
+                        {% if l.excluded %}
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        {% else %}
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        {% endif %}
+                    </button>
                     {% endif %}
                 </td>
             </tr>
@@ -120,4 +179,8 @@
 </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/billing/billing_draft.js?v=1"></script>
 {% endblock %}
