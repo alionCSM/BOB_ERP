@@ -10,6 +10,9 @@ use InvalidArgumentException;
 use App\Repository\Billing\BillingDraftRepository;
 use App\Repository\Billing\BillingRepository;
 use App\Validator\Documents\DateNormalizer;
+use App\Domain\YardWorksiteBilling;
+use App\Infrastructure\Config;
+use App\Infrastructure\SqlServerConnection;
 
 /**
  * Orchestrates the editable fatturazione draft.
@@ -82,6 +85,191 @@ final class BillingDraftService
             throw new RuntimeException('Impossibile annullare una bozza già fatturata.');
         }
         $this->drafts->updateStatus($draftId, 'annullata');
+    }
+
+    // ── Fattura ora (Phase 4) ────────────────────────────────────────────────
+
+    /**
+     * Finalize a draft into an actual invoice:
+     *   1. Inside a BOB MySQL transaction:
+     *        - UPDATE bb_billing for each non-excluded line (apply edits + emessa=1)
+     *        - UPDATE bb_billing_drafts → status=fatturata + invoice_number + invoice_date
+     *   2. After commit, attempt Yard SQL Server sync per line. Failures are
+     *      tracked on the line so the user can retry.
+     *
+     * Returns a summary the controller can surface to the UI.
+     *
+     * @return array{
+     *   invoice_number: string,
+     *   invoice_date:   string,
+     *   yard: array{synced:int, failed:int, na:int, failures: array<int, array<string,mixed>>}
+     * }
+     */
+    public function commitInvoice(int $draftId, string $invoiceNumber, string $invoiceDate): array
+    {
+        $draft = $this->drafts->findById($draftId);
+        if (!$draft) {
+            throw new RuntimeException('Bozza non trovata.');
+        }
+        if ($draft['status'] !== 'approvata') {
+            throw new InvalidArgumentException(
+                "Per fatturare la bozza deve essere in stato 'approvata' (attuale: {$draft['status']})."
+            );
+        }
+        $invoiceNumber = trim($invoiceNumber);
+        if ($invoiceNumber === '') {
+            throw new InvalidArgumentException('Numero fattura mancante.');
+        }
+        $iso = DateNormalizer::toIso($invoiceDate);
+        if (!$iso) {
+            throw new InvalidArgumentException('Data fattura non valida.');
+        }
+
+        $lines = $this->drafts->getLinesWithSourceForWriteback($draftId);
+        $toCommit = array_values(array_filter($lines, static fn ($l) => (int)$l['excluded'] === 0));
+
+        // ── BOB MySQL transaction ────────────────────────────────────────────
+        $this->conn->beginTransaction();
+        try {
+            foreach ($toCommit as $l) {
+                $this->drafts->applyLineToBilling((int)$l['bb_billing_id'], [
+                    'data'              => $l['data'],
+                    'descrizione'       => $l['descrizione'],
+                    'totale_imponibile' => $l['totale_imponibile'],
+                    'aliquota_iva'      => $l['aliquota_iva'],
+                ]);
+                // Tag rows without yard_id as 'na' so they don't show as pending
+                if (empty($l['yard_id'])) {
+                    $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'na', null);
+                }
+            }
+            $this->drafts->finalizeDraftHeader($draftId, $invoiceNumber, $iso);
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollBack();
+            throw new RuntimeException(
+                'Scrittura su bb_billing fallita: ' . $e->getMessage(), 0, $e
+            );
+        }
+
+        // ── Yard SQL Server sync (post-commit, per-row) ─────────────────────
+        $yardLines = array_values(array_filter($toCommit, static fn ($l) => !empty($l['yard_id'])));
+        $yardResult = $this->syncLinesToYard($yardLines);
+
+        return [
+            'invoice_number' => $invoiceNumber,
+            'invoice_date'   => $iso,
+            'yard'           => $yardResult,
+        ];
+    }
+
+    /**
+     * Re-attempt Yard sync for lines whose status is 'failed' (or NULL).
+     * Available on a fatturata draft so the user can retry after a Yard
+     * connection issue without re-running the whole commit.
+     */
+    public function retryYardSync(int $draftId): array
+    {
+        $draft = $this->drafts->findById($draftId);
+        if (!$draft) {
+            throw new RuntimeException('Bozza non trovata.');
+        }
+        if ($draft['status'] !== 'fatturata') {
+            throw new RuntimeException(
+                "Retry Yard disponibile solo per bozze fatturate (attuale: {$draft['status']})."
+            );
+        }
+        $all = $this->drafts->getLinesWithSourceForWriteback($draftId);
+        $toRetry = array_values(array_filter(
+            $all,
+            static fn ($l) => (int)$l['excluded'] === 0
+                          && !empty($l['yard_id'])
+                          && in_array($l['yard_sync_status'], [null, 'failed', 'pending'], true)
+        ));
+        return $this->syncLinesToYard($toRetry);
+    }
+
+    /**
+     * Per-line Yard updateBrogliaccio with persisted status. Never throws —
+     * collects failures so the caller can show them in bulk.
+     *
+     * @param array<int, array<string,mixed>> $lines
+     */
+    private function syncLinesToYard(array $lines): array
+    {
+        if (empty($lines)) {
+            return ['synced' => 0, 'failed' => 0, 'na' => 0, 'failures' => []];
+        }
+
+        // Lazy-build the Yard client (avoid opening SqlServer connection until
+        // we know we need it — e.g. if no row has yard_id, we skip entirely)
+        try {
+            $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        } catch (\Throwable $e) {
+            // Yard unreachable at all — mark every line failed with the same reason
+            $err = 'Yard non raggiungibile: ' . $e->getMessage();
+            foreach ($lines as $l) {
+                $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'failed', $err);
+            }
+            return [
+                'synced'   => 0,
+                'failed'   => count($lines),
+                'na'       => 0,
+                'failures' => array_map(fn ($l) => [
+                    'line_id'  => (int)$l['line_id'],
+                    'cantiere' => $l['worksite_name'] ?? '',
+                    'error'    => $err,
+                ], $lines),
+            ];
+        }
+
+        $synced   = 0;
+        $failed   = 0;
+        $failures = [];
+
+        foreach ($lines as $l) {
+            $yardArticleId = $this->billing->getArticleYardId((int)($l['bob_articolo_id'] ?? 0));
+            if (!$yardArticleId) {
+                $err = 'articolo_id senza yard_id corrispondente';
+                $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'failed', $err);
+                $failed++;
+                $failures[] = [
+                    'line_id'  => (int)$l['line_id'],
+                    'cantiere' => (string)($l['worksite_name'] ?? ''),
+                    'error'    => $err,
+                ];
+                continue;
+            }
+
+            $dataY = [
+                'data'              => $l['data'] ?: null,
+                'nome_cantiere'     => (string)($l['worksite_name'] ?? ''),
+                'nome_cliente'      => (string)($l['client_name'] ?? ''),
+                'descrizione'       => (string)($l['descrizione'] ?? ''),
+                'aliquota_iva'      => (float)($l['aliquota_iva'] ?? 0),
+                'totale_imponibile' => (float)($l['totale_imponibile'] ?? 0),
+                'articolo_id'       => (int)$yardArticleId,
+                'cantiere_id'       => $l['yard_worksite_id'] ?? null,
+                'iva_id'            => $l['iva_id'] ?? null,
+            ];
+
+            try {
+                $yardBilling->updateBrogliaccio((int)$l['yard_id'], $dataY);
+                $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'synced', null);
+                $synced++;
+            } catch (\Throwable $e) {
+                $err = $e->getMessage();
+                $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'failed', $err);
+                $failed++;
+                $failures[] = [
+                    'line_id'  => (int)$l['line_id'],
+                    'cantiere' => (string)($l['worksite_name'] ?? ''),
+                    'error'    => $err,
+                ];
+            }
+        }
+
+        return ['synced' => $synced, 'failed' => $failed, 'na' => 0, 'failures' => $failures];
     }
 
     /**
@@ -317,6 +505,9 @@ final class BillingDraftService
                 $draftId,
                 (int)$draft['client_id']
             ),
+            'yard_summary' => $draft['status'] === 'fatturata'
+                ? $this->drafts->getYardSyncSummary($draftId)
+                : null,
         ];
     }
 

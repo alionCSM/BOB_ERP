@@ -71,6 +71,126 @@ final class BillingDraftRepository
         $stmt->execute([':id' => $draftId]);
     }
 
+    /**
+     * Finalize: set status=fatturata + invoice number + invoice date.
+     */
+    public function finalizeDraftHeader(int $draftId, string $invoiceNumber, string $invoiceDate): void
+    {
+        $stmt = $this->conn->prepare(
+            "UPDATE bb_billing_drafts
+                SET status         = 'fatturata',
+                    invoice_number = :num,
+                    invoice_date   = :dt
+              WHERE id = :id"
+        );
+        $stmt->execute([
+            ':num' => $invoiceNumber,
+            ':dt'  => $invoiceDate,
+            ':id'  => $draftId,
+        ]);
+    }
+
+    /**
+     * Lines + everything needed for the writeback to bb_billing AND Yard.
+     * Filtered by excluded so callers can pick what to operate on.
+     */
+    public function getLinesWithSourceForWriteback(int $draftId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT
+                l.id                AS line_id,
+                l.bb_billing_id,
+                l.worksite_id,
+                l.data,
+                l.descrizione,
+                l.totale_imponibile,
+                l.aliquota_iva,
+                l.excluded,
+                l.yard_sync_status,
+                b.yard_id,
+                b.articolo_id       AS bob_articolo_id,
+                b.iva_id,
+                w.name              AS worksite_name,
+                w.yard_worksite_id,
+                c.id                AS client_id,
+                c.name              AS client_name
+            FROM bb_billing_draft_lines l
+            JOIN bb_billing   b ON b.id = l.bb_billing_id
+            JOIN bb_worksites w ON w.id = l.worksite_id
+            JOIN bb_clients   c ON c.id = w.client_id
+            WHERE l.draft_id = :id
+            ORDER BY l.display_order ASC, l.id ASC
+        ");
+        $stmt->execute([':id' => $draftId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Write the draft-line values back to bb_billing and set emessa=1.
+     */
+    public function applyLineToBilling(int $bbBillingId, array $values): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE bb_billing
+               SET data              = :data,
+                   descrizione       = :descr,
+                   totale_imponibile = :imp,
+                   aliquota_iva      = :iva,
+                   emessa            = 1
+             WHERE id = :id
+        ");
+        $stmt->execute([
+            ':data'  => $values['data'] ?: null,
+            ':descr' => (string)($values['descrizione'] ?? ''),
+            ':imp'   => (float)($values['totale_imponibile'] ?? 0),
+            ':iva'   => (float)($values['aliquota_iva'] ?? 0),
+            ':id'    => $bbBillingId,
+        ]);
+    }
+
+    /**
+     * Persist the per-line Yard sync outcome.
+     */
+    public function setLineYardSyncStatus(int $lineId, string $status, ?string $error): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE bb_billing_draft_lines
+               SET yard_sync_status       = :s,
+                   yard_sync_error        = :e,
+                   yard_sync_attempted_at = NOW()
+             WHERE id = :id
+        ");
+        $stmt->execute([
+            ':s'  => $status,
+            ':e'  => $error,
+            ':id' => $lineId,
+        ]);
+    }
+
+    /**
+     * Aggregate Yard sync counters for a draft — used for the fatturata banner.
+     */
+    public function getYardSyncSummary(int $draftId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT
+                COALESCE(SUM(yard_sync_status = 'synced'),  0) AS synced,
+                COALESCE(SUM(yard_sync_status = 'failed'),  0) AS failed,
+                COALESCE(SUM(yard_sync_status = 'na'),      0) AS na,
+                COALESCE(SUM(yard_sync_status = 'pending' OR yard_sync_status IS NULL), 0) AS pending
+            FROM bb_billing_draft_lines
+            WHERE draft_id = :id AND excluded = 0
+        ");
+        $stmt->execute([':id' => $draftId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        return [
+            'synced'  => (int)($row['synced']  ?? 0),
+            'failed'  => (int)($row['failed']  ?? 0),
+            'na'      => (int)($row['na']      ?? 0),
+            'pending' => (int)($row['pending'] ?? 0),
+        ];
+    }
+
     // ── Draft lines ──────────────────────────────────────────────────────────
 
     /**

@@ -366,7 +366,54 @@ final class BillingController
             'lines'         => $view['lines'],
             'totals'        => $view['totals'],
             'newRowsCount'  => $view['new_rows_count'],
+            'yardSummary'   => $view['yard_summary'] ?? null,
         ]);
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/finalize
+     * JSON body: { invoice_number, invoice_date }
+     * Commits the draft → bb_billing + Yard, marks status=fatturata.
+     */
+    public function finalizeDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        $payload  = $this->readJsonBody();
+        $number   = trim((string)($payload['invoice_number'] ?? ''));
+        $date     = trim((string)($payload['invoice_date']   ?? ''));
+
+        try {
+            $result = $this->draftService()->commitInvoice($draftId, $number, $date);
+            Response::json(['ok' => true] + $result);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/retry-yard-sync
+     * Re-attempts Yard sync for any failed lines on a fatturata draft.
+     */
+    public function retryYardSync(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+        try {
+            $result = $this->draftService()->retryYardSync($draftId);
+            Response::json(['ok' => true, 'yard' => $result]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
     }
 
     /**
