@@ -370,6 +370,51 @@ final class BillingController
     }
 
     /**
+     * POST /billing/client/{clientId}/draft/{draftId}/transition
+     * JSON body: { to: 'inviata_cliente'|'da_modificare'|'approvata'|'annullata' }
+     * Returns: { ok, draft } or { ok:false, error }
+     */
+    public function transitionDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        $payload = $this->readJsonBody();
+        $to      = trim((string)($payload['to'] ?? ''));
+        if ($to === '') {
+            Response::json(['ok' => false, 'error' => 'Stato di destinazione mancante.'], 400);
+        }
+
+        try {
+            $draft = $this->draftService()->transitionDraft($draftId, $to);
+            Response::json(['ok' => true, 'draft' => $draft]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * GET /billing/client/{clientId}/draft/{draftId}/export — Excel download
+     * of the editable draft (only non-excluded rows).
+     */
+    public function exportDraftExcel(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::error('Parametri mancanti.', 400);
+        }
+        $conn = $this->conn;
+        require APP_ROOT . '/views/billing/export_draft_excel.php';
+        exit;
+    }
+
+    /**
      * POST /billing/draft-lines/{id}/update — inline-edit a single field.
      * JSON body: { field: "data"|"descrizione"|"totale_imponibile"|"aliquota_iva",
      *              value: <string|number> }

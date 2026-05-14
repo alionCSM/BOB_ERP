@@ -388,9 +388,11 @@ if ($uri === '/billing' || str_starts_with($uri, '/billing/')) {
            // ── Fatturazione editable draft ───────────────────────────────
            ->post('/billing/client/{id}/draft',                        [BillingController::class, 'createDraft'])
            ->get('/billing/client/{clientId}/draft/{draftId}',         [BillingController::class, 'showDraft'])
-           ->post('/billing/client/{clientId}/draft/{draftId}/cancel', [BillingController::class, 'cancelDraft'])
-           ->post('/billing/draft-lines/{id}/update',                  [BillingController::class, 'updateDraftLine'])
-           ->post('/billing/draft-lines/{id}/exclude',                 [BillingController::class, 'toggleDraftLineExcluded']);
+           ->post('/billing/client/{clientId}/draft/{draftId}/cancel',     [BillingController::class, 'cancelDraft'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/transition', [BillingController::class, 'transitionDraft'])
+           ->get('/billing/client/{clientId}/draft/{draftId}/export',      [BillingController::class, 'exportDraftExcel'])
+           ->post('/billing/draft-lines/{id}/update',                      [BillingController::class, 'updateDraftLine'])
+           ->post('/billing/draft-lines/{id}/exclude',                     [BillingController::class, 'toggleDraftLineExcluded']);
 
     $router->dispatch($request, $container);
 }

@@ -63,6 +63,14 @@ final class BillingDraftRepository
         $stmt->execute([':s' => $status, ':id' => $draftId]);
     }
 
+    public function markExcelGenerated(int $draftId): void
+    {
+        $stmt = $this->conn->prepare(
+            'UPDATE bb_billing_drafts SET excel_generated_at = NOW() WHERE id = :id'
+        );
+        $stmt->execute([':id' => $draftId]);
+    }
+
     // ── Draft lines ──────────────────────────────────────────────────────────
 
     /**

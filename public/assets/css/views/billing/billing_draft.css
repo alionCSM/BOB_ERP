@@ -96,7 +96,52 @@
 
 @media (max-width: 768px) {
     .bd-draft-totals { flex-direction: column; }
+    .bd-draft-actions { flex-wrap: wrap; }
 }
+
+/* ── Hero action buttons (state-machine + export) ── */
+.bd-draft-actions {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+}
+.bd-draft-actions button,
+.bd-draft-actions a {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 14px;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+    transition: background .12s ease, border-color .12s ease, opacity .12s ease;
+}
+.bd-draft-actions button:disabled { opacity: .55; cursor: wait; }
+.bd-draft-actions svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+.bd-btn-primary {
+    background: rgba(255,255,255,.92);
+    color: #4c1d95;
+    border-color: rgba(255,255,255,.6);
+}
+.bd-btn-primary:hover { background: #fff; }
+
+.bd-btn-success {
+    background: rgba(34,197,94,.22);
+    color: #bbf7d0;
+    border-color: rgba(34,197,94,.55);
+}
+.bd-btn-success:hover { background: rgba(34,197,94,.35); }
+
+.bd-btn-warning {
+    background: rgba(245,158,11,.2);
+    color: #fde68a;
+    border-color: rgba(245,158,11,.5);
+}
+.bd-btn-warning:hover { background: rgba(245,158,11,.32); }
 
 /* ── Editable table cells ───────────────────────── */
 .bd-table-editable td { padding: 4px 6px; vertical-align: middle; }

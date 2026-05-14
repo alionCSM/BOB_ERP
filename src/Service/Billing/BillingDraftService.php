@@ -84,6 +84,41 @@ final class BillingDraftService
         $this->drafts->updateStatus($draftId, 'annullata');
     }
 
+    /**
+     * Valid status transitions for the draft state machine.
+     * 'fatturata' is set only by the Phase 4 "Fattura ora" flow, not via
+     * the generic transition endpoint, so it isn't listed as a target here.
+     */
+    private const TRANSITIONS = [
+        'bozza'           => ['inviata_cliente', 'annullata'],
+        'inviata_cliente' => ['da_modificare', 'approvata', 'annullata'],
+        'da_modificare'   => ['inviata_cliente', 'annullata'],
+        'approvata'       => ['annullata'], // → fatturata is reserved for Phase 4
+        'fatturata'       => [],
+        'annullata'       => [],
+    ];
+
+    /**
+     * Move the draft to a new status, enforcing the transition whitelist.
+     * Returns the refreshed draft row.
+     */
+    public function transitionDraft(int $draftId, string $toStatus): array
+    {
+        $draft = $this->drafts->findById($draftId);
+        if (!$draft) {
+            throw new RuntimeException('Bozza non trovata.');
+        }
+        $from    = (string)$draft['status'];
+        $allowed = self::TRANSITIONS[$from] ?? [];
+        if (!in_array($toStatus, $allowed, true)) {
+            throw new InvalidArgumentException(
+                "Transizione non permessa: {$from} → {$toStatus}"
+            );
+        }
+        $this->drafts->updateStatus($draftId, $toStatus);
+        return $this->drafts->findById($draftId);
+    }
+
     // ── Inline edit (Phase 2) ────────────────────────────────────────────────
 
     /** Statuses where the draft is still editable. */

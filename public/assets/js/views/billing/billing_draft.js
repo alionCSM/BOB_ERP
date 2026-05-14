@@ -179,6 +179,52 @@
         inp.dataset.lastSaved = inp.value;
     });
 
+    // ── State-machine action buttons ─────────────────────────────────────────
+
+    var actionsEl = document.querySelector('.bd-draft-actions');
+    if (actionsEl) {
+        actionsEl.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-transition], [data-disabled-reason]');
+            if (!btn) return;
+
+            // Disabled placeholder (Phase 4 button)
+            if (btn.dataset.disabledReason) {
+                alert(btn.dataset.disabledReason);
+                return;
+            }
+
+            var to = btn.dataset.transition;
+            if (!to) return;
+
+            if (btn.dataset.confirm && !confirm(btn.dataset.confirm)) {
+                return;
+            }
+
+            var clientId = actionsEl.dataset.clientId;
+            var draftId  = actionsEl.dataset.draftId;
+            btn.disabled = true;
+
+            trackSave(
+                postJSON('/billing/client/' + clientId + '/draft/' + draftId + '/transition', { to: to })
+                    .then(function (res) {
+                        if (!res.data.ok) {
+                            alert(res.data.error || 'Errore nella transizione');
+                            btn.disabled = false;
+                            return;
+                        }
+                        // Reload — easier than swapping all the buttons + readonly
+                        // flags + status pills inline. Status change is infrequent.
+                        location.reload();
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert('Errore di rete');
+                        btn.disabled = false;
+                    })
+            );
+        });
+    }
+
     // ── Exclude toggle ───────────────────────────────────────────────────────
 
     if (isEditable) {
