@@ -92,13 +92,18 @@ final class BillingDraftService
     /**
      * Apply the draft's edits back to the cantieri (bb_billing + Yard).
      *
-     * This is NOT invoice generation — the actual fattura is created
-     * downstream by accounting on Yard. What we do here:
+     * This is NOT invoice generation — the actual fattura is emitted
+     * downstream by accounting on Yard. We only propagate the user's edits
+     * (data, descrizione, importo, iva). The emessa flag is intentionally
+     * left untouched: it will become 1 when accounting actually invoices
+     * the row on Yard, and `syncEmessaForClient` will pick that up.
+     *
+     * What we do here:
      *   1. Inside a BOB MySQL transaction:
-     *        - UPDATE bb_billing for each non-excluded line (apply edits + emessa=1)
+     *        - UPDATE bb_billing for each non-excluded line (values only)
      *        - UPDATE bb_billing_drafts → status=fatturata (internal label for
-     *          "applied"), invoice_date = today (for audit). invoice_number
-     *          stays NULL — can be filled in later if accounting wants the link.
+     *          "applied"), invoice_date = today (audit only). invoice_number
+     *          stays NULL — can be filled in later if needed.
      *   2. After commit, attempt Yard SQL Server sync per line. Failures are
      *      tracked on the line so the user can retry.
      *

@@ -129,7 +129,12 @@ final class BillingDraftRepository
     }
 
     /**
-     * Write the draft-line values back to bb_billing and set emessa=1.
+     * Write the draft-line values back to bb_billing.
+     *
+     * IMPORTANT: this does NOT touch `emessa`. The emessa flag is set
+     * downstream by accounting when the actual fattura is emitted on Yard
+     * — at which point `syncEmessaForClient` reads it back into BOB.
+     * We only propagate the user's edits (data, descrizione, importo, iva).
      */
     public function applyLineToBilling(int $bbBillingId, array $values): void
     {
@@ -138,8 +143,7 @@ final class BillingDraftRepository
                SET data              = :data,
                    descrizione       = :descr,
                    totale_imponibile = :imp,
-                   aliquota_iva      = :iva,
-                   emessa            = 1
+                   aliquota_iva      = :iva
              WHERE id = :id
         ");
         $stmt->execute([
