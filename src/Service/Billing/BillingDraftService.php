@@ -462,9 +462,7 @@ final class BillingDraftService
 
     /**
      * Hydrates the draft view: header + lines + meta (e.g. new rows added
-     * to bb_billing after draft creation). Lines are enriched with the
-     * latest "movimentato" month per worksite (from bb_presenze /
-     * bb_presenze_consorziate), shown as a read-only hint column in the UI.
+     * to bb_billing after draft creation).
      *
      * @return array{draft: array, lines: array<int,array>, totals: array, new_rows_count: int}
      */
@@ -475,13 +473,6 @@ final class BillingDraftService
             throw new RuntimeException('Bozza non trovata.');
         }
         $lines = $this->drafts->getLinesForDraft($draftId);
-
-        // Lookup most-recent presenze month per worksite (display-only)
-        $movMap      = $this->loadMovimentatoMap(array_unique(array_column($lines, 'worksite_id')));
-        foreach ($lines as &$l) {
-            $l['movimentato'] = $movMap[(int)$l['worksite_id']] ?? null;
-        }
-        unset($l);
 
         $totImponibile = 0.0;
         $totEscluso    = 0.0;
@@ -512,43 +503,4 @@ final class BillingDraftService
         ];
     }
 
-    /**
-     * For a list of worksite ids, return [worksite_id => "Mag 2026"] using
-     * the latest presenze month (bb_presenze ∪ bb_presenze_consorziate).
-     * Returns empty array if input is empty.
-     */
-    private function loadMovimentatoMap(array $worksiteIds): array
-    {
-        $worksiteIds = array_values(array_unique(array_filter(array_map('intval', $worksiteIds))));
-        if (empty($worksiteIds)) {
-            return [];
-        }
-        $monthNames   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-        $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
-        $sql = "
-            SELECT worksite_id, yr, mo
-            FROM (
-                SELECT worksite_id, YEAR(data) AS yr, MONTH(data) AS mo
-                FROM bb_presenze
-                WHERE worksite_id IN ({$placeholders})
-                UNION
-                SELECT worksite_id, YEAR(data_presenza) AS yr, MONTH(data_presenza) AS mo
-                FROM bb_presenze_consorziate
-                WHERE worksite_id IN ({$placeholders})
-            ) AS combined
-            GROUP BY worksite_id, yr, mo
-            ORDER BY worksite_id, yr DESC, mo DESC
-        ";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute(array_merge($worksiteIds, $worksiteIds));
-        $map = [];
-        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $m) {
-            $wid = (int)$m['worksite_id'];
-            // First seen wins = most recent month per worksite
-            if (!isset($map[$wid])) {
-                $map[$wid] = $monthNames[(int)$m['mo'] - 1] . ' ' . $m['yr'];
-            }
-        }
-        return $map;
-    }
 }

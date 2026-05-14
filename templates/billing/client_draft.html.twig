@@ -185,7 +185,6 @@
             <tr>
                 <th style="width:110px;">Data</th>
                 <th style="width:180px;">Cantiere</th>
-                <th class="center" style="width:90px;" title="Ultimo mese di presenza per il cantiere">Mov.</th>
                 <th>Descrizione</th>
                 <th class="right" style="width:140px;">Imponibile (€)</th>
                 <th class="right" style="width:80px;">IVA %</th>
@@ -210,14 +209,6 @@
 
                 <td class="bd-cell-cantiere">
                     <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere }}</a>
-                </td>
-
-                <td class="center bd-cell-mov">
-                    {% if l.movimentato %}
-                        <span class="bd-mov-pill">{{ l.movimentato }}</span>
-                    {% else %}
-                        <span class="bd-muted">—</span>
-                    {% endif %}
                 </td>
 
                 <td class="bd-cell-descrizione">
