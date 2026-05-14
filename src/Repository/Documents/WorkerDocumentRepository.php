@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository\Documents;
 use PDO;
 use App\Repository\Contracts\WorkerDocumentRepositoryInterface;
+use App\Validator\Documents\DateNormalizer;
 
 class WorkerDocumentRepository implements WorkerDocumentRepositoryInterface
 {
@@ -83,7 +84,10 @@ class WorkerDocumentRepository implements WorkerDocumentRepositoryInterface
             ':worker_id' => (int)$current['worker_id'],
             ':company_name' => (string)($current['company_name'] ?? 'N/D'),
             ':tipo_documento' => (string)$current['tipo_documento'],
-            ':data_emissione' => (string)$current['data_emissione'],
+            // Normalize legacy Italian-format dates (dd/mm/YYYY) to ISO before
+            // inserting into the archive's DATE column
+            ':data_emissione' => DateNormalizer::toIso((string)($current['data_emissione'] ?? ''))
+                                  ?? (string)($current['data_emissione'] ?? ''),
             ':scadenza' => $current['scadenza'] ?: null,
             ':path' => $archivedDbPath,
             ':archived_by' => $archivedBy,

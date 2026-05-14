@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Documents;
 use RuntimeException;
 use App\Repository\Documents\WorkerDocumentRepository;
+use App\Validator\Documents\DateNormalizer;
 
 class WorkerDocumentService
 {
@@ -100,7 +101,10 @@ class WorkerDocumentService
     {
         $documentId = (int)$payload['document_id'];
         $docType = (string)$payload['document_type'];
-        $dateEmission = (string)$payload['date_emission'];
+        // Normalize to ISO even if the validator already did it — safety net for
+        // legacy records and edge cases (e.g. dd/mm/YYYY arriving from old forms)
+        $rawEmission  = (string)($payload['date_emission'] ?? '');
+        $dateEmission = DateNormalizer::toIso($rawEmission) ?? $rawEmission;
         $expiryDate = $payload['expiry_date'] ?? null;
         $file = $payload['file'];
 
