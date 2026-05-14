@@ -321,6 +321,50 @@
             }
         }
 
+        // ── Drag-and-drop support ─────────────────────────────────────────────
+        if (dropzone) {
+            // Make the dropzone a valid drop target (required to receive drop events)
+            dropzone.addEventListener('dragenter', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('is-drag-over');
+            });
+            dropzone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('is-drag-over');
+            });
+            dropzone.addEventListener('dragleave', function (e) {
+                // dragleave fires when moving to a child element — ignore those
+                if (dropzone.contains(e.relatedTarget)) return;
+                dropzone.classList.remove('is-drag-over');
+            });
+            dropzone.addEventListener('dragend', function () {
+                dropzone.classList.remove('is-drag-over');
+            });
+            dropzone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('is-drag-over');
+
+                var files = e.dataTransfer && e.dataTransfer.files;
+                if (!files || files.length === 0) return;
+                var file = files[0];
+
+                // Assign the dropped file to the hidden <input type="file">
+                // using the DataTransfer API so the change event fires normally
+                try {
+                    var dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileInput.files = dt.files;
+                } catch (err) {
+                    // DataTransfer not available (old browsers) — skip silently
+                    return;
+                }
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        }
+
         fileInput.addEventListener('change', function () {
             var file = fileInput.files && fileInput.files[0];
 

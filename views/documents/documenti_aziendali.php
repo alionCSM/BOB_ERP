@@ -225,9 +225,9 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <div class="modal-footer wd-modal-footer">
-                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
-                <button type="submit" class="btn btn-primary wd-btn-submit">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right:6px;">
+                <button type="button" data-tw-dismiss="modal" class="wd-btn wd-btn-cancel">Annulla</button>
+                <button type="submit" class="wd-btn wd-btn-submit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
                         <polyline points="20 6 9 17 4 12"/>
                     </svg>
                     Carica documento
@@ -278,6 +278,13 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     border-style: solid;
                     border-color: #10b981;
                     background: #ecfdf5;
+                }
+                .wd-dropzone.is-drag-over {
+                    border-color: #8b5cf6;
+                    border-style: solid;
+                    background: #ede9fe;
+                    transform: scale(1.01);
+                    box-shadow: 0 0 0 4px rgba(139,92,246,.12);
                 }
                 .wd-dropzone-optional {
                     /* Modal di modifica: file opzionale, look meno "obbligatorio" */
@@ -342,8 +349,51 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     border-top: 1px solid #e2e8f0;
                     padding: 14px 22px;
                     background: #fafafa;
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 10px;
+                    align-items: center;
                 }
-                .wd-btn-submit { display: inline-flex; align-items: center; }
+
+                /* Unified button base — same height, padding, radius, font */
+                .wd-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    height: 36px;
+                    padding: 0 18px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    font-weight: 500;
+                    line-height: 1;
+                    cursor: pointer;
+                    border: 1px solid transparent;
+                    transition: background .12s ease, border-color .12s ease, color .12s ease;
+                    white-space: nowrap;
+                    text-decoration: none;
+                }
+                .wd-btn-cancel {
+                    background: #fff;
+                    border-color: #cbd5e1;
+                    color: #475569;
+                }
+                .wd-btn-cancel:hover {
+                    background: #f1f5f9;
+                    border-color: #94a3b8;
+                    color: #1e293b;
+                }
+                .wd-btn-submit {
+                    background: #6366f1;
+                    border-color: #6366f1;
+                    color: #fff;
+                }
+                .wd-btn-submit:hover {
+                    background: #4f46e5;
+                    border-color: #4f46e5;
+                    color: #fff;
+                }
+                .wd-btn svg { flex-shrink: 0; }
 
                 /* Banner BOB compatto */
                 .wd-ai-banner {
@@ -484,9 +534,9 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
 
             <div class="modal-footer wd-modal-footer">
-                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary">Annulla</button>
-                <button type="submit" class="btn btn-primary wd-btn-submit">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="margin-right:6px;">
+                <button type="button" data-tw-dismiss="modal" class="wd-btn wd-btn-cancel">Annulla</button>
+                <button type="submit" class="wd-btn wd-btn-submit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15">
                         <polyline points="20 6 9 17 4 12"/>
                     </svg>
                     Salva modifiche
@@ -522,5 +572,5 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<script src="/assets/js/views/documents/documenti_aziendali.js?v=2"></script>
+<script src="/assets/js/views/documents/documenti_aziendali.js?v=3"></script>
 
