@@ -59,16 +59,11 @@ $sheet->setTitle('Bozza Fatturazione');
 // A=Cantiere B=Ordine C=DataOrdine D=Descrizione E=DataFattura F=Imponibile
 $lastCol = 'F';
 
-// Title row
+// Title row — same look & wording as the legacy "Da Emettere" export
 $sheet->mergeCells("A1:{$lastCol}1");
-$title = 'Bozza Fatturazione – ' . $clientName;
-if (!empty($draft['period_label'])) {
-    $title .= ' – ' . $draft['period_label'];
-}
-$title .= '  (bozza #' . $draft['id'] . ')';
-$sheet->setCellValue('A1', $title);
+$sheet->setCellValue('A1', 'Fatture da Emettere – ' . $clientName);
 $sheet->getStyle('A1')->applyFromArray([
-    'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => '4C1D95']],
+    'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => '1E3A5F']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
 ]);
 $sheet->getRowDimension(1)->setRowHeight(24);
@@ -87,7 +82,7 @@ foreach ($headers as $cell => $text) {
 }
 $sheet->getStyle("A2:{$lastCol}2")->applyFromArray([
     'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
-    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '6D28D9']],
+    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E3A5F']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
 ]);
 $sheet->getRowDimension(2)->setRowHeight(20);
@@ -95,7 +90,7 @@ $sheet->getRowDimension(2)->setRowHeight(20);
 // Data rows
 $rowNum   = 3;
 $total    = 0.0;
-$altLight = 'F5F3FF';
+$altLight = 'F0F4FA';
 $altDark  = 'FFFFFF';
 
 foreach ($rows as $row) {
@@ -141,7 +136,7 @@ $sheet->setCellValue("A{$rowNum}", 'TOTALE');
 $sheet->setCellValue("F{$rowNum}", $total);
 $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
     'font'      => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'FFFFFF']],
-    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '7C3AED']],
+    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'DC2626']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
 ]);
 $sheet->getStyle("F{$rowNum}")->getNumberFormat()->setFormatCode('€ #,##0.00');
@@ -177,9 +172,9 @@ try {
     // non-fatal
 }
 
-// Output
+// Output — same filename pattern as the legacy "Da Emettere" export
 $safeClient = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $clientName);
-$filename   = 'bozza_fatturazione_' . $safeClient . '_n' . $draft['id'] . '_' . date('Ymd') . '.xlsx';
+$filename   = 'fatture_da_emettere_' . $safeClient . '_' . date('Ymd') . '.xlsx';
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
