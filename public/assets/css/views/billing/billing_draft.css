@@ -1,0 +1,99 @@
+/* ── Billing Draft page (bd-draft-) ─────────────── */
+
+.bd-draft-page .bd-hero {
+    background: linear-gradient(135deg, #2e1065 0%, #4c1d95 40%, #6d28d9 100%);
+}
+
+.bd-hero-title { display: flex; align-items: center; gap: 12px; }
+
+/* ── New rows warning banner ───────────────────── */
+.bd-new-rows-banner {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    margin: 0 0 16px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-left: 4px solid #f59e0b;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #78350f;
+}
+.bd-new-rows-banner svg {
+    width: 18px; height: 18px; flex-shrink: 0;
+    stroke: #f59e0b; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+.bd-new-rows-banner em { color: #9a7521; font-style: italic; }
+.bd-new-rows-banner strong { color: #78350f; }
+
+/* ── Totals row ─────────────────────────────────── */
+.bd-draft-totals {
+    display: flex; gap: 16px;
+    margin: 0 0 18px;
+}
+.bd-draft-total {
+    flex: 1;
+    padding: 14px 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+.bd-draft-total-label {
+    font-size: 11px; font-weight: 500; color: #64748b;
+    text-transform: uppercase; letter-spacing: .5px;
+    margin-bottom: 4px;
+}
+.bd-draft-total-value { font-size: 20px; font-weight: 600; color: #0f172a; }
+.bd-draft-total-value.success { color: #16a34a; }
+.bd-draft-total-value.muted   { color: #94a3b8; text-decoration: line-through; }
+
+/* ── Excluded row styling ───────────────────────── */
+.bd-row-excluded {
+    background: #fef2f2;
+    color: #991b1b;
+}
+.bd-row-excluded td { text-decoration: line-through; opacity: .75; }
+.bd-row-excluded .bd-link { color: #991b1b; }
+
+/* ── Pills (row status) ─────────────────────────── */
+.bd-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+}
+.bd-pill-danger  { background: #fee2e2; color: #b91c1c; }
+.bd-pill-warning { background: #fef3c7; color: #b45309; }
+.bd-pill-muted   { background: #f1f5f9; color: #94a3b8; }
+
+/* ── Cancel button ──────────────────────────────── */
+.bd-btn-danger-outline {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 14px;
+    border-radius: 8px;
+    background: rgba(239,68,68,.12);
+    color: #fecaca;
+    border: 1px solid rgba(239,68,68,.45);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background .12s ease;
+}
+.bd-btn-danger-outline:hover {
+    background: rgba(239,68,68,.22);
+    border-color: rgba(239,68,68,.7);
+}
+.bd-btn-danger-outline svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Section header note ────────────────────────── */
+.bd-draft-phase-note {
+    font-size: 11px; color: #94a3b8; font-style: italic;
+}
+
+@media (max-width: 768px) {
+    .bd-draft-totals { flex-direction: column; }
+}

@@ -1,0 +1,123 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_detail.css">
+<link rel="stylesheet" href="/assets/css/views/billing/billing_draft.css">
+{% endblock %}
+
+{% block content %}
+<div class="bd-page bd-draft-page">
+
+{# ── Hero ── #}
+<div class="bd-hero">
+    <div class="bd-hero-content">
+        <div class="bd-hero-left">
+            <div class="bd-hero-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <div>
+                <div class="bd-hero-breadcrumb">
+                    <a href="/billing/clients">Fatture per Cliente</a> ›
+                    <a href="/billing/client/{{ client.id }}">{{ client.name }}</a> ›
+                    Bozza #{{ draft.id }}
+                </div>
+                <h1 class="bd-hero-title">
+                    Bozza fatturazione
+                    <span class="bd-draft-status bd-draft-status-{{ draft.status }}">{{ draft.status|replace({'_': ' '}) }}</span>
+                </h1>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <form method="post" action="/billing/client/{{ client.id }}/draft/{{ draft.id }}/cancel"
+                  onsubmit="return confirm('Annullare la bozza? Le righe torneranno disponibili in da-emettere.');"
+                  style="margin:0;">
+                <button type="submit" class="bd-btn-danger-outline">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Annulla bozza
+                </button>
+            </form>
+            <a href="/billing/client/{{ client.id }}" class="bd-btn-back">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                Torna al cliente
+            </a>
+        </div>
+    </div>
+</div>
+
+{# ── New rows banner ── #}
+{% if newRowsCount > 0 %}
+<div class="bd-new-rows-banner">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>
+        Ci sono <strong>{{ newRowsCount }}</strong> nuove righe da fatturare per questo cliente create dopo l'apertura della bozza.
+        <em>(L'aggiunta sarà disponibile in Fase 2.)</em>
+    </span>
+</div>
+{% endif %}
+
+{# ── Totals ── #}
+<div class="bd-draft-totals">
+    <div class="bd-draft-total">
+        <div class="bd-draft-total-label">Imponibile fatturabile</div>
+        <div class="bd-draft-total-value success">€ {{ totals.imponibile|number_format(2, ',', '.') }}</div>
+    </div>
+    {% if totals.escluso > 0 %}
+    <div class="bd-draft-total">
+        <div class="bd-draft-total-label">Imponibile escluso</div>
+        <div class="bd-draft-total-value muted">€ {{ totals.escluso|number_format(2, ',', '.') }}</div>
+    </div>
+    {% endif %}
+    <div class="bd-draft-total">
+        <div class="bd-draft-total-label">Righe in bozza</div>
+        <div class="bd-draft-total-value">{{ lines|length }}</div>
+    </div>
+</div>
+
+{# ── Read-only table (Phase 1 — Phase 2 makes editable) ── #}
+<div class="bd-section">
+    <div class="bd-section-header">
+        <h3 class="bd-section-title">
+            <span class="bd-section-dot" style="background:#8b5cf6;box-shadow:0 0 5px rgba(139,92,246,.4);"></span>
+            Righe in bozza
+        </h3>
+        <span class="bd-draft-phase-note">In sola lettura — la modifica inline arriva in Fase 2</span>
+    </div>
+
+    <div class="bd-table-wrap">
+        <table class="bd-table">
+            <thead>
+            <tr>
+                <th>Data</th>
+                <th>Cantiere</th>
+                <th>Descrizione</th>
+                <th class="right">Imponibile (€)</th>
+                <th class="right">IVA %</th>
+                <th class="center">Stato</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for l in lines %}
+            <tr class="{% if l.excluded %}bd-row-excluded{% endif %}">
+                <td class="bd-muted" style="white-space:nowrap;">{{ l.data }}</td>
+                <td><a href="/worksites/{{ l.worksite_id }}" class="bd-link">{{ l.cantiere }}</a></td>
+                <td style="font-size:12px;color:#64748b;">{{ l.descrizione }}</td>
+                <td class="right">€ {{ l.totale_imponibile|number_format(2, ',', '.') }}</td>
+                <td class="right bd-muted">{{ l.aliquota_iva }}%</td>
+                <td class="center">
+                    {% if l.excluded %}
+                        <span class="bd-pill bd-pill-danger">esclusa</span>
+                    {% elseif l.modified %}
+                        <span class="bd-pill bd-pill-warning">modificata</span>
+                    {% else %}
+                        <span class="bd-pill bd-pill-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</div>
+{% endblock %}

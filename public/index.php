@@ -384,7 +384,11 @@ if ($uri === '/billing' || str_starts_with($uri, '/billing/')) {
            ->get('/billing/clients/emesse-month',    [BillingController::class, 'emesseMonthFragment'])
            ->get('/billing/client/{id}',             [BillingController::class, 'clientDetail'])
            ->get('/billing/client/{id}/emesse',      [BillingController::class, 'clientEmesse'])
-           ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere']);
+           ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere'])
+           // ── Fatturazione editable draft ───────────────────────────────
+           ->post('/billing/client/{id}/draft',                        [BillingController::class, 'createDraft'])
+           ->get('/billing/client/{clientId}/draft/{draftId}',         [BillingController::class, 'showDraft'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/cancel', [BillingController::class, 'cancelDraft']);
 
     $router->dispatch($request, $container);
 }

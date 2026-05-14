@@ -185,3 +185,88 @@
     .bd-search-wrap input { width: 100%; }
     .bd-table-wrap { overflow-x: auto; }
 }
+
+/* ── Draft "Crea bozza" hero button ─────────────── */
+.bd-btn-draft {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 36px; padding: 0 16px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.18);
+    color: #ede9fe;
+    border: 1px solid rgba(139, 92, 246, 0.5);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease;
+}
+.bd-btn-draft:hover {
+    background: rgba(139, 92, 246, 0.3);
+    border-color: rgba(139, 92, 246, 0.8);
+}
+.bd-btn-draft svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Active-draft banner on client_detail page ─── */
+.bd-draft-banner {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px;
+    margin: 0 0 18px;
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    border: 1px solid #c4b5fd;
+    border-left: 4px solid #8b5cf6;
+    border-radius: 10px;
+}
+.bd-draft-banner-icon {
+    width: 38px; height: 38px; flex-shrink: 0;
+    background: #fff;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #7c3aed;
+}
+.bd-draft-banner-icon svg {
+    width: 18px; height: 18px;
+    stroke: currentColor; fill: none; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+.bd-draft-banner-body { flex: 1; min-width: 0; }
+.bd-draft-banner-title {
+    font-size: 14px; font-weight: 600; color: #4c1d95;
+    display: flex; align-items: center; gap: 10px;
+}
+.bd-draft-banner-sub { font-size: 12px; color: #6d28d9; margin-top: 2px; }
+
+.bd-btn-draft-open {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 36px; padding: 0 16px;
+    border-radius: 8px;
+    background: #8b5cf6; color: #fff;
+    border: 1px solid #8b5cf6;
+    font-size: 13px; font-weight: 500;
+    text-decoration: none;
+    transition: background .12s ease;
+}
+.bd-btn-draft-open:hover { background: #7c3aed; color: #fff; text-decoration: none; }
+.bd-btn-draft-open svg {
+    width: 14px; height: 14px;
+    stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Status pill (shared between banner + draft page hero) ── */
+.bd-draft-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.bd-draft-status-bozza           { background: #ede9fe; color: #6d28d9; }
+.bd-draft-status-inviata_cliente { background: #dbeafe; color: #1d4ed8; }
+.bd-draft-status-da_modificare   { background: #fef3c7; color: #b45309; }
+.bd-draft-status-approvata       { background: #dcfce7; color: #166534; }
+.bd-draft-status-fatturata       { background: #f1f5f9; color: #475569; }
+.bd-draft-status-annullata       { background: #fee2e2; color: #b91c1c; }

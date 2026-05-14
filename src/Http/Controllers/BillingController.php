@@ -6,6 +6,8 @@ use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Infrastructure\SqlServerConnection;
 use App\Repository\Billing\BillingRepository;
+use App\Repository\Billing\BillingDraftRepository;
+use App\Service\Billing\BillingDraftService;
 
 final class BillingController
 {
@@ -279,11 +281,112 @@ final class BillingController
         $emesseCountYr     = (int)($yrTotals['emesse_count_yr'] ?? 0);
         $emesseEuroYr      = (float)($yrTotals['emesse_euro_yr'] ?? 0);
 
+        // Active draft (Fatturazione editable workflow — Phase 1)
+        $activeDraft = $this->draftService()->getActiveDraft($clientId);
+
         Response::view('billing/client_detail.html.twig', $request, compact(
             'client', 'daEmettere', 'totalDaEmettere',
             'emesse', 'totalEmesse', 'totalEmesseEuro', 'perPage',
-            'currentYear', 'daEmettereCountYr', 'daEmettereEuroYr', 'emesseCountYr', 'emesseEuroYr'
+            'currentYear', 'daEmettereCountYr', 'daEmettereEuroYr', 'emesseCountYr', 'emesseEuroYr',
+            'activeDraft'
         ));
+    }
+
+    // ── Fatturazione draft (editable invoice draft) ──────────────────────────
+
+    private function draftService(): BillingDraftService
+    {
+        return new BillingDraftService(
+            $this->conn,
+            new BillingDraftRepository($this->conn),
+            $this->billingRepo,
+        );
+    }
+
+    /**
+     * POST /billing/client/{id}/draft — create a new draft snapshotting all
+     * emessa=0 rows for this client. Redirects to the draft view on success.
+     */
+    public function createDraft(Request $request): never
+    {
+        $user     = $request->user();
+        $clientId = $request->intParam('id');
+        if (!$clientId) {
+            Response::error('Cliente non specificato.', 400);
+        }
+
+        $periodLabel = trim((string)($_POST['period_label'] ?? '')) ?: null;
+
+        try {
+            $draftId = $this->draftService()->createDraftForClient(
+                $clientId,
+                $periodLabel,
+                (int)$user->id
+            );
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 400);
+        }
+
+        Response::redirect('/billing/client/' . $clientId . '/draft/' . $draftId);
+    }
+
+    /**
+     * GET /billing/client/{clientId}/draft/{draftId} — read-only view of the
+     * draft. Phase 2 will replace this with the editable grid.
+     */
+    public function showDraft(Request $request): void
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::redirect('/billing/clients');
+        }
+
+        $stmt = $this->conn->prepare('SELECT id, name FROM bb_clients WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $clientId]);
+        $client = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$client) {
+            Response::redirect('/billing/clients');
+        }
+
+        try {
+            $view = $this->draftService()->getDraftView($draftId);
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 404);
+        }
+
+        // Sanity check: draft belongs to this client
+        if ((int)$view['draft']['client_id'] !== $clientId) {
+            Response::redirect('/billing/client/' . $clientId);
+        }
+
+        Response::view('billing/client_draft.html.twig', $request, [
+            'client'        => $client,
+            'draft'         => $view['draft'],
+            'lines'         => $view['lines'],
+            'totals'        => $view['totals'],
+            'newRowsCount'  => $view['new_rows_count'],
+        ]);
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/cancel — cancel a draft.
+     */
+    public function cancelDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::error('Parametri mancanti.', 400);
+        }
+
+        try {
+            $this->draftService()->cancelDraft($draftId);
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 400);
+        }
+
+        Response::redirect('/billing/client/' . $clientId);
     }
 
     // ── Per-client billing: export da-emettere Excel ─────────────────────────
