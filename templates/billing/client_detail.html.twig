@@ -85,9 +85,17 @@
         <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     </div>
     <div class="bd-draft-banner-body">
+        {% set statusLabel = {
+            'bozza': 'bozza',
+            'inviata_cliente': 'inviata cliente',
+            'da_modificare': 'da modificare',
+            'approvata': 'approvata',
+            'fatturata': 'applicata',
+            'annullata': 'annullata',
+        }[activeDraft.status] ?? activeDraft.status %}
         <div class="bd-draft-banner-title">
             Bozza fatturazione attiva
-            <span class="bd-draft-status bd-draft-status-{{ activeDraft.status }}">{{ activeDraft.status|replace({'_': ' '}) }}</span>
+            <span class="bd-draft-status bd-draft-status-{{ activeDraft.status }}">{{ statusLabel }}</span>
         </div>
         <div class="bd-draft-banner-sub">
             Creata il {{ activeDraft.created_at|date('d/m/Y') }}{% if activeDraft.period_label %} · {{ activeDraft.period_label }}{% endif %}

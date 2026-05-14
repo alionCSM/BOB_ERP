@@ -72,9 +72,12 @@ final class BillingDraftRepository
     }
 
     /**
-     * Finalize: set status=fatturata + invoice number + invoice date.
+     * Finalize: mark draft as "fatturata" (internal label for applied —
+     * edits propagated to bb_billing + Yard). invoice_number stays NULL
+     * unless accounting later wants to link the BOB draft to the real
+     * fattura emitted on Yard. invoice_date stores when we applied.
      */
-    public function finalizeDraftHeader(int $draftId, string $invoiceNumber, string $invoiceDate): void
+    public function finalizeDraftHeader(int $draftId, ?string $invoiceNumber, string $invoiceDate): void
     {
         $stmt = $this->conn->prepare(
             "UPDATE bb_billing_drafts
@@ -84,7 +87,7 @@ final class BillingDraftRepository
               WHERE id = :id"
         );
         $stmt->execute([
-            ':num' => $invoiceNumber,
+            ':num' => $invoiceNumber !== null && $invoiceNumber !== '' ? $invoiceNumber : null,
             ':dt'  => $invoiceDate,
             ':id'  => $draftId,
         ]);

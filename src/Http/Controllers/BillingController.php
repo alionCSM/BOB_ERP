@@ -372,8 +372,10 @@ final class BillingController
 
     /**
      * POST /billing/client/{clientId}/draft/{draftId}/finalize
-     * JSON body: { invoice_number, invoice_date }
-     * Commits the draft → bb_billing + Yard, marks status=fatturata.
+     * No body required — confirmation only. Applies the draft's edits to
+     * bb_billing (BOB) and CNT_cantieri_brogliacci (Yard), marks the draft
+     * as fatturata (internal label for "applicata"). The real fattura is
+     * generated downstream by accounting on Yard.
      */
     public function finalizeDraft(Request $request): never
     {
@@ -383,12 +385,8 @@ final class BillingController
             Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
         }
 
-        $payload  = $this->readJsonBody();
-        $number   = trim((string)($payload['invoice_number'] ?? ''));
-        $date     = trim((string)($payload['invoice_date']   ?? ''));
-
         try {
-            $result = $this->draftService()->commitInvoice($draftId, $number, $date);
+            $result = $this->draftService()->commitInvoice($draftId);
             Response::json(['ok' => true] + $result);
         } catch (\InvalidArgumentException $e) {
             Response::json(['ok' => false, 'error' => $e->getMessage()], 422);

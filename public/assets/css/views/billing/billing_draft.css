@@ -246,6 +246,13 @@
 .bd-modal-close:hover { background: #f1f5f9; color: #475569; }
 
 .bd-modal-body { padding: 18px 22px; }
+.bd-modal-text {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.55;
+    margin: 0 0 14px;
+}
+.bd-modal-text strong { color: #0f172a; font-weight: 600; }
 .bd-modal-warn {
     display: flex; align-items: flex-start; gap: 8px;
     padding: 10px 12px;

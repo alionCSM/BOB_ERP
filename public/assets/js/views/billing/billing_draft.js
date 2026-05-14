@@ -183,21 +183,16 @@
 
     var finalizeModal = document.getElementById('bd-finalize-modal');
     if (finalizeModal) {
-        var openBtn  = document.querySelector('[data-action="open-finalize-modal"]');
-        var closeBtns = finalizeModal.querySelectorAll('[data-action="close-modal"]');
+        var openBtn    = document.querySelector('[data-action="open-finalize-modal"]');
+        var closeBtns  = finalizeModal.querySelectorAll('[data-action="close-modal"]');
         var confirmBtn = document.getElementById('bd-finalize-confirm');
         var errorBox   = document.getElementById('bd-finalize-error');
-        var numberInp  = document.getElementById('bd-invoice-number');
-        var dateInp    = document.getElementById('bd-invoice-date');
 
-        function openModal() {
-            finalizeModal.style.display = 'flex';
-            setTimeout(function () { if (numberInp) numberInp.focus(); }, 50);
-        }
+        function openModal()  { finalizeModal.style.display = 'flex'; }
         function closeModal() {
             finalizeModal.style.display = 'none';
-            if (errorBox) errorBox.style.display = 'none';
-            if (confirmBtn) confirmBtn.disabled = false;
+            if (errorBox)   errorBox.style.display = 'none';
+            if (confirmBtn) confirmBtn.disabled    = false;
         }
 
         if (openBtn) openBtn.addEventListener('click', openModal);
@@ -210,47 +205,30 @@
         });
 
         confirmBtn.addEventListener('click', function () {
-            var num  = (numberInp.value || '').trim();
-            var date = (dateInp.value   || '').trim();
-            if (errorBox) errorBox.style.display = 'none';
-            if (!num) {
-                errorBox.textContent = 'Inserisci il numero fattura.';
-                errorBox.style.display = 'block';
-                return;
-            }
-            if (!date) {
-                errorBox.textContent = 'Inserisci la data fattura.';
-                errorBox.style.display = 'block';
-                return;
-            }
-
             var clientId = finalizeModal.dataset.clientId;
             var draftId  = finalizeModal.dataset.draftId;
+            if (errorBox) errorBox.style.display = 'none';
             confirmBtn.disabled = true;
-            setSaving('saving', 'Fatturazione in corso…');
+            setSaving('saving', 'Applicazione modifiche in corso…');
 
-            postJSON('/billing/client/' + clientId + '/draft/' + draftId + '/finalize', {
-                invoice_number: num,
-                invoice_date:   date,
-            })
-            .then(function (res) {
-                if (!res.data.ok) {
-                    errorBox.textContent = res.data.error || 'Errore';
+            postJSON('/billing/client/' + clientId + '/draft/' + draftId + '/finalize', {})
+                .then(function (res) {
+                    if (!res.data.ok) {
+                        errorBox.textContent = res.data.error || 'Errore';
+                        errorBox.style.display = 'block';
+                        confirmBtn.disabled  = false;
+                        setSaving('error', res.data.error || 'Errore');
+                        return;
+                    }
+                    location.reload();
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    errorBox.textContent = 'Errore di rete';
                     errorBox.style.display = 'block';
-                    confirmBtn.disabled = false;
-                    setSaving('error', res.data.error || 'Errore');
-                    return;
-                }
-                // Reload — the new fatturata view shows the Yard sync banner
-                location.reload();
-            })
-            .catch(function (err) {
-                console.error(err);
-                errorBox.textContent = 'Errore di rete';
-                errorBox.style.display = 'block';
-                confirmBtn.disabled = false;
-                setSaving('error', 'Errore di rete');
-            });
+                    confirmBtn.disabled  = false;
+                    setSaving('error', 'Errore di rete');
+                });
         });
     }
 

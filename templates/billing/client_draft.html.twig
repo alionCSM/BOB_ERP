@@ -21,9 +21,17 @@
                     <a href="/billing/client/{{ client.id }}">{{ client.name }}</a> ›
                     Bozza #{{ draft.id }}
                 </div>
+                {% set statusLabel = {
+                    'bozza': 'bozza',
+                    'inviata_cliente': 'inviata cliente',
+                    'da_modificare': 'da modificare',
+                    'approvata': 'approvata',
+                    'fatturata': 'applicata',
+                    'annullata': 'annullata',
+                }[draft.status] ?? draft.status %}
                 <h1 class="bd-hero-title">
                     Bozza fatturazione
-                    <span class="bd-draft-status bd-draft-status-{{ draft.status }}">{{ draft.status|replace({'_': ' '}) }}</span>
+                    <span class="bd-draft-status bd-draft-status-{{ draft.status }}">{{ statusLabel }}</span>
                 </h1>
             </div>
         </div>
@@ -49,8 +57,8 @@
             </button>
             {% elseif draft.status == 'approvata' %}
             <button type="button" class="bd-btn-primary" data-action="open-finalize-modal">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                Fattura ora
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                Applica modifiche ai cantieri
             </button>
             <button type="button" class="bd-btn-warning" data-transition="bozza"
                     data-confirm="Riportare la bozza in modifica? I campi torneranno editabili.">
@@ -59,7 +67,7 @@
             </button>
             {% elseif draft.status == 'fatturata' %}
             <span class="bd-fattura-info">
-                Fattura <strong>{{ draft.invoice_number }}</strong> · {{ draft.invoice_date|date('d/m/Y') }}
+                Applicata il <strong>{{ draft.invoice_date|date('d/m/Y') }}</strong>
             </span>
             {% elseif draft.status == 'inviata_cliente' or draft.status == 'da_modificare' %}
             {# Legacy states — provide an escape hatch back to bozza #}
@@ -265,37 +273,33 @@
     </div>
 </div>
 
-{# ── Finalize modal (Fattura ora) ── #}
+{# ── Finalize modal — confirms the writeback to cantieri + Yard ── #}
 {% if draft.status == 'approvata' %}
+{% set fatturabili = lines|filter(l => not l.excluded)|length %}
 <div class="bd-modal-backdrop" id="bd-finalize-modal" style="display:none;" data-client-id="{{ client.id }}" data-draft-id="{{ draft.id }}">
     <div class="bd-modal">
         <div class="bd-modal-header">
             <div class="bd-modal-icon">
-                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div>
-                <h3 class="bd-modal-title">Fattura ora</h3>
+                <h3 class="bd-modal-title">Applica modifiche ai cantieri</h3>
                 <p class="bd-modal-sub">
-                    {{ totals.imponibile|number_format(2, ',', '.') }} € · {{ lines|length }} righe
-                    ({{ lines|filter(l => not l.excluded)|length }} fatturabili)
+                    {{ fatturabili }} righe da applicare · € {{ totals.imponibile|number_format(2, ',', '.') }}
+                    {% if totals.escluso > 0 %} · {{ lines|length - fatturabili }} escluse{% endif %}
                 </p>
             </div>
             <button type="button" class="bd-modal-close" data-action="close-modal">&times;</button>
         </div>
         <div class="bd-modal-body">
+            <p class="bd-modal-text">
+                Le modifiche apportate nella bozza verranno scritte sulle righe corrispondenti
+                dei cantieri (bb_billing) e sincronizzate su <strong>Yard</strong>.
+                Le righe escluse resteranno in da-emettere per essere fatturate in un'altra bozza.
+            </p>
             <div class="bd-modal-warn">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span>Le modifiche verranno scritte su <strong>bb_billing</strong> e sincronizzate su <strong>Yard</strong>. L'operazione è irreversibile dall'interfaccia.</span>
-            </div>
-            <div class="bd-modal-fields">
-                <div class="bd-modal-field">
-                    <label for="bd-invoice-number">Numero fattura <span style="color:#ef4444;">*</span></label>
-                    <input type="text" id="bd-invoice-number" placeholder="es. 2026/0042" autocomplete="off" required>
-                </div>
-                <div class="bd-modal-field">
-                    <label for="bd-invoice-date">Data fattura <span style="color:#ef4444;">*</span></label>
-                    <input type="text" id="bd-invoice-date" placeholder="gg/mm/aaaa" value="{{ 'now'|date('d/m/Y') }}" required>
-                </div>
+                <span>Questa operazione <strong>non genera la fattura</strong>. La fattura sarà emessa successivamente dall'ufficio amministrazione su Yard.</span>
             </div>
             <div class="bd-modal-error" id="bd-finalize-error" style="display:none;"></div>
         </div>
@@ -303,7 +307,7 @@
             <button type="button" class="bd-btn-cancel-modal" data-action="close-modal">Annulla</button>
             <button type="button" class="bd-btn-confirm-modal" id="bd-finalize-confirm">
                 <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                Conferma e fattura
+                Conferma e applica
             </button>
         </div>
     </div>
@@ -314,5 +318,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/billing/billing_draft.js?v=4"></script>
+<script src="/assets/js/views/billing/billing_draft.js?v=5"></script>
 {% endblock %}

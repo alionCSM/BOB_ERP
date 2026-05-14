@@ -90,22 +90,26 @@ final class BillingDraftService
     // ── Fattura ora (Phase 4) ────────────────────────────────────────────────
 
     /**
-     * Finalize a draft into an actual invoice:
+     * Apply the draft's edits back to the cantieri (bb_billing + Yard).
+     *
+     * This is NOT invoice generation — the actual fattura is created
+     * downstream by accounting on Yard. What we do here:
      *   1. Inside a BOB MySQL transaction:
      *        - UPDATE bb_billing for each non-excluded line (apply edits + emessa=1)
-     *        - UPDATE bb_billing_drafts → status=fatturata + invoice_number + invoice_date
+     *        - UPDATE bb_billing_drafts → status=fatturata (internal label for
+     *          "applied"), invoice_date = today (for audit). invoice_number
+     *          stays NULL — can be filled in later if accounting wants the link.
      *   2. After commit, attempt Yard SQL Server sync per line. Failures are
      *      tracked on the line so the user can retry.
      *
      * Returns a summary the controller can surface to the UI.
      *
      * @return array{
-     *   invoice_number: string,
-     *   invoice_date:   string,
+     *   applied_at: string,
      *   yard: array{synced:int, failed:int, na:int, failures: array<int, array<string,mixed>>}
      * }
      */
-    public function commitInvoice(int $draftId, string $invoiceNumber, string $invoiceDate): array
+    public function commitInvoice(int $draftId): array
     {
         $draft = $this->drafts->findById($draftId);
         if (!$draft) {
@@ -113,17 +117,10 @@ final class BillingDraftService
         }
         if ($draft['status'] !== 'approvata') {
             throw new InvalidArgumentException(
-                "Per fatturare la bozza deve essere in stato 'approvata' (attuale: {$draft['status']})."
+                "Per applicare le modifiche la bozza deve essere in stato 'approvata' (attuale: {$draft['status']})."
             );
         }
-        $invoiceNumber = trim($invoiceNumber);
-        if ($invoiceNumber === '') {
-            throw new InvalidArgumentException('Numero fattura mancante.');
-        }
-        $iso = DateNormalizer::toIso($invoiceDate);
-        if (!$iso) {
-            throw new InvalidArgumentException('Data fattura non valida.');
-        }
+        $appliedDate = date('Y-m-d');
 
         $lines = $this->drafts->getLinesWithSourceForWriteback($draftId);
         $toCommit = array_values(array_filter($lines, static fn ($l) => (int)$l['excluded'] === 0));
@@ -143,7 +140,7 @@ final class BillingDraftService
                     $this->drafts->setLineYardSyncStatus((int)$l['line_id'], 'na', null);
                 }
             }
-            $this->drafts->finalizeDraftHeader($draftId, $invoiceNumber, $iso);
+            $this->drafts->finalizeDraftHeader($draftId, null, $appliedDate);
             $this->conn->commit();
         } catch (\Throwable $e) {
             $this->conn->rollBack();
@@ -153,13 +150,12 @@ final class BillingDraftService
         }
 
         // ── Yard SQL Server sync (post-commit, per-row) ─────────────────────
-        $yardLines = array_values(array_filter($toCommit, static fn ($l) => !empty($l['yard_id'])));
+        $yardLines  = array_values(array_filter($toCommit, static fn ($l) => !empty($l['yard_id'])));
         $yardResult = $this->syncLinesToYard($yardLines);
 
         return [
-            'invoice_number' => $invoiceNumber,
-            'invoice_date'   => $iso,
-            'yard'           => $yardResult,
+            'applied_at' => $appliedDate,
+            'yard'       => $yardResult,
         ];
     }
 
