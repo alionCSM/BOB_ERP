@@ -147,6 +147,22 @@
 .bd-table-editable td { padding: 4px 6px; vertical-align: middle; }
 .bd-table-editable .bd-cell-cantiere { padding-left: 12px; }
 
+/* Movimentato pill (read-only hint column) */
+.bd-cell-mov { padding: 4px 4px; }
+.bd-mov-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.bd-row-excluded .bd-mov-pill { opacity: .55; }
+
 .bd-cell-input {
     width: 100%;
     height: 32px;

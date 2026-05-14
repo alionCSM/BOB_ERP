@@ -51,41 +51,13 @@ $stmt = $conn->prepare("
 $stmt->execute([':did' => $draftId]);
 $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-// ── Movimentazione months (same logic as legacy export) ─────────────────────
-$worksiteIds = array_unique(array_filter(array_column($rows, 'worksite_id')));
-$movMap = [];
-if (!empty($worksiteIds)) {
-    $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
-    $monthNames   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-    $movStmt = $conn->prepare("
-        SELECT worksite_id, yr, mo
-        FROM (
-            SELECT worksite_id, YEAR(data) AS yr, MONTH(data) AS mo
-            FROM bb_presenze
-            WHERE worksite_id IN ({$placeholders})
-            UNION
-            SELECT worksite_id, YEAR(data_presenza) AS yr, MONTH(data_presenza) AS mo
-            FROM bb_presenze_consorziate
-            WHERE worksite_id IN ({$placeholders})
-        ) AS combined
-        GROUP BY worksite_id, yr, mo
-        ORDER BY worksite_id, yr DESC, mo DESC
-    ");
-    $movStmt->execute(array_merge(array_values($worksiteIds), array_values($worksiteIds)));
-    foreach ($movStmt->fetchAll(\PDO::FETCH_ASSOC) as $m) {
-        $wid = (int)$m['worksite_id'];
-        if (!isset($movMap[$wid])) {
-            $movMap[$wid] = $monthNames[(int)$m['mo'] - 1] . ' ' . $m['yr'];
-        }
-    }
-}
-
 // ── Spreadsheet ─────────────────────────────────────────────────────────────
 $spreadsheet = new Spreadsheet();
 $sheet       = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Bozza Fatturazione');
 
-$lastCol = 'G';
+// A=Cantiere B=Ordine C=DataOrdine D=Descrizione E=DataFattura F=Imponibile
+$lastCol = 'F';
 
 // Title row
 $sheet->mergeCells("A1:{$lastCol}1");
@@ -109,7 +81,6 @@ $headers = [
     'D2' => 'Descrizione',
     'E2' => 'Data Fattura',
     'F2' => 'Imponibile (€)',
-    'G2' => 'Movimentato',
 ];
 foreach ($headers as $cell => $text) {
     $sheet->setCellValue($cell, $text);
@@ -144,16 +115,12 @@ foreach ($rows as $row) {
     $imponibile = (float)$row['totale_imponibile'];
     $total     += $imponibile;
 
-    $wid         = (int)$row['worksite_id'];
-    $movimentato = $movMap[$wid] ?? '—';
-
     $sheet->setCellValue("A{$rowNum}", $row['cantiere']     ?? '');
     $sheet->setCellValue("B{$rowNum}", $row['order_number'] ?? '');
     $sheet->setCellValue("C{$rowNum}", $orderDate);
     $sheet->setCellValue("D{$rowNum}", $row['descrizione']  ?? '');
     $sheet->setCellValue("E{$rowNum}", $fatDate);
     $sheet->setCellValue("F{$rowNum}", $imponibile);
-    $sheet->setCellValue("G{$rowNum}", $movimentato);
 
     $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
         'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
@@ -195,7 +162,6 @@ $sheet->getColumnDimension('D')->setWidth(60);
 $sheet->getStyle("D3:D{$rowNum}")->getAlignment()->setWrapText(true);
 $sheet->getColumnDimension('E')->setAutoSize(true);
 $sheet->getColumnDimension('F')->setAutoSize(true);
-$sheet->getColumnDimension('G')->setAutoSize(true);
 
 for ($r = 3; $r < $rowNum; $r++) {
     $desc  = $sheet->getCell("D{$r}")->getValue();

@@ -86,14 +86,23 @@ final class BillingDraftService
 
     /**
      * Valid status transitions for the draft state machine.
+     *
+     * The "Invia al cliente" step is intentionally skipped — the client
+     * review happens externally (user emails the Excel) so the BOB UI
+     * only needs to track approval.
+     *
      * 'fatturata' is set only by the Phase 4 "Fattura ora" flow, not via
      * the generic transition endpoint, so it isn't listed as a target here.
+     *
+     * inviata_cliente / da_modificare remain in the enum for back-compat
+     * with any drafts created during Phase 3 testing, but aren't reachable
+     * from the new UI.
      */
     private const TRANSITIONS = [
-        'bozza'           => ['inviata_cliente', 'annullata'],
-        'inviata_cliente' => ['da_modificare', 'approvata', 'annullata'],
-        'da_modificare'   => ['inviata_cliente', 'annullata'],
-        'approvata'       => ['annullata'], // → fatturata is reserved for Phase 4
+        'bozza'           => ['approvata', 'annullata'],
+        'approvata'       => ['bozza', 'annullata'], // → fatturata is reserved for Phase 4
+        'inviata_cliente' => ['bozza', 'approvata', 'annullata'], // legacy: route back
+        'da_modificare'   => ['bozza', 'annullata'],              // legacy: route back
         'fatturata'       => [],
         'annullata'       => [],
     ];
@@ -122,7 +131,7 @@ final class BillingDraftService
     // ── Inline edit (Phase 2) ────────────────────────────────────────────────
 
     /** Statuses where the draft is still editable. */
-    private const EDITABLE_STATUSES = ['bozza', 'da_modificare'];
+    private const EDITABLE_STATUSES = ['bozza'];
 
     /** Whitelist of columns the inline editor can write. */
     private const EDITABLE_FIELDS = ['data', 'descrizione', 'totale_imponibile', 'aliquota_iva'];
@@ -264,7 +273,9 @@ final class BillingDraftService
 
     /**
      * Hydrates the draft view: header + lines + meta (e.g. new rows added
-     * to bb_billing after draft creation).
+     * to bb_billing after draft creation). Lines are enriched with the
+     * latest "movimentato" month per worksite (from bb_presenze /
+     * bb_presenze_consorziate), shown as a read-only hint column in the UI.
      *
      * @return array{draft: array, lines: array<int,array>, totals: array, new_rows_count: int}
      */
@@ -275,6 +286,13 @@ final class BillingDraftService
             throw new RuntimeException('Bozza non trovata.');
         }
         $lines = $this->drafts->getLinesForDraft($draftId);
+
+        // Lookup most-recent presenze month per worksite (display-only)
+        $movMap      = $this->loadMovimentatoMap(array_unique(array_column($lines, 'worksite_id')));
+        foreach ($lines as &$l) {
+            $l['movimentato'] = $movMap[(int)$l['worksite_id']] ?? null;
+        }
+        unset($l);
 
         $totImponibile = 0.0;
         $totEscluso    = 0.0;
@@ -300,5 +318,45 @@ final class BillingDraftService
                 (int)$draft['client_id']
             ),
         ];
+    }
+
+    /**
+     * For a list of worksite ids, return [worksite_id => "Mag 2026"] using
+     * the latest presenze month (bb_presenze ∪ bb_presenze_consorziate).
+     * Returns empty array if input is empty.
+     */
+    private function loadMovimentatoMap(array $worksiteIds): array
+    {
+        $worksiteIds = array_values(array_unique(array_filter(array_map('intval', $worksiteIds))));
+        if (empty($worksiteIds)) {
+            return [];
+        }
+        $monthNames   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+        $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
+        $sql = "
+            SELECT worksite_id, yr, mo
+            FROM (
+                SELECT worksite_id, YEAR(data) AS yr, MONTH(data) AS mo
+                FROM bb_presenze
+                WHERE worksite_id IN ({$placeholders})
+                UNION
+                SELECT worksite_id, YEAR(data_presenza) AS yr, MONTH(data_presenza) AS mo
+                FROM bb_presenze_consorziate
+                WHERE worksite_id IN ({$placeholders})
+            ) AS combined
+            GROUP BY worksite_id, yr, mo
+            ORDER BY worksite_id, yr DESC, mo DESC
+        ";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute(array_merge($worksiteIds, $worksiteIds));
+        $map = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $m) {
+            $wid = (int)$m['worksite_id'];
+            // First seen wins = most recent month per worksite
+            if (!isset($map[$wid])) {
+                $map[$wid] = $monthNames[(int)$m['mo'] - 1] . ' ' . $m['yr'];
+            }
+        }
+        return $map;
     }
 }
