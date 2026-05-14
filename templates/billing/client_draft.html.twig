@@ -47,39 +47,30 @@
             </a>
             {% endif %}
 
-            {# State-machine actions — simplified flow (no "Invia al cliente":
-               client review happens externally via the Excel) #}
+            {# State-machine actions — single confirmation step. Edit happens
+               in bozza; client review happens externally via the Excel; one
+               click 'Applica modifiche' propagates to bb_billing + Yard. #}
             {% if draft.status == 'bozza' %}
-            <button type="button" class="bd-btn-success" data-transition="approvata"
-                    data-confirm="Confermi che il cliente ha approvato la bozza? La bozza verrà bloccata in lettura.">
-                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                Cliente ha approvato
-            </button>
-            {% elseif draft.status == 'approvata' %}
             <button type="button" class="bd-btn-primary" data-action="open-finalize-modal">
                 <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
                 Applica modifiche ai cantieri
-            </button>
-            <button type="button" class="bd-btn-warning" data-transition="bozza"
-                    data-confirm="Riportare la bozza in modifica? I campi torneranno editabili.">
-                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                Riapri per modifiche
             </button>
             {% elseif draft.status == 'fatturata' %}
             <span class="bd-fattura-info">
                 Applicata il <strong>{{ draft.invoice_date|date('d/m/Y') }}</strong>
             </span>
-            {% elseif draft.status == 'inviata_cliente' or draft.status == 'da_modificare' %}
-            {# Legacy states — provide an escape hatch back to bozza #}
+            <button type="button" class="bd-btn-warning" data-transition="bozza"
+                    data-confirm="Riportare la bozza in modifica? I campi torneranno editabili e potrai riapplicare con i nuovi valori.">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Riapri per modifiche
+            </button>
+            {% elseif draft.status == 'approvata' or draft.status == 'inviata_cliente' or draft.status == 'da_modificare' %}
+            {# Legacy states — give an escape hatch back to bozza, then user
+               clicks 'Applica modifiche' from there #}
             <button type="button" class="bd-btn-warning" data-transition="bozza"
                     data-confirm="Riportare la bozza in modifica?">
                 <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 Riapri per modifiche
-            </button>
-            <button type="button" class="bd-btn-success" data-transition="approvata"
-                    data-confirm="Confermi che il cliente ha approvato la bozza?">
-                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                Cliente ha approvato
             </button>
             {% endif %}
 
@@ -265,7 +256,7 @@
 </div>
 
 {# ── Finalize modal — confirms the writeback to cantieri + Yard ── #}
-{% if draft.status == 'approvata' %}
+{% if draft.status == 'bozza' or draft.status == 'approvata' %}
 {% set fatturabili = lines|filter(l => not l.excluded)|length %}
 <div class="bd-modal-backdrop" id="bd-finalize-modal" style="display:none;" data-client-id="{{ client.id }}" data-draft-id="{{ draft.id }}">
     <div class="bd-modal">

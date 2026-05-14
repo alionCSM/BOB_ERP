@@ -120,9 +120,9 @@ final class BillingDraftService
         if (!$draft) {
             throw new RuntimeException('Bozza non trovata.');
         }
-        if ($draft['status'] !== 'approvata') {
+        if (!in_array($draft['status'], ['bozza', 'approvata'], true)) {
             throw new InvalidArgumentException(
-                "Per applicare le modifiche la bozza deve essere in stato 'approvata' (attuale: {$draft['status']})."
+                "Per applicare le modifiche la bozza deve essere in stato 'bozza' o 'approvata' (attuale: {$draft['status']})."
             );
         }
         $appliedDate = date('Y-m-d');
@@ -288,11 +288,11 @@ final class BillingDraftService
      * from the new UI.
      */
     private const TRANSITIONS = [
-        'bozza'           => ['approvata', 'annullata'],
-        'approvata'       => ['bozza', 'annullata'], // → fatturata is reserved for Phase 4
-        'inviata_cliente' => ['bozza', 'approvata', 'annullata'], // legacy: route back
-        'da_modificare'   => ['bozza', 'annullata'],              // legacy: route back
-        'fatturata'       => [],
+        'bozza'           => ['annullata'], // → fatturata happens via commitInvoice (Applica modifiche)
+        'approvata'       => ['bozza', 'annullata'], // legacy escape
+        'inviata_cliente' => ['bozza', 'annullata'], // legacy escape
+        'da_modificare'   => ['bozza', 'annullata'], // legacy escape
+        'fatturata'       => ['bozza'], // riapri: allows edit + re-apply
         'annullata'       => [],
     ];
 
