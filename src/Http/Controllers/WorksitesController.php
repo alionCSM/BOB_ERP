@@ -650,13 +650,29 @@ final class WorksitesController
 
         $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
         $totalEmesseReale = 0.0;
+        $extraEmessaMap   = []; // extra_id => bool (Yard says emessa=1)
         foreach ($fatture as &$f) {
             $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
             if ($f['emessa_reale']) {
                 $totalEmesseReale += (float)($f['totale_imponibile'] ?? 0);
             }
+            if (!empty($f['extra_id'])) {
+                // If multiple righe link to the same extra, treat the extra
+                // as "fatturato" if at least one of them is emessa.
+                $eid = (int)$f['extra_id'];
+                $extraEmessaMap[$eid] = ($extraEmessaMap[$eid] ?? false) || !empty($f['emessa_reale']);
+            }
         }
         unset($f);
+
+        // Surface the emessa flag back into the $extra rows so the template
+        // can render gray 'Mandato in fatturazione' vs green 'Fatturato'.
+        foreach ($extra as &$e) {
+            $e['billing_emessa_reale'] = !empty($e['billing_id'])
+                ? ($extraEmessaMap[(int)$e['id']] ?? false)
+                : false;
+        }
+        unset($e);
 
         // Presenze date filters
         $dateFilter = $request->get('filter_date');

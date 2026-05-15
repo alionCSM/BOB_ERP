@@ -1178,9 +1178,14 @@
                                 <td>{{ e.descrizione|nl2br }}</td>
                                 <td>{{ e.totale|number_format(2) }} €</td>
                                 <td class="text-center">
-                                    {% if e.billing_id %}
+                                    {% if e.billing_id and e.billing_emessa_reale %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;">
                                             <i data-lucide="check" class="w-3 h-3"></i> Fatturato
+                                        </span>
+                                    {% elseif e.billing_id %}
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;"
+                                              title="La riga di fatturazione è stata creata ma non ancora emessa">
+                                            <i data-lucide="send" class="w-3 h-3"></i> Mandato in fatturazione
                                         </span>
                                     {% elseif e.tracks_billing %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;font-size:11px;font-weight:500;">
