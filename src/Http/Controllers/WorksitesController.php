@@ -14,6 +14,7 @@ use App\Repository\Extra\ExtraRepository;
 use App\Repository\Orders\OrderRepository;
 use App\Repository\Users\UserRepository;
 use App\Repository\Worksites\WorksiteRepository;
+use App\Repository\Worksites\WorksiteFinanceNotesRepository;
 
 final class WorksitesController
 {
@@ -804,6 +805,12 @@ final class WorksitesController
 
         $userObj = $user; // alias expected by view.html.twig (userObj.type)
 
+        // Finance notes — only loaded for users who can see prices.
+        // The tab itself is gated in Twig by the same condition.
+        $financeNotes = $canSeePrices
+            ? (new WorksiteFinanceNotesRepository($this->conn))->getByWorksite($worksite_id)
+            : [];
+
         Response::view('worksites/view.html.twig', $request, compact(
             'worksite_id', 'worksite', 'isWorker',
             'offerId', 'presenze', 'presenzeCons', 'allPresenze',
@@ -820,7 +827,8 @@ final class WorksitesController
             'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale',
             'extrasUnbilledCount',
             'totalFatture', 'totalFattureDaEmettere',
-            'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare'
+            'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
+            'financeNotes'
         ));
     }
 
@@ -2537,6 +2545,40 @@ final class WorksitesController
                    ->execute(['id' => $doc['id']]);
 
         Response::json(['error' => 0]);
+    }
+
+    // ── Finance notes (canSeePrices only) ─────────────────────────────────────
+
+    public function addFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $content = trim((string)($_POST['content'] ?? ''));
+        if ($content === '') {
+            $_SESSION['error'] = 'La nota è vuota.';
+            Response::redirect("/worksites/{$worksiteId}#note");
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->create($worksiteId, (int)$user->id, $content);
+        $_SESSION['success'] = 'Nota aggiunta.';
+        Response::redirect("/worksites/{$worksiteId}#note");
+    }
+
+    public function deleteFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->delete($worksiteId, $noteId);
+        $_SESSION['success'] = 'Nota eliminata.';
+        Response::redirect("/worksites/{$worksiteId}#note");
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
