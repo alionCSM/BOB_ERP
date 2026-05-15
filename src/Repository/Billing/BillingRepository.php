@@ -58,13 +58,16 @@ final class BillingRepository
                 INSERT INTO bb_billing (
                     worksite_id, nome_cantiere, nome_cliente, data,
                     descrizione, totale_imponibile, aliquota_iva,
-                    articolo_id, iva_id, attivita_id
+                    articolo_id, iva_id, attivita_id, extra_id
                 ) VALUES (
                     :worksite_id, :nome_cantiere, :nome_cliente, :data,
                     :descrizione, :totale_imponibile, :aliquota_iva,
-                    :articolo_id, :iva_id, :attivita_id
+                    :articolo_id, :iva_id, :attivita_id, :extra_id
                 )
             ");
+            $extraId = isset($data['extra_id']) && $data['extra_id'] !== '' && $data['extra_id'] !== null
+                          ? (int)$data['extra_id']
+                          : null;
             $stmt->execute([
                 ':worksite_id'       => $data['worksite_id'],
                 ':nome_cantiere'     => $data['nome_cantiere'],
@@ -76,6 +79,7 @@ final class BillingRepository
                 ':articolo_id'       => $data['articolo_id'],
                 ':iva_id'            => $data['iva_id'],
                 ':attivita_id'       => $data['attivita_id'],
+                ':extra_id'          => $extraId,
             ]);
             return (int)$this->conn->lastInsertId();
         } catch (Exception $ex) {

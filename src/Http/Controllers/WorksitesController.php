@@ -618,6 +618,17 @@ final class WorksitesController
         $ordini = $this->orderRepo->getByWorksiteId($worksite_id);
         $extra  = $this->extraRepo->getByWorksiteId($worksite_id);
 
+        // Count tracked extras still missing a billing link → drives the
+        // "X extra da fatturare" avviso in the cantiere extras tab. Only
+        // extras with tracks_billing=1 (i.e. created after this feature
+        // shipped) count.
+        $extrasUnbilledCount = 0;
+        foreach ($extra as $e) {
+            if ((int)($e['tracks_billing'] ?? 0) === 1 && empty($e['billing_id'])) {
+                $extrasUnbilledCount++;
+            }
+        }
+
         // Attività
         $attivita           = $this->activityRepo->getByWorksiteId($worksite_id);
         $totaleGiornateUomo = $this->activityRepo->getTotaleGiornateUomo($worksite_id);
@@ -748,7 +759,8 @@ final class WorksitesController
             'disegni', 'disegniByCategory', 'sharedMap', 'worksiteUsers',
             'documents', 'isWorkerOrClient',
             'orderDateFormatted', 'clientName', 'clientId',
-            'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale'
+            'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale',
+            'extrasUnbilledCount'
         ));
     }
 
@@ -1204,6 +1216,12 @@ final class WorksitesController
             Response::redirect("/worksites/{$worksite_id}#billing");
         }
 
+        // extra_id is filled in by the "Fattura" button on an extra row.
+        // For manually-added righe it stays null. We only persist it on
+        // INSERT (UPDATE preserves whatever link the row already had).
+        $extraIdRaw = trim((string)($_POST['extra_id'] ?? ''));
+        $extraIdNew = ($extraIdRaw !== '' && ctype_digit($extraIdRaw)) ? (int)$extraIdRaw : null;
+
         $dataMy = [
             'worksite_id'       => $worksite_id,
             'nome_cantiere'     => $ws['name'],
@@ -1215,6 +1233,7 @@ final class WorksitesController
             'articolo_id'       => $articolo_id,
             'iva_id'            => $iva_id,
             'attivita_id'       => null,
+            'extra_id'          => $extraIdNew,
         ];
 
         try {
