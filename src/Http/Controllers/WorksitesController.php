@@ -635,8 +635,12 @@ final class WorksitesController
         $fatture  = $this->billingRepo->getByWorksiteId($worksite_id);
 
         $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        $totalEmesseReale = 0.0;
         foreach ($fatture as &$f) {
             $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
+            if ($f['emessa_reale']) {
+                $totalEmesseReale += (float)($f['totale_imponibile'] ?? 0);
+            }
         }
         unset($f);
 
@@ -744,7 +748,7 @@ final class WorksitesController
             'disegni', 'disegniByCategory', 'sharedMap', 'worksiteUsers',
             'documents', 'isWorkerOrClient',
             'orderDateFormatted', 'clientName', 'clientId',
-            'billingDefaultDescr', 'billingRemaining'
+            'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale'
         ));
     }
 
