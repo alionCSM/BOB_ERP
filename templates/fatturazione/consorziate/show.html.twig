@@ -5,31 +5,17 @@
 {% endblock %}
 
 {# ── Macro: render the "Nostra fattura" cell content ────────────────────
-   Used by both the "no ordini" branch and the "has ordini" branch so
-   the divider 'Nel periodo / Altre fatture' renders consistently. #}
+   Period-scoped only: shows the orange total + the righe whose data
+   is inside [from, to]. Righe fuori periodo are esclusi. #}
 {% macro nostra_fattura_cell(nostraFatturaTotal, righe) %}
     {% set righeInPeriod = righe|filter(rf => rf.in_period) %}
-    {% set righeOutside  = righe|filter(rf => not rf.in_period) %}
-    {% if nostraFatturaTotal > 0 or righe %}
+    {% if nostraFatturaTotal > 0 or righeInPeriod|length > 0 %}
         {% if nostraFatturaTotal > 0 %}
             <div class="fc-nostra-tot">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
-            <div class="fc-nostra-sub">nel periodo selezionato</div>
         {% endif %}
         {% if righeInPeriod|length > 0 %}
             <ul class="fc-righe-list fc-righe-list-in">
             {% for rf in righeInPeriod %}
-                <li>
-                    <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
-                    <span class="fc-righe-descr">{{ rf.descrizione }}</span>
-                    <span class="fc-righe-amt">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
-                </li>
-            {% endfor %}
-            </ul>
-        {% endif %}
-        {% if righeOutside|length > 0 %}
-            <div class="fc-righe-divider">Altre fatture</div>
-            <ul class="fc-righe-list fc-righe-list-out">
-            {% for rf in righeOutside %}
                 <li>
                     <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
                     <span class="fc-righe-descr">{{ rf.descrizione }}</span>
