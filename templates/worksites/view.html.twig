@@ -1267,6 +1267,22 @@
                  billingRemaining. defaultVatId is hardcoded as 15.
            ════════════════════════════════════════════════════════════ #}
         <div class="tab-pane fade" id="billing" role="tabpanel">
+
+            {% if isOfficeForExtras and (extrasUnbilledCount ?? 0) > 0 %}
+            <div class="flex items-start gap-3 p-3 mb-3 rounded-md"
+                 style="background:#fef3c7;border:1px solid #fcd34d;border-left:4px solid #f59e0b;color:#78350f;">
+                <i data-lucide="alert-triangle" class="w-5 h-5 flex-shrink-0" style="margin-top:1px;color:#b45309;"></i>
+                <div style="font-size:13px;line-height:1.5;">
+                    <strong>{{ extrasUnbilledCount }}</strong>
+                    extra {{ extrasUnbilledCount == 1 ? 'è ancora da' : 'sono ancora da' }}
+                    fatturare in questo cantiere.
+                    <a href="#extra" data-bs-toggle="tab" data-bs-target="#extra"
+                       class="font-medium" style="color:#92400e;text-decoration:underline;cursor:pointer;">Vai alla tab Extra</a>
+                    e clicca <em>Fattura</em> sulla riga corrispondente per creare la riga di fatturazione.
+                </div>
+            </div>
+            {% endif %}
+
             <div class="flex justify-end mb-3">
                 <button class="btn btn-primary text-sm px-4 py-2"
                         data-tw-toggle="modal"
