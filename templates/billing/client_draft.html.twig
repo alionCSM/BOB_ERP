@@ -94,6 +94,40 @@
     </div>
 </div>
 
+{# ── Open client notes (fatturazione + sconto, aperte) ── #}
+{% if clientNotes is defined and clientNotes|length > 0 %}
+<div class="bd-notes-banner">
+    <div class="bd-notes-banner-head">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <strong>{{ clientNotes|length }}</strong>
+        not{{ clientNotes|length == 1 ? 'a' : 'e' }} dei cantieri di questo cliente da considerare prima di fatturare
+    </div>
+    <ul class="bd-notes-banner-list">
+    {% for n in clientNotes %}
+        <li class="bd-notes-banner-item">
+            <span class="bd-notes-tipo bd-notes-tipo-{{ n.tipo }}">
+                {% if n.tipo == 'fatturazione' %}Fatturazione
+                {% elseif n.tipo == 'sconto' %}Sconto
+                {% else %}Generica{% endif %}
+            </span>
+            <a href="/worksites/{{ n.worksite_id }}#note" target="_blank" class="bd-notes-cantiere">
+                {% if n.worksite_code %}<span class="bd-notes-code">{{ n.worksite_code }}</span>{% endif %}
+                {{ n.worksite_name }}
+            </a>
+            <span class="bd-notes-text">{{ n.content|nl2br }}</span>
+            <span class="bd-notes-author">— {{ n.author_username ?: '—' }} · {{ n.created_at|date('d/m') }}</span>
+            <form method="POST" action="/worksites/{{ n.worksite_id }}/finance-notes/{{ n.id }}/apply" class="bd-notes-form">
+                <input type="hidden" name="return" value="/billing/client/{{ client.id }}/draft/{{ draft.id }}">
+                <button type="submit" class="bd-notes-apply" title="Segna come applicata">
+                    ✓ Applicata
+                </button>
+            </form>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
 {# ── New rows banner ── #}
 {% if newRowsCount > 0 %}
 <div class="bd-new-rows-banner">

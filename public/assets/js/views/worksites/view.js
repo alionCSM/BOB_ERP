@@ -43,11 +43,14 @@
             btn.addEventListener('click', function () {
                 var noteId  = this.dataset.noteId;
                 var content = this.dataset.noteContent || '';
+                var tipo    = this.dataset.noteTipo    || 'generica';
                 var form    = document.getElementById('note-edit-form');
                 var ta      = document.getElementById('note-edit-content');
+                var sel     = document.getElementById('note-edit-tipo');
                 if (!form || !ta || !worksiteId || !noteId) return;
                 form.action  = '/worksites/' + worksiteId + '/finance-notes/' + noteId + '/edit';
                 ta.value     = content;
+                if (sel) sel.value = tipo;
                 var modalEl  = document.getElementById('note-edit-modal');
                 if (modalEl && window.tailwind && tailwind.Modal) {
                     tailwind.Modal.getOrCreateInstance(modalEl).show();

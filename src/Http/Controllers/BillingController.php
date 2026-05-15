@@ -7,6 +7,7 @@ use App\Infrastructure\Config;
 use App\Infrastructure\SqlServerConnection;
 use App\Repository\Billing\BillingRepository;
 use App\Repository\Billing\BillingDraftRepository;
+use App\Repository\Worksites\WorksiteFinanceNotesRepository;
 use App\Service\Billing\BillingDraftService;
 
 final class BillingController
@@ -360,6 +361,11 @@ final class BillingController
             Response::redirect('/billing/client/' . $clientId);
         }
 
+        // Open finance notes for all cantieri of this client, restricted
+        // to billing-relevant tipi → banner on top of the bozza editor.
+        $clientNotes = (new WorksiteFinanceNotesRepository($this->conn))
+            ->getOpenForClient($clientId, WorksiteFinanceNotesRepository::TIPI_BILLING);
+
         Response::view('billing/client_draft.html.twig', $request, [
             'client'        => $client,
             'draft'         => $view['draft'],
@@ -368,6 +374,7 @@ final class BillingController
             'newRowsCount'  => $view['new_rows_count'],
             'yardSummary'   => $view['yard_summary'] ?? null,
             'vatCodes'      => $view['vat_codes'] ?? [],
+            'clientNotes'   => $clientNotes,
         ]);
     }
 

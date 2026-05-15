@@ -447,3 +447,79 @@ select.bd-cell-input.bd-cell-select:disabled {
     0%, 100% { transform: scale(1); opacity: 1; }
     50%      { transform: scale(1.4); opacity: .6; }
 }
+
+/* ── Note dei cantieri (bozza editor banner) ─────────── */
+.bd-notes-banner {
+    background: #fef9c3;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    color: #78350f;
+}
+.bd-notes-banner-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    margin-bottom: 10px;
+}
+.bd-notes-banner-head svg {
+    width: 16px; height: 16px;
+    stroke: #b45309; fill: none; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+.bd-notes-banner-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.bd-notes-banner-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,.7);
+    border-radius: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+.bd-notes-tipo {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    white-space: nowrap;
+}
+.bd-notes-tipo-fatturazione { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.bd-notes-tipo-sconto       { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+.bd-notes-tipo-generica     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+.bd-notes-cantiere {
+    color: #4c1d95;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.bd-notes-cantiere:hover { text-decoration: underline; }
+.bd-notes-code {
+    font-family: 'SF Mono','Cascadia Code','Consolas',monospace;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    margin-right: 4px;
+}
+.bd-notes-text { color: #422006; flex: 1 1 auto; }
+.bd-notes-author { color: #92400e; font-size: 11px; white-space: nowrap; }
+.bd-notes-form { margin: 0; }
+.bd-notes-apply {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    border: 1px solid #16a34a;
+    background: #fff;
+    color: #15803d;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.bd-notes-apply:hover { background: #dcfce7; }

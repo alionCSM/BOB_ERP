@@ -807,9 +807,18 @@ final class WorksitesController
 
         // Finance notes — only loaded for users who can see prices.
         // The tab itself is gated in Twig by the same condition.
-        $financeNotes = $canSeePrices
-            ? (new WorksiteFinanceNotesRepository($this->conn))->getByWorksite($worksite_id)
-            : [];
+        // - financeNotes: full list for the Note tab
+        // - financeNotesBillingOpen: aperte tipo fatt/sconto → banner in Fatturazione tab
+        $financeNotes            = [];
+        $financeNotesBillingOpen = [];
+        if ($canSeePrices) {
+            $notesRepo = new WorksiteFinanceNotesRepository($this->conn);
+            $financeNotes            = $notesRepo->getByWorksite($worksite_id);
+            $financeNotesBillingOpen = $notesRepo->getOpenForWorksite(
+                $worksite_id,
+                WorksiteFinanceNotesRepository::TIPI_BILLING
+            );
+        }
 
         Response::view('worksites/view.html.twig', $request, compact(
             'worksite_id', 'worksite', 'isWorker',
@@ -828,7 +837,7 @@ final class WorksitesController
             'extrasUnbilledCount',
             'totalFatture', 'totalFattureDaEmettere',
             'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
-            'financeNotes'
+            'financeNotes', 'financeNotesBillingOpen'
         ));
     }
 
@@ -2549,6 +2558,21 @@ final class WorksitesController
 
     // ── Finance notes (canSeePrices only) ─────────────────────────────────────
 
+    /**
+     * Common gate + redirect target resolver for note actions.
+     * Returns the URL to redirect to (?return= override is allowed so the
+     * "Applicata" button from the bozza editor or fatturazione tab keeps
+     * the user where they were).
+     */
+    private function noteAccess(int $worksiteId): string
+    {
+        $user = ($GLOBALS['request'] ?? null)?->user() ?? null; // fallback
+        // The request is also reachable via the standard Request param; the
+        // method below is called from controllers that already have it
+        // (we re-check inside each endpoint for clarity).
+        return "/worksites/{$worksiteId}#note";
+    }
+
     public function addFinanceNote(Request $request): never
     {
         $worksiteId = $request->intParam('id');
@@ -2557,12 +2581,13 @@ final class WorksitesController
             Response::error('Accesso negato.', 403);
         }
         $content = trim((string)($_POST['content'] ?? ''));
+        $tipo    = WorksiteFinanceNotesRepository::normalizeTipo($_POST['tipo'] ?? null);
         if ($content === '') {
             $_SESSION['error'] = 'La nota è vuota.';
             Response::redirect("/worksites/{$worksiteId}#note");
         }
         $repo = new WorksiteFinanceNotesRepository($this->conn);
-        $repo->create($worksiteId, (int)$user->id, $content);
+        $repo->create($worksiteId, (int)$user->id, $content, $tipo);
         $_SESSION['success'] = 'Nota aggiunta.';
         Response::redirect("/worksites/{$worksiteId}#note");
     }
@@ -2578,7 +2603,7 @@ final class WorksitesController
         $repo = new WorksiteFinanceNotesRepository($this->conn);
         $repo->delete($worksiteId, $noteId);
         $_SESSION['success'] = 'Nota eliminata.';
-        Response::redirect("/worksites/{$worksiteId}#note");
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
     }
 
     public function editFinanceNote(Request $request): never
@@ -2590,17 +2615,18 @@ final class WorksitesController
             Response::error('Accesso negato.', 403);
         }
         $content = trim((string)($_POST['content'] ?? ''));
+        $tipo    = WorksiteFinanceNotesRepository::normalizeTipo($_POST['tipo'] ?? null);
         if ($content === '') {
             $_SESSION['error'] = 'La nota è vuota.';
             Response::redirect("/worksites/{$worksiteId}#note");
         }
         $repo = new WorksiteFinanceNotesRepository($this->conn);
-        $repo->update($worksiteId, $noteId, (int)$user->id, $content);
+        $repo->update($worksiteId, $noteId, (int)$user->id, $content, $tipo);
         $_SESSION['success'] = 'Nota modificata.';
-        Response::redirect("/worksites/{$worksiteId}#note");
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
     }
 
-    public function togglePinFinanceNote(Request $request): never
+    public function applyFinanceNote(Request $request): never
     {
         $worksiteId = $request->intParam('id');
         $noteId     = $request->intParam('noteId');
@@ -2609,8 +2635,37 @@ final class WorksitesController
             Response::error('Accesso negato.', 403);
         }
         $repo = new WorksiteFinanceNotesRepository($this->conn);
-        $repo->togglePinned($worksiteId, $noteId);
-        Response::redirect("/worksites/{$worksiteId}#note");
+        $repo->markApplied($worksiteId, $noteId, (int)$user->id);
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    public function reopenFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->reopen($worksiteId, $noteId);
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    /**
+     * The "✓ Applicata" button can fire from three places (Note tab,
+     * Fatturazione tab banner, Bozza editor banner). The form posts a
+     * `return` hidden field with the URL we should bounce to so the user
+     * stays where they were.
+     */
+    private function resolveNoteReturn(int $worksiteId): string
+    {
+        $ret = trim((string)($_POST['return'] ?? ''));
+        // Only allow same-origin paths
+        if ($ret !== '' && str_starts_with($ret, '/') && !str_starts_with($ret, '//')) {
+            return $ret;
+        }
+        return "/worksites/{$worksiteId}#note";
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

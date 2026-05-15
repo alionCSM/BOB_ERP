@@ -1,5 +1,29 @@
 {% extends "layout/base.html.twig" %}
 
+{# ── Macro: chip "tipo nota" ────────────────────────────────── #}
+{% macro tipo_chip(tipo) %}
+    {% set t = tipo|default('generica') %}
+    {% set classes = {
+        'fatturazione': 'wv-note-tipo-fatturazione',
+        'sconto':       'wv-note-tipo-sconto',
+        'generica':     'wv-note-tipo-generica'
+    } %}
+    {% set labels = {
+        'fatturazione': 'Fatturazione',
+        'sconto':       'Sconto / Variazione',
+        'generica':     'Generica'
+    } %}
+    {% set icons = {
+        'fatturazione': 'flag',
+        'sconto':       'percent',
+        'generica':     'file-text'
+    } %}
+    <span class="wv-note-tipo {{ classes[t] }}">
+        <i data-lucide="{{ icons[t] }}" class="w-3 h-3"></i>
+        {{ labels[t] }}
+    </span>
+{% endmacro %}
+
 {% block head %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="/assets/css/views/worksites/view.css">
@@ -14,6 +38,7 @@
 {% endblock %}
 
 {% block content %}
+{% import _self as wv %}
 {# ── Pre-computed values (passed from controller) ── #}
 {# orderDateFormatted, clientName, clientId are expected from controller #}
 {# TODO: controller should pass orderDateFormatted, clientName, clientId explicitly #}
@@ -1325,6 +1350,31 @@
            ════════════════════════════════════════════════════════════ #}
         <div class="tab-pane fade" id="billing" role="tabpanel">
 
+            {% if financeNotesBillingOpen is defined and financeNotesBillingOpen|length > 0 %}
+            <div class="wv-note-banner">
+                <div class="wv-note-banner-head">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                    <strong>{{ financeNotesBillingOpen|length }}</strong>
+                    not{{ financeNotesBillingOpen|length == 1 ? 'a' : 'e' }} di fatturazione/sconto da considerare
+                </div>
+                <ul class="wv-note-banner-list">
+                {% for n in financeNotesBillingOpen %}
+                    <li class="wv-note-banner-item">
+                        {{ wv.tipo_chip(n.tipo) }}
+                        <span class="wv-note-banner-text">{{ n.content|nl2br }}</span>
+                        <span class="wv-note-banner-author">— {{ n.author_username ?: '—' }} · {{ n.created_at|date('d/m') }}</span>
+                        <form method="POST" action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/apply" class="wv-note-banner-form">
+                            <input type="hidden" name="return" value="/worksites/{{ worksite_id }}#billing">
+                            <button type="submit" class="wv-note-banner-apply" title="Segna come applicata">
+                                <i data-lucide="check" class="w-3 h-3"></i> Applicata
+                            </button>
+                        </form>
+                    </li>
+                {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
             {% if isOfficeForExtras and (extrasUnbilledCount ?? 0) > 0 %}
             <div class="flex items-start gap-3 p-3 mb-3 rounded-md"
                  style="background:#fef3c7;border:1px solid #fcd34d;border-left:4px solid #f59e0b;color:#78350f;">
@@ -1526,39 +1576,41 @@
                 {% else %}
                     <ul class="wv-notes-list">
                     {% for n in financeNotes %}
-                        {% set wasEdited = n.updated_by is not null %}
-                        <li class="wv-note {% if n.is_pinned %}wv-note-pinned{% endif %}">
+                        {% set isApplied = n.status == 'applicata' %}
+                        <li class="wv-note wv-note-tipo-{{ n.tipo }} {% if isApplied %}wv-note-applied{% endif %}">
                             <div class="wv-note-meta">
+                                {{ wv.tipo_chip(n.tipo) }}
                                 <span class="wv-note-author">
                                     <i data-lucide="user" class="w-3 h-3"></i>
-                                    {{ n.author_username ?: 'utente sconosciuto' }}
+                                    {{ n.author_username ?: '—' }}
                                 </span>
                                 <span class="wv-note-date">{{ n.created_at|date('d/m/Y H:i') }}</span>
-                                {% if wasEdited %}
-                                    <span class="wv-note-edited"
-                                          title="Modificata da {{ n.editor_username ?: 'utente sconosciuto' }} il {{ n.updated_at|date('d/m/Y H:i') }}">
-                                        modificata
-                                    </span>
-                                {% endif %}
-                                {% if n.is_pinned %}
-                                    <span class="wv-note-pin-badge">
-                                        <i data-lucide="pin" class="w-3 h-3"></i> fissata
+                                {% if isApplied %}
+                                    <span class="wv-note-applied-badge"
+                                          title="Applicata da {{ n.applier_username ?: '—' }} il {{ n.applied_at|date('d/m/Y H:i') }}">
+                                        <i data-lucide="check" class="w-3 h-3"></i> applicata
                                     </span>
                                 {% endif %}
                                 <div class="wv-note-actions">
-                                    <form method="POST"
-                                          action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/toggle-pin"
-                                          class="wv-note-action-form">
-                                        <button type="submit" title="{{ n.is_pinned ? 'Sfissa' : 'Fissa in cima' }}"
-                                                class="wv-note-action {{ n.is_pinned ? 'is-active' : '' }}">
-                                            <i data-lucide="pin" class="w-4 h-4"></i>
-                                        </button>
-                                    </form>
+                                    {% if isApplied %}
+                                        <form method="POST" action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/reopen" class="wv-note-action-form">
+                                            <button type="submit" class="wv-note-action" title="Riapri">
+                                                <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/apply" class="wv-note-action-form">
+                                            <button type="submit" class="wv-note-action wv-note-action-success" title="Segna come applicata">
+                                                <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
                                     <button type="button"
                                             class="wv-note-action wv-note-edit-btn"
                                             title="Modifica"
                                             data-note-id="{{ n.id }}"
-                                            data-note-content="{{ n.content }}">
+                                            data-note-content="{{ n.content }}"
+                                            data-note-tipo="{{ n.tipo }}">
                                         <i data-lucide="edit-3" class="w-4 h-4"></i>
                                     </button>
                                     <form method="POST"
@@ -1586,9 +1638,17 @@
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
+                                <label class="form-label">Tipo</label>
+                                <select class="form-control" name="tipo" required>
+                                    <option value="fatturazione">Fatturazione (promemoria)</option>
+                                    <option value="sconto">Sconto / Variazione importo</option>
+                                    <option value="generica">Generica / interna</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Contenuto</label>
                                 <textarea class="form-control" name="content" rows="4" required
-                                          placeholder="Promemoria su pagamenti, accordi, fatturazione, ecc."></textarea>
+                                          placeholder="Es. 'Per la fattura di maggio scalare €200 di acconto'"></textarea>
                             </div>
                         </div>
                         <div class="modal-footer text-right">
@@ -1606,6 +1666,14 @@
                             <h2 class="font-medium text-base mr-auto">Modifica Nota</h2>
                         </div>
                         <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo</label>
+                                <select class="form-control" name="tipo" id="note-edit-tipo" required>
+                                    <option value="fatturazione">Fatturazione (promemoria)</option>
+                                    <option value="sconto">Sconto / Variazione importo</option>
+                                    <option value="generica">Generica / interna</option>
+                                </select>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label">Contenuto</label>
                                 <textarea class="form-control" name="content" id="note-edit-content" rows="4" required></textarea>
