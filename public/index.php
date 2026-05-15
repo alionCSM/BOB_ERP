@@ -336,6 +336,8 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/extra',                                      [WorksitesController::class, 'saveExtra'])
            ->post('/worksites/{id}/extra/{extraId}/delete',                     [WorksitesController::class, 'destroyExtra'])
            ->post('/worksites/{id}/finance-notes',                              [WorksitesController::class, 'addFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/edit',                [WorksitesController::class, 'editFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/toggle-pin',          [WorksitesController::class, 'togglePinFinanceNote'])
            ->post('/worksites/{id}/finance-notes/{noteId}/delete',              [WorksitesController::class, 'deleteFinanceNote'])
            ->post('/worksites/{id}/attivita',                                              [WorksitesController::class, 'saveAttivita'])
            ->post('/worksites/{id}/attivita/{attivitaId}/delete',                          [WorksitesController::class, 'destroyAttivita'])

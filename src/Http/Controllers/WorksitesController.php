@@ -2581,6 +2581,38 @@ final class WorksitesController
         Response::redirect("/worksites/{$worksiteId}#note");
     }
 
+    public function editFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $content = trim((string)($_POST['content'] ?? ''));
+        if ($content === '') {
+            $_SESSION['error'] = 'La nota è vuota.';
+            Response::redirect("/worksites/{$worksiteId}#note");
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->update($worksiteId, $noteId, (int)$user->id, $content);
+        $_SESSION['success'] = 'Nota modificata.';
+        Response::redirect("/worksites/{$worksiteId}#note");
+    }
+
+    public function togglePinFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->togglePinned($worksiteId, $noteId);
+        Response::redirect("/worksites/{$worksiteId}#note");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private function toDecimal(string $value): float

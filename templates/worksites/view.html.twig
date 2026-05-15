@@ -1526,21 +1526,50 @@
                 {% else %}
                     <ul class="wv-notes-list">
                     {% for n in financeNotes %}
-                        <li class="wv-note">
+                        {% set wasEdited = n.updated_by is not null %}
+                        <li class="wv-note {% if n.is_pinned %}wv-note-pinned{% endif %}">
                             <div class="wv-note-meta">
                                 <span class="wv-note-author">
                                     <i data-lucide="user" class="w-3 h-3"></i>
-                                    {{ n.username ?: 'utente sconosciuto' }}
+                                    {{ n.author_username ?: 'utente sconosciuto' }}
                                 </span>
                                 <span class="wv-note-date">{{ n.created_at|date('d/m/Y H:i') }}</span>
-                                <form method="POST"
-                                      action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/delete"
-                                      data-confirm="Eliminare questa nota?"
-                                      class="wv-note-delete">
-                                    <button type="submit" title="Elimina">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                {% if wasEdited %}
+                                    <span class="wv-note-edited"
+                                          title="Modificata da {{ n.editor_username ?: 'utente sconosciuto' }} il {{ n.updated_at|date('d/m/Y H:i') }}">
+                                        modificata
+                                    </span>
+                                {% endif %}
+                                {% if n.is_pinned %}
+                                    <span class="wv-note-pin-badge">
+                                        <i data-lucide="pin" class="w-3 h-3"></i> fissata
+                                    </span>
+                                {% endif %}
+                                <div class="wv-note-actions">
+                                    <form method="POST"
+                                          action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/toggle-pin"
+                                          class="wv-note-action-form">
+                                        <button type="submit" title="{{ n.is_pinned ? 'Sfissa' : 'Fissa in cima' }}"
+                                                class="wv-note-action {{ n.is_pinned ? 'is-active' : '' }}">
+                                            <i data-lucide="pin" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                    <button type="button"
+                                            class="wv-note-action wv-note-edit-btn"
+                                            title="Modifica"
+                                            data-note-id="{{ n.id }}"
+                                            data-note-content="{{ n.content }}">
+                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
                                     </button>
-                                </form>
+                                    <form method="POST"
+                                          action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/delete"
+                                          data-confirm="Eliminare questa nota?"
+                                          class="wv-note-action-form">
+                                        <button type="submit" title="Elimina" class="wv-note-action wv-note-action-danger">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                             <div class="wv-note-content">{{ n.content|nl2br }}</div>
                         </li>
@@ -1560,6 +1589,26 @@
                                 <label class="form-label">Contenuto</label>
                                 <textarea class="form-control" name="content" rows="4" required
                                           placeholder="Promemoria su pagamenti, accordi, fatturazione, ecc."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer text-right">
+                            <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-2">Chiudi</button>
+                            <button type="submit" class="btn btn-primary w-20">Salva</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="note-edit-modal" class="modal" tabindex="-1" aria-hidden="true" data-tw-backdrop="static" data-tw-keyboard="false">
+                <div class="modal-dialog" style="max-width: 600px;">
+                    <form method="POST" id="note-edit-form" action="" class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="font-medium text-base mr-auto">Modifica Nota</h2>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Contenuto</label>
+                                <textarea class="form-control" name="content" id="note-edit-content" rows="4" required></textarea>
                             </div>
                         </div>
                         <div class="modal-footer text-right">

@@ -33,6 +33,31 @@
             }
         }
 
+        // === Note tab: wire edit buttons to the shared edit modal ===
+        // Worksite id read from window.location pathname (/worksites/{id})
+        var pathParts   = (location.pathname || '').split('/');
+        var worksiteIdx = pathParts.indexOf('worksites');
+        var worksiteId  = (worksiteIdx >= 0 && pathParts[worksiteIdx + 1]) ? pathParts[worksiteIdx + 1] : null;
+
+        document.querySelectorAll('.wv-note-edit-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var noteId  = this.dataset.noteId;
+                var content = this.dataset.noteContent || '';
+                var form    = document.getElementById('note-edit-form');
+                var ta      = document.getElementById('note-edit-content');
+                if (!form || !ta || !worksiteId || !noteId) return;
+                form.action  = '/worksites/' + worksiteId + '/finance-notes/' + noteId + '/edit';
+                ta.value     = content;
+                var modalEl  = document.getElementById('note-edit-modal');
+                if (modalEl && window.tailwind && tailwind.Modal) {
+                    tailwind.Modal.getOrCreateInstance(modalEl).show();
+                } else if (modalEl && window.bootstrap && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+                setTimeout(function () { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 60);
+            });
+        });
+
         // === Search filter wiring (extras + fatturazione tabs) ===
         function wireTableSearch(inputId, tableId) {
             const input = document.getElementById(inputId);
