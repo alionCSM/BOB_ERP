@@ -1221,7 +1221,7 @@
                                                 data-data="{{ e.data }}"
                                                 data-ordine="{{ e.ordine }}"
                                                 data-cantiere="{{ worksite.getName() }}"
-                                                data-descrizione="{{ e.descrizione }}{% if e.billing_partial %} (saldo){% endif %}"
+                                                data-descrizione="{{ e.descrizione }}"
                                                 data-totale="{{ e.billing_partial ? e.billing_remaining : e.totale }}"
                                                 data-billing-prefix="{{ billingDefaultDescr }}"
                                                 title="{% if e.billing_partial %}Crea una riga di saldo per la differenza non ancora fatturata{% else %}Crea la riga di fatturazione per questo extra{% endif %}">
