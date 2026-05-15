@@ -201,18 +201,20 @@ final class ConsorziataFatturazioneRepository
 
     /**
      * Per-worksite list of bb_billing righe that were touched by an
-     * applied bozza (status='fatturata', excluded=0) AND whose `data`
-     * falls inside the selected period. Used to expand the "Nostra
-     * fattura" column with the actual riga descrizioni — period-scoped
-     * so the cell shows what we billed for the work done in that period.
+     * applied bozza (status='fatturata', excluded=0). Returns ALL such
+     * righe for the cantieri (no period filter on `data`), but each row
+     * is tagged with `in_period` = 1 when b.data is inside [from, to].
      *
-     * Ordini are intentionally NOT scoped this way (kept all-time up to
-     * :to in getOrdiniByWorksite) — an ordine that spans multiple months
-     * should stay visible from any month so you can register payments
-     * against it.
+     * The template uses the flag to split the list into two visual
+     * groups ("Nel periodo" highlighted vs "Altre fatture" muted),
+     * while the "Nostra fattura" total in the cell header counts only
+     * the in-period subset (consistent with getDetailRows).
      *
      * @param  int[] $worksiteIds
-     * @return array<int, array<int, array{id:int, data:?string, descrizione:?string, totale_imponibile:float}>>
+     * @return array<int, array<int, array{
+     *     id:int, data:?string, descrizione:?string,
+     *     totale_imponibile:float, in_period:int
+     * }>>
      */
     public function getRigheFattureByWorksite(array $worksiteIds, string $from, string $to): array
     {
@@ -226,19 +228,19 @@ final class ConsorziataFatturazioneRepository
                 b.worksite_id,
                 b.data,
                 b.descrizione,
-                b.totale_imponibile
+                b.totale_imponibile,
+                (b.data BETWEEN ? AND ?) AS in_period
             FROM   bb_billing b
             WHERE  b.worksite_id IN ({$placeholders})
-              AND  b.data BETWEEN ? AND ?
               AND  b.id IN (
                   SELECT DISTINCT l.bb_billing_id
                   FROM   bb_billing_draft_lines l
                   JOIN   bb_billing_drafts      d ON d.id = l.draft_id
                   WHERE  d.status = 'fatturata' AND l.excluded = 0
               )
-            ORDER BY b.worksite_id ASC, b.data DESC, b.id DESC
+            ORDER BY b.worksite_id ASC, in_period DESC, b.data DESC, b.id DESC
         ";
-        $params = array_merge($worksiteIds, [$from, $to]);
+        $params = array_merge([$from, $to], $worksiteIds);
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
         $byWorksite = [];

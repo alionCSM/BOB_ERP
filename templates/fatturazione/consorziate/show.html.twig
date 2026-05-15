@@ -173,11 +173,28 @@
                                                 {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                             </td>
                                             <td>
-                                                {% if r.nostra_fattura > 0 %}
-                                                    <div class="fc-nostra-tot">€ {{ r.nostra_fattura|number_format(2, ',', '.') }}</div>
-                                                    {% if wsRighe %}
-                                                        <ul class="fc-righe-list">
-                                                        {% for rf in wsRighe %}
+                                                {% set righeInPeriod = wsRighe|filter(rf => rf.in_period) %}
+                                                {% set righeOutside  = wsRighe|filter(rf => not rf.in_period) %}
+                                                {% if r.nostra_fattura > 0 or wsRighe %}
+                                                    {% if r.nostra_fattura > 0 %}
+                                                        <div class="fc-nostra-tot">€ {{ r.nostra_fattura|number_format(2, ',', '.') }}</div>
+                                                        <div class="fc-nostra-sub">nel periodo selezionato</div>
+                                                    {% endif %}
+                                                    {% if righeInPeriod|length > 0 %}
+                                                        <ul class="fc-righe-list fc-righe-list-in">
+                                                        {% for rf in righeInPeriod %}
+                                                            <li>
+                                                                <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
+                                                                <span class="fc-righe-descr">{{ rf.descrizione }}</span>
+                                                                <span class="fc-righe-amt">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
+                                                            </li>
+                                                        {% endfor %}
+                                                        </ul>
+                                                    {% endif %}
+                                                    {% if righeOutside|length > 0 %}
+                                                        <div class="fc-righe-divider">Altre fatture</div>
+                                                        <ul class="fc-righe-list fc-righe-list-out">
+                                                        {% for rf in righeOutside %}
                                                             <li>
                                                                 <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
                                                                 <span class="fc-righe-descr">{{ rf.descrizione }}</span>
