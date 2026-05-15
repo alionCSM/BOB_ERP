@@ -53,9 +53,11 @@ final class ConsorziataFatturazioneController
         $rows     = $this->repo->getDetailRows($id, $from, $to);
         $payments = $this->repo->getPayments($id);
 
-        // Orders per cantiere, used by the payment form's ordine dropdown
-        $worksiteIds = array_map('intval', array_column($rows, 'worksite_id'));
-        $ordiniByWorksite = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
+        // Orders + bb_billing righe per cantiere, used by the row-per-ordine
+        // layout and the "Nostra fattura" expanded list.
+        $worksiteIds        = array_map('intval', array_column($rows, 'worksite_id'));
+        $ordiniByWorksite   = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
+        $righeByWorksite    = $this->repo->getRigheFattureByWorksite($worksiteIds);
 
         // Pre-compute totals for Twig (avoids |sum(attribute=...) filter issues)
         $totalPresenze       = array_sum(array_column($rows, 'presenze_gg'));
@@ -71,7 +73,7 @@ final class ConsorziataFatturazioneController
 
         Response::view('fatturazione/consorziate/show.html.twig', $request, compact(
             'consorziata', 'from', 'to', 'fromLabel', 'toLabel',
-            'rows', 'payments', 'ordiniByWorksite',
+            'rows', 'payments', 'ordiniByWorksite', 'righeByWorksite',
             'totalPresenze', 'totalContratto', 'totalNostraFattura',
             'totalOrdine', 'totalGiaPagato', 'totalSpese', 'totalStorico'
         ));

@@ -221,3 +221,49 @@
     .fp-save-bar { flex-direction: column; align-items: stretch; }
     .fp-save-bar-note input { width: 100%; }
 }
+
+/* ── Per-ordine rows: visual cantiere grouping ────────────── */
+.fc-cantiere-first > td {
+    border-top: 2px solid #cbd5e1;      /* hairline divider between cantieri */
+}
+.fc-cantiere-first > td[rowspan] {
+    background: #f8fafc;                 /* subtle tint on shared cells */
+    vertical-align: top;
+}
+.fc-cantiere-sub > td {
+    border-top: 1px dashed #e2e8f0;      /* lighter divider for sub-rows */
+}
+
+/* "Nostra fattura" cell — header line + righe list */
+.fc-nostra-tot {
+    font-weight: 600;
+    color: #b45309;
+    font-size: 13px;
+}
+.fc-righe-list {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    border-top: 1px solid #e2e8f0;
+}
+.fc-righe-list li {
+    display: grid;
+    grid-template-columns: 70px 1fr auto;
+    gap: 8px;
+    align-items: baseline;
+    padding: 3px 0;
+    font-size: 11px;
+    border-bottom: 1px dotted #f1f5f9;
+}
+.fc-righe-list li:last-child { border-bottom: 0; }
+.fc-righe-date  { color: #94a3b8; font-variant-numeric: tabular-nums; }
+.fc-righe-descr { color: #475569; }
+.fc-righe-amt   { color: #b45309; font-weight: 500; white-space: nowrap; }
+
+/* Ordine cell — number + oggetto */
+.fc-ord-oggetto {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 2px;
+    line-height: 1.3;
+}

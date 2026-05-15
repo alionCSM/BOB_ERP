@@ -167,18 +167,68 @@ final class ConsorziataFatturazioneRepository
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
+        // Also fetch per-ordine 'già pagato' (vs the cantiere-level sum on
+        // getDetailRows) so the template can show payment status per row.
         $sql = "
-            SELECT id, worksite_id, order_number, order_date, total
-            FROM   bb_ordini
-            WHERE  destinatario_id = ?
-              AND  worksite_id IN ({$placeholders})
-              AND  order_date <= ?
-            ORDER BY worksite_id ASC, order_date DESC, id DESC
+            SELECT
+                o.id, o.worksite_id, o.order_number, o.order_date, o.total,
+                o.oggetto,
+                COALESCE((
+                    SELECT SUM(pg.importo)
+                    FROM   bb_pagamenti_consorziate pg
+                    WHERE  pg.azienda_id = ?
+                      AND  pg.ordine_id  = o.id
+                ), 0) AS gia_pagato_ordine
+            FROM   bb_ordini o
+            WHERE  o.destinatario_id = ?
+              AND  o.worksite_id IN ({$placeholders})
+              AND  o.order_date <= ?
+            ORDER BY o.worksite_id ASC, o.order_date DESC, o.id DESC
         ";
-        $params = array_merge([$aziendaId], $worksiteIds, [$to]);
+        $params = array_merge([$aziendaId, $aziendaId], $worksiteIds, [$to]);
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
 
+        $byWorksite = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $byWorksite[(int)$row['worksite_id']][] = $row;
+        }
+        return $byWorksite;
+    }
+
+    /**
+     * Per-worksite list of bb_billing righe that were touched by an
+     * applied bozza (status='fatturata', excluded=0). Used to expand the
+     * "Nostra fattura" column with the actual riga descrizioni.
+     *
+     * @param  int[] $worksiteIds
+     * @return array<int, array<int, array{id:int, data:?string, descrizione:?string, totale_imponibile:float}>>
+     */
+    public function getRigheFattureByWorksite(array $worksiteIds): array
+    {
+        if (empty($worksiteIds)) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
+        $sql = "
+            SELECT
+                b.id,
+                b.worksite_id,
+                b.data,
+                b.descrizione,
+                b.totale_imponibile
+            FROM   bb_billing b
+            WHERE  b.worksite_id IN ({$placeholders})
+              AND  b.id IN (
+                  SELECT DISTINCT l.bb_billing_id
+                  FROM   bb_billing_draft_lines l
+                  JOIN   bb_billing_drafts      d ON d.id = l.draft_id
+                  WHERE  d.status = 'fatturata' AND l.excluded = 0
+              )
+            ORDER BY b.worksite_id ASC, b.data DESC, b.id DESC
+        ";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($worksiteIds);
         $byWorksite = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $byWorksite[(int)$row['worksite_id']][] = $row;
