@@ -82,20 +82,16 @@ final class ConsorziataFatturazioneRepository
                     ), 0)
                 )                                                                 AS totale_contratto,
                 /* nostra fattura: somma delle righe bb_billing del cantiere
-                   che sono state toccate da una bozza fatturata (escluse le
-                   righe excluded) E con data nel periodo selezionato.
-                   Stesso criterio della lista in getRigheFattureByWorksite. */
+                   con data nel periodo selezionato. Non filtriamo per
+                   linkage a bozza: bb_billing è la lista canonica delle
+                   righe da fatturare al cliente, la bozza è solo un flusso
+                   di revisione sopra. Se le bozze non sono ancora applicate
+                   l'importo resta visibile lo stesso. */
                 COALESCE((
                     SELECT SUM(b.totale_imponibile)
                     FROM   bb_billing b
                     WHERE  b.worksite_id = w.id
                       AND  b.data BETWEEN :from_nf AND :to_nf
-                      AND  b.id IN (
-                          SELECT DISTINCT l.bb_billing_id
-                          FROM   bb_billing_draft_lines l
-                          JOIN   bb_billing_drafts      d ON d.id = l.draft_id
-                          WHERE  d.status = 'fatturata' AND l.excluded = 0
-                      )
                 ), 0)                                                             AS nostra_fattura,
                 COALESCE((
                     SELECT SUM(o.total)
@@ -200,15 +196,16 @@ final class ConsorziataFatturazioneRepository
     }
 
     /**
-     * Per-worksite list of bb_billing righe that were touched by an
-     * applied bozza (status='fatturata', excluded=0). Returns ALL such
-     * righe for the cantieri (no period filter on `data`), but each row
-     * is tagged with `in_period` = 1 when b.data is inside [from, to].
+     * Per-worksite list of bb_billing righe (the canonical "righe da
+     * fatturare al cliente"). Returns ALL righe for the cantieri but
+     * tags each with `in_period` = 1 when b.data falls in [from, to];
+     * the template uses the flag to split into "Nel periodo" /
+     * "Altre fatture".
      *
-     * The template uses the flag to split the list into two visual
-     * groups ("Nel periodo" highlighted vs "Altre fatture" muted),
-     * while the "Nostra fattura" total in the cell header counts only
-     * the in-period subset (consistent with getDetailRows).
+     * No draft-linkage filter: bb_billing rows are visible as soon as
+     * the operator creates them on the cantiere, regardless of whether
+     * a bozza has been applied. Matches the same widening done in
+     * getDetailRows.nostra_fattura.
      *
      * @param  int[] $worksiteIds
      * @return array<int, array<int, array{
@@ -232,12 +229,6 @@ final class ConsorziataFatturazioneRepository
                 (b.data BETWEEN ? AND ?) AS in_period
             FROM   bb_billing b
             WHERE  b.worksite_id IN ({$placeholders})
-              AND  b.id IN (
-                  SELECT DISTINCT l.bb_billing_id
-                  FROM   bb_billing_draft_lines l
-                  JOIN   bb_billing_drafts      d ON d.id = l.draft_id
-                  WHERE  d.status = 'fatturata' AND l.excluded = 0
-              )
             ORDER BY b.worksite_id ASC, in_period DESC, b.data DESC, b.id DESC
         ";
         $params = array_merge([$from, $to], $worksiteIds);
