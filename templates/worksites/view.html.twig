@@ -1503,31 +1503,35 @@
            ════════════════════════════════════════════════════════════ #}
         {% if canSeePrices %}
         <div class="tab-pane fade" id="note" role="tabpanel">
-            <div class="wv-notes-wrap">
-                <form method="POST" action="/worksites/{{ worksite_id }}/finance-notes" class="wv-notes-form">
-                    <label class="wv-notes-label" for="wv-note-content">Aggiungi una nota</label>
-                    <textarea id="wv-note-content" name="content" rows="3" required
-                              placeholder="Promemoria su pagamenti, accordi, fatturazione, ecc."></textarea>
-                    <div class="wv-notes-form-actions">
-                        <button type="submit" class="btn btn-primary text-sm">
-                            <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi nota
-                        </button>
-                    </div>
-                </form>
 
-                <h3 class="wv-notes-title">
-                    Note del cantiere
-                    <span class="wv-notes-count">({{ financeNotes|length }})</span>
-                </h3>
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-muted text-sm">
+                    {% if financeNotes|length > 0 %}
+                        <strong>{{ financeNotes|length }}</strong>
+                        not{{ financeNotes|length == 1 ? 'a' : 'e' }} registrat{{ financeNotes|length == 1 ? 'a' : 'e' }}
+                    {% endif %}
+                </span>
+                <button class="btn btn-primary text-sm px-4 py-2"
+                        data-tw-toggle="modal"
+                        data-tw-target="#note-modal">
+                    <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi Nota
+                </button>
+            </div>
 
+            <div class="w-full overflow-x-auto">
                 {% if financeNotes is empty %}
-                    <div class="wv-notes-empty">Nessuna nota registrata per questo cantiere.</div>
+                    <div class="text-center py-10 text-slate-500" style="background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;">
+                        Nessuna nota registrata per questo cantiere.
+                    </div>
                 {% else %}
                     <ul class="wv-notes-list">
                     {% for n in financeNotes %}
                         <li class="wv-note">
                             <div class="wv-note-meta">
-                                <span class="wv-note-author">{{ n.username ?: 'utente sconosciuto' }}</span>
+                                <span class="wv-note-author">
+                                    <i data-lucide="user" class="w-3 h-3"></i>
+                                    {{ n.username ?: 'utente sconosciuto' }}
+                                </span>
                                 <span class="wv-note-date">{{ n.created_at|date('d/m/Y H:i') }}</span>
                                 <form method="POST"
                                       action="/worksites/{{ worksite_id }}/finance-notes/{{ n.id }}/delete"
@@ -1543,6 +1547,27 @@
                     {% endfor %}
                     </ul>
                 {% endif %}
+            </div>
+
+            <div id="note-modal" class="modal" tabindex="-1" aria-hidden="true" data-tw-backdrop="static" data-tw-keyboard="false">
+                <div class="modal-dialog" style="max-width: 600px;">
+                    <form method="POST" action="/worksites/{{ worksite_id }}/finance-notes" class="modal-content">
+                        <div class="modal-header">
+                            <h2 class="font-medium text-base mr-auto">Aggiungi Nota</h2>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Contenuto</label>
+                                <textarea class="form-control" name="content" rows="4" required
+                                          placeholder="Promemoria su pagamenti, accordi, fatturazione, ecc."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer text-right">
+                            <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary w-20 mr-2">Chiudi</button>
+                            <button type="submit" class="btn btn-primary w-20">Salva</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
         {% endif %}

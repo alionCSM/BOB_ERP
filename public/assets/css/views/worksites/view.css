@@ -236,67 +236,14 @@
 }
 
 /* ── Note tab (canSeePrices only) ───────────────── */
-.wv-notes-wrap { max-width: 760px; }
-.wv-notes-form {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 24px;
-}
-.wv-notes-label {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    margin-bottom: 6px;
-}
-.wv-notes-form textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 7px;
-    font-family: inherit;
-    font-size: 13px;
-    line-height: 1.5;
-    resize: vertical;
-    min-height: 70px;
-    background: #fff;
-}
-.wv-notes-form textarea:focus {
-    outline: 2px solid rgba(99,102,241,.18);
-    border-color: #6366f1;
-}
-.wv-notes-form-actions {
+.wv-notes-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
-    justify-content: flex-end;
-    margin-top: 8px;
+    flex-direction: column;
+    gap: 10px;
 }
-
-.wv-notes-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #0f172a;
-    margin: 0 0 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.wv-notes-count { color: #94a3b8; font-weight: 400; font-size: 12px; }
-
-.wv-notes-empty {
-    padding: 24px;
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 10px;
-    text-align: center;
-    color: #64748b;
-    font-size: 13px;
-}
-
-.wv-notes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .wv-note {
     background: #fff;
     border: 1px solid #e2e8f0;
@@ -313,15 +260,18 @@
     font-size: 11px;
 }
 .wv-note-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-weight: 600;
     color: #4c1d95;
     background: #ede9fe;
     padding: 2px 8px;
     border-radius: 999px;
 }
+.wv-note-author svg { width: 11px; height: 11px; }
 .wv-note-date { color: #94a3b8; font-variant-numeric: tabular-nums; }
 .wv-note-delete {
-    margin-left: auto;
     margin: 0 0 0 auto;
 }
 .wv-note-delete button {
