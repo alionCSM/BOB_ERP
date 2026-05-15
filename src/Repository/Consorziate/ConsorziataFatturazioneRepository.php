@@ -83,12 +83,13 @@ final class ConsorziataFatturazioneRepository
                 )                                                                 AS totale_contratto,
                 /* nostra fattura: somma delle righe bb_billing del cantiere
                    che sono state toccate da una bozza fatturata (escluse le
-                   righe excluded). DISTINCT per evitare di contare due volte
-                   se la stessa riga è in più bozze. */
+                   righe excluded) E con data nel periodo selezionato.
+                   Stesso criterio della lista in getRigheFattureByWorksite. */
                 COALESCE((
                     SELECT SUM(b.totale_imponibile)
                     FROM   bb_billing b
                     WHERE  b.worksite_id = w.id
+                      AND  b.data BETWEEN :from_nf AND :to_nf
                       AND  b.id IN (
                           SELECT DISTINCT l.bb_billing_id
                           FROM   bb_billing_draft_lines l
@@ -138,15 +139,17 @@ final class ConsorziataFatturazioneRepository
             ORDER BY w.worksite_code ASC
         ");
         $stmt->execute([
-            ':aid1' => $aziendaId,
-            ':to1'  => $to,
-            ':aid2' => $aziendaId,
-            ':aid4' => $aziendaId,
-            ':aid3' => $aziendaId,
-            ':aid5' => $aziendaId,
-            ':to2'  => $to,
-            ':from' => $from,
-            ':to'   => $to,
+            ':aid1'    => $aziendaId,
+            ':to1'     => $to,
+            ':aid2'    => $aziendaId,
+            ':aid4'    => $aziendaId,
+            ':aid3'    => $aziendaId,
+            ':aid5'    => $aziendaId,
+            ':to2'     => $to,
+            ':from'    => $from,
+            ':to'      => $to,
+            ':from_nf' => $from,
+            ':to_nf'   => $to,
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -198,13 +201,20 @@ final class ConsorziataFatturazioneRepository
 
     /**
      * Per-worksite list of bb_billing righe that were touched by an
-     * applied bozza (status='fatturata', excluded=0). Used to expand the
-     * "Nostra fattura" column with the actual riga descrizioni.
+     * applied bozza (status='fatturata', excluded=0) AND whose `data`
+     * falls inside the selected period. Used to expand the "Nostra
+     * fattura" column with the actual riga descrizioni — period-scoped
+     * so the cell shows what we billed for the work done in that period.
+     *
+     * Ordini are intentionally NOT scoped this way (kept all-time up to
+     * :to in getOrdiniByWorksite) — an ordine that spans multiple months
+     * should stay visible from any month so you can register payments
+     * against it.
      *
      * @param  int[] $worksiteIds
      * @return array<int, array<int, array{id:int, data:?string, descrizione:?string, totale_imponibile:float}>>
      */
-    public function getRigheFattureByWorksite(array $worksiteIds): array
+    public function getRigheFattureByWorksite(array $worksiteIds, string $from, string $to): array
     {
         if (empty($worksiteIds)) {
             return [];
@@ -219,6 +229,7 @@ final class ConsorziataFatturazioneRepository
                 b.totale_imponibile
             FROM   bb_billing b
             WHERE  b.worksite_id IN ({$placeholders})
+              AND  b.data BETWEEN ? AND ?
               AND  b.id IN (
                   SELECT DISTINCT l.bb_billing_id
                   FROM   bb_billing_draft_lines l
@@ -227,8 +238,9 @@ final class ConsorziataFatturazioneRepository
               )
             ORDER BY b.worksite_id ASC, b.data DESC, b.id DESC
         ";
+        $params = array_merge($worksiteIds, [$from, $to]);
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute($worksiteIds);
+        $stmt->execute($params);
         $byWorksite = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $byWorksite[(int)$row['worksite_id']][] = $row;

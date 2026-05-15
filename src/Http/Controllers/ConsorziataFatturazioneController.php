@@ -57,7 +57,7 @@ final class ConsorziataFatturazioneController
         // layout and the "Nostra fattura" expanded list.
         $worksiteIds        = array_map('intval', array_column($rows, 'worksite_id'));
         $ordiniByWorksite   = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
-        $righeByWorksite    = $this->repo->getRigheFattureByWorksite($worksiteIds);
+        $righeByWorksite    = $this->repo->getRigheFattureByWorksite($worksiteIds, $from, $to);
 
         // Pre-compute totals for Twig (avoids |sum(attribute=...) filter issues)
         $totalPresenze       = array_sum(array_column($rows, 'presenze_gg'));
