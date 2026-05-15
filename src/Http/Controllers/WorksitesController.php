@@ -213,7 +213,10 @@ final class WorksitesController
 
         $name         = $_POST['name']         ?? '';
         $location     = $_POST['location']     ?? '';
-        $start_date   = $_POST['start_date']   ?? null;
+        // data_inizio: the field was removed from the create form (users
+        // didn't care about it). Default to today; respect $_POST only if
+        // legacy callers still send it.
+        $start_date   = !empty($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-d');
         $offer_number = !empty($_POST['offer_number']) ? $_POST['offer_number'] : null;
         $order_date   = !empty($_POST['order_date'])   ? $_POST['order_date']   : null;
         $order_number = !empty($_POST['order_number']) ? $_POST['order_number'] : null;
@@ -825,7 +828,11 @@ final class WorksitesController
             'location'        => $_POST['location']  ?? '',
             'descrizione'     => $_POST['descrizione']     ?? '',
             'ext_descrizione' => $_POST['ext_descrizione'] ?? '',
-            'start_date'      => $_POST['start_date'] ?? null,
+            // data_inizio is no longer shown in the edit form — preserve
+            // the existing value (fallback to today if it was somehow null)
+            'start_date'      => !empty($_POST['start_date'])
+                                    ? $_POST['start_date']
+                                    : ($worksite['start_date'] ?? date('Y-m-d')),
             'offer_number'    => isset($_POST['offer_number']) && trim($_POST['offer_number']) !== '' ? $_POST['offer_number'] : null,
             'status'          => $_POST['status']   ?? 'In Corso',
             'end_date'        => $end_date,

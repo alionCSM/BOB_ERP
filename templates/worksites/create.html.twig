@@ -67,10 +67,7 @@
                         <input type="text" name="location" placeholder="Es. Milano, Via Roma 1">
                     </div>
 
-                    <div class="wcf-field">
-                        <label>Data Inizio <span class="req">*</span></label>
-                        <input type="date" name="start_date" required>
-                    </div>
+                    {# data_inizio: rimossa dal form — viene impostata in automatico alla data di creazione del cantiere #}
 
                     {% if companyId == 1 %}
                         <div class="wcf-field wcf-span-2">
