@@ -52,11 +52,19 @@
             </div>
         </div>
         <div class="fp-stat">
+            <div class="fp-stat-dot" style="background:#0ea5e9;"></div>
+            <div>
+                <div class="fp-stat-value">€ {{ totalContratto|number_format(0, ',', '.') }}</div>
+                <div class="fp-stat-label">Totale contratto</div>
+                <div class="fp-stat-sub">cantieri nel periodo</div>
+            </div>
+        </div>
+        <div class="fp-stat">
             <div class="fp-stat-dot" style="background:#f97316;"></div>
             <div>
-                <div class="fp-stat-value">€ {{ totalCosto|number_format(0, ',', '.') }}</div>
-                <div class="fp-stat-label">Costo presenze</div>
-                <div class="fp-stat-sub">nel periodo</div>
+                <div class="fp-stat-value">€ {{ totalNostraFattura|number_format(0, ',', '.') }}</div>
+                <div class="fp-stat-label">Nostra fattura</div>
+                <div class="fp-stat-sub">da bozze fatturate</div>
             </div>
         </div>
         <div class="fp-stat">
@@ -128,7 +136,8 @@
                                 <tr>
                                     <th>Cantiere</th>
                                     <th class="right">Presenze (gg)</th>
-                                    <th class="right">Costo presenze</th>
+                                    <th class="right" title="Totale contratto cantiere = total_offer + somma extras">Totale contratto</th>
+                                    <th class="right" title="Importo richiesto al cliente in base alle bozze applicate">Nostra fattura</th>
                                     <th class="right">Valore ordine</th>
                                     <th class="right">Data ordine</th>
                                     <th class="right">Già pagato</th>
@@ -152,7 +161,20 @@
                                         </a>
                                     </td>
                                     <td class="right">{{ r.presenze_gg|number_format(2, ',', '.') }}</td>
-                                    <td class="right">€ {{ r.costo_presenze|number_format(2, ',', '.') }}</td>
+                                    <td class="right">
+                                        {% if r.totale_contratto > 0 %}
+                                            € {{ r.totale_contratto|number_format(2, ',', '.') }}
+                                        {% else %}
+                                            <span class="fp-dash">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="right">
+                                        {% if r.nostra_fattura > 0 %}
+                                            € {{ r.nostra_fattura|number_format(2, ',', '.') }}
+                                        {% else %}
+                                            <span class="fp-dash">—</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="right">
                                         {% if r.valore_ordine > 0 %}
                                             € {{ r.valore_ordine|number_format(2, ',', '.') }}
@@ -215,7 +237,8 @@
                             <tfoot>
                                 <tr>
                                     <td class="right fp-muted" colspan="2">Totali</td>
-                                    <td class="right">€ {{ totalCosto|number_format(2, ',', '.') }}</td>
+                                    <td class="right">€ {{ totalContratto|number_format(2, ',', '.') }}</td>
+                                    <td class="right">€ {{ totalNostraFattura|number_format(2, ',', '.') }}</td>
                                     <td class="right">€ {{ totalOrdine|number_format(2, ',', '.') }}</td>
                                     <td class="right"></td>
                                     <td class="right">€ {{ totalGiaPagato|number_format(2, ',', '.') }}</td>

@@ -75,7 +75,27 @@ final class ConsorziataFatturazioneRepository
                 w.worksite_code,
                 w.name                                                            AS worksite_name,
                 SUM(p.quantita)                                                   AS presenze_gg,
-                SUM(p.quantita * IFNULL(p.costo_unitario, 0))                    AS costo_presenze,
+                /* totale contratto cantiere = total_offer + somma extras */
+                (
+                    COALESCE(w.total_offer, 0) + COALESCE((
+                        SELECT SUM(e.totale) FROM bb_extra e WHERE e.worksite_id = w.id
+                    ), 0)
+                )                                                                 AS totale_contratto,
+                /* nostra fattura: somma delle righe bb_billing del cantiere
+                   che sono state toccate da una bozza fatturata (escluse le
+                   righe excluded). DISTINCT per evitare di contare due volte
+                   se la stessa riga è in più bozze. */
+                COALESCE((
+                    SELECT SUM(b.totale_imponibile)
+                    FROM   bb_billing b
+                    WHERE  b.worksite_id = w.id
+                      AND  b.id IN (
+                          SELECT DISTINCT l.bb_billing_id
+                          FROM   bb_billing_draft_lines l
+                          JOIN   bb_billing_drafts      d ON d.id = l.draft_id
+                          WHERE  d.status = 'fatturata' AND l.excluded = 0
+                      )
+                ), 0)                                                             AS nostra_fattura,
                 COALESCE((
                     SELECT SUM(o.total)
                     FROM   bb_ordini o
@@ -114,7 +134,7 @@ final class ConsorziataFatturazioneRepository
             INNER JOIN bb_worksites w ON w.id = p.worksite_id
             WHERE p.azienda_id    = :aid3
               AND p.data_presenza BETWEEN :from AND :to
-            GROUP BY w.id, w.worksite_code, w.name
+            GROUP BY w.id, w.worksite_code, w.name, w.total_offer
             ORDER BY w.worksite_code ASC
         ");
         $stmt->execute([

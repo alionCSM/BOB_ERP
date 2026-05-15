@@ -39,7 +39,7 @@ $spreadsheet = new Spreadsheet();
 $sheet       = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Dettaglio');
 
-$lastCol = 'G'; // A–G (7 columns)
+$lastCol = 'H'; // A–H (8 columns)
 
 // ── Row 1: title ──────────────────────────────────────────────────────────────
 $title = trim(($codice ? "[{$codice}] " : '') . $name . ' — ' . $fromLabel . ' / ' . $toLabel);
@@ -55,11 +55,12 @@ $sheet->getRowDimension(1)->setRowHeight(26);
 $headers = [
     'A' => 'Cantiere',
     'B' => 'Presenze (gg)',
-    'C' => 'Costo presenze (€)',
-    'D' => 'Valore ordine (€)',
-    'E' => 'Già pagato (€)',
-    'F' => 'Spese a carico (€)',
-    'G' => 'Residuo (€)',
+    'C' => 'Totale contratto (€)',
+    'D' => 'Nostra fattura (€)',
+    'E' => 'Valore ordine (€)',
+    'F' => 'Già pagato (€)',
+    'G' => 'Spese a carico (€)',
+    'H' => 'Residuo (€)',
 ];
 foreach ($headers as $col => $text) {
     $sheet->setCellValue("{$col}2", $text);
@@ -76,12 +77,13 @@ $rowNum     = 3;
 $altLight   = 'F0F4FA';
 $altDark    = 'FFFFFF';
 
-$sumPresenze = 0.0;
-$sumCosto    = 0.0;
-$sumOrdine   = 0.0;
-$sumPagato   = 0.0;
-$sumSpese    = 0.0;
-$sumResiduo  = 0.0;
+$sumPresenze   = 0.0;
+$sumContratto  = 0.0;
+$sumNostraFat  = 0.0;
+$sumOrdine     = 0.0;
+$sumPagato     = 0.0;
+$sumSpese      = 0.0;
+$sumResiduo    = 0.0;
 
 foreach ($rows as $row) {
     $bg = ($rowNum % 2 === 0) ? $altLight : $altDark;
@@ -91,27 +93,30 @@ foreach ($rows as $row) {
         ($row['worksite_name'] ?? '')
     );
 
-    $presenze = (float)$row['presenze_gg'];
-    $costo    = (float)$row['costo_presenze'];
-    $ordine   = (float)$row['valore_ordine'];
-    $pagato   = (float)$row['gia_pagato'];
-    $spese    = (float)$row['spese_consorziata'];
-    $residuo  = $ordine - $pagato - $spese;
+    $presenze  = (float)$row['presenze_gg'];
+    $contratto = (float)($row['totale_contratto'] ?? 0);
+    $nostraFat = (float)($row['nostra_fattura']   ?? 0);
+    $ordine    = (float)$row['valore_ordine'];
+    $pagato    = (float)$row['gia_pagato'];
+    $spese     = (float)$row['spese_consorziata'];
+    $residuo   = $ordine - $pagato - $spese;
 
-    $sumPresenze += $presenze;
-    $sumCosto    += $costo;
-    $sumOrdine   += $ordine;
-    $sumPagato   += $pagato;
-    $sumSpese    += $spese;
-    $sumResiduo  += $residuo;
+    $sumPresenze  += $presenze;
+    $sumContratto += $contratto;
+    $sumNostraFat += $nostraFat;
+    $sumOrdine    += $ordine;
+    $sumPagato    += $pagato;
+    $sumSpese     += $spese;
+    $sumResiduo   += $residuo;
 
     $sheet->setCellValue("A{$rowNum}", $cantiere);
     $sheet->setCellValue("B{$rowNum}", $presenze);
-    $sheet->setCellValue("C{$rowNum}", $costo);
-    $sheet->setCellValue("D{$rowNum}", $ordine);
-    $sheet->setCellValue("E{$rowNum}", $pagato);
-    $sheet->setCellValue("F{$rowNum}", $spese);
-    $sheet->setCellValue("G{$rowNum}", $residuo);
+    $sheet->setCellValue("C{$rowNum}", $contratto);
+    $sheet->setCellValue("D{$rowNum}", $nostraFat);
+    $sheet->setCellValue("E{$rowNum}", $ordine);
+    $sheet->setCellValue("F{$rowNum}", $pagato);
+    $sheet->setCellValue("G{$rowNum}", $spese);
+    $sheet->setCellValue("H{$rowNum}", $residuo);
 
     $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
         'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
@@ -121,7 +126,7 @@ foreach ($rows as $row) {
 
     // Number formats
     $sheet->getStyle("B{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
-    foreach (['C', 'D', 'E', 'F', 'G'] as $c) {
+    foreach (['C', 'D', 'E', 'F', 'G', 'H'] as $c) {
         $sheet->getStyle("{$c}{$rowNum}")->getNumberFormat()->setFormatCode('€ #,##0.00');
         $sheet->getStyle("{$c}{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
     }
@@ -129,7 +134,7 @@ foreach ($rows as $row) {
 
     // Colour residuo cell when negative
     if ($residuo < 0) {
-        $sheet->getStyle("G{$rowNum}")->getFont()->getColor()->setRGB('DC2626');
+        $sheet->getStyle("H{$rowNum}")->getFont()->getColor()->setRGB('DC2626');
     }
 
     $rowNum++;
@@ -138,11 +143,12 @@ foreach ($rows as $row) {
 // ── Totals row ────────────────────────────────────────────────────────────────
 $sheet->setCellValue("A{$rowNum}", 'TOTALE');
 $sheet->setCellValue("B{$rowNum}", $sumPresenze);
-$sheet->setCellValue("C{$rowNum}", $sumCosto);
-$sheet->setCellValue("D{$rowNum}", $sumOrdine);
-$sheet->setCellValue("E{$rowNum}", $sumPagato);
-$sheet->setCellValue("F{$rowNum}", $sumSpese);
-$sheet->setCellValue("G{$rowNum}", $sumResiduo);
+$sheet->setCellValue("C{$rowNum}", $sumContratto);
+$sheet->setCellValue("D{$rowNum}", $sumNostraFat);
+$sheet->setCellValue("E{$rowNum}", $sumOrdine);
+$sheet->setCellValue("F{$rowNum}", $sumPagato);
+$sheet->setCellValue("G{$rowNum}", $sumSpese);
+$sheet->setCellValue("H{$rowNum}", $sumResiduo);
 
 $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
     'font'      => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'FFFFFF']],
@@ -152,7 +158,7 @@ $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
 $sheet->getStyle("A{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
 $sheet->getStyle("B{$rowNum}")->getNumberFormat()->setFormatCode('#,##0.00');
-foreach (['C', 'D', 'E', 'F', 'G'] as $c) {
+foreach (['C', 'D', 'E', 'F', 'G', 'H'] as $c) {
     $sheet->getStyle("{$c}{$rowNum}")->getNumberFormat()->setFormatCode('€ #,##0.00');
 }
 $sheet->getRowDimension($rowNum)->setRowHeight(20);
@@ -166,7 +172,7 @@ $sheet->getStyle("A2:{$lastCol}{$rowNum}")->applyFromArray([
 
 // ── Column widths ─────────────────────────────────────────────────────────────
 $sheet->getColumnDimension('A')->setWidth(40);
-foreach (['B', 'C', 'D', 'E', 'F', 'G'] as $c) {
+foreach (['B', 'C', 'D', 'E', 'F', 'G', 'H'] as $c) {
     $sheet->getColumnDimension($c)->setAutoSize(true);
 }
 
