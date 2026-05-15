@@ -33,6 +33,18 @@
             }
         }
 
+        // In-page links that need to jump to another tab (e.g. the avviso
+        // 'Vai alla tab Extra' inside the Fatturazione tab). We click the
+        // corresponding nav button so the active highlight stays consistent.
+        document.querySelectorAll('[data-wv-goto-tab]').forEach(function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = link.getAttribute('data-wv-goto-tab');
+                const navBtn = document.querySelector('.wv-tab-btn[data-bs-target="' + target + '"]');
+                if (navBtn) navBtn.click();
+            });
+        });
+
         // === GESTIONE FILTRI DATE (per ogni tabella con bottoni filtro) ===
         const dateContainers = document.querySelectorAll('.date-scrollbar, .date-scrollbar-cons');
         dateContainers.forEach(container => {
