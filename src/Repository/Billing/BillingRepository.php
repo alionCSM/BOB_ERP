@@ -54,19 +54,15 @@ final class BillingRepository
     public function create(array $data): int
     {
         try {
-            // emessa = 0 explicitly: otherwise the column falls back to its
-            // DEFAULT (which is NULL on legacy installs), and a NULL emessa
-            // makes the row invisible to getClientsWithBillingSummary /
-            // getDaEmettereByClient until syncEmessaForClient runs.
             $stmt = $this->conn->prepare("
                 INSERT INTO bb_billing (
                     worksite_id, nome_cantiere, nome_cliente, data,
                     descrizione, totale_imponibile, aliquota_iva,
-                    articolo_id, iva_id, attivita_id, extra_id, emessa
+                    articolo_id, iva_id, attivita_id, extra_id
                 ) VALUES (
                     :worksite_id, :nome_cantiere, :nome_cliente, :data,
                     :descrizione, :totale_imponibile, :aliquota_iva,
-                    :articolo_id, :iva_id, :attivita_id, :extra_id, 0
+                    :articolo_id, :iva_id, :attivita_id, :extra_id
                 )
             ");
             $extraId = isset($data['extra_id']) && $data['extra_id'] !== '' && $data['extra_id'] !== null
@@ -247,21 +243,18 @@ final class BillingRepository
      */
     public function getClientsWithBillingSummary(int $year): array
     {
-        // COALESCE(b.emessa, 0) so newly-created rows with a NULL emessa
-        // (pre-sync from Yard) are counted as "da emettere" rather than
-        // disappearing from the client list entirely.
         $stmt = $this->conn->prepare("
             SELECT
                 c.id,
                 c.name,
                 COUNT(b.id)                                                                       AS total_fatture,
-                SUM(COALESCE(b.emessa, 0) = 0)                                                    AS da_emettere_count,
+                SUM(b.emessa = 0)                                                                 AS da_emettere_count,
                 SUM(b.emessa = 1)                                                                 AS emesse_count,
-                COALESCE(SUM(CASE WHEN COALESCE(b.emessa, 0) = 0 THEN b.totale_imponibile END), 0) AS da_emettere_euro,
+                COALESCE(SUM(CASE WHEN b.emessa = 0 THEN b.totale_imponibile END), 0)             AS da_emettere_euro,
                 COALESCE(SUM(CASE WHEN b.emessa = 1 THEN b.totale_imponibile END), 0)             AS emesse_euro,
-                SUM(COALESCE(b.emessa, 0) = 0 AND YEAR(b.data) = :yr)                             AS da_emettere_count_yr,
+                SUM(b.emessa = 0 AND YEAR(b.data) = :yr)                                          AS da_emettere_count_yr,
                 SUM(b.emessa = 1 AND YEAR(b.data) = :yr2)                                         AS emesse_count_yr,
-                COALESCE(SUM(CASE WHEN COALESCE(b.emessa, 0) = 0 AND YEAR(b.data) = :yr3 THEN b.totale_imponibile END), 0) AS da_emettere_euro_yr,
+                COALESCE(SUM(CASE WHEN b.emessa = 0 AND YEAR(b.data) = :yr3 THEN b.totale_imponibile END), 0) AS da_emettere_euro_yr,
                 COALESCE(SUM(CASE WHEN b.emessa = 1 AND YEAR(b.data) = :yr4 THEN b.totale_imponibile END), 0) AS emesse_euro_yr
             FROM bb_clients c
             JOIN bb_worksites w ON w.client_id = c.id
@@ -305,7 +298,7 @@ final class BillingRepository
                 WHERE d.status = 'fatturata' AND l.excluded = 0
                 GROUP BY l.bb_billing_id
             ) applied ON applied.bb_billing_id = b.id
-            WHERE w.client_id = :cid AND COALESCE(b.emessa, 0) = 0
+            WHERE w.client_id = :cid AND b.emessa = 0
             ORDER BY b.data ASC, w.name ASC
         ");
         $stmt->execute([':cid' => $clientId]);
