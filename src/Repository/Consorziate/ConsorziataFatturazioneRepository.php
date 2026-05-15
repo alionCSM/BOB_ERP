@@ -82,9 +82,9 @@ final class ConsorziataFatturazioneRepository
                     ), 0)
                 )                                                                 AS totale_contratto,
                 /* nostra fattura: somma delle righe bb_billing del cantiere
-                   che sono state toccate da una bozza fatturata (escluse le
-                   righe excluded) E con data nel periodo selezionato.
-                   Stesso criterio della lista in getRigheFattureByWorksite. */
+                   che sono state toccate da una bozza NON annullata (qualsiasi
+                   stato: bozza/inviata/approvata/fatturata) con riga non
+                   esclusa, e con data nel periodo selezionato. */
                 COALESCE((
                     SELECT SUM(b.totale_imponibile)
                     FROM   bb_billing b
@@ -94,7 +94,7 @@ final class ConsorziataFatturazioneRepository
                           SELECT DISTINCT l.bb_billing_id
                           FROM   bb_billing_draft_lines l
                           JOIN   bb_billing_drafts      d ON d.id = l.draft_id
-                          WHERE  d.status = 'fatturata' AND l.excluded = 0
+                          WHERE  d.status <> 'annullata' AND l.excluded = 0
                       )
                 ), 0)                                                             AS nostra_fattura,
                 COALESCE((
@@ -200,10 +200,11 @@ final class ConsorziataFatturazioneRepository
     }
 
     /**
-     * Per-worksite list of bb_billing righe that were touched by an
-     * applied bozza (status='fatturata', excluded=0). Returns ALL such
-     * righe for the cantieri (no period filter on `data`), but each row
-     * is tagged with `in_period` = 1 when b.data is inside [from, to].
+     * Per-worksite list of bb_billing righe that were touched by ANY bozza
+     * not annullata (status in bozza|inviata_cliente|da_modificare|approvata|
+     * fatturata), with riga non excluded. Returns ALL such righe for the
+     * cantieri (no period filter on `data`), but each row is tagged with
+     * `in_period` = 1 when b.data is inside [from, to].
      *
      * The template uses the flag to split the list into two visual
      * groups ("Nel periodo" highlighted vs "Altre fatture" muted),
@@ -236,7 +237,7 @@ final class ConsorziataFatturazioneRepository
                   SELECT DISTINCT l.bb_billing_id
                   FROM   bb_billing_draft_lines l
                   JOIN   bb_billing_drafts      d ON d.id = l.draft_id
-                  WHERE  d.status = 'fatturata' AND l.excluded = 0
+                  WHERE  d.status <> 'annullata' AND l.excluded = 0
               )
             ORDER BY b.worksite_id ASC, in_period DESC, b.data DESC, b.id DESC
         ";
