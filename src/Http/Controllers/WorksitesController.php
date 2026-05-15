@@ -730,12 +730,15 @@ final class WorksitesController
         $clientName = $worksite->getClientName();
         $clientId   = $worksite->getClientId();
 
-        // Billing modal defaults (from billing.php)
-        $billingDefaultDescr = sprintf(
-            'ORDINE %s - CANTIERE %s',
-            $worksite->getOrderNumber(),
-            $worksite->getName()
-        );
+        // Billing modal defaults — format:
+        //   "ORDINE [commessa] {ordine} del {data} - CANTIERE {nome}"
+        // commessa segment is dropped if not set; ' del {data}' if no order_date.
+        $bdCommessa   = trim((string)($worksite->getCommessa() ?? ''));
+        $bdOrdineLine = 'ORDINE'
+                      . ($bdCommessa !== '' ? ' ' . $bdCommessa : '')
+                      . ' ' . (string)$worksite->getOrderNumber()
+                      . ($orderDateFormatted !== '-' ? ' del ' . $orderDateFormatted : '');
+        $billingDefaultDescr = $bdOrdineLine . ' - CANTIERE ' . $worksite->getName();
         $billingRemaining = $worksite->getRemainingToBill();
 
         // For consuntivo: override remaining-to-bill using estimated revenue

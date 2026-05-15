@@ -29,8 +29,15 @@
                     document.getElementById('billing-extra-id').value = this.dataset.extraId;
 
                     document.getElementById('billing-data').value = this.dataset.data;
+
+                    // Description: extend the server-built billing prefix
+                    // (ORDINE [commessa] N. del data - CANTIERE name) with
+                    // the EXTRA segment. Falls back to the cantiere-only
+                    // prefix if the data attribute isn't set.
+                    var prefix = this.dataset.billingPrefix
+                                || ('CANTIERE ' + this.dataset.cantiere);
                     document.getElementById('billing-descrizione').value =
-                        this.dataset.cantiere +
+                        prefix +
                         ' - EXTRA ' + this.dataset.ordine +
                         ' - ' + this.dataset.descrizione;
 
