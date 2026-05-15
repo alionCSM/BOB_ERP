@@ -1149,16 +1149,36 @@
             </div>
             {% endif %}
 
-            <div class="flex justify-end mb-3">
+            <div class="flex flex-wrap items-center gap-3 mb-3">
                 <button class="btn btn-primary text-sm px-4 py-2"
                         data-tw-toggle="modal"
                         data-tw-target="#extra-modal">
                     <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi Extra
                 </button>
+                <div class="ms-auto" style="position:relative;min-width:240px;">
+                    <i data-lucide="search" class="w-4 h-4" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;"></i>
+                    <input type="text" id="wv-extras-search" placeholder="Cerca negli extra…"
+                           class="form-control" style="padding-left:32px;height:36px;font-size:13px;">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-3 mb-3">
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#3b82f6;">
+                    <div class="text-slate-500 text-xs uppercase">Totale Extras</div>
+                    <div class="text-xl font-semibold" style="color:#1e40af;">€ {{ totalExtra|number_format(2, ',', '.') }}</div>
+                </div>
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#22c55e;">
+                    <div class="text-slate-500 text-xs uppercase">Fatturato (emesso)</div>
+                    <div class="text-xl font-semibold" style="color:#15803d;">€ {{ totalExtraFatturato|number_format(2, ',', '.') }}</div>
+                </div>
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#f59e0b;">
+                    <div class="text-slate-500 text-xs uppercase">Da fatturare</div>
+                    <div class="text-xl font-semibold" style="color:#b45309;">€ {{ totalExtraDaFatturare|number_format(2, ',', '.') }}</div>
+                </div>
             </div>
 
             <div class="w-full overflow-x-auto">
-                <table class="table table-sm table-striped">
+                <table class="table table-sm table-striped" id="wv-extras-table">
                     <thead>
                     <tr>
                         <th class="text-center" style="width:60px;">Rif.</th>
@@ -1314,16 +1334,36 @@
             </div>
             {% endif %}
 
-            <div class="flex justify-end mb-3">
+            <div class="flex flex-wrap items-center gap-3 mb-3">
                 <button class="btn btn-primary text-sm px-4 py-2"
                         data-tw-toggle="modal"
                         data-tw-target="#billing-modal">
                     <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi Fattura
                 </button>
+                <div class="ms-auto" style="position:relative;min-width:240px;">
+                    <i data-lucide="search" class="w-4 h-4" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none;"></i>
+                    <input type="text" id="wv-billing-search" placeholder="Cerca nelle fatture…"
+                           class="form-control" style="padding-left:32px;height:36px;font-size:13px;">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-12 gap-3 mb-3">
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#3b82f6;">
+                    <div class="text-slate-500 text-xs uppercase">Totale Fatture</div>
+                    <div class="text-xl font-semibold" style="color:#1e40af;">€ {{ totalFatture|number_format(2, ',', '.') }}</div>
+                </div>
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#22c55e;">
+                    <div class="text-slate-500 text-xs uppercase">Emesso (Yard)</div>
+                    <div class="text-xl font-semibold" style="color:#15803d;">€ {{ totalEmesseReale|number_format(2, ',', '.') }}</div>
+                </div>
+                <div class="col-span-12 sm:col-span-4 box p-3 border-l-4" style="border-color:#f59e0b;">
+                    <div class="text-slate-500 text-xs uppercase">Da emettere</div>
+                    <div class="text-xl font-semibold" style="color:#b45309;">€ {{ totalFattureDaEmettere|number_format(2, ',', '.') }}</div>
+                </div>
             </div>
 
             <div class="w-full overflow-x-auto">
-                <table class="table table-sm table-striped">
+                <table class="table table-sm table-striped" id="wv-billing-table">
                     <thead>
                     <tr>
                         <th class="text-center" style="width:60px;">Rif.</th>

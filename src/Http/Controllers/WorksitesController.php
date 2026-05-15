@@ -646,13 +646,20 @@ final class WorksitesController
         $fatture  = $this->billingRepo->getByWorksiteId($worksite_id);
 
         $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
-        $totalEmesseReale = 0.0;
-        $extraEmessaCount = []; // extra_id => # of linked righe with emessa=1 (Yard)
-        $extraLinkedCount = []; // extra_id => # of linked righe (any state)
+        $totalEmesseReale     = 0.0;
+        $totalFatture         = 0.0;
+        $totalExtraFatturato  = 0.0; // sum of righe linked to extras AND emessa on Yard
+        $extraEmessaCount     = []; // extra_id => # of linked righe with emessa=1 (Yard)
+        $extraLinkedCount     = []; // extra_id => # of linked righe (any state)
         foreach ($fatture as &$f) {
             $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
+            $imp = (float)($f['totale_imponibile'] ?? 0);
+            $totalFatture += $imp;
             if ($f['emessa_reale']) {
-                $totalEmesseReale += (float)($f['totale_imponibile'] ?? 0);
+                $totalEmesseReale += $imp;
+                if (!empty($f['extra_id'])) {
+                    $totalExtraFatturato += $imp;
+                }
             }
             if (!empty($f['extra_id'])) {
                 $eid = (int)$f['extra_id'];
@@ -663,6 +670,7 @@ final class WorksitesController
             }
         }
         unset($f);
+        $totalFattureDaEmettere = max(0.0, $totalFatture - $totalEmesseReale);
 
         // Enrich $extra rows for the template: how much is covered, whether
         // ALL linked righe are emessa, and the remaining amount left to bill.
@@ -692,6 +700,15 @@ final class WorksitesController
             }
         }
         unset($e);
+
+        // Totals for the extras tab strip
+        $totalExtra            = array_sum(array_map(fn($e) => (float)($e['totale'] ?? 0), $extra));
+        $totalExtraDaFatturare = 0.0;
+        foreach ($extra as $e) {
+            if ((int)($e['tracks_billing'] ?? 0) === 1) {
+                $totalExtraDaFatturare += (float)($e['billing_remaining'] ?? 0);
+            }
+        }
 
         // Presenze date filters
         $dateFilter = $request->get('filter_date');
@@ -801,7 +818,9 @@ final class WorksitesController
             'documents', 'isWorkerOrClient',
             'orderDateFormatted', 'clientName', 'clientId',
             'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale',
-            'extrasUnbilledCount'
+            'extrasUnbilledCount',
+            'totalFatture', 'totalFattureDaEmettere',
+            'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare'
         ));
     }
 

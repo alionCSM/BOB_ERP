@@ -33,6 +33,26 @@
             }
         }
 
+        // === Search filter wiring (extras + fatturazione tabs) ===
+        function wireTableSearch(inputId, tableId) {
+            const input = document.getElementById(inputId);
+            const table = document.getElementById(tableId);
+            if (!input || !table) return;
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            input.addEventListener('input', function () {
+                const q = this.value.trim().toLowerCase();
+                tbody.querySelectorAll('tr').forEach(function (row) {
+                    // Skip the empty-state row (single big colspan)
+                    if (row.children.length === 1) return;
+                    const visible = q === '' || row.textContent.toLowerCase().indexOf(q) !== -1;
+                    row.style.display = visible ? '' : 'none';
+                });
+            });
+        }
+        wireTableSearch('wv-extras-search',  'wv-extras-table');
+        wireTableSearch('wv-billing-search', 'wv-billing-table');
+
         // === GESTIONE FILTRI DATE (per ogni tabella con bottoni filtro) ===
         const dateContainers = document.querySelectorAll('.date-scrollbar, .date-scrollbar-cons');
         dateContainers.forEach(container => {
