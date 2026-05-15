@@ -1173,8 +1173,6 @@
                     <tbody>
                     {% if extra is not empty %}
                         {% for e in extra %}
-                            {# Divergence: extra.totale vs the linked billing's totale_imponibile #}
-                            {% set hasDivergence = e.billing_id and (e.totale|number_format(2) != e.billing_totale|number_format(2)) %}
                             <tr>
                                 <td class="text-center">
                                     <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:11px;font-weight:500;">
@@ -1186,14 +1184,25 @@
                                 <td>{{ e.descrizione|nl2br }}</td>
                                 <td>{{ e.totale|number_format(2) }} €</td>
                                 <td class="text-center">
-                                    {% if e.billing_id and e.billing_emessa_reale %}
+                                    {% if e.billing_fully_covered and e.billing_all_emessa %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;">
                                             <i data-lucide="check" class="w-3 h-3"></i> Fatturato
                                         </span>
-                                    {% elseif e.billing_id %}
+                                    {% elseif e.billing_fully_covered %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;"
-                                              title="La riga di fatturazione è stata creata ma non ancora emessa">
+                                              title="Le righe di fatturazione coprono l'importo dell'extra ma non sono ancora tutte emesse su Yard">
                                             <i data-lucide="send" class="w-3 h-3"></i> Mandato in fatturazione
+                                        </span>
+                                    {% elseif e.billing_over_covered %}
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:11px;font-weight:500;"
+                                              title="Le righe di fatturazione superano l'importo dell'extra. Verifica.">
+                                            <i data-lucide="alert-triangle" class="w-3 h-3"></i> Fatturato in eccesso
+                                        </span>
+                                    {% elseif e.billing_partial %}
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#ffedd5;color:#9a3412;border:1px solid #fdba74;font-size:11px;font-weight:500;"
+                                              title="Una parte dell'extra è già stata fatturata. Crea un'altra riga per coprire la differenza.">
+                                            <i data-lucide="pie-chart" class="w-3 h-3"></i>
+                                            Parziale: € {{ e.billing_total|number_format(2, ',', '.') }} / {{ e.totale|number_format(2, ',', '.') }}
                                         </span>
                                     {% elseif e.tracks_billing %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;font-size:11px;font-weight:500;">
@@ -1202,26 +1211,22 @@
                                     {% else %}
                                         <span class="text-slate-400" style="font-size:11px;">—</span>
                                     {% endif %}
-                                    {% if hasDivergence %}
-                                    <div style="margin-top:4px;display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:10px;font-weight:500;"
-                                         title="L'imponibile della riga di fatturazione collegata differisce dal totale dell'extra. Verifica se è intenzionale.">
-                                        <i data-lucide="alert-triangle" class="w-3 h-3"></i>
-                                        Fatturato: € {{ e.billing_totale|number_format(2, ',', '.') }}
-                                    </div>
-                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="flex justify-center items-center">
-                                        {% if not e.billing_id %}
+                                        {# Button visible whenever there's still uncovered amount #}
+                                        {% if not e.billing_fully_covered and not e.billing_over_covered %}
                                         <button class="flex items-center mr-3 create-billing-from-extra"
                                                 data-extra-id="{{ e.id }}"
                                                 data-data="{{ e.data }}"
                                                 data-ordine="{{ e.ordine }}"
                                                 data-cantiere="{{ worksite.getName() }}"
-                                                data-descrizione="{{ e.descrizione }}"
-                                                data-totale="{{ e.totale }}"
-                                                data-billing-prefix="{{ billingDefaultDescr }}">
-                                            <i data-lucide="file-plus" class="w-4 h-4 mr-1"></i> Fattura
+                                                data-descrizione="{{ e.descrizione }}{% if e.billing_partial %} (saldo){% endif %}"
+                                                data-totale="{{ e.billing_partial ? e.billing_remaining : e.totale }}"
+                                                data-billing-prefix="{{ billingDefaultDescr }}"
+                                                title="{% if e.billing_partial %}Crea una riga di saldo per la differenza non ancora fatturata{% else %}Crea la riga di fatturazione per questo extra{% endif %}">
+                                            <i data-lucide="file-plus" class="w-4 h-4 mr-1"></i>
+                                            {{ e.billing_partial ? 'Saldo' : 'Fattura' }}
                                         </button>
                                         {% endif %}
                                         <button class="flex items-center mr-3 edit-extra-btn"

@@ -621,16 +621,13 @@ final class WorksitesController
         $ordini = $this->orderRepo->getByWorksiteId($worksite_id);
         $extra  = $this->extraRepo->getByWorksiteId($worksite_id);
 
-        // Count tracked extras still missing a billing link → drives the
-        // "X extra da fatturare" avviso in the cantiere extras tab. Only
-        // extras with tracks_billing=1 (i.e. created after this feature
-        // shipped) count.
+        // Count tracked extras still not fully covered by billing rows →
+        // drives the "X extra da fatturare" avviso. Includes both
+        // unbilled and partially-billed extras (where billing_total <
+        // totale). Only extras with tracks_billing=1 count.
+        // NOTE: at this point in show() the billing aggregates haven't been
+        // computed yet — see further below for the actual counter init.
         $extrasUnbilledCount = 0;
-        foreach ($extra as $e) {
-            if ((int)($e['tracks_billing'] ?? 0) === 1 && empty($e['billing_id'])) {
-                $extrasUnbilledCount++;
-            }
-        }
 
         // Attività
         $attivita           = $this->activityRepo->getByWorksiteId($worksite_id);
@@ -650,27 +647,49 @@ final class WorksitesController
 
         $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
         $totalEmesseReale = 0.0;
-        $extraEmessaMap   = []; // extra_id => bool (Yard says emessa=1)
+        $extraEmessaCount = []; // extra_id => # of linked righe with emessa=1 (Yard)
+        $extraLinkedCount = []; // extra_id => # of linked righe (any state)
         foreach ($fatture as &$f) {
             $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
             if ($f['emessa_reale']) {
                 $totalEmesseReale += (float)($f['totale_imponibile'] ?? 0);
             }
             if (!empty($f['extra_id'])) {
-                // If multiple righe link to the same extra, treat the extra
-                // as "fatturato" if at least one of them is emessa.
                 $eid = (int)$f['extra_id'];
-                $extraEmessaMap[$eid] = ($extraEmessaMap[$eid] ?? false) || !empty($f['emessa_reale']);
+                $extraLinkedCount[$eid] = ($extraLinkedCount[$eid] ?? 0) + 1;
+                if (!empty($f['emessa_reale'])) {
+                    $extraEmessaCount[$eid] = ($extraEmessaCount[$eid] ?? 0) + 1;
+                }
             }
         }
         unset($f);
 
-        // Surface the emessa flag back into the $extra rows so the template
-        // can render gray 'Mandato in fatturazione' vs green 'Fatturato'.
+        // Enrich $extra rows for the template: how much is covered, whether
+        // ALL linked righe are emessa, and the remaining amount left to bill.
         foreach ($extra as &$e) {
-            $e['billing_emessa_reale'] = !empty($e['billing_id'])
-                ? ($extraEmessaMap[(int)$e['id']] ?? false)
-                : false;
+            $eid          = (int)$e['id'];
+            $linkedCount  = $extraLinkedCount[$eid] ?? 0;
+            $emessaCount  = $extraEmessaCount[$eid] ?? 0;
+            $coveredTot   = (float)($e['billing_total'] ?? 0);
+            $extraTot     = (float)($e['totale'] ?? 0);
+            $remaining    = max(0.0, $extraTot - $coveredTot);
+
+            $e['billing_linked_count']    = $linkedCount;
+            $e['billing_all_emessa']      = $linkedCount > 0 && $emessaCount === $linkedCount;
+            $e['billing_remaining']       = $remaining;
+            // Two-decimal compare so floating-point noise doesn't trigger states
+            $e['billing_fully_covered']   = $linkedCount > 0
+                                            && abs($extraTot - $coveredTot) < 0.005;
+            $e['billing_over_covered']   = $linkedCount > 0
+                                            && ($coveredTot - $extraTot) >= 0.005;
+            $e['billing_partial']         = $linkedCount > 0
+                                            && ($extraTot - $coveredTot) >= 0.005;
+
+            // Avviso counter: tracked extras that aren't yet fully covered
+            // (so both unlinked AND partially-covered count).
+            if ((int)($e['tracks_billing'] ?? 0) === 1 && !$e['billing_fully_covered'] && !$e['billing_over_covered']) {
+                $extrasUnbilledCount++;
+            }
         }
         unset($e);
 
