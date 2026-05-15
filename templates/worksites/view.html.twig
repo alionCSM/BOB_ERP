@@ -1195,7 +1195,7 @@
                         {% for e in extra %}
                             <tr>
                                 <td class="text-center">
-                                    <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:11px;font-weight:500;">
+                                    <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:11px;font-weight:500;white-space:nowrap;">
                                         EX-{{ e.id }}
                                     </span>
                                 </td>
@@ -1205,27 +1205,27 @@
                                 <td>{{ e.totale|number_format(2) }} €</td>
                                 <td class="text-center">
                                     {% if e.billing_fully_covered and e.billing_all_emessa %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="check" class="w-3 h-3"></i> Fatturato
                                         </span>
                                     {% elseif e.billing_fully_covered %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;"
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;white-space:nowrap;"
                                               title="Le righe di fatturazione coprono l'importo dell'extra ma non sono ancora tutte emesse su Yard">
                                             <i data-lucide="send" class="w-3 h-3"></i> Mandato in fatturazione
                                         </span>
                                     {% elseif e.billing_over_covered %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:11px;font-weight:500;"
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:11px;font-weight:500;white-space:nowrap;"
                                               title="Le righe di fatturazione superano l'importo dell'extra. Verifica.">
                                             <i data-lucide="alert-triangle" class="w-3 h-3"></i> Fatturato in eccesso
                                         </span>
                                     {% elseif e.billing_partial %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#ffedd5;color:#9a3412;border:1px solid #fdba74;font-size:11px;font-weight:500;"
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#ffedd5;color:#9a3412;border:1px solid #fdba74;font-size:11px;font-weight:500;white-space:nowrap;"
                                               title="Una parte dell'extra è già stata fatturata. Crea un'altra riga per coprire la differenza.">
                                             <i data-lucide="pie-chart" class="w-3 h-3"></i>
                                             Parziale: € {{ e.billing_total|number_format(2, ',', '.') }} / {{ e.totale|number_format(2, ',', '.') }}
                                         </span>
                                     {% elseif e.tracks_billing %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;font-size:11px;font-weight:500;">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#fef3c7;color:#b45309;border:1px solid #fcd34d;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="clock" class="w-3 h-3"></i> Da fatturare
                                         </span>
                                     {% else %}
@@ -1382,7 +1382,7 @@
                             <tr>
                                 <td class="text-center">
                                     {% if e.extra_id %}
-                                        <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:11px;font-weight:500;"
+                                        <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-family:'SF Mono','Cascadia Code','Consolas',monospace;font-size:11px;font-weight:500;white-space:nowrap;"
                                               title="Riga generata da Extra #{{ e.extra_id }}">
                                             EX-{{ e.extra_id }}
                                         </span>
@@ -1397,11 +1397,11 @@
                                 <td>{{ e.aliquota_iva|number_format(0, ',', '.') }}%</td>
                                 <td>
                                     {% if e.emessa_reale is not empty %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="check" class="w-3 h-3"></i> Emessa
                                         </span>
                                     {% else %}
-                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;">
+                                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="clock" class="w-3 h-3"></i> Non emessa
                                         </span>
                                     {% endif %}
