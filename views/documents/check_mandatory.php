@@ -30,9 +30,20 @@ foreach ($docs as $d) {
     $workerDocs[$d['tipo_documento']] = $d['scadenza'];
 }
 
-// Funzione per controllare se una stringa è una data valida dd/mm/yyyy
-function isValidDateDMY($date) {
-    return preg_match('/^[0-9]{2}\/[0-9]{2}\/[0-9]{4}$/', $date);
+// Parses dd/mm/yyyy OR yyyy-mm-dd and returns a DateTime, or null if not a date.
+// (Stringhe libere come INDETERMINATO / LEGALE RAPPRESENTANTE → null.)
+function parseScadenza(string $raw): ?DateTime {
+    $raw = trim($raw);
+    if ($raw === '') return null;
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+        $dt = DateTime::createFromFormat('Y-m-d', $raw);
+        if ($dt && $dt->format('Y-m-d') === $raw) return $dt;
+    }
+    if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $raw)) {
+        $dt = DateTime::createFromFormat('d/m/Y', $raw);
+        if ($dt && $dt->format('d/m/Y') === $raw) return $dt;
+    }
+    return null;
 }
 
 echo "<table class='table-auto w-full border-collapse border border-gray-300'>";
@@ -59,29 +70,27 @@ foreach ($mandatoryDocs as $doc) {
         $dotColor = "#ef4444"; // red
         $statusText = "<span class='text-red-600 font-semibold'>Da inserire</span>";
     }
-    // 2️⃣ SE È UNA DATA VALIDA dd/mm/yyyy
-    elseif (isValidDateDMY($raw)) {
+    // 2️⃣ SE È UNA DATA (dd/mm/yyyy o yyyy-mm-dd)
+    elseif (($dt = parseScadenza($raw)) !== null) {
 
-        $formattedDate = $raw; // mostriamo la data com’è
-        $dt = DateTime::createFromFormat("d/m/Y", $raw);
+        // Mostriamo SEMPRE in dd/mm/yyyy, indipendentemente dal formato sorgente
+        $formattedDate = $dt->format('d/m/Y');
 
-        if ($dt) {
-            $timestamp = $dt->getTimestamp();
-            $days = ($timestamp - $today) / 86400;
+        $timestamp = $dt->getTimestamp();
+        $days = ($timestamp - $today) / 86400;
 
-            if ($days < 0) {
-                $dotColor = "#ef4444";
-                $statusText = "<span class='text-red-600 font-semibold'>Scaduto</span>";
-            } elseif ($days <= 30) {
-                $dotColor = "#CCB000";
-                $statusText = "<span class='text-amber-500 font-semibold'>In scadenza</span>";
-            } else {
-                $dotColor = "#22c55e";
-                $statusText = "<span class='text-green-600 font-semibold'>Valido</span>";
-            }
+        if ($days < 0) {
+            $dotColor = "#ef4444";
+            $statusText = "<span class='text-red-600 font-semibold'>Scaduto</span>";
+        } elseif ($days <= 30) {
+            $dotColor = "#CCB000";
+            $statusText = "<span class='text-amber-500 font-semibold'>In scadenza</span>";
+        } else {
+            $dotColor = "#22c55e";
+            $statusText = "<span class='text-green-600 font-semibold'>Valido</span>";
         }
     }
-    // 3️⃣ SE È QUALSIASI ALTRA STRINGA → consideriamo "senza scadenza"
+    // 3️⃣ SE È QUALSIASI ALTRA STRINGA (es. INDETERMINATO) → senza scadenza
     else {
         $formattedDate = $raw;
         $dotColor = "#6b7280"; // grey
