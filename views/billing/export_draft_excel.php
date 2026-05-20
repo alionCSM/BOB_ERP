@@ -15,60 +15,51 @@ if (!$user) {
     exit;
 }
 
-// $clientId and $conn are injected by BillingController::exportDaEmettere()
-if (empty($clientId)) {
+// $draftId, $clientId, $conn injected by BillingController::exportDraftExcel()
+if (empty($draftId) || empty($clientId)) {
     http_response_code(400);
-    exit('Client ID mancante');
+    exit('Parametri mancanti');
 }
 
-$billing = new \App\Domain\Billing($conn);
+// ── Load draft + lines ──────────────────────────────────────────────────────
+$stmt = $conn->prepare('SELECT * FROM bb_billing_drafts WHERE id = :id AND client_id = :cid LIMIT 1');
+$stmt->execute([':id' => $draftId, ':cid' => $clientId]);
+$draft = $stmt->fetch(\PDO::FETCH_ASSOC);
+if (!$draft) {
+    http_response_code(404);
+    exit('Bozza non trovata');
+}
 
-// Fetch client name
 $stmt = $conn->prepare('SELECT name FROM bb_clients WHERE id = :id LIMIT 1');
 $stmt->execute([':id' => $clientId]);
 $clientName = $stmt->fetchColumn() ?: 'Cliente';
 
-$rows = $billing->getDaEmettereByClient($clientId);
-
-// ── Fetch movimentazione months for all worksites in one query ───────────────
-$worksiteIds = array_unique(array_filter(array_column($rows, 'worksite_id')));
-$movMap = [];
-if (!empty($worksiteIds)) {
-    $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
-    $monthNames   = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
-    $movStmt = $conn->prepare("
-        SELECT worksite_id, yr, mo
-        FROM (
-            SELECT worksite_id, YEAR(data) AS yr, MONTH(data) AS mo
-            FROM bb_presenze
-            WHERE worksite_id IN ({$placeholders})
-            UNION
-            SELECT worksite_id, YEAR(data_presenza) AS yr, MONTH(data_presenza) AS mo
-            FROM bb_presenze_consorziate
-            WHERE worksite_id IN ({$placeholders})
-        ) AS combined
-        GROUP BY worksite_id, yr, mo
-        ORDER BY worksite_id, yr DESC, mo DESC
-    ");
-    $movStmt->execute(array_merge(array_values($worksiteIds), array_values($worksiteIds)));
-    foreach ($movStmt->fetchAll(\PDO::FETCH_ASSOC) as $m) {
-        $wid = (int)$m['worksite_id'];
-        // Keep only the first (= most recent) month per worksite
-        if (!isset($movMap[$wid])) {
-            $movMap[$wid] = $monthNames[(int)$m['mo'] - 1] . ' ' . $m['yr'];
-        }
-    }
-}
+// Only non-excluded lines for the Excel — excluded rows stay in the draft
+// for tracking but are not sent to the client.
+$stmt = $conn->prepare("
+    SELECT
+        l.data, l.descrizione, l.totale_imponibile, l.aliquota_iva,
+        l.worksite_id,
+        w.name         AS cantiere,
+        w.order_number,
+        w.order_date
+    FROM bb_billing_draft_lines l
+    JOIN bb_worksites w ON w.id = l.worksite_id
+    WHERE l.draft_id = :did AND l.excluded = 0
+    ORDER BY l.display_order ASC, l.id ASC
+");
+$stmt->execute([':did' => $draftId]);
+$rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
 // ── Spreadsheet ─────────────────────────────────────────────────────────────
 $spreadsheet = new Spreadsheet();
 $sheet       = $spreadsheet->getActiveSheet();
-$sheet->setTitle('Da Emettere');
+$sheet->setTitle('Bozza Fatturazione');
 
-// Columns: A=Cantiere B=Ordine C=DataOrdine D=Descrizione E=DataFattura F=Imponibile G=Movimentato
-$lastCol = 'G';
+// A=Cantiere B=Ordine C=DataOrdine D=Descrizione E=DataFattura F=Imponibile
+$lastCol = 'F';
 
-// ── Title row ────────────────────────────────────────────────────────────────
+// Title row — same look & wording as the legacy "Da Emettere" export
 $sheet->mergeCells("A1:{$lastCol}1");
 $sheet->setCellValue('A1', 'Fatture da Emettere – ' . $clientName);
 $sheet->getStyle('A1')->applyFromArray([
@@ -77,7 +68,7 @@ $sheet->getStyle('A1')->applyFromArray([
 ]);
 $sheet->getRowDimension(1)->setRowHeight(24);
 
-// ── Header row ───────────────────────────────────────────────────────────────
+// Header row
 $headers = [
     'A2' => 'Cantiere',
     'B2' => 'Ordine',
@@ -85,7 +76,6 @@ $headers = [
     'D2' => 'Descrizione',
     'E2' => 'Data Fattura',
     'F2' => 'Imponibile (€)',
-    'G2' => 'Movimentato',
 ];
 foreach ($headers as $cell => $text) {
     $sheet->setCellValue($cell, $text);
@@ -97,7 +87,7 @@ $sheet->getStyle("A2:{$lastCol}2")->applyFromArray([
 ]);
 $sheet->getRowDimension(2)->setRowHeight(20);
 
-// ── Data rows ────────────────────────────────────────────────────────────────
+// Data rows
 $rowNum   = 3;
 $total    = 0.0;
 $altLight = 'F0F4FA';
@@ -120,34 +110,27 @@ foreach ($rows as $row) {
     $imponibile = (float)$row['totale_imponibile'];
     $total     += $imponibile;
 
-    $wid         = (int)$row['worksite_id'];
-    $movimentato = $movMap[$wid] ?? '—';
-
     $sheet->setCellValue("A{$rowNum}", $row['cantiere']     ?? '');
     $sheet->setCellValue("B{$rowNum}", $row['order_number'] ?? '');
     $sheet->setCellValue("C{$rowNum}", $orderDate);
     $sheet->setCellValue("D{$rowNum}", $row['descrizione']  ?? '');
     $sheet->setCellValue("E{$rowNum}", $fatDate);
     $sheet->setCellValue("F{$rowNum}", $imponibile);
-    $sheet->setCellValue("G{$rowNum}", $movimentato);
 
-    // Row base style
     $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
         'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $bg]],
         'font'      => ['size' => 10],
         'alignment' => ['vertical' => Alignment::VERTICAL_TOP, 'wrapText' => true],
     ]);
-    // Currency
     $sheet->getStyle("F{$rowNum}")->getNumberFormat()->setFormatCode('€ #,##0.00');
     $sheet->getStyle("F{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-    // Center cols
     $sheet->getStyle("B{$rowNum}:C{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
     $sheet->getStyle("E{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
     $rowNum++;
 }
 
-// ── Total row ────────────────────────────────────────────────────────────────
+// Total row
 $sheet->mergeCells("A{$rowNum}:E{$rowNum}");
 $sheet->setCellValue("A{$rowNum}", 'TOTALE');
 $sheet->setCellValue("F{$rowNum}", $total);
@@ -159,14 +142,14 @@ $sheet->getStyle("A{$rowNum}:{$lastCol}{$rowNum}")->applyFromArray([
 $sheet->getStyle("F{$rowNum}")->getNumberFormat()->setFormatCode('€ #,##0.00');
 $sheet->getRowDimension($rowNum)->setRowHeight(20);
 
-// ── Borders ──────────────────────────────────────────────────────────────────
+// Borders
 $sheet->getStyle("A2:{$lastCol}{$rowNum}")->applyFromArray([
     'borders' => [
         'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D1D9E6']],
     ],
 ]);
 
-// ── Column widths: auto-size most, cap description ───────────────────────────
+// Column widths
 $sheet->getColumnDimension('A')->setAutoSize(true);
 $sheet->getColumnDimension('B')->setAutoSize(true);
 $sheet->getColumnDimension('C')->setAutoSize(true);
@@ -174,19 +157,22 @@ $sheet->getColumnDimension('D')->setWidth(60);
 $sheet->getStyle("D3:D{$rowNum}")->getAlignment()->setWrapText(true);
 $sheet->getColumnDimension('E')->setAutoSize(true);
 $sheet->getColumnDimension('F')->setAutoSize(true);
-$sheet->getColumnDimension('G')->setAutoSize(true);
 
-// ── Row heights: auto for data rows (wrap text drives height) ─────────────────
-// PhpSpreadsheet cannot truly auto-calc row height for wrapped text from PHP,
-// but setting a generous default lets Excel/LibreOffice reflow on open.
 for ($r = 3; $r < $rowNum; $r++) {
-    $desc = $sheet->getCell("D{$r}")->getValue();
-    // Estimate: ~80 chars per line at width 60, ~15pt per line
+    $desc  = $sheet->getCell("D{$r}")->getValue();
     $lines = max(1, (int)ceil(mb_strlen((string)$desc) / 80));
     $sheet->getRowDimension($r)->setRowHeight(max(16, $lines * 16));
 }
 
-// ── Output ───────────────────────────────────────────────────────────────────
+// Mark Excel generated on the draft (best-effort)
+try {
+    $upd = $conn->prepare('UPDATE bb_billing_drafts SET excel_generated_at = NOW() WHERE id = :id');
+    $upd->execute([':id' => $draftId]);
+} catch (\Throwable $e) {
+    // non-fatal
+}
+
+// Output — same filename pattern as the legacy "Da Emettere" export
 $safeClient = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $clientName);
 $filename   = 'fatture_da_emettere_' . $safeClient . '_' . date('Ymd') . '.xlsx';
 

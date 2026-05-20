@@ -6,6 +6,9 @@ use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Infrastructure\SqlServerConnection;
 use App\Repository\Billing\BillingRepository;
+use App\Repository\Billing\BillingDraftRepository;
+use App\Repository\Worksites\WorksiteFinanceNotesRepository;
+use App\Service\Billing\BillingDraftService;
 
 final class BillingController
 {
@@ -279,11 +282,278 @@ final class BillingController
         $emesseCountYr     = (int)($yrTotals['emesse_count_yr'] ?? 0);
         $emesseEuroYr      = (float)($yrTotals['emesse_euro_yr'] ?? 0);
 
+        // Active draft (Fatturazione editable workflow — Phase 1)
+        $activeDraft = $this->draftService()->getActiveDraft($clientId);
+
         Response::view('billing/client_detail.html.twig', $request, compact(
             'client', 'daEmettere', 'totalDaEmettere',
             'emesse', 'totalEmesse', 'totalEmesseEuro', 'perPage',
-            'currentYear', 'daEmettereCountYr', 'daEmettereEuroYr', 'emesseCountYr', 'emesseEuroYr'
+            'currentYear', 'daEmettereCountYr', 'daEmettereEuroYr', 'emesseCountYr', 'emesseEuroYr',
+            'activeDraft'
         ));
+    }
+
+    // ── Fatturazione draft (editable invoice draft) ──────────────────────────
+
+    private function draftService(): BillingDraftService
+    {
+        return new BillingDraftService(
+            $this->conn,
+            new BillingDraftRepository($this->conn),
+            $this->billingRepo,
+        );
+    }
+
+    /**
+     * POST /billing/client/{id}/draft — create a new draft snapshotting all
+     * emessa=0 rows for this client. Redirects to the draft view on success.
+     */
+    public function createDraft(Request $request): never
+    {
+        $user     = $request->user();
+        $clientId = $request->intParam('id');
+        if (!$clientId) {
+            Response::error('Cliente non specificato.', 400);
+        }
+
+        $periodLabel = trim((string)($_POST['period_label'] ?? '')) ?: null;
+
+        try {
+            $draftId = $this->draftService()->createDraftForClient(
+                $clientId,
+                $periodLabel,
+                (int)$user->id
+            );
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 400);
+        }
+
+        Response::redirect('/billing/client/' . $clientId . '/draft/' . $draftId);
+    }
+
+    /**
+     * GET /billing/client/{clientId}/draft/{draftId} — read-only view of the
+     * draft. Phase 2 will replace this with the editable grid.
+     */
+    public function showDraft(Request $request): void
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::redirect('/billing/clients');
+        }
+
+        $stmt = $this->conn->prepare('SELECT id, name FROM bb_clients WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $clientId]);
+        $client = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$client) {
+            Response::redirect('/billing/clients');
+        }
+
+        try {
+            $view = $this->draftService()->getDraftView($draftId);
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 404);
+        }
+
+        // Sanity check: draft belongs to this client
+        if ((int)$view['draft']['client_id'] !== $clientId) {
+            Response::redirect('/billing/client/' . $clientId);
+        }
+
+        // Open finance notes for all cantieri of this client, restricted
+        // to billing-relevant tipi → banner on top of the bozza editor.
+        $clientNotes = (new WorksiteFinanceNotesRepository($this->conn))
+            ->getOpenForClient($clientId, WorksiteFinanceNotesRepository::TIPI_BILLING);
+
+        Response::view('billing/client_draft.html.twig', $request, [
+            'client'        => $client,
+            'draft'         => $view['draft'],
+            'lines'         => $view['lines'],
+            'totals'        => $view['totals'],
+            'newRowsCount'  => $view['new_rows_count'],
+            'yardSummary'   => $view['yard_summary'] ?? null,
+            'vatCodes'      => $view['vat_codes'] ?? [],
+            'clientNotes'   => $clientNotes,
+        ]);
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/finalize
+     * No body required — confirmation only. Applies the draft's edits to
+     * bb_billing (BOB) and CNT_cantieri_brogliacci (Yard), marks the draft
+     * as fatturata (internal label for "applicata"). The real fattura is
+     * generated downstream by accounting on Yard.
+     */
+    public function finalizeDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        try {
+            $result = $this->draftService()->commitInvoice($draftId);
+            Response::json(['ok' => true] + $result);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/retry-yard-sync
+     * Re-attempts Yard sync for any failed lines on a fatturata draft.
+     */
+    public function retryYardSync(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+        try {
+            $result = $this->draftService()->retryYardSync($draftId);
+            Response::json(['ok' => true, 'yard' => $result]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/transition
+     * JSON body: { to: 'inviata_cliente'|'da_modificare'|'approvata'|'annullata' }
+     * Returns: { ok, draft } or { ok:false, error }
+     */
+    public function transitionDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        $payload = $this->readJsonBody();
+        $to      = trim((string)($payload['to'] ?? ''));
+        if ($to === '') {
+            Response::json(['ok' => false, 'error' => 'Stato di destinazione mancante.'], 400);
+        }
+
+        try {
+            $draft = $this->draftService()->transitionDraft($draftId, $to);
+            Response::json(['ok' => true, 'draft' => $draft]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * GET /billing/client/{clientId}/draft/{draftId}/export — Excel download
+     * of the editable draft (only non-excluded rows).
+     */
+    public function exportDraftExcel(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::error('Parametri mancanti.', 400);
+        }
+        $conn = $this->conn;
+        require APP_ROOT . '/views/billing/export_draft_excel.php';
+        exit;
+    }
+
+    /**
+     * POST /billing/draft-lines/{id}/update — inline-edit a single field.
+     * JSON body: { field: "data"|"descrizione"|"totale_imponibile"|"aliquota_iva",
+     *              value: <string|number> }
+     * Returns JSON: { ok, line, totals, modified } or { ok:false, error }.
+     */
+    public function updateDraftLine(Request $request): never
+    {
+        $lineId = $request->intParam('id');
+        if (!$lineId) {
+            Response::json(['ok' => false, 'error' => 'Riga non specificata.'], 400);
+        }
+
+        $payload = $this->readJsonBody();
+        $field   = (string)($payload['field'] ?? '');
+        if ($field === '' || !array_key_exists('value', $payload)) {
+            Response::json(['ok' => false, 'error' => 'Parametri mancanti.'], 400);
+        }
+
+        try {
+            $result = $this->draftService()->updateLineField($lineId, $field, $payload['value']);
+            Response::json([
+                'ok'       => true,
+                'line'     => $result['line'],
+                'totals'   => $result['totals'],
+                'modified' => $result['modified'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * POST /billing/draft-lines/{id}/exclude — toggle the excluded flag.
+     * JSON body: { excluded: bool, reason?: string }
+     */
+    public function toggleDraftLineExcluded(Request $request): never
+    {
+        $lineId = $request->intParam('id');
+        if (!$lineId) {
+            Response::json(['ok' => false, 'error' => 'Riga non specificata.'], 400);
+        }
+
+        $payload  = $this->readJsonBody();
+        $excluded = (bool)($payload['excluded'] ?? false);
+        $reason   = isset($payload['reason']) ? trim((string)$payload['reason']) : null;
+        if ($reason === '') $reason = null;
+
+        try {
+            $result = $this->draftService()->setLineExcluded($lineId, $excluded, $reason);
+            Response::json([
+                'ok'     => true,
+                'line'   => $result['line'],
+                'totals' => $result['totals'],
+            ]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 400);
+        }
+    }
+
+    private function readJsonBody(): array
+    {
+        $raw = file_get_contents('php://input') ?: '';
+        $data = json_decode($raw, true);
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * POST /billing/client/{clientId}/draft/{draftId}/cancel — cancel a draft.
+     */
+    public function cancelDraft(Request $request): never
+    {
+        $clientId = $request->intParam('clientId');
+        $draftId  = $request->intParam('draftId');
+        if (!$clientId || !$draftId) {
+            Response::error('Parametri mancanti.', 400);
+        }
+
+        try {
+            $this->draftService()->cancelDraft($draftId);
+        } catch (\Throwable $e) {
+            Response::error($e->getMessage(), 400);
+        }
+
+        Response::redirect('/billing/client/' . $clientId);
     }
 
     // ── Per-client billing: export da-emettere Excel ─────────────────────────

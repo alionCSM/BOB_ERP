@@ -127,7 +127,8 @@
                 placeholder: 'Seleziona Operaio',
                 load: function(query, callback) {
                     if (query.length < 2) return callback();
-                    fetch('/api/attendance/workers?q=' + encodeURIComponent(query))
+                    // context=add_attendance → solo operai attivi
+                    fetch('/api/attendance/workers?context=add_attendance&q=' + encodeURIComponent(query))
                         .then(res => res.json())
                         .then(callback)
                         .catch(() => callback());

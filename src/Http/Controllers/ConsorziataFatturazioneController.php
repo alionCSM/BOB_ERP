@@ -53,25 +53,29 @@ final class ConsorziataFatturazioneController
         $rows     = $this->repo->getDetailRows($id, $from, $to);
         $payments = $this->repo->getPayments($id);
 
-        // Orders per cantiere, used by the payment form's ordine dropdown
-        $worksiteIds = array_map('intval', array_column($rows, 'worksite_id'));
-        $ordiniByWorksite = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
+        // Orders + bb_billing righe per cantiere, used by the row-per-ordine
+        // layout and the "Nostra fattura" expanded list.
+        $worksiteIds        = array_map('intval', array_column($rows, 'worksite_id'));
+        $ordiniByWorksite   = $this->repo->getOrdiniByWorksite($id, $worksiteIds, $to);
+        $righeByWorksite    = $this->repo->getRigheFattureByWorksite($worksiteIds, $from, $to);
 
         // Pre-compute totals for Twig (avoids |sum(attribute=...) filter issues)
-        $totalPresenze     = array_sum(array_column($rows, 'presenze_gg'));
-        $totalCosto        = array_sum(array_column($rows, 'costo_presenze'));
-        $totalOrdine       = array_sum(array_column($rows, 'valore_ordine'));
-        $totalGiaPagato    = array_sum(array_column($rows, 'gia_pagato'));
-        $totalSpese        = array_sum(array_column($rows, 'spese_consorziata'));
-        $totalStorico      = array_sum(array_column($payments, 'importo'));
+        $totalPresenze       = array_sum(array_column($rows, 'presenze_gg'));
+        $totalContratto      = array_sum(array_column($rows, 'totale_contratto'));
+        $totalNostraFattura  = array_sum(array_column($rows, 'nostra_fattura'));
+        $totalOrdine         = array_sum(array_column($rows, 'valore_ordine'));
+        $totalGiaPagato      = array_sum(array_column($rows, 'gia_pagato'));
+        $totalSpese          = array_sum(array_column($rows, 'spese_consorziata'));
+        $totalStorico        = array_sum(array_column($payments, 'importo'));
 
         $fromLabel = \DateTime::createFromFormat('Y-m-d', $from)?->format('d/m/Y') ?? $from;
         $toLabel   = \DateTime::createFromFormat('Y-m-d', $to)?->format('d/m/Y')   ?? $to;
 
         Response::view('fatturazione/consorziate/show.html.twig', $request, compact(
             'consorziata', 'from', 'to', 'fromLabel', 'toLabel',
-            'rows', 'payments', 'ordiniByWorksite',
-            'totalPresenze', 'totalCosto', 'totalOrdine', 'totalGiaPagato', 'totalSpese', 'totalStorico'
+            'rows', 'payments', 'ordiniByWorksite', 'righeByWorksite',
+            'totalPresenze', 'totalContratto', 'totalNostraFattura',
+            'totalOrdine', 'totalGiaPagato', 'totalSpese', 'totalStorico'
         ));
     }
 

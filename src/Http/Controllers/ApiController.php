@@ -33,25 +33,37 @@ final class ApiController
             Response::json([]);
         }
 
+        // Default: tutti gli operai (anche quelli non attivi) — usato dalla
+        // ricerca operaio del list page e dall'export Excel per operaio.
+        // Quando si registrano nuove presenze (context=add_attendance) si
+        // restringe ai soli operai attivi, così non si scelgono per sbaglio
+        // operai cessati.
         $context = $_GET['context'] ?? '';
 
         $sql = "
             SELECT id,
-                   CONCAT(first_name, ' ', last_name, ' (', UPPER(LEFT(company, 3)), ')') AS name
+                   CONCAT(first_name, ' ', last_name, ' (', UPPER(LEFT(company, 3)), ')') AS name,
+                   active
             FROM bb_workers
             WHERE CONCAT(first_name, ' ', last_name) LIKE :search
         ";
-        if ($context !== 'attendance') {
+        if ($context === 'add_attendance') {
             $sql .= " AND active = 'Y'";
         }
-        $sql .= " ORDER BY first_name ASC";
+        $sql .= " ORDER BY active DESC, first_name ASC";
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([':search' => "%$q%"]);
 
         $results = [];
         while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-            $results[] = ['value' => $row['id'], 'text' => $row['name']];
+            // Append a small marker for inactive workers so the user sees it
+            // in the dropdown even though they're still selectable.
+            $label = $row['name'];
+            if (($row['active'] ?? 'Y') !== 'Y') {
+                $label .= ' — non attivo';
+            }
+            $results[] = ['value' => $row['id'], 'text' => $label];
         }
 
         Response::json($results);

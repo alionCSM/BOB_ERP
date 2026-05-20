@@ -4,6 +4,31 @@
 <link rel="stylesheet" href="/assets/css/views/fatturazione/consorziate_show.css">
 {% endblock %}
 
+{# ── Macro: render the "Nostra fattura" cell content ────────────────────
+   Period-scoped only: shows the orange total + the righe whose data
+   is inside [from, to]. Righe fuori periodo are esclusi. #}
+{% macro nostra_fattura_cell(nostraFatturaTotal, righe) %}
+    {% set righeInPeriod = righe|filter(rf => rf.in_period) %}
+    {% if nostraFatturaTotal > 0 or righeInPeriod|length > 0 %}
+        {% if nostraFatturaTotal > 0 %}
+            <div class="fc-nostra-tot">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
+        {% endif %}
+        {% if righeInPeriod|length > 0 %}
+            <ul class="fc-righe-list fc-righe-list-in">
+            {% for rf in righeInPeriod %}
+                <li>
+                    <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
+                    <span class="fc-righe-descr">{{ rf.descrizione }}</span>
+                    <span class="fc-righe-amt">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
+                </li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% else %}<span class="fp-dash">—</span>{% endif %}
+{% endmacro %}
+
+{% import _self as nf %}
+
 {% block content %}
 <div class="fp-page">
 
@@ -52,11 +77,19 @@
             </div>
         </div>
         <div class="fp-stat">
+            <div class="fp-stat-dot" style="background:#0ea5e9;"></div>
+            <div>
+                <div class="fp-stat-value">€ {{ totalContratto|number_format(0, ',', '.') }}</div>
+                <div class="fp-stat-label">Totale contratto</div>
+                <div class="fp-stat-sub">cantieri nel periodo</div>
+            </div>
+        </div>
+        <div class="fp-stat">
             <div class="fp-stat-dot" style="background:#f97316;"></div>
             <div>
-                <div class="fp-stat-value">€ {{ totalCosto|number_format(0, ',', '.') }}</div>
-                <div class="fp-stat-label">Costo presenze</div>
-                <div class="fp-stat-sub">nel periodo</div>
+                <div class="fp-stat-value">€ {{ totalNostraFattura|number_format(0, ',', '.') }}</div>
+                <div class="fp-stat-label">Nostra fattura</div>
+                <div class="fp-stat-sub">da bozze fatturate</div>
             </div>
         </div>
         <div class="fp-stat">
@@ -128,100 +161,128 @@
                                 <tr>
                                     <th>Cantiere</th>
                                     <th class="right">Presenze (gg)</th>
-                                    <th class="right">Costo presenze</th>
+                                    <th class="right" title="Totale contratto cantiere = total_offer + somma extras">Totale contratto</th>
+                                    <th title="Righe di bb_billing già passate per una bozza applicata">Nostra fattura</th>
+                                    <th>Ordine</th>
                                     <th class="right">Valore ordine</th>
                                     <th class="right">Data ordine</th>
                                     <th class="right">Già pagato</th>
                                     <th class="right">Spese a carico</th>
                                     <th class="right">Residuo</th>
-                                    <th style="min-width:170px;">Ordine da pagare</th>
                                     <th class="right" style="min-width:150px;">Da pagare (€)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for r in rows %}
-                                <tr class="detail-row"
-                                    data-valore="{{ r.valore_ordine }}"
-                                    data-pagato="{{ r.gia_pagato }}"
-                                    data-spese="{{ r.spese_consorziata }}">
-                                    <td>
-                                        <input type="hidden" name="worksite_id[]" value="{{ r.worksite_id }}">
-                                        <a href="/worksites/{{ r.worksite_id }}" class="fp-link" target="_blank">
-                                            {% if r.worksite_code %}<span class="fp-code">{{ r.worksite_code }}</span>{% endif %}
-                                            {{ r.worksite_name }}
-                                        </a>
-                                    </td>
-                                    <td class="right">{{ r.presenze_gg|number_format(2, ',', '.') }}</td>
-                                    <td class="right">€ {{ r.costo_presenze|number_format(2, ',', '.') }}</td>
-                                    <td class="right">
-                                        {% if r.valore_ordine > 0 %}
-                                            € {{ r.valore_ordine|number_format(2, ',', '.') }}
-                                        {% else %}
-                                            <span class="fp-dash">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="right" style="white-space:nowrap;">
-                                        {% if r.data_ordine %}
-                                            {{ r.data_ordine|date('d/m/Y') }}
-                                        {% else %}
-                                            <span class="fp-dash">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="right">
-                                        {% if r.gia_pagato > 0 %}
-                                            <span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>
-                                        {% else %}
-                                            <span class="fp-dash">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="right">
-                                        {% if r.spese_consorziata > 0 %}
-                                            <span class="fp-danger">€ {{ r.spese_consorziata|number_format(2, ',', '.') }}</span>
-                                        {% else %}
-                                            <span class="fp-dash">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="right fc-residuo">
-                                        {% set residuo = r.valore_ordine - r.gia_pagato - r.spese_consorziata %}
-                                        <span class="{{ residuo < 0 ? 'fp-danger' : (residuo == 0 ? 'fp-muted' : '') }}">
-                                            € {{ residuo|number_format(2, ',', '.') }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% set wsOrdini = ordiniByWorksite[r.worksite_id] ?? [] %}
-                                        <select name="ordine_id[]" class="fp-input">
-                                            <option value="">— nessuno —</option>
-                                            {% for o in wsOrdini %}
-                                                <option value="{{ o.id }}"{{ wsOrdini|length == 1 ? ' selected' : '' }}>
-                                                    {{ o.order_number ?: ('Ordine #' ~ o.id) }}
-                                                    {% if o.order_date %} · {{ o.order_date|date('d/m/Y') }}{% endif %}
-                                                    {% if o.total %} · € {{ o.total|number_format(0, ',', '.') }}{% endif %}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </td>
-                                    <td class="right">
-                                        <input type="number"
-                                               name="importo[]"
-                                               class="fp-input fc-importo-input"
-                                               step="0.01"
-                                               min="0"
-                                               placeholder="0,00"
-                                               autocomplete="off">
-                                    </td>
-                                </tr>
+                                    {% set wsOrdini = ordiniByWorksite[r.worksite_id] ?? [] %}
+                                    {% set wsRighe  = righeByWorksite[r.worksite_id]  ?? [] %}
+                                    {% set rowCount = wsOrdini|length > 0 ? wsOrdini|length : 1 %}
+                                    {% set residuoCantiere = r.valore_ordine - r.gia_pagato - r.spese_consorziata %}
+
+                                    {% if wsOrdini is empty %}
+                                        {# No ordini → single row, no per-ordine columns #}
+                                        <tr class="detail-row fc-cantiere-first"
+                                            data-valore="{{ r.valore_ordine }}"
+                                            data-pagato="{{ r.gia_pagato }}"
+                                            data-spese="{{ r.spese_consorziata }}">
+                                            <td>
+                                                <input type="hidden" name="worksite_id[]" value="{{ r.worksite_id }}">
+                                                <input type="hidden" name="ordine_id[]"   value="">
+                                                <a href="/worksites/{{ r.worksite_id }}" class="fp-link" target="_blank">
+                                                    {% if r.worksite_code %}<span class="fp-code">{{ r.worksite_code }}</span>{% endif %}
+                                                    {{ r.worksite_name }}
+                                                </a>
+                                            </td>
+                                            <td class="right">{{ r.presenze_gg|number_format(2, ',', '.') }}</td>
+                                            <td class="right">
+                                                {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
+                                            </td>
+                                            <td>{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                            <td><span class="fp-dash">—</span></td>
+                                            <td class="right"><span class="fp-dash">—</span></td>
+                                            <td class="right"><span class="fp-dash">—</span></td>
+                                            <td class="right">
+                                                {% if r.gia_pagato > 0 %}<span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                            </td>
+                                            <td class="right">
+                                                {% if r.spese_consorziata > 0 %}<span class="fp-danger">€ {{ r.spese_consorziata|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                            </td>
+                                            <td class="right fc-residuo">
+                                                <span class="{{ residuoCantiere < 0 ? 'fp-danger' : (residuoCantiere == 0 ? 'fp-muted' : '') }}">
+                                                    € {{ residuoCantiere|number_format(2, ',', '.') }}
+                                                </span>
+                                            </td>
+                                            <td class="right">
+                                                <input type="number" name="importo[]" class="fp-input fc-importo-input"
+                                                       step="0.01" min="0" placeholder="0,00" autocomplete="off">
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        {% for o in wsOrdini %}
+                                            <tr class="detail-row {{ loop.first ? 'fc-cantiere-first' : 'fc-cantiere-sub' }}"
+                                                data-valore="{{ o.total }}"
+                                                data-pagato="{{ o.gia_pagato_ordine }}"
+                                                data-spese="{{ loop.first ? r.spese_consorziata : 0 }}">
+                                                {% if loop.first %}
+                                                    <td rowspan="{{ rowCount }}">
+                                                        <a href="/worksites/{{ r.worksite_id }}" class="fp-link" target="_blank">
+                                                            {% if r.worksite_code %}<span class="fp-code">{{ r.worksite_code }}</span>{% endif %}
+                                                            {{ r.worksite_name }}
+                                                        </a>
+                                                    </td>
+                                                    <td rowspan="{{ rowCount }}" class="right">{{ r.presenze_gg|number_format(2, ',', '.') }}</td>
+                                                    <td rowspan="{{ rowCount }}" class="right">
+                                                        {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    </td>
+                                                    <td rowspan="{{ rowCount }}">{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                                {% endif %}
+                                                {# Per-ordine cells #}
+                                                <td>
+                                                    <input type="hidden" name="worksite_id[]" value="{{ r.worksite_id }}">
+                                                    <input type="hidden" name="ordine_id[]"   value="{{ o.id }}">
+                                                    <strong>{{ o.order_number ?: ('#' ~ o.id) }}</strong>
+                                                    {% if o.oggetto %}<div class="fc-ord-oggetto">{{ o.oggetto }}</div>{% endif %}
+                                                </td>
+                                                <td class="right">
+                                                    {% if o.total > 0 %}€ {{ o.total|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                </td>
+                                                <td class="right" style="white-space:nowrap;">
+                                                    {% if o.order_date %}{{ o.order_date|date('d/m/Y') }}{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                </td>
+                                                <td class="right">
+                                                    {% if o.gia_pagato_ordine > 0 %}<span class="fp-success">€ {{ o.gia_pagato_ordine|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                </td>
+                                                {% if loop.first %}
+                                                    <td rowspan="{{ rowCount }}" class="right">
+                                                        {% if r.spese_consorziata > 0 %}<span class="fp-danger">€ {{ r.spese_consorziata|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    </td>
+                                                {% endif %}
+                                                <td class="right fc-residuo">
+                                                    {% set residuoOrd = o.total - o.gia_pagato_ordine - (loop.first ? r.spese_consorziata : 0) %}
+                                                    <span class="{{ residuoOrd < 0 ? 'fp-danger' : (residuoOrd == 0 ? 'fp-muted' : '') }}">
+                                                        € {{ residuoOrd|number_format(2, ',', '.') }}
+                                                    </span>
+                                                </td>
+                                                <td class="right">
+                                                    <input type="number" name="importo[]" class="fp-input fc-importo-input"
+                                                           step="0.01" min="0" placeholder="0,00" autocomplete="off">
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% endif %}
                                 {% endfor %}
                             </tbody>
                             <tfoot>
                                 <tr>
                                     <td class="right fp-muted" colspan="2">Totali</td>
-                                    <td class="right">€ {{ totalCosto|number_format(2, ',', '.') }}</td>
+                                    <td class="right">€ {{ totalContratto|number_format(2, ',', '.') }}</td>
+                                    <td class="right">€ {{ totalNostraFattura|number_format(2, ',', '.') }}</td>
+                                    <td></td>
                                     <td class="right">€ {{ totalOrdine|number_format(2, ',', '.') }}</td>
-                                    <td class="right"></td>
+                                    <td></td>
                                     <td class="right">€ {{ totalGiaPagato|number_format(2, ',', '.') }}</td>
                                     <td class="right">{% if totalSpese > 0 %}<span class="fp-danger">€ {{ totalSpese|number_format(2, ',', '.') }}</span>{% else %}—{% endif %}</td>
                                     <td class="right" id="tot-residuo"></td>
-                                    <td></td>
                                     <td class="right" id="tot-da-pagare">—</td>
                                 </tr>
                             </tfoot>

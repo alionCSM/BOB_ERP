@@ -1,0 +1,339 @@
+{% extends "layout/base.html.twig" %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_detail.css">
+<link rel="stylesheet" href="/assets/css/views/billing/billing_draft.css">
+{% endblock %}
+
+{% block content %}
+<div class="bd-page bd-draft-page">
+
+{# ── Hero ── #}
+<div class="bd-hero">
+    <div class="bd-hero-content">
+        <div class="bd-hero-left">
+            <div class="bd-hero-icon">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <div>
+                <div class="bd-hero-breadcrumb">
+                    <a href="/billing/clients">Fatture per Cliente</a> ›
+                    <a href="/billing/client/{{ client.id }}">{{ client.name }}</a> ›
+                    Bozza #{{ draft.id }}
+                </div>
+                {% set statusLabel = {
+                    'bozza': 'bozza',
+                    'inviata_cliente': 'inviata cliente',
+                    'da_modificare': 'da modificare',
+                    'approvata': 'approvata',
+                    'fatturata': 'applicata',
+                    'annullata': 'annullata',
+                }[draft.status] ?? draft.status %}
+                <h1 class="bd-hero-title">
+                    Bozza fatturazione
+                    <span class="bd-draft-status bd-draft-status-{{ draft.status }}">{{ statusLabel }}</span>
+                </h1>
+            </div>
+        </div>
+        <div class="bd-draft-actions"
+             data-draft-id="{{ draft.id }}"
+             data-client-id="{{ client.id }}"
+             data-status="{{ draft.status }}">
+            {# Excel download — always available except terminal states #}
+            {% if draft.status != 'annullata' %}
+            <a href="/billing/client/{{ client.id }}/draft/{{ draft.id }}/export" class="bd-btn-export">
+                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Scarica Excel
+            </a>
+            {% endif %}
+
+            {# State-machine actions — single confirmation step. Edit happens
+               in bozza; client review happens externally via the Excel; one
+               click 'Applica modifiche' propagates to bb_billing + Yard. #}
+            {% if draft.status == 'bozza' %}
+            <button type="button" class="bd-btn-primary" data-action="open-finalize-modal">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                Applica modifiche ai cantieri
+            </button>
+            {% elseif draft.status == 'fatturata' %}
+            <span class="bd-fattura-info">
+                Applicata il <strong>{{ draft.invoice_date|date('d/m/Y') }}</strong>
+            </span>
+            <button type="button" class="bd-btn-warning" data-transition="bozza"
+                    data-confirm="Riportare la bozza in modifica? I campi torneranno editabili e potrai riapplicare con i nuovi valori.">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Riapri per modifiche
+            </button>
+            {% elseif draft.status == 'approvata' or draft.status == 'inviata_cliente' or draft.status == 'da_modificare' %}
+            {# Legacy states — give an escape hatch back to bozza, then user
+               clicks 'Applica modifiche' from there #}
+            <button type="button" class="bd-btn-warning" data-transition="bozza"
+                    data-confirm="Riportare la bozza in modifica?">
+                <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Riapri per modifiche
+            </button>
+            {% endif %}
+
+            {# Cancel — always available except terminal states #}
+            {% if draft.status != 'fatturata' and draft.status != 'annullata' %}
+            <form method="post" action="/billing/client/{{ client.id }}/draft/{{ draft.id }}/cancel"
+                  onsubmit="return confirm('Annullare la bozza? Le righe torneranno disponibili in da-emettere.');"
+                  style="margin:0;">
+                <button type="submit" class="bd-btn-danger-outline">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Annulla bozza
+                </button>
+            </form>
+            {% endif %}
+
+            <a href="/billing/client/{{ client.id }}" class="bd-btn-back">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+                Torna al cliente
+            </a>
+        </div>
+    </div>
+</div>
+
+{# ── Open client notes (fatturazione + sconto, aperte) ── #}
+{% if clientNotes is defined and clientNotes|length > 0 %}
+<div class="bd-notes-banner">
+    <div class="bd-notes-banner-head">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <strong>{{ clientNotes|length }}</strong>
+        not{{ clientNotes|length == 1 ? 'a' : 'e' }} dei cantieri di questo cliente da considerare prima di fatturare
+    </div>
+    <ul class="bd-notes-banner-list">
+    {% for n in clientNotes %}
+        <li class="bd-notes-banner-item">
+            <span class="bd-notes-tipo bd-notes-tipo-{{ n.tipo }}">
+                {% if n.tipo == 'fatturazione' %}Fatturazione
+                {% elseif n.tipo == 'sconto' %}Sconto
+                {% else %}Generica{% endif %}
+            </span>
+            <a href="/worksites/{{ n.worksite_id }}#note" target="_blank" class="bd-notes-cantiere">
+                {% if n.worksite_code %}<span class="bd-notes-code">{{ n.worksite_code }}</span>{% endif %}
+                {{ n.worksite_name }}
+            </a>
+            <span class="bd-notes-text">{{ n.content|nl2br }}</span>
+            <span class="bd-notes-author">— {{ n.author_username ?: '—' }} · {{ n.created_at|date('d/m') }}</span>
+            <form method="POST" action="/worksites/{{ n.worksite_id }}/finance-notes/{{ n.id }}/apply" class="bd-notes-form">
+                <input type="hidden" name="return" value="/billing/client/{{ client.id }}/draft/{{ draft.id }}">
+                <button type="submit" class="bd-notes-apply" title="Segna come applicata">
+                    ✓ Applicata
+                </button>
+            </form>
+        </li>
+    {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{# ── New rows banner ── #}
+{% if newRowsCount > 0 %}
+<div class="bd-new-rows-banner">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>
+        Ci sono <strong>{{ newRowsCount }}</strong> nuove righe da fatturare per questo cliente create dopo l'apertura della bozza.
+        <em>(L'aggiunta sarà disponibile in Fase 2.)</em>
+    </span>
+</div>
+{% endif %}
+
+{# ── Yard sync banner (only for fatturata) ── #}
+{% if yardSummary %}
+<div class="bd-yard-banner {% if yardSummary.failed > 0 %}is-error{% else %}is-ok{% endif %}"
+     id="bd-yard-banner"
+     data-client-id="{{ client.id }}"
+     data-draft-id="{{ draft.id }}">
+    {% if yardSummary.failed > 0 %}
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>
+            Sync Yard incompleto: <strong>{{ yardSummary.synced }}</strong> ok,
+            <strong style="color:#b91c1c;">{{ yardSummary.failed }}</strong> falliti
+            {% if yardSummary.na > 0 %}, {{ yardSummary.na }} senza yard_id{% endif %}.
+        </span>
+        <button type="button" class="bd-btn-retry" id="bd-retry-yard">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Riprova sync Yard
+        </button>
+    {% else %}
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>
+            Yard sincronizzato: {{ yardSummary.synced }} righe
+            {% if yardSummary.na > 0 %} ({{ yardSummary.na }} senza yard_id){% endif %}.
+        </span>
+    {% endif %}
+</div>
+{% endif %}
+
+{# ── Totals (auto-updated by JS) ── #}
+<div class="bd-draft-totals" id="bd-draft-totals">
+    <div class="bd-draft-total">
+        <div class="bd-draft-total-label">Imponibile fatturabile</div>
+        <div class="bd-draft-total-value success" id="bd-total-imponibile">€ {{ totals.imponibile|number_format(2, ',', '.') }}</div>
+    </div>
+    <div class="bd-draft-total" id="bd-total-escluso-card" style="{% if totals.escluso == 0 %}display:none;{% endif %}">
+        <div class="bd-draft-total-label">Imponibile escluso</div>
+        <div class="bd-draft-total-value muted" id="bd-total-escluso">€ {{ totals.escluso|number_format(2, ',', '.') }}</div>
+    </div>
+    <div class="bd-draft-total">
+        <div class="bd-draft-total-label">Righe in bozza</div>
+        <div class="bd-draft-total-value">{{ lines|length }}</div>
+    </div>
+    <div class="bd-draft-total bd-save-indicator-card">
+        <div class="bd-draft-total-label">Stato salvataggio</div>
+        <div class="bd-draft-total-value bd-save-indicator" id="bd-save-indicator">
+            <span class="bd-save-dot"></span>
+            <span class="bd-save-text">Tutte le modifiche salvate</span>
+        </div>
+    </div>
+</div>
+
+{# ── Editable table (Phase 2) ── #}
+{% set isEditable = draft.status == 'bozza' %}
+<div class="bd-section">
+    <div class="bd-section-header">
+        <h3 class="bd-section-title">
+            <span class="bd-section-dot" style="background:#8b5cf6;box-shadow:0 0 5px rgba(139,92,246,.4);"></span>
+            Righe in bozza
+        </h3>
+        {% if not isEditable %}
+        <span class="bd-draft-phase-note">In sola lettura (stato: {{ draft.status|replace({'_': ' '}) }})</span>
+        {% else %}
+        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare</span>
+        {% endif %}
+    </div>
+
+    <div class="bd-table-wrap">
+        <table class="bd-table bd-table-editable" data-editable="{{ isEditable ? '1' : '0' }}">
+            <thead>
+            <tr>
+                <th style="width:110px;">Data</th>
+                <th style="width:180px;">Cantiere</th>
+                <th>Descrizione</th>
+                <th class="right" style="width:140px;">Imponibile (€)</th>
+                <th style="width:200px;">IVA</th>
+                <th class="center" style="width:120px;">Stato</th>
+                <th class="center" style="width:60px;"></th>
+            </tr>
+            </thead>
+            <tbody id="bd-draft-tbody">
+            {% for l in lines %}
+            <tr class="bd-draft-row {% if l.excluded %}bd-row-excluded{% endif %} {% if l.modified %}bd-row-modified{% endif %}"
+                data-line-id="{{ l.id }}"
+                data-excluded="{{ l.excluded ? '1' : '0' }}">
+
+                <td class="bd-cell-data">
+                    <input type="text"
+                           class="bd-cell-input bd-cell-date"
+                           data-field="data"
+                           value="{{ l.data ? l.data|date('d/m/Y') : '' }}"
+                           placeholder="gg/mm/aaaa"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-cantiere">
+                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere }}</a>
+                </td>
+
+                <td class="bd-cell-descrizione">
+                    <input type="text"
+                           class="bd-cell-input"
+                           data-field="descrizione"
+                           value="{{ l.descrizione }}"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-imponibile right">
+                    <input type="text"
+                           class="bd-cell-input bd-cell-number"
+                           data-field="totale_imponibile"
+                           value="{{ l.totale_imponibile|number_format(2, ',', '.') }}"
+                           data-raw="{{ l.totale_imponibile }}"
+                           {% if not isEditable %}readonly{% endif %}>
+                </td>
+
+                <td class="bd-cell-iva">
+                    <select class="bd-cell-input bd-cell-select"
+                            data-field="iva_id"
+                            {% if not isEditable %}disabled{% endif %}>
+                        {% for vid, vdesc in vatCodes %}
+                            <option value="{{ vid }}" {% if vid == l.iva_id %}selected{% endif %}>{{ vdesc }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+
+                <td class="center bd-cell-status">
+                    <span class="bd-pill bd-pill-danger"  data-tag="excluded" style="{% if not l.excluded %}display:none;{% endif %}">esclusa</span>
+                    <span class="bd-pill bd-pill-warning" data-tag="modified" style="{% if l.excluded or not l.modified %}display:none;{% endif %}">modificata</span>
+                    <span class="bd-pill bd-pill-muted"   data-tag="clean"    style="{% if l.excluded or l.modified %}display:none;{% endif %}">—</span>
+                </td>
+
+                <td class="center">
+                    {% if isEditable %}
+                    <button type="button"
+                            class="bd-exclude-btn"
+                            title="{% if l.excluded %}Includi nella fattura{% else %}Escludi dalla fattura{% endif %}"
+                            data-action="toggle-exclude">
+                        {% if l.excluded %}
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        {% else %}
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        {% endif %}
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ── Finalize modal — confirms the writeback to cantieri + Yard ── #}
+{% if draft.status == 'bozza' or draft.status == 'approvata' %}
+{% set fatturabili = lines|filter(l => not l.excluded)|length %}
+<div class="bd-modal-backdrop" id="bd-finalize-modal" style="display:none;" data-client-id="{{ client.id }}" data-draft-id="{{ draft.id }}">
+    <div class="bd-modal">
+        <div class="bd-modal-header">
+            <div class="bd-modal-icon">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div>
+                <h3 class="bd-modal-title">Applica modifiche ai cantieri</h3>
+                <p class="bd-modal-sub">
+                    {{ fatturabili }} righe da applicare · € {{ totals.imponibile|number_format(2, ',', '.') }}
+                    {% if totals.escluso > 0 %} · {{ lines|length - fatturabili }} escluse{% endif %}
+                </p>
+            </div>
+            <button type="button" class="bd-modal-close" data-action="close-modal">&times;</button>
+        </div>
+        <div class="bd-modal-body">
+            <p class="bd-modal-text">
+                Le modifiche apportate nella bozza verranno scritte sulle righe corrispondenti
+                dei cantieri e sincronizzate su <strong>Yard</strong>.
+                Le righe escluse resteranno in da-emettere per essere fatturate in un'altra bozza.
+            </p>
+            <div class="bd-modal-warn">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Questa operazione <strong>non genera la fattura</strong>. La fattura sarà emessa successivamente dall'ufficio amministrazione su <strong>Business</strong>.</span>
+            </div>
+            <div class="bd-modal-error" id="bd-finalize-error" style="display:none;"></div>
+        </div>
+        <div class="bd-modal-footer">
+            <button type="button" class="bd-btn-cancel-modal" data-action="close-modal">Annulla</button>
+            <button type="button" class="bd-btn-confirm-modal" id="bd-finalize-confirm">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                Conferma e applica
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/billing/billing_draft.js?v=6"></script>
+{% endblock %}

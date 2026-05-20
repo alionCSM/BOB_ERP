@@ -55,6 +55,7 @@ class Worksite
             $this->isConsuntivo  = (int)($data['is_consuntivo'] ?? 0);
             $this->prezzoPersona = isset($data['prezzo_persona']) ? (float)$data['prezzo_persona'] : null;
             $this->orderNumber   = $data['order_number'];
+            $this->commessa      = $data['commessa'] ?? null;
             $this->orderDate   = $data['order_date'];
             $this->description   = $data['descrizione'];
             $this->startDate = $data['start_date'];
@@ -89,6 +90,9 @@ class Worksite
 
     public function getOrderNumber(): ?string {
         return $this->orderNumber;
+    }
+    public function getCommessa(): ?string {
+        return $this->commessa ?? null;
     }
     public function getOrderDate(): ?string {
         return $this->orderDate;

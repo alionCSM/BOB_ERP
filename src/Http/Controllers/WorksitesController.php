@@ -14,6 +14,7 @@ use App\Repository\Extra\ExtraRepository;
 use App\Repository\Orders\OrderRepository;
 use App\Repository\Users\UserRepository;
 use App\Repository\Worksites\WorksiteRepository;
+use App\Repository\Worksites\WorksiteFinanceNotesRepository;
 
 final class WorksitesController
 {
@@ -213,7 +214,10 @@ final class WorksitesController
 
         $name         = $_POST['name']         ?? '';
         $location     = $_POST['location']     ?? '';
-        $start_date   = $_POST['start_date']   ?? null;
+        // data_inizio: the field was removed from the create form (users
+        // didn't care about it). Default to today; respect $_POST only if
+        // legacy callers still send it.
+        $start_date   = !empty($_POST['start_date']) ? $_POST['start_date'] : date('Y-m-d');
         $offer_number = !empty($_POST['offer_number']) ? $_POST['offer_number'] : null;
         $order_date   = !empty($_POST['order_date'])   ? $_POST['order_date']   : null;
         $order_number = !empty($_POST['order_number']) ? $_POST['order_number'] : null;
@@ -618,6 +622,14 @@ final class WorksitesController
         $ordini = $this->orderRepo->getByWorksiteId($worksite_id);
         $extra  = $this->extraRepo->getByWorksiteId($worksite_id);
 
+        // Count tracked extras still not fully covered by billing rows →
+        // drives the "X extra da fatturare" avviso. Includes both
+        // unbilled and partially-billed extras (where billing_total <
+        // totale). Only extras with tracks_billing=1 count.
+        // NOTE: at this point in show() the billing aggregates haven't been
+        // computed yet — see further below for the actual counter init.
+        $extrasUnbilledCount = 0;
+
         // Attività
         $attivita           = $this->activityRepo->getByWorksiteId($worksite_id);
         $totaleGiornateUomo = $this->activityRepo->getTotaleGiornateUomo($worksite_id);
@@ -635,10 +647,69 @@ final class WorksitesController
         $fatture  = $this->billingRepo->getByWorksiteId($worksite_id);
 
         $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        $totalEmesseReale     = 0.0;
+        $totalFatture         = 0.0;
+        $totalExtraFatturato  = 0.0; // sum of righe linked to extras AND emessa on Yard
+        $extraEmessaCount     = []; // extra_id => # of linked righe with emessa=1 (Yard)
+        $extraLinkedCount     = []; // extra_id => # of linked righe (any state)
         foreach ($fatture as &$f) {
             $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
+            $imp = (float)($f['totale_imponibile'] ?? 0);
+            $totalFatture += $imp;
+            if ($f['emessa_reale']) {
+                $totalEmesseReale += $imp;
+                if (!empty($f['extra_id'])) {
+                    $totalExtraFatturato += $imp;
+                }
+            }
+            if (!empty($f['extra_id'])) {
+                $eid = (int)$f['extra_id'];
+                $extraLinkedCount[$eid] = ($extraLinkedCount[$eid] ?? 0) + 1;
+                if (!empty($f['emessa_reale'])) {
+                    $extraEmessaCount[$eid] = ($extraEmessaCount[$eid] ?? 0) + 1;
+                }
+            }
         }
         unset($f);
+        $totalFattureDaEmettere = max(0.0, $totalFatture - $totalEmesseReale);
+
+        // Enrich $extra rows for the template: how much is covered, whether
+        // ALL linked righe are emessa, and the remaining amount left to bill.
+        foreach ($extra as &$e) {
+            $eid          = (int)$e['id'];
+            $linkedCount  = $extraLinkedCount[$eid] ?? 0;
+            $emessaCount  = $extraEmessaCount[$eid] ?? 0;
+            $coveredTot   = (float)($e['billing_total'] ?? 0);
+            $extraTot     = (float)($e['totale'] ?? 0);
+            $remaining    = max(0.0, $extraTot - $coveredTot);
+
+            $e['billing_linked_count']    = $linkedCount;
+            $e['billing_all_emessa']      = $linkedCount > 0 && $emessaCount === $linkedCount;
+            $e['billing_remaining']       = $remaining;
+            // Two-decimal compare so floating-point noise doesn't trigger states
+            $e['billing_fully_covered']   = $linkedCount > 0
+                                            && abs($extraTot - $coveredTot) < 0.005;
+            $e['billing_over_covered']   = $linkedCount > 0
+                                            && ($coveredTot - $extraTot) >= 0.005;
+            $e['billing_partial']         = $linkedCount > 0
+                                            && ($extraTot - $coveredTot) >= 0.005;
+
+            // Avviso counter: tracked extras that aren't yet fully covered
+            // (so both unlinked AND partially-covered count).
+            if ((int)($e['tracks_billing'] ?? 0) === 1 && !$e['billing_fully_covered'] && !$e['billing_over_covered']) {
+                $extrasUnbilledCount++;
+            }
+        }
+        unset($e);
+
+        // Totals for the extras tab strip
+        $totalExtra            = array_sum(array_map(fn($e) => (float)($e['totale'] ?? 0), $extra));
+        $totalExtraDaFatturare = 0.0;
+        foreach ($extra as $e) {
+            if ((int)($e['tracks_billing'] ?? 0) === 1) {
+                $totalExtraDaFatturare += (float)($e['billing_remaining'] ?? 0);
+            }
+        }
 
         // Presenze date filters
         $dateFilter = $request->get('filter_date');
@@ -715,12 +786,15 @@ final class WorksitesController
         $clientName = $worksite->getClientName();
         $clientId   = $worksite->getClientId();
 
-        // Billing modal defaults (from billing.php)
-        $billingDefaultDescr = sprintf(
-            'ORDINE %s - CANTIERE %s',
-            $worksite->getOrderNumber(),
-            $worksite->getName()
-        );
+        // Billing modal defaults — format:
+        //   "ORDINE [commessa] {ordine} del {data} - CANTIERE {nome}"
+        // commessa segment is dropped if not set; ' del {data}' if no order_date.
+        $bdCommessa   = trim((string)($worksite->getCommessa() ?? ''));
+        $bdOrdineLine = 'ORDINE'
+                      . ($bdCommessa !== '' ? ' ' . $bdCommessa : '')
+                      . ' ' . (string)$worksite->getOrderNumber()
+                      . ($orderDateFormatted !== '-' ? ' del ' . $orderDateFormatted : '');
+        $billingDefaultDescr = $bdOrdineLine . ' - CANTIERE ' . $worksite->getName();
         $billingRemaining = $worksite->getRemainingToBill();
 
         // For consuntivo: override remaining-to-bill using estimated revenue
@@ -730,6 +804,21 @@ final class WorksitesController
         }
 
         $userObj = $user; // alias expected by view.html.twig (userObj.type)
+
+        // Finance notes — only loaded for users who can see prices.
+        // The tab itself is gated in Twig by the same condition.
+        // - financeNotes: full list for the Note tab
+        // - financeNotesBillingOpen: aperte tipo fatt/sconto → banner in Fatturazione tab
+        $financeNotes            = [];
+        $financeNotesBillingOpen = [];
+        if ($canSeePrices) {
+            $notesRepo = new WorksiteFinanceNotesRepository($this->conn);
+            $financeNotes            = $notesRepo->getByWorksite($worksite_id);
+            $financeNotesBillingOpen = $notesRepo->getOpenForWorksite(
+                $worksite_id,
+                WorksiteFinanceNotesRepository::TIPI_BILLING
+            );
+        }
 
         Response::view('worksites/view.html.twig', $request, compact(
             'worksite_id', 'worksite', 'isWorker',
@@ -744,7 +833,11 @@ final class WorksitesController
             'disegni', 'disegniByCategory', 'sharedMap', 'worksiteUsers',
             'documents', 'isWorkerOrClient',
             'orderDateFormatted', 'clientName', 'clientId',
-            'billingDefaultDescr', 'billingRemaining'
+            'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale',
+            'extrasUnbilledCount',
+            'totalFatture', 'totalFattureDaEmettere',
+            'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
+            'financeNotes', 'financeNotesBillingOpen'
         ));
     }
 
@@ -806,7 +899,11 @@ final class WorksitesController
             'location'        => $_POST['location']  ?? '',
             'descrizione'     => $_POST['descrizione']     ?? '',
             'ext_descrizione' => $_POST['ext_descrizione'] ?? '',
-            'start_date'      => $_POST['start_date'] ?? null,
+            // data_inizio is no longer shown in the edit form — preserve
+            // the existing value (fallback to today if it was somehow null)
+            'start_date'      => !empty($_POST['start_date'])
+                                    ? $_POST['start_date']
+                                    : ($worksite['start_date'] ?? date('Y-m-d')),
             'offer_number'    => isset($_POST['offer_number']) && trim($_POST['offer_number']) !== '' ? $_POST['offer_number'] : null,
             'status'          => $_POST['status']   ?? 'In Corso',
             'end_date'        => $end_date,
@@ -1200,6 +1297,12 @@ final class WorksitesController
             Response::redirect("/worksites/{$worksite_id}#billing");
         }
 
+        // extra_id is filled in by the "Fattura" button on an extra row.
+        // For manually-added righe it stays null. We only persist it on
+        // INSERT (UPDATE preserves whatever link the row already had).
+        $extraIdRaw = trim((string)($_POST['extra_id'] ?? ''));
+        $extraIdNew = ($extraIdRaw !== '' && ctype_digit($extraIdRaw)) ? (int)$extraIdRaw : null;
+
         $dataMy = [
             'worksite_id'       => $worksite_id,
             'nome_cantiere'     => $ws['name'],
@@ -1211,6 +1314,7 @@ final class WorksitesController
             'articolo_id'       => $articolo_id,
             'iva_id'            => $iva_id,
             'attivita_id'       => null,
+            'extra_id'          => $extraIdNew,
         ];
 
         try {
@@ -2450,6 +2554,118 @@ final class WorksitesController
                    ->execute(['id' => $doc['id']]);
 
         Response::json(['error' => 0]);
+    }
+
+    // ── Finance notes (canSeePrices only) ─────────────────────────────────────
+
+    /**
+     * Common gate + redirect target resolver for note actions.
+     * Returns the URL to redirect to (?return= override is allowed so the
+     * "Applicata" button from the bozza editor or fatturazione tab keeps
+     * the user where they were).
+     */
+    private function noteAccess(int $worksiteId): string
+    {
+        $user = ($GLOBALS['request'] ?? null)?->user() ?? null; // fallback
+        // The request is also reachable via the standard Request param; the
+        // method below is called from controllers that already have it
+        // (we re-check inside each endpoint for clarity).
+        return "/worksites/{$worksiteId}#note";
+    }
+
+    public function addFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $content = trim((string)($_POST['content'] ?? ''));
+        $tipo    = WorksiteFinanceNotesRepository::normalizeTipo($_POST['tipo'] ?? null);
+        if ($content === '') {
+            $_SESSION['error'] = 'La nota è vuota.';
+            Response::redirect("/worksites/{$worksiteId}#note");
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->create($worksiteId, (int)$user->id, $content, $tipo);
+        $_SESSION['success'] = 'Nota aggiunta.';
+        Response::redirect("/worksites/{$worksiteId}#note");
+    }
+
+    public function deleteFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->delete($worksiteId, $noteId);
+        $_SESSION['success'] = 'Nota eliminata.';
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    public function editFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $content = trim((string)($_POST['content'] ?? ''));
+        $tipo    = WorksiteFinanceNotesRepository::normalizeTipo($_POST['tipo'] ?? null);
+        if ($content === '') {
+            $_SESSION['error'] = 'La nota è vuota.';
+            Response::redirect("/worksites/{$worksiteId}#note");
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->update($worksiteId, $noteId, (int)$user->id, $content, $tipo);
+        $_SESSION['success'] = 'Nota modificata.';
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    public function applyFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->markApplied($worksiteId, $noteId, (int)$user->id);
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    public function reopenFinanceNote(Request $request): never
+    {
+        $worksiteId = $request->intParam('id');
+        $noteId     = $request->intParam('noteId');
+        $user       = $request->user();
+        if (!$user || !$user->canSeePrices()) {
+            Response::error('Accesso negato.', 403);
+        }
+        $repo = new WorksiteFinanceNotesRepository($this->conn);
+        $repo->reopen($worksiteId, $noteId);
+        Response::redirect($this->resolveNoteReturn((int)$worksiteId));
+    }
+
+    /**
+     * The "✓ Applicata" button can fire from three places (Note tab,
+     * Fatturazione tab banner, Bozza editor banner). The form posts a
+     * `return` hidden field with the URL we should bounce to so the user
+     * stays where they were.
+     */
+    private function resolveNoteReturn(int $worksiteId): string
+    {
+        $ret = trim((string)($_POST['return'] ?? ''));
+        // Only allow same-origin paths
+        if ($ret !== '' && str_starts_with($ret, '/') && !str_starts_with($ret, '//')) {
+            return $ret;
+        }
+        return "/worksites/{$worksiteId}#note";
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

@@ -335,6 +335,11 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/billing/{billingId}/delete',                 [WorksitesController::class, 'destroyBilling'])
            ->post('/worksites/{id}/extra',                                      [WorksitesController::class, 'saveExtra'])
            ->post('/worksites/{id}/extra/{extraId}/delete',                     [WorksitesController::class, 'destroyExtra'])
+           ->post('/worksites/{id}/finance-notes',                              [WorksitesController::class, 'addFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/edit',                [WorksitesController::class, 'editFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/apply',               [WorksitesController::class, 'applyFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/reopen',              [WorksitesController::class, 'reopenFinanceNote'])
+           ->post('/worksites/{id}/finance-notes/{noteId}/delete',              [WorksitesController::class, 'deleteFinanceNote'])
            ->post('/worksites/{id}/attivita',                                              [WorksitesController::class, 'saveAttivita'])
            ->post('/worksites/{id}/attivita/{attivitaId}/delete',                          [WorksitesController::class, 'destroyAttivita'])
            ->post('/worksites/{id}/attivita/{attivitaId}/photos/upload',                   [WorksitesController::class, 'uploadAttivitaPhoto'])
@@ -384,7 +389,17 @@ if ($uri === '/billing' || str_starts_with($uri, '/billing/')) {
            ->get('/billing/clients/emesse-month',    [BillingController::class, 'emesseMonthFragment'])
            ->get('/billing/client/{id}',             [BillingController::class, 'clientDetail'])
            ->get('/billing/client/{id}/emesse',      [BillingController::class, 'clientEmesse'])
-           ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere']);
+           ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere'])
+           // ── Fatturazione editable draft ───────────────────────────────
+           ->post('/billing/client/{id}/draft',                        [BillingController::class, 'createDraft'])
+           ->get('/billing/client/{clientId}/draft/{draftId}',         [BillingController::class, 'showDraft'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/cancel',     [BillingController::class, 'cancelDraft'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/transition',       [BillingController::class, 'transitionDraft'])
+           ->get('/billing/client/{clientId}/draft/{draftId}/export',            [BillingController::class, 'exportDraftExcel'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/finalize',         [BillingController::class, 'finalizeDraft'])
+           ->post('/billing/client/{clientId}/draft/{draftId}/retry-yard-sync',  [BillingController::class, 'retryYardSync'])
+           ->post('/billing/draft-lines/{id}/update',                            [BillingController::class, 'updateDraftLine'])
+           ->post('/billing/draft-lines/{id}/exclude',                           [BillingController::class, 'toggleDraftLineExcluded']);
 
     $router->dispatch($request, $container);
 }

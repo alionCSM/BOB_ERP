@@ -28,6 +28,14 @@
                 Excel Da Emettere
             </a>
             {% endif %}
+            {% if activeDraft is empty and daEmettere is not empty %}
+            <form method="post" action="/billing/client/{{ client.id }}/draft" style="margin:0;">
+                <button type="submit" class="bd-btn-draft">
+                    <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    Crea bozza fatturazione
+                </button>
+            </form>
+            {% endif %}
             <a href="/billing/clients" class="bd-btn-back">
                 <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
                 Tutti i clienti
@@ -69,6 +77,36 @@
         </div>
     </div>
 </div>
+
+{# ── BOZZA ATTIVA (Phase 1) ── #}
+{% if activeDraft %}
+<div class="bd-draft-banner">
+    <div class="bd-draft-banner-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    </div>
+    <div class="bd-draft-banner-body">
+        {% set statusLabel = {
+            'bozza': 'bozza',
+            'inviata_cliente': 'inviata cliente',
+            'da_modificare': 'da modificare',
+            'approvata': 'approvata',
+            'fatturata': 'applicata',
+            'annullata': 'annullata',
+        }[activeDraft.status] ?? activeDraft.status %}
+        <div class="bd-draft-banner-title">
+            Bozza fatturazione attiva
+            <span class="bd-draft-status bd-draft-status-{{ activeDraft.status }}">{{ statusLabel }}</span>
+        </div>
+        <div class="bd-draft-banner-sub">
+            Creata il {{ activeDraft.created_at|date('d/m/Y') }}{% if activeDraft.period_label %} · {{ activeDraft.period_label }}{% endif %}
+        </div>
+    </div>
+    <a href="/billing/client/{{ client.id }}/draft/{{ activeDraft.id }}" class="bd-btn-draft-open">
+        Apri bozza
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>
+</div>
+{% endif %}
 
 {# ── DA EMETTERE ── #}
 <div class="bd-section">
@@ -112,10 +150,18 @@
             </thead>
             <tbody id="da-emettere-tbody">
             {% for r in daEmettere %}
-            <tr class="da-emettere-row" data-cantiere="{{ r.cantiere|lower }}">
+            <tr class="da-emettere-row {% if r.applied_draft_id %}bd-row-applied{% endif %}" data-cantiere="{{ r.cantiere|lower }}">
                 <td class="bd-muted" style="white-space:nowrap;">{{ r.data }}</td>
                 <td>
                     <a href="/worksites/{{ r.worksite_id }}" class="bd-link">{{ r.cantiere }}</a>
+                    {% if r.applied_draft_id %}
+                    <a href="/billing/client/{{ client.id }}/draft/{{ r.applied_draft_id }}"
+                       class="bd-applied-badge"
+                       title="Modifiche già applicate via bozza — in attesa di emissione fattura su Yard">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        applicata · bozza #{{ r.applied_draft_id }}{% if r.applied_at %} · {{ r.applied_at|date('d/m') }}{% endif %}
+                    </a>
+                    {% endif %}
                 </td>
                 <td class="bd-muted" style="white-space:nowrap;">{{ r.order_number ?? '—' }}</td>
                 <td style="font-size:12px;color:#64748b;">{{ r.descrizione }}</td>

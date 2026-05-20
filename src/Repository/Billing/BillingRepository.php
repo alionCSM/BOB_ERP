@@ -58,13 +58,16 @@ final class BillingRepository
                 INSERT INTO bb_billing (
                     worksite_id, nome_cantiere, nome_cliente, data,
                     descrizione, totale_imponibile, aliquota_iva,
-                    articolo_id, iva_id, attivita_id
+                    articolo_id, iva_id, attivita_id, extra_id
                 ) VALUES (
                     :worksite_id, :nome_cantiere, :nome_cliente, :data,
                     :descrizione, :totale_imponibile, :aliquota_iva,
-                    :articolo_id, :iva_id, :attivita_id
+                    :articolo_id, :iva_id, :attivita_id, :extra_id
                 )
             ");
+            $extraId = isset($data['extra_id']) && $data['extra_id'] !== '' && $data['extra_id'] !== null
+                          ? (int)$data['extra_id']
+                          : null;
             $stmt->execute([
                 ':worksite_id'       => $data['worksite_id'],
                 ':nome_cantiere'     => $data['nome_cantiere'],
@@ -76,6 +79,7 @@ final class BillingRepository
                 ':articolo_id'       => $data['articolo_id'],
                 ':iva_id'            => $data['iva_id'],
                 ':attivita_id'       => $data['attivita_id'],
+                ':extra_id'          => $extraId,
             ]);
             return (int)$this->conn->lastInsertId();
         } catch (Exception $ex) {
@@ -265,6 +269,11 @@ final class BillingRepository
 
     /**
      * All da-emettere rows for a client (emessa = 0).
+     *
+     * Also surfaces, when applicable, the most recent "applicata" draft
+     * (status=fatturata) that touched each row — so the UI can flag rows
+     * that have already been applied and are now waiting on Yard accounting
+     * to flip emessa to 1.
      */
     public function getDaEmettereByClient(int $clientId): array
     {
@@ -273,10 +282,22 @@ final class BillingRepository
                 b.id, b.data, b.descrizione, b.totale_imponibile, b.aliquota_iva,
                 b.emessa, b.yard_id,
                 w.id AS worksite_id, w.name AS cantiere, w.order_number, w.order_date,
-                c.name AS ragione_sociale
+                c.name AS ragione_sociale,
+                applied.applied_draft_id,
+                applied.applied_at
             FROM bb_billing b
             JOIN bb_worksites w ON w.id = b.worksite_id
             JOIN bb_clients   c ON c.id = w.client_id
+            LEFT JOIN (
+                SELECT
+                    l.bb_billing_id,
+                    MAX(d.id)          AS applied_draft_id,
+                    MAX(d.invoice_date) AS applied_at
+                FROM bb_billing_draft_lines l
+                JOIN bb_billing_drafts     d ON d.id = l.draft_id
+                WHERE d.status = 'fatturata' AND l.excluded = 0
+                GROUP BY l.bb_billing_id
+            ) applied ON applied.bb_billing_id = b.id
             WHERE w.client_id = :cid AND b.emessa = 0
             ORDER BY b.data ASC, w.name ASC
         ");

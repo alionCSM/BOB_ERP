@@ -234,3 +234,160 @@
     .wv-tabs-bar { gap: 2px; padding: 8px 12px; }
     .wv-tab-btn { padding: 6px 12px; font-size: 11px; }
 }
+
+/* ── Banner sopra Fatturazione tab: note aperte ───── */
+.wv-note-banner {
+    background: #fef9c3;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    color: #78350f;
+}
+.wv-note-banner-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+.wv-note-banner-head svg { width: 16px; height: 16px; stroke: #b45309; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.wv-note-banner-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.wv-note-banner-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,.6);
+    border-radius: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+.wv-note-banner-text { color: #422006; flex: 1 1 auto; }
+.wv-note-banner-author { color: #92400e; font-size: 11px; white-space: nowrap; }
+.wv-note-banner-form { margin: 0; }
+.wv-note-banner-apply {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px;
+    border: 1px solid #16a34a;
+    background: #fff;
+    color: #15803d;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.wv-note-banner-apply:hover { background: #dcfce7; }
+.wv-note-banner-apply svg { width: 11px; height: 11px; }
+
+/* ── Note tab (canSeePrices only) ───────────────── */
+.wv-notes-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.wv-note {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color .12s ease, background .12s ease, opacity .12s ease;
+}
+.wv-note:hover { border-color: #94a3b8; }
+
+/* Tipi: bordo sinistro colorato */
+.wv-note.wv-note-tipo-fatturazione { border-left-color: #f59e0b; }
+.wv-note.wv-note-tipo-sconto       { border-left-color: #3b82f6; }
+.wv-note.wv-note-tipo-generica     { border-left-color: #cbd5e1; }
+
+/* Stato applicata: gray, strikethrough, opacity */
+.wv-note-applied {
+    opacity: .55;
+    background: #f8fafc;
+}
+.wv-note-applied .wv-note-content { text-decoration: line-through; }
+
+/* Chip tipo */
+.wv-note-tipo {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+.wv-note-tipo svg { width: 10px; height: 10px; }
+.wv-note-tipo-fatturazione { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.wv-note-tipo-sconto       { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+.wv-note-tipo-generica     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+/* The chip class also lands on the <li> for the left border above — these
+   selectors target the .wv-note-tipo SPAN specifically. */
+.wv-note-meta .wv-note-tipo { /* keep specific to the chip in the meta */ }
+
+.wv-note-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 11px;
+    flex-wrap: wrap;
+}
+.wv-note-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+    color: #4c1d95;
+    background: #ede9fe;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+.wv-note-author svg { width: 11px; height: 11px; }
+.wv-note-date { color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+/* Applied pill */
+.wv-note-applied-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+    font-size: 10px;
+    font-weight: 500;
+    cursor: help;
+}
+.wv-note-applied-badge svg { width: 10px; height: 10px; }
+
+/* Right-aligned action group */
+.wv-note-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.wv-note-action-form { margin: 0; display: inline-flex; }
+.wv-note-action {
+    background: transparent;
+    border: 0;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    line-height: 0;
+}
+.wv-note-action:hover { color: #475569; background: #f1f5f9; }
+.wv-note-action-success { color: #16a34a; }
+.wv-note-action-success:hover { background: #dcfce7; color: #15803d; }
+.wv-note-action-danger:hover { color: #b91c1c !important; background: #fef2f2 !important; }
+.wv-note-action svg { width: 14px; height: 14px; }
+
+.wv-note-content {
+    font-size: 13px;
+    color: #1e293b;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
