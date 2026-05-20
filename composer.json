@@ -8,10 +8,10 @@
         "php-di/php-di": "^7.0",
         "twig/twig": "^3.0",
         "monolog/monolog": "^3.0",
+        "robmorgan/phinx": "^0.16",
         "ext-pdo": "*"
     },
     "require-dev": {
-        "robmorgan/phinx": "^0.16"
     },
     "scripts": {
         "migrate": "phinx migrate",
