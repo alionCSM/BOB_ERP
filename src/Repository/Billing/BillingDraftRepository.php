@@ -292,10 +292,14 @@ final class BillingDraftRepository
                 /* externally_modified = 1 quando bb_billing differisce dallo
                    snapshot originale al momento di creazione bozza, ignorando
                    le righe added_after_create (per cui original_ = bb_billing
-                   sempre) */
+                   sempre). COLLATE esplicito su descrizione perché bb_billing
+                   e bb_billing_draft_lines hanno collation differenti
+                   (utf8mb4_general_ci vs utf8mb4_unicode_ci a seconda di
+                   quando le tabelle sono state create). */
                 CASE WHEN COALESCE(l.added_after_create, 0) = 1 THEN 0
-                     WHEN (COALESCE(b.data, '')         <> COALESCE(l.original_data, ''))
-                       OR (COALESCE(b.descrizione, '')  <> COALESCE(l.original_descrizione, ''))
+                     WHEN (COALESCE(b.data, '1970-01-01') <> COALESCE(l.original_data, '1970-01-01'))
+                       OR (COALESCE(b.descrizione, '') COLLATE utf8mb4_unicode_ci
+                           <> COALESCE(l.original_descrizione, '') COLLATE utf8mb4_unicode_ci)
                        OR ABS(COALESCE(b.totale_imponibile, 0) - COALESCE(l.original_totale_imponibile, 0)) > 0.005
                        OR ABS(COALESCE(b.aliquota_iva, 0) - COALESCE(l.original_aliquota_iva, 0)) > 0.005
                      THEN 1
