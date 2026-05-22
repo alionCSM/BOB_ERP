@@ -128,14 +128,26 @@
 </div>
 {% endif %}
 
-{# ── New rows banner ── #}
-{% if newRowsCount > 0 %}
-<div class="bd-new-rows-banner">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    <span>
-        Ci sono <strong>{{ newRowsCount }}</strong> nuove righe da fatturare per questo cliente create dopo l'apertura della bozza.
-        <em>(L'aggiunta sarà disponibile in Fase 2.)</em>
-    </span>
+{# ── Legend per le righe colorate ─────────────────────────────────
+   Le nuove righe (aggiunte dai cantieri dopo l'apertura bozza) sono
+   blu; le righe modificate esternamente dal cantiere sono arancioni;
+   le modifiche fatte dentro la bozza dall'utente sono gialle. #}
+{% set hasNew      = lines|filter(l => l.added_after_create)|length > 0 %}
+{% set hasExtMod   = lines|filter(l => l.externally_modified and not l.added_after_create)|length > 0 %}
+{% if hasNew or hasExtMod %}
+<div class="bd-row-legend">
+    {% if hasNew %}
+        <span class="bd-row-legend-item bd-row-legend-new">
+            <span class="bd-row-legend-dot"></span>
+            Aggiunte dal cantiere dopo l'apertura bozza
+        </span>
+    {% endif %}
+    {% if hasExtMod %}
+        <span class="bd-row-legend-item bd-row-legend-ext">
+            <span class="bd-row-legend-dot"></span>
+            Modificate dal cantiere dopo lo snapshot
+        </span>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -219,7 +231,12 @@
             </thead>
             <tbody id="bd-draft-tbody">
             {% for l in lines %}
-            <tr class="bd-draft-row {% if l.excluded %}bd-row-excluded{% endif %} {% if l.modified %}bd-row-modified{% endif %}"
+            <tr class="bd-draft-row
+                       {% if l.excluded %}bd-row-excluded{% endif %}
+                       {% if l.added_after_create %}bd-row-added-new
+                       {% elseif l.externally_modified %}bd-row-ext-modified
+                       {% elseif l.modified %}bd-row-modified
+                       {% endif %}"
                 data-line-id="{{ l.id }}"
                 data-excluded="{{ l.excluded ? '1' : '0' }}">
 
@@ -265,8 +282,14 @@
 
                 <td class="center bd-cell-status">
                     <span class="bd-pill bd-pill-danger"  data-tag="excluded" style="{% if not l.excluded %}display:none;{% endif %}">esclusa</span>
-                    <span class="bd-pill bd-pill-warning" data-tag="modified" style="{% if l.excluded or not l.modified %}display:none;{% endif %}">modificata</span>
-                    <span class="bd-pill bd-pill-muted"   data-tag="clean"    style="{% if l.excluded or l.modified %}display:none;{% endif %}">—</span>
+                    {% if l.added_after_create %}
+                        <span class="bd-pill bd-pill-info"     data-tag="new" style="{% if l.excluded %}display:none;{% endif %}">nuova</span>
+                    {% elseif l.externally_modified %}
+                        <span class="bd-pill bd-pill-orange"   data-tag="ext-modified" style="{% if l.excluded %}display:none;{% endif %}">cambiata in cantiere</span>
+                    {% else %}
+                        <span class="bd-pill bd-pill-warning" data-tag="modified" style="{% if l.excluded or not l.modified %}display:none;{% endif %}">modificata</span>
+                        <span class="bd-pill bd-pill-muted"   data-tag="clean"    style="{% if l.excluded or l.modified %}display:none;{% endif %}">—</span>
+                    {% endif %}
                 </td>
 
                 <td class="center">

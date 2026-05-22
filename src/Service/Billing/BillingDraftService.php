@@ -497,6 +497,15 @@ final class BillingDraftService
         if (!$draft) {
             throw new RuntimeException('Bozza non trovata.');
         }
+
+        // Auto-snapshot any bb_billing rows that have appeared on the
+        // client's cantieri after the bozza was created — but only when
+        // the bozza is still being worked on (editable). On fatturata /
+        // annullata bozze we leave the list frozen as it was.
+        if (in_array($draft['status'], self::EDITABLE_STATUSES, true)) {
+            $this->drafts->snapshotMissingLines($draftId, (int)$draft['client_id']);
+        }
+
         $lines = $this->drafts->getLinesForDraft($draftId);
 
         $totImponibile = 0.0;

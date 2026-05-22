@@ -281,13 +281,30 @@ final class BillingDraftRepository
                 COALESCE(l.original_iva_id, b.iva_id) AS original_iva_id,
                 l.excluded, l.excluded_reason,
                 l.modified, l.modification_notes,
+                COALESCE(l.added_after_create, 0) AS added_after_create,
                 l.display_order,
                 l.yard_sync_status, l.yard_sync_error, l.yard_sync_attempted_at,
                 l.created_at, l.updated_at,
                 w.name         AS cantiere,
                 w.order_number,
                 b.yard_id      AS source_yard_id,
-                b.emessa       AS source_emessa
+                b.emessa       AS source_emessa,
+                /* externally_modified = 1 quando bb_billing differisce dallo
+                   snapshot originale al momento di creazione bozza, ignorando
+                   le righe added_after_create (per cui original_ = bb_billing
+                   sempre). COLLATE esplicito su descrizione perché bb_billing
+                   e bb_billing_draft_lines hanno collation differenti
+                   (utf8mb4_general_ci vs utf8mb4_unicode_ci a seconda di
+                   quando le tabelle sono state create). */
+                CASE WHEN COALESCE(l.added_after_create, 0) = 1 THEN 0
+                     WHEN (COALESCE(b.data, '1970-01-01') <> COALESCE(l.original_data, '1970-01-01'))
+                       OR (COALESCE(b.descrizione, '') COLLATE utf8mb4_unicode_ci
+                           <> COALESCE(l.original_descrizione, '') COLLATE utf8mb4_unicode_ci)
+                       OR ABS(COALESCE(b.totale_imponibile, 0) - COALESCE(l.original_totale_imponibile, 0)) > 0.005
+                       OR ABS(COALESCE(b.aliquota_iva, 0) - COALESCE(l.original_aliquota_iva, 0)) > 0.005
+                     THEN 1
+                     ELSE 0
+                END AS externally_modified
             FROM bb_billing_draft_lines l
             JOIN bb_billing   b ON b.id = l.bb_billing_id
             JOIN bb_worksites w ON w.id = l.worksite_id
@@ -296,6 +313,80 @@ final class BillingDraftRepository
         ");
         $stmt->execute([':id' => $draftId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Snapshot any bb_billing rows that have appeared on the client's
+     * cantieri AFTER the bozza was created (emessa=0 and not already
+     * tracked by this draft). Inserts them as draft_lines with
+     * added_after_create=1 so the UI can paint them blue.
+     *
+     * Returns the count of rows added.
+     */
+    public function snapshotMissingLines(int $draftId, int $clientId): int
+    {
+        // Find missing bb_billing rows
+        $stmt = $this->conn->prepare("
+            SELECT b.id, b.worksite_id, b.data, b.descrizione,
+                   b.totale_imponibile, b.aliquota_iva, b.iva_id
+            FROM   bb_billing b
+            JOIN   bb_worksites w ON w.id = b.worksite_id
+            WHERE  w.client_id = :cid
+              AND  b.emessa = 0
+              AND  b.id NOT IN (
+                  SELECT bb_billing_id FROM bb_billing_draft_lines WHERE draft_id = :did
+              )
+            ORDER BY b.data ASC, b.id ASC
+        ");
+        $stmt->execute([':cid' => $clientId, ':did' => $draftId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($rows)) {
+            return 0;
+        }
+
+        // Determine starting display_order (after existing lines)
+        $ordStmt = $this->conn->prepare(
+            'SELECT COALESCE(MAX(display_order), -1) + 1 FROM bb_billing_draft_lines WHERE draft_id = :did'
+        );
+        $ordStmt->execute([':did' => $draftId]);
+        $nextOrder = (int)$ordStmt->fetchColumn();
+
+        $ins = $this->conn->prepare("
+            INSERT INTO bb_billing_draft_lines (
+                draft_id, bb_billing_id, worksite_id,
+                data, descrizione, totale_imponibile, aliquota_iva, iva_id,
+                original_data, original_descrizione, original_totale_imponibile, original_aliquota_iva, original_iva_id,
+                display_order, added_after_create
+            ) VALUES (
+                :draft_id, :bb_id, :worksite_id,
+                :data, :descr, :imp, :iva, :ivaid,
+                :odata, :odescr, :oimp, :oiva, :oivaid,
+                :ord, 1
+            )
+        ");
+
+        $count = 0;
+        foreach ($rows as $r) {
+            $ivaId = ($r['iva_id'] !== null && $r['iva_id'] !== '') ? (int)$r['iva_id'] : null;
+            $ins->execute([
+                ':draft_id'    => $draftId,
+                ':bb_id'       => (int)$r['id'],
+                ':worksite_id' => (int)$r['worksite_id'],
+                ':data'        => $r['data'] ?: null,
+                ':descr'       => $r['descrizione'] ?? '',
+                ':imp'         => (float)($r['totale_imponibile'] ?? 0),
+                ':iva'         => (float)($r['aliquota_iva'] ?? 0),
+                ':ivaid'       => $ivaId,
+                ':odata'       => $r['data'] ?: null,
+                ':odescr'      => $r['descrizione'] ?? '',
+                ':oimp'        => (float)($r['totale_imponibile'] ?? 0),
+                ':oiva'        => (float)($r['aliquota_iva'] ?? 0),
+                ':oivaid'      => $ivaId,
+                ':ord'         => $nextOrder++,
+            ]);
+            $count++;
+        }
+        return $count;
     }
 
     /**
