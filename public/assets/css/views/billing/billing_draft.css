@@ -66,6 +66,8 @@
 .bd-pill-danger  { background: #fee2e2; color: #b91c1c; }
 .bd-pill-warning { background: #fef3c7; color: #b45309; }
 .bd-pill-muted   { background: #f1f5f9; color: #94a3b8; }
+.bd-pill-info    { background: #dbeafe; color: #1d4ed8; }
+.bd-pill-orange  { background: #ffedd5; color: #9a3412; }
 
 /* ── Cancel button ──────────────────────────────── */
 .bd-btn-danger-outline {
@@ -396,9 +398,19 @@ select.bd-cell-input.bd-cell-select:disabled {
     100% { background: transparent; }
 }
 
-/* Modified-row tint (yellow stripe on left) */
+/* Modified-row tint (yellow stripe on left — modifiche dell'utente in bozza) */
 .bd-row-modified td { background: #fffbeb; }
 .bd-row-modified td:first-child { box-shadow: inset 3px 0 0 #f59e0b; }
+
+/* Added after bozza create (blue) — riga apparsa sul cantiere dopo lo snapshot */
+.bd-row-added-new td { background: #eff6ff; }
+.bd-row-added-new td:first-child { box-shadow: inset 3px 0 0 #3b82f6; }
+
+/* Externally modified (orange) — bb_billing è stato modificato in cantiere
+   dopo che la bozza l'aveva snappato. Diverso dal giallo (modifica utente
+   in bozza) — qui il dato "vero" è cambiato fuori dalla nostra bozza. */
+.bd-row-ext-modified td { background: #fff7ed; }
+.bd-row-ext-modified td:first-child { box-shadow: inset 3px 0 0 #ea580c; }
 
 /* Excluded rows: red bg + strikethrough inputs */
 .bd-row-excluded .bd-cell-input { text-decoration: line-through; opacity: .65; }
@@ -523,3 +535,25 @@ select.bd-cell-input.bd-cell-select:disabled {
     white-space: nowrap;
 }
 .bd-notes-apply:hover { background: #dcfce7; }
+
+/* ── Row legend (blue + orange row colors explanation) ─────── */
+.bd-row-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 8px 12px;
+    margin: 0 0 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #475569;
+}
+.bd-row-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.bd-row-legend-dot {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 3px;
+}
+.bd-row-legend-new .bd-row-legend-dot { background: #3b82f6; }
+.bd-row-legend-ext .bd-row-legend-dot { background: #ea580c; }
