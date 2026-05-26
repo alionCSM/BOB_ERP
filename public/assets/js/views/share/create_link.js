@@ -148,20 +148,34 @@ document.addEventListener("DOMContentLoaded", () => {
     /* ── Workers search & select ── */
     document.getElementById("search-workers").addEventListener("input", function () {
 
-        const tokens = this.value
-            .toLowerCase()
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
+        // Normalizziamo gli spazi multipli a uno solo, sia nella query che
+        // nel testo della riga, così la ricerca è contigua ma resiliente
+        // alla formattazione. La query è confrontata come substring INTERA:
+        // - "dumi montaggi srl" matcha "Dumi Montaggi SRL"
+        // - NON matcha "Dumi Montaggi Europa SRL" (c'è 'europa' in mezzo)
+        // Se invece la query non ha match, proviamo il fallback per parole
+        // separate per supportare casi tipo "rossi mario" / "mario rossi".
+        const raw = this.value.toLowerCase().trim().replace(/\s+/g, ' ');
 
+        let visible = 0;
         document.querySelectorAll("#workers-list tr").forEach(tr => {
-
-            const text = tr.textContent.toLowerCase();
-
-            const match = tokens.every(token => text.includes(token));
-
+            const text  = tr.textContent.toLowerCase().replace(/\s+/g, ' ');
+            const match = raw === '' || text.includes(raw);
             tr.style.display = match ? "" : "none";
+            if (match) visible++;
         });
+
+        // Fallback solo se la query ha più parole e la ricerca contigua
+        // non ha prodotto nulla — così l'ordine delle parole non blocca
+        // l'utente che cerca "rossi mario" su un record "MARIO ROSSI".
+        if (raw !== '' && visible === 0 && raw.indexOf(' ') !== -1) {
+            const tokens = raw.split(' ').filter(Boolean);
+            document.querySelectorAll("#workers-list tr").forEach(tr => {
+                const text  = tr.textContent.toLowerCase();
+                const match = tokens.every(t => text.includes(t));
+                tr.style.display = match ? "" : "none";
+            });
+        }
 
         document.getElementById("select-all-workers").checked = false;
     });
