@@ -501,36 +501,56 @@ PROMPT;
     ): ?array {
         $text = mb_substr($documentText, 0, self::MAX_TEXT_CHARS);
 
+        // Same canonical list used by the upload AI. Missing it here was
+        // why the cron classified ogni attestato di sicurezza specifico
+        // (gru, piattaforma, antincendio, ecc.) come generic "Formazione
+        // sicurezza" → migliaia di falsi mismatch.
+        $types     = $this->monitoredWorkerTypes();
+        $typesList = '- ' . implode("\n- ", $types) . "\n- Altro";
+
         $systemPrompt = <<<PROMPT
 Sei BOB, l'assistente del gestionale BOB. Analizzi il testo grezzo (estratto da PDF, possibile OCR rumoroso) di un documento di un operaio e devi estrarre alcuni dati.
 
-I tipi di documento riconosciuti sono:
-- UNILAV (comunicazione obbligatoria di assunzione/proroga/cessazione lavoro)
-- Visita medica (idoneità sanitaria mansione)
-- DURC (regolarità contributiva)
-- Visura camerale
-- Patente (di guida)
-- Carta d'identità
-- Codice fiscale (tessera sanitaria)
-- Formazione sicurezza
-- Permesso di soggiorno
-- Altro
+I tipi di documento riconosciuti sono (rispetta esattamente maiuscole/minuscole):
+{$typesList}
 
 Devi rispondere SOLO con un oggetto JSON valido, niente prefisso, niente commenti, niente markdown.
 
 Schema:
 {
-  "tipo_documento_rilevato": "UNILAV"|"Visita medica"|...|"Altro",
+  "tipo_documento_rilevato": "uno dei tipi sopra (incluso Altro)",
   "nome_rilevato": "Nome Cognome o stringa vuota se non rilevato",
   "scadenza_rilevata": "YYYY-MM-DD" oppure "INDETERMINATO" oppure stringa vuota,
   "confidenza": 0-100,
   "note": "breve nota se serve, massimo 150 caratteri"
 }
 
-Regole:
-- Per UNILAV la "scadenza" è la data di fine rapporto; se rapporto a tempo indeterminato scrivi "INDETERMINATO".
-- Per Visita medica la "scadenza" è la data di prossima revisione/scadenza dell'idoneità.
-- Se il testo è troppo confuso o non riconosci il tipo, restituisci "Altro" e confidenza bassa.
+IMPORTANTE — come distinguere le formazioni specifiche:
+Quasi tutti gli attestati di sicurezza citano "D.Lgs 81/08", "Accordo Stato-Regioni", "rischio basso/medio/alto" e simili. NON usare quasi mai "Formazione sicurezza" come categoria: serve solo per i corsi di formazione generale del lavoratore (16h o 4+12h, rischio basso/medio/alto). Se nel testo trovi una specializzazione, scegli SEMPRE quella specifica:
+
+- "carrello elevatore" / "muletto" / "transpallet con conducente" → Carrello elevatore
+- "PLE" / "piattaforma di lavoro elevabile" / "piattaforma aerea" / "ragno" → Piattaforma
+- "gru a torre" / "gru fissa" → Gru a torre
+- "gru mobile" / "autogru" / "gru su autocarro" → Gru mobile
+- "braccio telescopico" / "sollevatore telescopico" / "manitou" → Braccio telescopico
+- "lavori in quota" / "DPI di III categoria" / "imbragature" / "anticaduta" → Lavori in quota DPI
+- "antincendio" / "addetto antincendio" / "rischio incendio" / "estintore" → Antincendio
+- "primo soccorso" / "BLSD" / "gruppo A/B/C" / "addetto primo soccorso" → Primo soccorso
+- "preposto" / "designazione preposto" → Preposto
+- "saldatura" / "patentino saldatore" / "UNI EN ISO 9606" → Saldatura
+- "verbale consegna DPI" / "consegna dispositivi protezione" → Verbale consegna DPI
+- Solo "Formazione generale del lavoratore" / "Formazione specifica rischio X" / "16 ore D.Lgs 81/08" senza una specializzazione → Formazione sicurezza
+
+Altri tipi:
+- "Comunicazione obbligatoria assunzione/cessazione" + codice fiscale lavoratore + datore → Unilav
+- "Idoneità alla mansione" / "medico competente" / "sorveglianza sanitaria" → Visita medica
+- "Carta d'identità" / "REPUBBLICA ITALIANA" + foto + numero documento → Documento d'identità
+
+Regole assolute:
+- Per Unilav la "scadenza" è la data di fine rapporto; se a tempo indeterminato scrivi "INDETERMINATO".
+- Per Visita medica la "scadenza" è la data della prossima visita / fine validità idoneità.
+- Per gli attestati di formazione la "scadenza" è quella indicata o calcolabile (validità tipica 5 anni dalla data corso per le abilitazioni Accordo Stato-Regioni, 3 anni per primo soccorso / antincendio).
+- Se il testo è troppo confuso o non riconosci il tipo, restituisci "Altro" e confidenza < 40.
 - Sii rigoroso: meglio bassa confidenza che invenzioni.
 PROMPT;
 
