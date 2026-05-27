@@ -453,7 +453,7 @@ class AnomalyCheckerService
                    DATEDIFF(CURDATE(), MAX(a.created_at)) AS days_inactive
             FROM bb_users u
             LEFT JOIN bb_user_activity a ON a.user_id = u.id
-            WHERE u.active = 1
+            WHERE u.active = 'Y'
               AND u.type = 'internal'
               AND EXISTS (SELECT 1 FROM bb_user_permissions p WHERE p.user_id = u.id AND p.allowed = 1)
             GROUP BY u.id
@@ -967,11 +967,13 @@ class AnomalyCheckerService
 
     private function getUsersWithPermission(string $module): array
     {
+        // bb_users.active è 'Y'/'N' (VARCHAR) — il vecchio = 1 restituiva
+        // sempre 0 righe, nessuna mail di anomalia veniva inviata.
         $stmt = $this->conn->prepare("
             SELECT DISTINCT u.id, u.email, u.first_name, u.last_name
             FROM bb_users u
             INNER JOIN bb_user_permissions p ON p.user_id = u.id
-            WHERE p.module = :mod AND p.allowed = 1 AND u.active = 1
+            WHERE p.module = :mod AND p.allowed = 1 AND u.active = 'Y'
         ");
         $stmt->execute([':mod' => $module]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

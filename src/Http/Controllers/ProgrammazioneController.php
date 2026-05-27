@@ -77,16 +77,369 @@ final class ProgrammazioneController
     {
         header('Content-Type: application/json; charset=utf-8');
 
-        // Expose the variables the api view expects
-        $conn               = $this->conn;
-        $authenticated_user = $GLOBALS['authenticated_user'] ?? [];
+        $action = $_GET['action'] ?? $_POST['action'] ?? '';
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $myId   = (int)($GLOBALS['authenticated_user']['user_id'] ?? 0);
 
-        $viewFile = APP_ROOT . '/views/programmazione/api.php';
-        $oldCwd   = getcwd();
-        chdir(dirname($viewFile));
-        include $viewFile;
-        chdir($oldCwd);
+        try {
+            if ($action === 'list'     && $method === 'GET')  { $this->apiList(); }
+            if ($action === 'save'     && $method === 'POST') { $this->apiSave($myId); }
+            if ($action === 'status'   && $method === 'POST') { $this->apiStatus(); }
+            if ($action === 'delete'   && $method === 'POST') { $this->apiDelete(); }
+            if ($action === 'reorder'  && $method === 'POST') { $this->apiReorder(); }
+            if ($action === 'alerts'   && $method === 'GET')  { $this->apiAlerts(); }
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
+
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'Unknown action']);
         exit;
+    }
+
+    // ─── API actions ──────────────────────────────────────────────────────────
+
+    private function apiList(): never
+    {
+        $mese = (int)($_GET['mese'] ?? date('n'));
+        $anno = (int)($_GET['anno'] ?? date('Y'));
+
+        $stmt = $this->conn->prepare("
+            SELECT id, data, indirizzo, committente, mezzi, stato_mezzi,
+                   durata, referente, capo_squadra, tot_persone,
+                   trasferta, stato_trasferta,
+                   info_beppe, stato_beppe, sort_order
+            FROM bb_programmazione
+            WHERE mese = :m AND anno = :a
+            ORDER BY data IS NULL, data, sort_order, id
+        ");
+        $stmt->execute([':m' => $mese, ':a' => $anno]);
+        echo json_encode(['ok' => true, 'rows' => $stmt->fetchAll(\PDO::FETCH_ASSOC)]);
+        exit;
+    }
+
+    private function apiSave(int $myId): never
+    {
+        $input = json_decode(file_get_contents('php://input') ?: '', true);
+        if (!$input) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Invalid JSON']);
+            exit;
+        }
+
+        $id          = (int)($input['id'] ?? 0);
+        $mese        = (int)($input['mese'] ?? date('n'));
+        $anno        = (int)($input['anno'] ?? date('Y'));
+        $data        = !empty($input['data']) ? $input['data'] : null;
+        $indirizzo   = trim((string)($input['indirizzo']   ?? ''));
+        $committente = trim((string)($input['committente'] ?? ''));
+        $mezzi       = trim((string)($input['mezzi']       ?? ''));
+        $durata      = trim((string)($input['durata']      ?? ''));
+        $referente   = trim((string)($input['referente']   ?? ''));
+        $capoSquadra = trim((string)($input['capo_squadra'] ?? ''));
+        $totPersone  = !empty($input['tot_persone']) ? (int)$input['tot_persone'] : null;
+        $trasferta   = trim((string)($input['trasferta']   ?? ''));
+        $infoBeppe   = trim((string)($input['info_beppe']  ?? ''));
+        $sortOrder   = (int)($input['sort_order'] ?? 0);
+
+        // Auto-move row to its own month if the date falls outside the current
+        // mese/anno tab (operator pasted a date from another month).
+        $movedToMonth = null;
+        if ($data) {
+            $ts = strtotime($data);
+            if ($ts !== false) {
+                $dm = (int)date('n', $ts);
+                $dy = (int)date('Y', $ts);
+                if ($dm !== $mese || $dy !== $anno) {
+                    $mese = $dm;
+                    $anno = $dy;
+                    $movedToMonth = $dm;
+                }
+            }
+        }
+
+        $oldRow = $id > 0 ? $this->fetchProgrammazioneRow($id) : null;
+
+        if ($id > 0) {
+            $stmt = $this->conn->prepare("
+                UPDATE bb_programmazione
+                   SET mese = :mese, anno = :anno, data = :data,
+                       indirizzo = :ind, committente = :com, mezzi = :mez,
+                       durata = :dur, referente = :ref, capo_squadra = :cs, tot_persone = :tp,
+                       trasferta = :tra, info_beppe = :inf, sort_order = :so
+                 WHERE id = :id
+            ");
+            $stmt->execute([
+                ':mese' => $mese, ':anno' => $anno, ':data' => $data,
+                ':ind'  => $indirizzo, ':com' => $committente, ':mez' => $mezzi,
+                ':dur'  => $durata, ':ref' => $referente, ':cs' => $capoSquadra, ':tp' => $totPersone,
+                ':tra'  => $trasferta, ':inf' => $infoBeppe, ':so' => $sortOrder,
+                ':id'   => $id,
+            ]);
+        } else {
+            $stmt = $this->conn->prepare("
+                INSERT INTO bb_programmazione (mese, anno, data, indirizzo, committente, mezzi, durata, referente, capo_squadra, tot_persone, trasferta, info_beppe, sort_order, created_by)
+                VALUES (:mese, :anno, :data, :ind, :com, :mez, :dur, :ref, :cs, :tp, :tra, :inf, :so, :cb)
+            ");
+            $stmt->execute([
+                ':mese' => $mese, ':anno' => $anno, ':data' => $data,
+                ':ind'  => $indirizzo, ':com' => $committente, ':mez' => $mezzi,
+                ':dur'  => $durata, ':ref' => $referente, ':cs' => $capoSquadra, ':tp' => $totPersone,
+                ':tra'  => $trasferta, ':inf' => $infoBeppe, ':so' => $sortOrder,
+                ':cb'   => $myId,
+            ]);
+            $id = (int)$this->conn->lastInsertId();
+        }
+
+        $currentRow = [
+            'data' => $data, 'indirizzo' => $indirizzo, 'committente' => $committente,
+            'mezzi' => $mezzi, 'stato_mezzi' => $oldRow['stato_mezzi'] ?? null,
+            'trasferta' => $trasferta, 'stato_trasferta' => $oldRow['stato_trasferta'] ?? null,
+            'info_beppe' => $infoBeppe, 'stato_beppe' => $oldRow['stato_beppe'] ?? null,
+        ];
+        $this->sendProgrammazioneNotifications($currentRow, $oldRow, $myId);
+
+        $resp = ['ok' => true, 'id' => $id];
+        if ($movedToMonth !== null) {
+            $resp['moved_to_month'] = $movedToMonth;
+            $resp['moved_to_year']  = $anno;
+        }
+        echo json_encode($resp);
+        exit;
+    }
+
+    private function apiStatus(): never
+    {
+        $input = json_decode(file_get_contents('php://input') ?: '', true);
+        $id    = (int)($input['id'] ?? 0);
+        $field = (string)($input['field'] ?? '');
+        $value = $input['value'] ?? null;
+
+        $allowed     = ['stato_mezzi', 'stato_trasferta', 'stato_beppe'];
+        $validValues = [null, 'in_lavorazione', 'completato'];
+
+        if ($id <= 0 || !in_array($field, $allowed, true) || !in_array($value, $validValues, true)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Invalid params']);
+            exit;
+        }
+
+        $stmt = $this->conn->prepare("UPDATE bb_programmazione SET {$field} = :val WHERE id = :id");
+        $stmt->execute([':val' => $value, ':id' => $id]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    private function apiDelete(): never
+    {
+        $input = json_decode(file_get_contents('php://input') ?: '', true);
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Missing id']);
+            exit;
+        }
+        $stmt = $this->conn->prepare("DELETE FROM bb_programmazione WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
+    private function apiReorder(): never
+    {
+        $input = json_decode(file_get_contents('php://input') ?: '', true);
+        $order = $input['order'] ?? [];
+
+        $this->conn->beginTransaction();
+        try {
+            $stmt = $this->conn->prepare("UPDATE bb_programmazione SET sort_order = :so WHERE id = :id");
+            foreach ($order as $i => $rowId) {
+                $stmt->execute([':so' => $i, ':id' => (int)$rowId]);
+            }
+            $this->conn->commit();
+            echo json_encode(['ok' => true]);
+        } catch (\Throwable $e) {
+            $this->conn->rollBack();
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function apiAlerts(): never
+    {
+        $stmt = $this->conn->prepare("
+            SELECT p.id, p.data, p.indirizzo, p.committente,
+                   p.mezzi, p.stato_mezzi,
+                   p.trasferta, p.stato_trasferta,
+                   p.info_beppe, p.stato_beppe
+            FROM bb_programmazione p
+            WHERE p.data IS NOT NULL
+              AND p.data BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+              AND (
+                  (p.stato_mezzi IS NULL OR p.stato_mezzi != 'completato')
+                  OR (p.stato_trasferta IS NULL OR p.stato_trasferta != 'completato')
+                  OR (p.stato_beppe IS NULL OR p.stato_beppe != 'completato')
+              )
+            ORDER BY p.data ASC
+        ");
+        $stmt->execute();
+        $alerts = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $result = [];
+        foreach ($alerts as $row) {
+            $d        = \DateTime::createFromFormat('Y-m-d', $row['data']);
+            $dateStr  = $d ? $d->format('d/m/Y') : $row['data'];
+            $daysLeft = $d ? (int)$d->diff(new \DateTime('today'))->days : 0;
+            $urgency  = $daysLeft <= 2 ? 'high' : 'normal';
+            $label    = trim(($row['committente'] ?? '') . ' — ' . ($row['indirizzo'] ?? ''), ' —');
+
+            $pending = [];
+            if (($row['stato_mezzi']     ?? '') !== 'completato') $pending[] = 'Mezzi';
+            if (($row['stato_trasferta'] ?? '') !== 'completato') $pending[] = 'Trasferta';
+            if (($row['stato_beppe']     ?? '') !== 'completato') $pending[] = 'Info Beppe';
+
+            $result[] = [
+                'id'        => $row['id'],
+                'data'      => $dateStr,
+                'days_left' => $daysLeft,
+                'urgency'   => $urgency,
+                'label'     => $label,
+                'pending'   => $pending,
+            ];
+        }
+
+        echo json_encode(['ok' => true, 'alerts' => $result]);
+        exit;
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private function fetchProgrammazioneRow(int $id): ?array
+    {
+        $stmt = $this->conn->prepare("SELECT * FROM bb_programmazione WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Notifications: for each field (mezzi, trasferta, info_beppe):
+     *   - empty + not completato     → notify scrivere
+     *   - has text + not completato  → notify azione
+     *   - completato                 → no notification
+     */
+    private function sendProgrammazioneNotifications(array $currentRow, ?array $oldRow, int $myId): void
+    {
+        $link  = '/programmazione';
+        $label = $this->buildProgrammazioneLabel($currentRow);
+
+        $fields = [
+            'mezzi'      => ['stato' => 'stato_mezzi',     'scrivere' => 'notif_mezzi_scrivere',     'azione' => 'notif_mezzi_azione',     'labelIt' => 'Mezzi',      'cat' => 'programmazione_mezzi'],
+            'trasferta'  => ['stato' => 'stato_trasferta', 'scrivere' => 'notif_trasferta_scrivere', 'azione' => 'notif_trasferta_azione', 'labelIt' => 'Trasferta',  'cat' => 'programmazione_trasferta'],
+            'info_beppe' => ['stato' => 'stato_beppe',     'scrivere' => 'notif_beppe_scrivere',     'azione' => 'notif_beppe_azione',     'labelIt' => 'Info Beppe', 'cat' => 'programmazione_info'],
+        ];
+
+        foreach ($fields as $field => $cfg) {
+            $value    = trim((string)($currentRow[$field]    ?? ''));
+            $oldValue = trim((string)($oldRow[$field]        ?? ''));
+            $stato    = $currentRow[$cfg['stato']]           ?? null;
+
+            if ($stato === 'completato') continue;
+
+            $isNew       = $oldRow === null;
+            $wasEmpty    = $oldValue === '';
+            $isEmpty     = $value === '';
+            $textChanged = !$isNew && !$wasEmpty && !$isEmpty && $value !== $oldValue;
+
+            if ($isEmpty && !$isNew && $wasEmpty) continue;
+
+            if ($isNew || ($isEmpty && $wasEmpty)) {
+                if ($isEmpty) {
+                    $this->notifyByPermission($cfg['scrivere'], "{$cfg['labelIt']} da compilare",
+                        "Nuovo cantiere — {$cfg['labelIt']} ancora da scrivere.\n{$label}",
+                        $link, $myId, $cfg['cat'], 'high');
+                }
+                if (!$isEmpty) {
+                    $short = strlen($value) > 80 ? substr($value, 0, 77) . '...' : $value;
+                    $this->notifyByPermission($cfg['azione'], "{$cfg['labelIt']} da gestire",
+                        "Nuova richiesta: {$short}\n{$label}",
+                        $link, $myId, $cfg['cat'], 'high');
+                }
+            } elseif (!$wasEmpty && $isEmpty) {
+                $this->notifyByPermission($cfg['scrivere'], "{$cfg['labelIt']} rimosso",
+                    "{$cfg['labelIt']} è stato svuotato. Da ricompilare.\n{$label}",
+                    $link, $myId, $cfg['cat'], 'high');
+            } elseif ($wasEmpty && !$isEmpty) {
+                $short = strlen($value) > 80 ? substr($value, 0, 77) . '...' : $value;
+                $this->notifyByPermission($cfg['azione'], "{$cfg['labelIt']} da gestire",
+                    "Nuova richiesta: {$short}\n{$label}",
+                    $link, $myId, $cfg['cat'], 'high');
+            } elseif ($textChanged) {
+                $short = strlen($value) > 80 ? substr($value, 0, 77) . '...' : $value;
+                $this->notifyByPermission($cfg['scrivere'], "{$cfg['labelIt']} modificato",
+                    "Modifica: {$short}\n{$label}", $link, $myId, $cfg['cat'], 'normal');
+                $this->notifyByPermission($cfg['azione'],   "{$cfg['labelIt']} modificato",
+                    "Modifica: {$short}\n{$label}", $link, $myId, $cfg['cat'], 'normal');
+            }
+        }
+    }
+
+    private function buildProgrammazioneLabel(array $row): string
+    {
+        $parts = [];
+        if (!empty($row['committente'])) $parts[] = $row['committente'];
+        if (!empty($row['indirizzo'])) {
+            $addr = $row['indirizzo'];
+            if (strlen($addr) > 60) $addr = substr($addr, 0, 57) . '...';
+            $parts[] = $addr;
+        }
+        if (!empty($row['data'])) {
+            $d = \DateTime::createFromFormat('Y-m-d', $row['data']);
+            if ($d) $parts[] = $d->format('d/m/Y');
+        }
+        return implode(' — ', $parts) ?: 'Nuova riga';
+    }
+
+    private function notifyByPermission(string $permission, string $title, string $message,
+                                        string $link, int $excludeUserId, string $category,
+                                        string $priority = 'normal'): void
+    {
+        // bb_users.active è VARCHAR ('Y'/'N'), non TINYINT — il vecchio
+        // codice usava 'u.active = 1' che restituiva sempre 0 righe e
+        // quindi nessuna notifica veniva mai inviata. Anche p.allowed
+        // deve essere = 1, altrimenti gli utenti che hanno il permesso
+        // disabilitato ricevono comunque.
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT u.id
+            FROM bb_users u
+            INNER JOIN bb_user_permissions p ON p.user_id = u.id
+            WHERE p.module = :mod
+              AND p.allowed = 1
+              AND u.active = 'Y'
+              AND u.id != :me
+        ");
+        $stmt->execute([':mod' => $permission, ':me' => $excludeUserId]);
+        $userIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        if (empty($userIds)) return;
+
+        $ins = $this->conn->prepare("
+            INSERT INTO bb_notifications (user_id, title, message, link, category, priority, created_by, is_read, created_at)
+            VALUES (:uid, :title, :msg, :link, :cat, :pri, :cb, 0, NOW())
+        ");
+        foreach ($userIds as $uid) {
+            $ins->execute([
+                ':uid'   => $uid,
+                ':title' => $title,
+                ':msg'   => $message,
+                ':link'  => $link,
+                ':cat'   => $category,
+                ':pri'   => $priority,
+                ':cb'    => $excludeUserId,
+            ]);
+        }
     }
 
     // ── POST /pianificazione/save ─────────────────────────────────────────────
