@@ -41,10 +41,12 @@ function markSentToday(PDO $conn, int $progId, string $key): void {
 }
 
 function getUsersWithPerm(PDO $conn, string $module): array {
+    // bb_users.active è 'Y'/'N' (VARCHAR) — il vecchio = 1 restituiva 0 righe.
+    // p.allowed = 1 esclude utenti con permesso revocato.
     $stmt = $conn->prepare("
         SELECT DISTINCT u.id FROM bb_users u
         INNER JOIN bb_user_permissions p ON p.user_id = u.id
-        WHERE p.module = :mod AND u.active = 1
+        WHERE p.module = :mod AND p.allowed = 1 AND u.active = 'Y'
     ");
     $stmt->execute([':mod' => $module]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);

@@ -407,11 +407,19 @@ final class ProgrammazioneController
                                         string $link, int $excludeUserId, string $category,
                                         string $priority = 'normal'): void
     {
+        // bb_users.active è VARCHAR ('Y'/'N'), non TINYINT — il vecchio
+        // codice usava 'u.active = 1' che restituiva sempre 0 righe e
+        // quindi nessuna notifica veniva mai inviata. Anche p.allowed
+        // deve essere = 1, altrimenti gli utenti che hanno il permesso
+        // disabilitato ricevono comunque.
         $stmt = $this->conn->prepare("
             SELECT DISTINCT u.id
             FROM bb_users u
             INNER JOIN bb_user_permissions p ON p.user_id = u.id
-            WHERE p.module = :mod AND u.active = 1 AND u.id != :me
+            WHERE p.module = :mod
+              AND p.allowed = 1
+              AND u.active = 'Y'
+              AND u.id != :me
         ");
         $stmt->execute([':mod' => $permission, ':me' => $excludeUserId]);
         $userIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
