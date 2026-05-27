@@ -280,6 +280,36 @@ final class BillingRepository
         ]);
     }
 
+    /**
+     * Most recent prospetto-done row per client (any period). Used to
+     * show the "Ultimo: <Mese Anno>" hint next to the button, regardless
+     * of whether the user is up-to-date on the suggested period.
+     *
+     * Returns map of (client_id => ['year', 'month', 'done_at']).
+     */
+    public function getLastProspettoDonePerClient(): array
+    {
+        $stmt = $this->conn->query("
+            SELECT pd.client_id, pd.year, pd.month, pd.done_at
+            FROM bb_billing_prospetti_done pd
+            JOIN (
+                SELECT client_id, MAX(year * 12 + month) AS max_period
+                FROM bb_billing_prospetti_done
+                GROUP BY client_id
+            ) latest ON latest.client_id = pd.client_id
+                    AND (pd.year * 12 + pd.month) = latest.max_period
+        ");
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(int)$row['client_id']] = [
+                'year'    => (int)$row['year'],
+                'month'   => (int)$row['month'],
+                'done_at' => $row['done_at'],
+            ];
+        }
+        return $out;
+    }
+
     public function unmarkProspettoDone(int $clientId, int $year, int $month): bool
     {
         $stmt = $this->conn->prepare(

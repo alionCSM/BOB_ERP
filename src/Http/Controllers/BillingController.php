@@ -77,6 +77,10 @@ final class BillingController
             $suggestedYear, $suggestedMonth
         );
 
+        // Map of LAST done per client (any period) — for the
+        // "Ultimo: <Mese Anno>" indicator.
+        $lastProspettoDone = $this->billingRepo->getLastProspettoDonePerClient();
+
         // Split into two groups and sort each A→Z (the SQL already orders
         // by name, we just need the partition).
         $clientsConImporto = [];
@@ -200,7 +204,8 @@ final class BillingController
             'defaultPickerValue',
             // Prospetto-fatto feature
             'clientsConImporto', 'clientsSenzaImporto',
-            'prospettiDone', 'suggestedYear', 'suggestedMonth'
+            'prospettiDone', 'lastProspettoDone',
+            'suggestedYear', 'suggestedMonth'
         ));
     }
 

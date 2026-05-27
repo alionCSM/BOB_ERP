@@ -123,8 +123,13 @@
     </div>
     {% else %}
     {# ── Macro: render una riga cliente ── #}
-    {% macro client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) %}
+    {% macro client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) %}
         {% set done = prospettiDone[c.id] is defined ? prospettiDone[c.id] : null %}
+        {% set last = lastProspettoDone[c.id] is defined ? lastProspettoDone[c.id] : null %}
+        {% set lastPeriodNum = last ? (last.year * 12 + last.month) : 0 %}
+        {% set suggestedNum  = suggestedYear * 12 + suggestedMonth %}
+        {# behind = ultimo done strettamente prima del periodo suggerito #}
+        {% set behind = last and lastPeriodNum < suggestedNum %}
         <tr class="client-row" data-name="{{ c.name|lower }}">
             <td><span class="bc-name">{{ c.name }}</span></td>
             <td class="center">
@@ -149,7 +154,8 @@
                     <span class="bc-dash">—</span>
                 {% endif %}
             </td>
-            <td class="center">
+            <td class="center bc-prospetto-cell">
+                {# Riga 1: stato del periodo SUGGERITO (chip verde se fatto, button se no) #}
                 {% if done %}
                     <button type="button"
                             class="bc-prospetto-chip"
@@ -168,9 +174,18 @@
                             data-action="open-prospetto-modal"
                             data-client-id="{{ c.id }}"
                             data-client-name="{{ c.name }}">
-                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                        Prospetto fatto
+                        Marca come fatto
                     </button>
+                {% endif %}
+                {# Riga 2: indicatore 'Ultimo: <Mese Anno>' — rosso se in ritardo,
+                   muted se è già il periodo suggerito (già coperto dal chip sopra) #}
+                {% if last and not done %}
+                    <div class="bc-prospetto-last {{ behind ? 'is-behind' : 'is-uptodate' }}"
+                         title="Ultimo prospetto marcato per questo cliente">
+                        Ultimo: {{ mesiNomi[last.month] }} {{ last.year }}
+                    </div>
+                {% elseif not last %}
+                    <div class="bc-prospetto-last is-never">Mai segnato</div>
                 {% endif %}
             </td>
             <td class="right">
@@ -201,13 +216,13 @@
         {% if clientsConImporto is not empty %}
             <tr class="bc-group-divider"><td colspan="7">Con importo da emettere ({{ clientsConImporto|length }})</td></tr>
             {% for c in clientsConImporto %}
-                {{ bc.client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) }}
+                {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
             {% endfor %}
         {% endif %}
         {% if clientsSenzaImporto is not empty %}
             <tr class="bc-group-divider bc-group-divider-muted"><td colspan="7">Senza importo da emettere ({{ clientsSenzaImporto|length }})</td></tr>
             {% for c in clientsSenzaImporto %}
-                {{ bc.client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) }}
+                {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
             {% endfor %}
         {% endif %}
         </tbody>
