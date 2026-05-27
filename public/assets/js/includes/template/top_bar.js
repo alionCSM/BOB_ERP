@@ -157,7 +157,8 @@
 })();
 
 async function dismissPriorityModal() {
-    document.getElementById('priority-notif-modal').style.display = 'none';
+    const modal = document.getElementById('priority-notif-modal');
+    if (modal) modal.style.display = 'none';
 
     // Mark all shown priority notifications as read
     const ids = window._priorityNotifIds || [];
@@ -170,6 +171,7 @@ async function dismissPriorityModal() {
             });
         } catch(e) {}
     }
+    window._priorityNotifIds = [];
     // Remove from bell dropdown too
     ids.forEach(id => {
         const item = document.querySelector(`.notification-item[data-id="${id}"]`);
@@ -177,6 +179,34 @@ async function dismissPriorityModal() {
     });
     if (typeof ensureEmptyMessage === 'function') ensureEmptyMessage();
 }
+
+// CSP-safe wiring: inline onclick is blocked, so attach listeners.
+// Both the X (top-right) and the "Ho capito" button dismiss; ESC also closes.
+(function () {
+    function attach() {
+        const xBtn  = document.getElementById('priority-notif-close-x');
+        const okBtn = document.getElementById('priority-notif-close-ok');
+        const modal = document.getElementById('priority-notif-modal');
+        if (xBtn)  xBtn.addEventListener('click',  dismissPriorityModal);
+        if (okBtn) okBtn.addEventListener('click', dismissPriorityModal);
+        if (modal) {
+            // Click on the backdrop (outside the white card) also closes.
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) dismissPriorityModal();
+            });
+        }
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal && modal.style.display === 'flex') {
+                dismissPriorityModal();
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+    } else {
+        attach();
+    }
+})();
 
     (function () {
         const openBtn = document.getElementById('open-history');

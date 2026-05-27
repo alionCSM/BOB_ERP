@@ -154,13 +154,13 @@
                 <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a">Notifiche Importanti</h3>
                 <p style="margin:2px 0 0;font-size:12px;color:#64748b">Richiedono la tua attenzione</p>
             </div>
-            <button onclick="dismissPriorityModal()" style="width:32px;height:32px;border-radius:8px;border:none;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
+            <button id="priority-notif-close-x" style="width:32px;height:32px;border-radius:8px;border:none;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
         </div>
         <div id="priority-notif-list" style="padding:16px 24px;overflow-y:auto;max-height:calc(80vh - 140px);display:flex;flex-direction:column;gap:10px;"></div>
         <div style="padding:14px 24px;border-top:1px solid #f1f5f9;display:flex;justify-content:flex-end;">
-            <button onclick="dismissPriorityModal()" style="height:38px;padding:0 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#312e81,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Ho capito</button>
+            <button id="priority-notif-close-ok" style="height:38px;padding:0 20px;border-radius:10px;border:none;background:linear-gradient(135deg,#312e81,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Ho capito</button>
         </div>
     </div>
 </div>
