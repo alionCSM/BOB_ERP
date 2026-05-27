@@ -213,18 +213,14 @@
         </tr>
         </thead>
         <tbody>
-        {% if clientsConImporto is not empty %}
-            <tr class="bc-group-divider"><td colspan="7">Con importo da emettere ({{ clientsConImporto|length }})</td></tr>
-            {% for c in clientsConImporto %}
-                {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
-            {% endfor %}
-        {% endif %}
-        {% if clientsSenzaImporto is not empty %}
-            <tr class="bc-group-divider bc-group-divider-muted"><td colspan="7">Senza importo da emettere ({{ clientsSenzaImporto|length }})</td></tr>
-            {% for c in clientsSenzaImporto %}
-                {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
-            {% endfor %}
-        {% endif %}
+        {# Single visual table: clienti con importo da emettere prima (A→Z),
+           poi quelli senza (A→Z). Stesso <tbody>, niente divisori. #}
+        {% for c in clientsConImporto %}
+            {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
+        {% endfor %}
+        {% for c in clientsSenzaImporto %}
+            {{ bc.client_row(c, prospettiDone, lastProspettoDone, suggestedYear, suggestedMonth, mesiNomi) }}
+        {% endfor %}
         </tbody>
     </table>
 

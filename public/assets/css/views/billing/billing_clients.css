@@ -149,23 +149,6 @@
     .bc-table-wrap { overflow-x: auto; }
 }
 
-/* ── Group dividers ─────────────────────────────────── */
-.bc-group-divider td {
-    background: #f1f5f9;
-    color: #475569;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    padding: 8px 16px;
-    border-top: 2px solid #cbd5e1 !important;
-    border-bottom: 1px solid #e2e8f0;
-}
-.bc-group-divider-muted td {
-    background: #f8fafc;
-    color: #94a3b8;
-}
-
 /* ── Prospetto cell layout ──────────────────────────── */
 .bc-prospetto-cell {
     line-height: 1.3;
