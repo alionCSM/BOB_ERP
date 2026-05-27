@@ -241,6 +241,54 @@ final class BillingRepository
     /**
      * All clients with at least one billing row; year-scoped KPI columns included.
      */
+    // ── Prospetto fatto (operator marks "I sent the monthly prospetto") ────
+
+    /**
+     * Map of (client_id => row) for prospetti marked done for a specific
+     * year+month. Used by the clients list to render the chip vs button.
+     */
+    public function getProspettiDoneForPeriod(int $year, int $month): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT pd.client_id, pd.year, pd.month, pd.done_at, pd.done_by,
+                   u.username AS done_by_username
+            FROM bb_billing_prospetti_done pd
+            LEFT JOIN bb_users u ON u.id = pd.done_by
+            WHERE pd.year = :y AND pd.month = :m
+        ");
+        $stmt->execute([':y' => $year, ':m' => $month]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(int)$row['client_id']] = $row;
+        }
+        return $out;
+    }
+
+    /**
+     * INSERT or UPDATE (idempotent) the prospetto-done row for a client
+     * + period. Returns true on success.
+     */
+    public function markProspettoDone(int $clientId, int $year, int $month, ?int $userId): bool
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO bb_billing_prospetti_done (client_id, year, month, done_at, done_by)
+            VALUES (:cid, :y, :m, NOW(), :u)
+            ON DUPLICATE KEY UPDATE done_at = NOW(), done_by = VALUES(done_by)
+        ");
+        return $stmt->execute([
+            ':cid' => $clientId, ':y' => $year, ':m' => $month, ':u' => $userId,
+        ]);
+    }
+
+    public function unmarkProspettoDone(int $clientId, int $year, int $month): bool
+    {
+        $stmt = $this->conn->prepare(
+            "DELETE FROM bb_billing_prospetti_done
+             WHERE client_id = :cid AND year = :y AND month = :m"
+        );
+        return $stmt->execute([':cid' => $clientId, ':y' => $year, ':m' => $month]);
+    }
+
     public function getClientsWithBillingSummary(int $year): array
     {
         $stmt = $this->conn->prepare("

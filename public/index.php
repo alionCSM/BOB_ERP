@@ -390,6 +390,8 @@ if ($uri === '/billing' || str_starts_with($uri, '/billing/')) {
            ->get('/billing/client/{id}',             [BillingController::class, 'clientDetail'])
            ->get('/billing/client/{id}/emesse',      [BillingController::class, 'clientEmesse'])
            ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere'])
+           ->post('/billing/client/{id}/mark-prospetto-done',   [BillingController::class, 'markProspettoDone'])
+           ->post('/billing/client/{id}/unmark-prospetto-done', [BillingController::class, 'unmarkProspettoDone'])
            // ── Fatturazione editable draft ───────────────────────────────
            ->post('/billing/client/{id}/draft',                        [BillingController::class, 'createDraft'])
            ->get('/billing/client/{clientId}/draft/{draftId}',         [BillingController::class, 'showDraft'])

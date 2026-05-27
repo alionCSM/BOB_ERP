@@ -122,19 +122,9 @@
         <p class="bc-empty-text">Nessuna fattura registrata.</p>
     </div>
     {% else %}
-    <table class="bc-table" id="clients-table">
-        <thead>
-        <tr>
-            <th>Cliente</th>
-            <th class="center">Da emettere</th>
-            <th class="right">Importo da emettere</th>
-            <th class="center">Emesse</th>
-            <th class="right">Importo emesso</th>
-            <th></th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for c in clients %}
+    {# ── Macro: render una riga cliente ── #}
+    {% macro client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) %}
+        {% set done = prospettiDone[c.id] is defined ? prospettiDone[c.id] : null %}
         <tr class="client-row" data-name="{{ c.name|lower }}">
             <td><span class="bc-name">{{ c.name }}</span></td>
             <td class="center">
@@ -159,6 +149,30 @@
                     <span class="bc-dash">—</span>
                 {% endif %}
             </td>
+            <td class="center">
+                {% if done %}
+                    <button type="button"
+                            class="bc-prospetto-chip"
+                            data-action="open-prospetto-modal"
+                            data-client-id="{{ c.id }}"
+                            data-client-name="{{ c.name }}"
+                            data-done-year="{{ done.year }}"
+                            data-done-month="{{ done.month }}"
+                            title="Prospetto già marcato come fatto. Clicca per cambiare o rimuovere.">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        {{ mesiNomi[done.month] }} {{ done.year }}
+                    </button>
+                {% else %}
+                    <button type="button"
+                            class="bc-prospetto-btn"
+                            data-action="open-prospetto-modal"
+                            data-client-id="{{ c.id }}"
+                            data-client-name="{{ c.name }}">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Prospetto fatto
+                    </button>
+                {% endif %}
+            </td>
             <td class="right">
                 <a href="/billing/client/{{ c.id }}" class="bc-btn-detail">
                     Dettaglio
@@ -166,9 +180,88 @@
                 </a>
             </td>
         </tr>
-        {% endfor %}
+    {% endmacro %}
+    {% import _self as bc %}
+
+    {% set mesiNomi = ['', 'Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'] %}
+
+    <table class="bc-table" id="clients-table">
+        <thead>
+        <tr>
+            <th>Cliente</th>
+            <th class="center">Da emettere</th>
+            <th class="right">Importo da emettere</th>
+            <th class="center">Emesse</th>
+            <th class="right">Importo emesso</th>
+            <th class="center" style="width:200px;">Prospetto {{ mesiNomi[suggestedMonth] }} {{ suggestedYear }}</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if clientsConImporto is not empty %}
+            <tr class="bc-group-divider"><td colspan="7">Con importo da emettere ({{ clientsConImporto|length }})</td></tr>
+            {% for c in clientsConImporto %}
+                {{ bc.client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) }}
+            {% endfor %}
+        {% endif %}
+        {% if clientsSenzaImporto is not empty %}
+            <tr class="bc-group-divider bc-group-divider-muted"><td colspan="7">Senza importo da emettere ({{ clientsSenzaImporto|length }})</td></tr>
+            {% for c in clientsSenzaImporto %}
+                {{ bc.client_row(c, prospettiDone, suggestedYear, suggestedMonth, mesiNomi) }}
+            {% endfor %}
+        {% endif %}
         </tbody>
     </table>
+
+    {# ── Modal Prospetto fatto ── #}
+    <div id="bc-prospetto-modal" class="bc-prospetto-modal" style="display:none;"
+         data-suggested-year="{{ suggestedYear }}" data-suggested-month="{{ suggestedMonth }}">
+        <div class="bc-prospetto-modal-backdrop" data-close></div>
+        <div class="bc-prospetto-modal-dialog">
+            <div class="bc-prospetto-modal-head">
+                <div class="bc-prospetto-modal-icon">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div>
+                    <h3 class="bc-prospetto-modal-title">Prospetto fatto e mandato</h3>
+                    <p class="bc-prospetto-modal-sub" id="bc-prospetto-client-name">—</p>
+                </div>
+                <button type="button" class="bc-prospetto-modal-close" data-close>&times;</button>
+            </div>
+            <div class="bc-prospetto-modal-body">
+                <p class="bc-prospetto-text">
+                    Sarà marcato come <strong>prospetto fatto e mandato</strong> per
+                    <strong id="bc-prospetto-period-label">—</strong>.
+                </p>
+                <button type="button" class="bc-prospetto-change-link" id="bc-prospetto-change-link">
+                    Clicca qui per cambiare mese
+                </button>
+                <div class="bc-prospetto-period-selector" id="bc-prospetto-period-selector" style="display:none;">
+                    <label>Mese</label>
+                    <select id="bc-prospetto-month">
+                        {% for i in 1..12 %}
+                            <option value="{{ i }}"{% if i == suggestedMonth %} selected{% endif %}>{{ mesiNomi[i] }}</option>
+                        {% endfor %}
+                    </select>
+                    <label>Anno</label>
+                    <select id="bc-prospetto-year">
+                        {% for y in (currentYear - 1)..(currentYear + 1) %}
+                            <option value="{{ y }}"{% if y == suggestedYear %} selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="bc-prospetto-modal-err" id="bc-prospetto-err" style="display:none;"></div>
+            </div>
+            <div class="bc-prospetto-modal-foot">
+                <button type="button" class="bc-prospetto-btn-unmark" id="bc-prospetto-unmark" style="display:none;">
+                    Rimuovi marcatura
+                </button>
+                <span style="flex:1"></span>
+                <button type="button" class="bc-prospetto-btn-cancel" data-close>Annulla</button>
+                <button type="button" class="bc-prospetto-btn-confirm" id="bc-prospetto-confirm">Conferma</button>
+            </div>
+        </div>
+    </div>
     <div id="bc-no-results" class="bc-empty" style="display:none;">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <p class="bc-empty-text">Nessun cliente trovato.</p>

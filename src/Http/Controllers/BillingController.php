@@ -57,6 +57,38 @@ final class BillingController
         $currentYear   = (int)date('Y');
         $clients       = $this->billingRepo->getClientsWithBillingSummary($currentYear);
 
+        // ── Prospetto fatto ────────────────────────────────────────────────
+        // Suggested period: if today is within day 1–10 of a month, we're
+        // probably still catching up on the previous month's prospetto,
+        // so suggest THAT. From day 11 onwards, suggest the current month.
+        $today    = new \DateTime();
+        $todayDay = (int)$today->format('j');
+        if ($todayDay <= 10) {
+            $suggested = (clone $today)->modify('first day of last month');
+        } else {
+            $suggested = (clone $today)->modify('first day of this month');
+        }
+        $suggestedYear  = (int)$suggested->format('Y');
+        $suggestedMonth = (int)$suggested->format('n');
+
+        // Map of clients that already have the prospetto marked done for
+        // the suggested period.
+        $prospettiDone = $this->billingRepo->getProspettiDoneForPeriod(
+            $suggestedYear, $suggestedMonth
+        );
+
+        // Split into two groups and sort each A→Z (the SQL already orders
+        // by name, we just need the partition).
+        $clientsConImporto = [];
+        $clientsSenzaImporto = [];
+        foreach ($clients as $c) {
+            if ((float)($c['da_emettere_euro'] ?? 0) > 0) {
+                $clientsConImporto[] = $c;
+            } else {
+                $clientsSenzaImporto[] = $c;
+            }
+        }
+
         // KPI cards: current-year only
         $totDaEmettere = array_sum(array_column($clients, 'da_emettere_count_yr'));
         $totEmesse     = array_sum(array_column($clients, 'emesse_count_yr'));
@@ -165,8 +197,60 @@ final class BillingController
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
             'emessRealCurFatture', 'emessRealPrevFatture',
-            'defaultPickerValue'
+            'defaultPickerValue',
+            // Prospetto-fatto feature
+            'clientsConImporto', 'clientsSenzaImporto',
+            'prospettiDone', 'suggestedYear', 'suggestedMonth'
         ));
+    }
+
+    /**
+     * POST /billing/client/{id}/mark-prospetto-done
+     * JSON: { year, month, note? }
+     */
+    public function markProspettoDone(Request $request): never
+    {
+        $clientId = $request->intParam('id');
+        if (!$clientId) Response::json(['ok' => false, 'error' => 'Cliente mancante.'], 400);
+
+        $payload = $this->readJsonBody();
+        $year    = (int)($payload['year']  ?? 0);
+        $month   = (int)($payload['month'] ?? 0);
+        if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
+            Response::json(['ok' => false, 'error' => 'Periodo non valido.'], 422);
+        }
+        $userId = (int)($request->user()->id ?? 0);
+
+        try {
+            $this->billingRepo->markProspettoDone($clientId, $year, $month, $userId);
+            Response::json(['ok' => true, 'client_id' => $clientId, 'year' => $year, 'month' => $month]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /billing/client/{id}/unmark-prospetto-done
+     * JSON: { year, month }
+     */
+    public function unmarkProspettoDone(Request $request): never
+    {
+        $clientId = $request->intParam('id');
+        if (!$clientId) Response::json(['ok' => false, 'error' => 'Cliente mancante.'], 400);
+
+        $payload = $this->readJsonBody();
+        $year    = (int)($payload['year']  ?? 0);
+        $month   = (int)($payload['month'] ?? 0);
+        if ($year < 2000 || $year > 2100 || $month < 1 || $month > 12) {
+            Response::json(['ok' => false, 'error' => 'Periodo non valido.'], 422);
+        }
+
+        try {
+            $this->billingRepo->unmarkProspettoDone($clientId, $year, $month);
+            Response::json(['ok' => true]);
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     // ── GET /billing/clients/emesse-month?month=YYYY-MM (HTML fragment) ───────
