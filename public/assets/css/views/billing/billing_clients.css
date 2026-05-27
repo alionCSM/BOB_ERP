@@ -195,9 +195,37 @@
     letter-spacing: .2px;
     white-space: nowrap;
 }
-.bc-prospetto-last.is-behind   { color: #b91c1c; }   /* red: ultimo precedente al periodo suggerito */
-.bc-prospetto-last.is-uptodate { color: #64748b; }   /* muted: già aggiornato (raramente visibile, di solito chip verde sopra) */
-.bc-prospetto-last.is-never    { color: #b91c1c; font-style: italic; }
+/* In ritardo (c'è uno storico ma vecchio): amber/arancione — situazione
+   da recuperare ma non drammatica */
+.bc-prospetto-last.is-behind   {
+    color: #b45309;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    padding: 1px 8px;
+    display: inline-block;
+}
+/* Già aggiornato — slate muted (raramente visibile: di solito sopra c'è
+   la chip verde con il mese) */
+.bc-prospetto-last.is-uptodate { color: #64748b; }
+/* Mai segnato — rosso forte con sfondo e icona warning: distingue
+   nettamente dai clienti che almeno una volta sono stati fatti */
+.bc-prospetto-last.is-never    {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-weight: 600;
+    font-style: normal;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.bc-prospetto-last.is-never::before {
+    content: '⚠';
+    font-size: 10px;
+}
 .bc-prospetto-chip {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 5px 12px;
