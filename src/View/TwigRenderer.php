@@ -27,10 +27,15 @@ final class TwigRenderer
 
         $isProduction = (new Config())->isProduction();
 
+        // auto_reload: true → Twig controlla la mtime dei file template e
+        // ricompila la cache automaticamente quando il sorgente cambia.
+        // Senza questo, le modifiche ai .twig richiedevano svuotamento
+        // manuale di storage/twig-cache prima di vedere l'effetto.
         $this->twig = new Environment($loader, [
-            'autoescape' => 'html',
-            'cache'      => $isProduction ? APP_ROOT . '/storage/twig-cache' : false,
-            'debug'      => !$isProduction,
+            'autoescape'  => 'html',
+            'cache'       => $isProduction ? APP_ROOT . '/storage/twig-cache' : false,
+            'debug'       => !$isProduction,
+            'auto_reload' => true,
         ]);
 
         $this->registerGlobals();
@@ -39,6 +44,21 @@ final class TwigRenderer
 
     public function render(string $template, array $data = []): string
     {
+        // I template del modulo fatturazione sono in iterazione frequente:
+        // bypass totale della cache per questi così non c'è proprio nulla
+        // da invalidare. Le altre cartelle restano cacheate normalmente
+        // (con auto_reload che gestisce le modifiche).
+        if (str_starts_with($template, 'billing/')
+            || str_starts_with($template, 'fatturazione/')) {
+            $previousCache = $this->twig->getCache(false);
+            $this->twig->setCache(false);
+            try {
+                return $this->twig->render($template, $data);
+            } finally {
+                $this->twig->setCache($previousCache);
+            }
+        }
+
         return $this->twig->render($template, $data);
     }
 
