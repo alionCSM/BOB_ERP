@@ -1,0 +1,66 @@
+{# Tab Storico Import — usa imports #}
+
+<div class="fl-table-wrap">
+    <table class="fl-table">
+        <thead>
+        <tr>
+            <th>Quando</th>
+            <th>Tipo</th>
+            <th>File</th>
+            <th>Periodo</th>
+            <th class="center">Importate</th>
+            <th class="center">Saltate</th>
+            <th class="center">Totale</th>
+            <th class="center">Stato</th>
+            <th>Caricato da</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if imports is empty %}
+            <tr><td colspan="9">
+                <div class="fl-empty">
+                    <svg viewBox="0 0 24 24"><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <p class="fl-empty-text">Nessun import ancora effettuato.</p>
+                </div>
+            </td></tr>
+        {% else %}
+            {% for i in imports %}
+                {% set badgeBg = i.status == 'ok' ? '#dcfce7' : (i.status == 'partial' ? '#fef3c7' : '#fee2e2') %}
+                {% set badgeFg = i.status == 'ok' ? '#15803d' : (i.status == 'partial' ? '#b45309' : '#b91c1c') %}
+                <tr>
+                    <td class="fl-small">{{ i.created_at|date('d/m/Y H:i') }}</td>
+                    <td>
+                        <span class="fl-tipo" style="background:{{ i.source == 'gps' ? '#eff6ff' : '#fef3c7' }};color:{{ i.source == 'gps' ? '#1d4ed8' : '#b45309' }};border-color:transparent;">
+                            {{ i.source }}
+                        </span>
+                    </td>
+                    <td class="fl-small" title="{{ i.filename }}">{{ i.filename|slice(0, 60) }}{% if i.filename|length > 60 %}…{% endif %}</td>
+                    <td class="fl-small">
+                        {% if i.period_from and i.period_to %}
+                            {{ i.period_from|date('d/m/Y') }} → {{ i.period_to|date('d/m/Y') }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="center"><b>{{ i.rows_imported }}</b></td>
+                    <td class="center">{{ i.rows_skipped > 0 ? i.rows_skipped : '—' }}</td>
+                    <td class="center fl-small">{{ i.rows_total }}</td>
+                    <td class="center">
+                        <span class="fl-chip" style="background:{{ badgeBg }};color:{{ badgeFg }};border-color:{{ badgeBg }};">
+                            {{ i.status }}
+                        </span>
+                    </td>
+                    <td class="fl-small">{{ i.by_username }}</td>
+                </tr>
+                {% if i.error_log %}
+                    <tr>
+                        <td colspan="9" style="background:#fff5f5;padding:8px 16px;font-size:11px;color:#991b1b;font-family:monospace;">
+                            <details><summary style="cursor:pointer;">Errori ({{ i.error_log|split('\n')|length }})</summary>
+                                <pre style="white-space:pre-wrap;margin:8px 0 0;">{{ i.error_log }}</pre>
+                            </details>
+                        </td>
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</div>

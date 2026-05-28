@@ -1,0 +1,96 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/fleet/fleet.css">
+{% endblock %}
+
+{% block content %}
+<div class="fl-page">
+
+    <div class="fl-hero">
+        <div class="fl-hero-content">
+            <div class="fl-hero-left">
+                <div class="fl-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div>
+                    <h1 class="fl-hero-title">Carica file flotta</h1>
+                    <p class="fl-hero-sub">Importa "Riepilogo tratte" GPS o fattura Q8 — i dati restano in BOB per analisi e riconciliazione</p>
+                </div>
+            </div>
+            <a href="/fleet" class="fl-btn-primary" style="background:rgba(255,255,255,.12);box-shadow:none;border:1px solid rgba(255,255,255,.18);">← Torna a Flotta</a>
+        </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+
+        {# ── GPS upload card ────────────────────────────────────────────── #}
+        <form method="POST" action="/fleet/import" enctype="multipart/form-data" class="fl-table-wrap" style="padding:24px;">
+            <input type="hidden" name="source" value="gps">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div class="fl-modal-icon" style="background:#eff6ff;color:#1d4ed8;">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Riepilogo tratte (GPS)</h3>
+                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;">File Excel esportato dal portale GPS — una riga per tratta</p>
+                </div>
+            </div>
+
+            <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:30px;text-align:center;background:#fafbfc;">
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required
+                       style="display:block;margin:0 auto;font-size:13px;">
+                <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
+            </div>
+
+            <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
+                <li>Match automatico veicolo per <b>targa</b> (colonna "Veicolo")</li>
+                <li>Dedup: tratte già importate vengono saltate</li>
+                <li>Citta/provincia estratte dall'indirizzo (best-effort)</li>
+            </ul>
+
+            <button type="submit" class="fl-btn-submit" style="width:100%;margin-top:16px;padding:12px;">
+                Importa file GPS
+            </button>
+        </form>
+
+        {# ── Q8 upload card ─────────────────────────────────────────────── #}
+        <form method="POST" action="/fleet/import" enctype="multipart/form-data" class="fl-table-wrap" style="padding:24px;">
+            <input type="hidden" name="source" value="q8">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div class="fl-modal-icon" style="background:#fef3c7;color:#b45309;">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 22V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v18"/><path d="M16 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V8l-3-3"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Fattura/transazioni Q8</h3>
+                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Excel scaricato dal portale Q8 — una riga per rifornimento</p>
+                </div>
+            </div>
+
+            <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:30px;text-align:center;background:#fafbfc;">
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required
+                       style="display:block;margin:0 auto;font-size:13px;">
+                <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
+            </div>
+
+            <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
+                <li>Match automatico carta per <b>numero</b> (catalogo bb_fleet_fuel_cards)</li>
+                <li>Mapping colonne tollerante (data/ora/litri/importo/distributore)</li>
+                <li>Dedup su (carta + timestamp + litri + importo)</li>
+            </ul>
+
+            <button type="submit" class="fl-btn-submit" style="width:100%;margin-top:16px;padding:12px;background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);">
+                Importa fattura Q8
+            </button>
+        </form>
+
+    </div>
+
+    <div style="margin-top:24px;padding:16px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe;font-size:13px;color:#1e40af;">
+        <b>Workflow:</b> dopo l'import, vai sulla tab <a href="/fleet?tab=trips" style="text-decoration:underline;color:#1d4ed8;">Tratte GPS</a>
+        o <a href="/fleet?tab=fuel" style="text-decoration:underline;color:#1d4ed8;">Rifornimenti Q8</a> per vedere i dati grezzi,
+        e su <a href="/fleet?tab=anomalies" style="text-decoration:underline;color:#1d4ed8;">Anomalie</a> per il risultato della riconciliazione.
+    </div>
+
+</div>
+{% endblock %}

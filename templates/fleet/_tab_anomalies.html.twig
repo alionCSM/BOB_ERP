@@ -1,0 +1,74 @@
+{# Tab Anomalie — usa anomalies (filtrate per status=open di default) #}
+
+<div class="fl-toolbar">
+    <div class="fl-search" style="flex:1;">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Cerca per veicolo, operaio, regola..." data-fl-filter=".fl-table">
+    </div>
+    <div style="display:flex;gap:6px;">
+        <a href="/fleet?tab=anomalies&status=open" class="fl-tab" style="padding:6px 12px;">Aperte</a>
+        <a href="/fleet?tab=anomalies&status=dismissed" class="fl-tab" style="padding:6px 12px;">Archiviate</a>
+    </div>
+</div>
+
+<div class="fl-table-wrap">
+    <table class="fl-table">
+        <thead>
+        <tr>
+            <th>Severità</th>
+            <th>Quando</th>
+            <th>Veicolo</th>
+            <th>Operaio</th>
+            <th>Regola</th>
+            <th>Descrizione</th>
+            <th class="center">Azioni</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if anomalies is empty %}
+            <tr><td colspan="7">
+                <div class="fl-empty">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+                    <p class="fl-empty-text">Nessuna anomalia. Lancia una riconciliazione per verificare i dati importati.</p>
+                </div>
+            </td></tr>
+        {% else %}
+            {% for a in anomalies %}
+                {% set sevColor = a.severity == 'high'   ? '#fee2e2'
+                              : a.severity == 'medium' ? '#fef3c7'
+                              : a.severity == 'low'    ? '#dbeafe' : '#f1f5f9' %}
+                {% set sevText  = a.severity == 'high'   ? '#b91c1c'
+                              : a.severity == 'medium' ? '#92400e'
+                              : a.severity == 'low'    ? '#1e40af' : '#475569' %}
+                <tr data-fl-row data-fl-search="{{ a.vehicle_targa }} {{ a.worker_name }} {{ a.rule_code }} {{ a.summary }}">
+                    <td>
+                        <span class="fl-chip" style="background:{{ sevColor }};color:{{ sevText }};border-color:{{ sevColor }};text-transform:uppercase;font-size:10px;letter-spacing:.5px;">
+                            {{ a.severity }}
+                        </span>
+                    </td>
+                    <td class="fl-small">{{ a.event_at ? a.event_at|date('d/m/Y H:i') : '—' }}</td>
+                    <td>{% if a.vehicle_targa %}<span class="fl-targa">{{ a.vehicle_targa }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
+                    <td class="fl-small">{{ a.worker_name|default('—') }}</td>
+                    <td><span class="fl-mono" style="font-size:11px;">{{ a.rule_code }}</span></td>
+                    <td>
+                        <div>{{ a.summary }}</div>
+                        {% if a.detail %}<div class="fl-small">{{ a.detail|slice(0, 150) }}</div>{% endif %}
+                    </td>
+                    <td class="center">
+                        {% if a.status == 'open' and canManage %}
+                            <form method="POST" action="/fleet/anomaly/dismiss" class="inline" onsubmit="return confirm('Archiviare questa anomalia?');">
+                                <input type="hidden" name="id" value="{{ a.id }}">
+                                <button type="submit" class="fl-act" title="Archivia">
+                                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                                </button>
+                            </form>
+                        {% elseif a.status == 'dismissed' %}
+                            <span class="fl-chip fl-chip-empty">archiviata</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</div>

@@ -516,7 +516,10 @@ if ($uri === '/fleet' || str_starts_with($uri, '/fleet/')) {
            ->post('/fleet/telepass/save',           [FleetController::class, 'saveTelepass'])
            ->post('/fleet/telepass/delete',         [FleetController::class, 'deleteTelepass'])
            ->post('/fleet/telepass/reassign',       [FleetController::class, 'reassignTelepass'])
-           ->get('/fleet/telepass/{id}/history',    [FleetController::class, 'telepassHistory']);
+           ->get('/fleet/telepass/{id}/history',    [FleetController::class, 'telepassHistory'])
+           ->get('/fleet/import',                   [FleetController::class, 'importForm'])
+           ->post('/fleet/import',                  [FleetController::class, 'importUpload'])
+           ->post('/fleet/anomaly/dismiss',         [FleetController::class, 'dismissAnomaly']);
 
     $router->dispatch($request, $container);
 }

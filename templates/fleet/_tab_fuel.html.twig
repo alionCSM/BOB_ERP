@@ -1,0 +1,72 @@
+{# Tab Rifornimenti Q8 — usa fuelTx, fuelStats, fuelFilter #}
+
+<div class="fl-toolbar">
+    <form method="GET" action="/fleet" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1;">
+        <input type="hidden" name="tab" value="fuel">
+        <input type="date" name="from" class="fl-input" style="width:auto;" value="{{ fuelFilter.from }}">
+        <input type="date" name="to"   class="fl-input" style="width:auto;" value="{{ fuelFilter.to }}">
+        <button type="submit" class="fl-btn-primary">Filtra</button>
+    </form>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Transazioni</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ fuelStats.total_tx ?? 0 }}</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Carte attive</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ fuelStats.cards_seen ?? 0 }}</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Litri totali</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ fuelStats.total_liters|default(0)|number_format(0, ',', '.') }} L</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Importo totale</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">€ {{ fuelStats.total_importo|default(0)|number_format(2, ',', '.') }}</div>
+    </div>
+</div>
+
+<div class="fl-table-wrap">
+    <table class="fl-table">
+        <thead>
+        <tr>
+            <th>Data</th>
+            <th>Ora</th>
+            <th>Carta</th>
+            <th>Distributore</th>
+            <th>Carburante</th>
+            <th>Litri</th>
+            <th>€/L</th>
+            <th>Importo</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if fuelTx is empty %}
+            <tr><td colspan="8">
+                <div class="fl-empty">
+                    <svg viewBox="0 0 24 24"><path d="M3 22V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v18"/><path d="M3 22h13"/></svg>
+                    <p class="fl-empty-text">Nessuna transazione importata. Carica una fattura Q8 (Excel/CSV).</p>
+                </div>
+            </td></tr>
+        {% else %}
+            {% for tx in fuelTx %}
+                <tr>
+                    <td>{{ tx.tx_at|date('d/m/Y') }}</td>
+                    <td class="fl-small">{{ tx.tx_at|date('H:i') }}</td>
+                    <td><span class="fl-mono">{{ tx.card_numero }}</span></td>
+                    <td>
+                        <div>{{ tx.city ?: '—' }}{% if tx.prov %} ({{ tx.prov }}){% endif %}</div>
+                        <div class="fl-small" title="{{ tx.distributore }}">{{ tx.distributore|slice(0, 50) }}{% if tx.distributore|length > 50 %}…{% endif %}</div>
+                    </td>
+                    <td class="fl-small">{{ tx.carburante ?: '—' }}</td>
+                    <td><b>{{ tx.litri|number_format(2, ',', '.') }}</b></td>
+                    <td class="fl-small">{{ tx.prezzo_unit ? tx.prezzo_unit|number_format(3, ',', '.') : '—' }}</td>
+                    <td><b>€ {{ tx.importo|number_format(2, ',', '.') }}</b></td>
+                </tr>
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</div>

@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Http\Request;
 use App\Http\Response;
 use App\Repository\Fleet\FleetRepository;
+use App\Repository\Fleet\FleetTelemetryRepository;
+use App\Service\Fleet\GpsRiepilogoTratteImporter;
+use App\Service\Fleet\Q8FuelInvoiceImporter;
 
 /**
  * Modulo Flotta — step 1.
@@ -26,7 +29,8 @@ final class FleetController
 {
     public function __construct(
         private \PDO $conn,
-        private FleetRepository $fleet
+        private FleetRepository $fleet,
+        private FleetTelemetryRepository $telemetry
     ) {}
 
     // ─── Pagina principale ────────────────────────────────────────────────────
@@ -35,20 +39,143 @@ final class FleetController
     {
         $this->requireView($request);
 
+        $allowedTabs = ['vehicles', 'cards', 'telepass', 'trips', 'fuel', 'anomalies', 'imports'];
         $tab = $_GET['tab'] ?? 'vehicles';
-        if (!in_array($tab, ['vehicles', 'cards', 'telepass'], true)) {
-            $tab = 'vehicles';
+        if (!in_array($tab, $allowedTabs, true)) $tab = 'vehicles';
+
+        // dati base sempre presenti per i tab principali
+        $payload = [
+            'tab'         => $tab,
+            'canManage'   => $this->canManage($request),
+            'vehicles'    => $this->fleet->listVehicles(),
+            'cards'       => $this->fleet->listFuelCards(),
+            'telepasses'  => $this->fleet->listTelepass(),
+            'workers'     => $this->fleet->activeWorkers(),
+            'vehiclesSel' => $this->fleet->activeVehicles(),
+        ];
+
+        // dati extra per tab di telemetria
+        if ($tab === 'trips') {
+            $filter = $this->tripsFilterFromQuery();
+            $payload['trips']       = $this->telemetry->listTrips($filter);
+            $payload['tripsFilter'] = $filter;
+            $payload['tripsStats']  = $this->telemetry->tripStats();
+        } elseif ($tab === 'fuel') {
+            $filter = [
+                'from' => $_GET['from'] ?? null,
+                'to'   => $_GET['to']   ?? null,
+            ];
+            $payload['fuelTx']     = $this->telemetry->listFuelTx($filter);
+            $payload['fuelStats']  = $this->telemetry->fuelTxStats();
+            $payload['fuelFilter'] = $filter;
+        } elseif ($tab === 'anomalies') {
+            $payload['anomalies'] = $this->telemetry->listAnomalies([
+                'severity' => $_GET['severity'] ?? null,
+                'status'   => $_GET['status']   ?? 'open',
+            ]);
+        } elseif ($tab === 'imports') {
+            $payload['imports'] = $this->telemetry->listImports();
         }
 
-        Response::view('fleet/index.html.twig', $request, [
-            'tab'          => $tab,
-            'canManage'    => $this->canManage($request),
-            'vehicles'     => $this->fleet->listVehicles(),
-            'cards'        => $this->fleet->listFuelCards(),
-            'telepasses'   => $this->fleet->listTelepass(),
-            'workers'      => $this->fleet->activeWorkers(),
-            'vehiclesSel'  => $this->fleet->activeVehicles(),
+        Response::view('fleet/index.html.twig', $request, $payload);
+    }
+
+    private function tripsFilterFromQuery(): array
+    {
+        return [
+            'vehicle_id' => !empty($_GET['vehicle_id']) ? (int)$_GET['vehicle_id'] : null,
+            'targa'      => !empty($_GET['targa']) ? trim($_GET['targa']) : null,
+            'from'       => $_GET['from'] ?? null,
+            'to'         => $_GET['to']   ?? null,
+            'limit'      => 300,
+        ];
+    }
+
+    // ─── Import upload ────────────────────────────────────────────────────────
+
+    public function importForm(Request $request): void
+    {
+        $this->requireManage($request);
+        Response::view('fleet/import.html.twig', $request, [
+            'canManage' => true,
         ]);
+    }
+
+    public function importUpload(Request $request): void
+    {
+        $this->requireManage($request);
+
+        $source = $_POST['source'] ?? '';
+        if (!in_array($source, ['gps', 'q8'], true)) {
+            $_SESSION['error'] = 'Tipo file non valido.';
+            Response::redirect('/fleet/import');
+        }
+        if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $_SESSION['error'] = 'Nessun file caricato (o errore upload).';
+            Response::redirect('/fleet/import');
+        }
+
+        $tmpPath  = $_FILES['file']['tmp_name'];
+        $origName = $_FILES['file']['name'];
+
+        // salva il file in storage/fleet_imports/YYYY-MM/...
+        $storedPath = $this->moveUploadedFile($tmpPath, $origName, $source);
+
+        $importId = $this->telemetry->createImport($source, $origName, $storedPath, $this->currentUserId($request));
+
+        try {
+            $result = $source === 'gps'
+                ? (new GpsRiepilogoTratteImporter($this->conn))->import($storedPath, $importId)
+                : (new Q8FuelInvoiceImporter($this->conn))->import($storedPath, $importId);
+
+            $this->telemetry->finalizeImport($importId, $result);
+
+            $_SESSION['success'] = sprintf(
+                'Import %s completato: %d righe importate, %d saltate (su %d totali).',
+                strtoupper($source),
+                $result['rows_imported'], $result['rows_skipped'], $result['rows_total']
+            );
+        } catch (\Throwable $e) {
+            $this->telemetry->finalizeImport($importId, [
+                'rows_total' => 0, 'rows_imported' => 0, 'rows_skipped' => 0,
+                'errors' => ['Eccezione: ' . $e->getMessage()],
+                'period_from' => null, 'period_to' => null,
+            ]);
+            $_SESSION['error'] = 'Import fallito: ' . $e->getMessage();
+            Response::redirect('/fleet/import');
+        }
+
+        Response::redirect('/fleet?tab=' . ($source === 'gps' ? 'trips' : 'fuel'));
+    }
+
+    /** Salva il file caricato sotto APP_ROOT/storage/fleet_imports/YYYY-MM/<hash>_<filename>. */
+    private function moveUploadedFile(string $tmpPath, string $origName, string $source): string
+    {
+        $base = APP_ROOT . '/storage/fleet_imports/' . date('Y-m');
+        if (!is_dir($base) && !mkdir($base, 0775, true) && !is_dir($base)) {
+            throw new \RuntimeException('Impossibile creare la directory di storage.');
+        }
+        $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', $origName);
+        $dest = $base . '/' . $source . '_' . date('Ymd_His') . '_' . substr(sha1_file($tmpPath), 0, 8) . '_' . $safe;
+        if (!move_uploaded_file($tmpPath, $dest)) {
+            // fallback per CLI/test
+            if (!@rename($tmpPath, $dest)) {
+                throw new \RuntimeException('Spostamento file fallito.');
+            }
+        }
+        return $dest;
+    }
+
+    public function dismissAnomaly(Request $request): void
+    {
+        $this->requireManage($request);
+        $id = (int)($_POST['id'] ?? 0);
+        $note = trim($_POST['note'] ?? '') ?: null;
+        if ($id > 0) {
+            $this->telemetry->dismissAnomaly($id, $this->currentUserId($request), $note);
+            $_SESSION['success'] = 'Anomalia archiviata.';
+        }
+        Response::redirect('/fleet?tab=anomalies');
     }
 
     // ─── Veicoli ──────────────────────────────────────────────────────────────
