@@ -24,11 +24,15 @@ final class AuthController
             }
         }
 
-        // 2) Auto-login via remember-me (GET only)
+        // 2) Auto-login via remember-me (GET only).
+        // NOTE: il vecchio codice richiedeva empty($_COOKIE['authentication_token'])
+        // ma il cookie auth resta nel browser per 8h anche dopo che la sessione
+        // DB è scaduta — bloccava l'auto-login. Basta !$autoRedirect (già true
+        // solo se validateToken ha avuto successo) per sapere che non abbiamo
+        // una sessione valida.
         if (
             !$autoRedirect
             && $_SERVER['REQUEST_METHOD'] === 'GET'
-            && empty($_COOKIE['authentication_token'])
             && !empty($_COOKIE['remember_me'])
             && str_contains($_COOKIE['remember_me'], ':')
         ) {

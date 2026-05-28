@@ -871,7 +871,8 @@ final class WorksitesController
         $clients = $clientStmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $returnTo = $_SESSION['return_to'] ?? '';
-        Response::view('worksites/edit.html.twig', $request, compact('worksite_id', 'worksite', 'companyId', 'clients', 'returnTo'));
+        $canSeePrices = $user ? $user->canSeePrices() : false;
+        Response::view('worksites/edit.html.twig', $request, compact('worksite_id', 'worksite', 'companyId', 'clients', 'returnTo', 'canSeePrices'));
     }
 
     // ── Update (POST /worksites/{id}/edit) ────────────────────────────────────
@@ -910,17 +911,32 @@ final class WorksitesController
             'company_id'      => $companyId,
         ];
 
-        $data['is_consuntivo']  = (($_POST['is_consuntivo'] ?? '0') === '1') ? 1 : 0;
-        $data['prezzo_persona'] = ($data['is_consuntivo'] && !empty($_POST['prezzo_persona']))
-            ? $this->toDecimal($_POST['prezzo_persona']) : null;
+        // Enforcement server-side: chi non ha view_prices non puo' toccare
+        // ne' i campi importo ne' il tipo contratto (che ne determina il
+        // significato economico). Si preserva il valore esistente anche se
+        // arrivasse nel POST (form manomesso).
+        $canSeePrices = $user ? $user->canSeePrices() : false;
+
+        if ($canSeePrices) {
+            $data['is_consuntivo']  = (($_POST['is_consuntivo'] ?? '0') === '1') ? 1 : 0;
+            $data['prezzo_persona'] = ($data['is_consuntivo'] && !empty($_POST['prezzo_persona']))
+                ? $this->toDecimal($_POST['prezzo_persona']) : null;
+        } else {
+            $data['is_consuntivo']  = (int)($worksite['is_consuntivo'] ?? 0);
+            $data['prezzo_persona'] = $worksite['prezzo_persona'] ?? null;
+        }
 
         if ($companyId == 1) {
-            $data['total_offer']  = $this->toDecimal($_POST['total_offer'] ?? '0');
+            $data['total_offer']  = $canSeePrices
+                ? $this->toDecimal($_POST['total_offer'] ?? '0')
+                : ($worksite['total_offer'] ?? 0);
             $data['commessa']     = $_POST['commessa']     ?? '';
             $data['order_number'] = $_POST['order_number'] ?? '';
             $data['order_date']   = empty($_POST['order_date']) ? null : $_POST['order_date'];
         } else {
-            $data['ext_total_offer']  = $this->toDecimal($_POST['ext_total_offer'] ?? '0');
+            $data['ext_total_offer']  = $canSeePrices
+                ? $this->toDecimal($_POST['ext_total_offer'] ?? '0')
+                : ($worksite['ext_total_offer'] ?? 0);
             $data['ext_order_number'] = $_POST['ext_order_number'] ?? '';
             $data['ext_order_date']   = empty($_POST['ext_order_date']) ? null : $_POST['ext_order_date'];
         }

@@ -102,11 +102,14 @@
         <div class="wcf-section">
             <div class="wcf-section-title">
                 <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                Contratto e Valore
+                {{ canSeePrices ? 'Contratto e Valore' : 'Contratto' }}
             </div>
             <div class="wcf-section-body">
 
-                {# Contract type toggle #}
+                {% if canSeePrices %}
+                {# Contract type toggle — nasconde a chi non vede i prezzi:
+                   cambiare contratto fisso/consuntivo modifica il modello
+                   economico, deve restare appannaggio del finance. #}
                 <div class="wcf-type-toggle">
                     <div class="wcf-type-option">
                         <input type="radio" name="is_consuntivo" id="tipo_contratto" value="0"
@@ -135,9 +138,11 @@
                         </label>
                     </div>
                 </div>
+                {% endif %}
 
                 <div class="wcf-grid-2">
 
+                    {% if canSeePrices %}
                     {# Contratto fisso fields #}
                     <div class="wcf-field" id="total_offer_wrap"
                          style="{{ worksite.is_consuntivo ? 'display:none;' : '' }}">
@@ -156,6 +161,7 @@
                                value="{{ worksite.prezzo_persona ? worksite.prezzo_persona|number_format(2, '.', '') : '' }}"
                                placeholder="Es. 350.00">
                     </div>
+                    {% endif %}
 
                     <div class="wcf-field">
                         <label>Numero Ordine <span class="req">*</span></label>
@@ -180,16 +186,18 @@
         <div class="wcf-section">
             <div class="wcf-section-title">
                 <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                Dati Economici
+                {{ canSeePrices ? 'Dati Economici' : 'Dati Ordine' }}
             </div>
             <div class="wcf-section-body">
                 <div class="wcf-grid-2">
+                    {% if canSeePrices %}
                     <div class="wcf-field">
                         <label>Totale Offerta (€)</label>
                         <input type="text" name="ext_total_offer"
                                value="{{ worksite.ext_total_offer|number_format(2, ',', '.') }}"
                                placeholder="Es. 50.000,00">
                     </div>
+                    {% endif %}
                     <div class="wcf-field">
                         <label>Numero Ordine</label>
                         <input type="text" name="ext_order_number" value="{{ worksite.ext_order_number }}">
