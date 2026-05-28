@@ -105,6 +105,7 @@ final class TwigRenderer
             '/offers'            => 'Offerte',
             '/bookings'          => 'Prenotazioni',
             '/equipment'         => 'Mezzi',
+            '/fleet'             => 'Flotta',
         ];
         $this->twig->addFilter(new TwigFilter('friendly_page', static function (string $raw) use ($pageMap): string {
             $path = parse_url($raw, PHP_URL_PATH) ?: $raw;

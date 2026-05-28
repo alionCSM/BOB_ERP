@@ -1,0 +1,332 @@
+{% extends 'layout/base.html.twig' %}
+
+{# Modulo Flotta — step 1: tab unico (Veicoli / Carte Q8 / Telepass). #}
+
+{% set pageTitle = 'Flotta' %}
+
+{% macro holder_chip(label, type) %}
+    {% set bg = type == 'vehicle' ? 'bg-blue-100 text-blue-800'
+              : type == 'user'    ? 'bg-emerald-100 text-emerald-800'
+              : 'bg-slate-200 text-slate-600' %}
+    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ bg }}">
+        {% if type == 'vehicle' %}<i data-lucide="truck" class="w-3 h-3 mr-1"></i>{% endif %}
+        {% if type == 'user'    %}<i data-lucide="user"  class="w-3 h-3 mr-1"></i>{% endif %}
+        {{ label }}
+    </span>
+{% endmacro %}
+
+{% import _self as fl %}
+
+{% block content %}
+<div class="grid grid-cols-12 gap-6 mt-5">
+
+    {# flash messages renderizzati globalmente da layout/_flash.html.twig #}
+
+    {# ── Header + tabs ─────────────────────────────────────────────────────── #}
+    <div class="col-span-12 flex items-center justify-between">
+        <h2 class="text-lg font-medium">Gestione Flotta</h2>
+    </div>
+
+    <div class="col-span-12">
+        <ul class="nav nav-link-tabs flex-col sm:flex-row text-center text-slate-600" role="tablist">
+            <li class="nav-item flex-1" role="presentation">
+                <a href="/fleet?tab=vehicles" class="nav-link {{ tab == 'vehicles' ? 'active font-semibold' : '' }}">
+                    <i data-lucide="truck" class="w-4 h-4 mr-1 inline-block"></i> Veicoli ({{ vehicles|length }})
+                </a>
+            </li>
+            <li class="nav-item flex-1" role="presentation">
+                <a href="/fleet?tab=cards" class="nav-link {{ tab == 'cards' ? 'active font-semibold' : '' }}">
+                    <i data-lucide="credit-card" class="w-4 h-4 mr-1 inline-block"></i> Carte Carburante ({{ cards|length }})
+                </a>
+            </li>
+            <li class="nav-item flex-1" role="presentation">
+                <a href="/fleet?tab=telepass" class="nav-link {{ tab == 'telepass' ? 'active font-semibold' : '' }}">
+                    <i data-lucide="radio" class="w-4 h-4 mr-1 inline-block"></i> Telepass ({{ telepasses|length }})
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    {# ═════════════════════════════════════════════════════════════════════════
+       TAB VEICOLI
+    ═════════════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'vehicles' %}
+        {% if canManage %}
+        <div class="col-span-12">
+            <button class="btn btn-primary shadow-md" data-tw-toggle="modal" data-tw-target="#vehicle-modal-new">
+                <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Nuovo Veicolo
+            </button>
+        </div>
+        {% endif %}
+
+        <div class="col-span-12 overflow-auto">
+            <table class="table table-report -mt-2">
+                <thead>
+                <tr>
+                    <th>Targa</th>
+                    <th>Modello</th>
+                    <th>Tipo</th>
+                    <th>Assegnato a</th>
+                    <th>Cantiere</th>
+                    <th>Carta Q8</th>
+                    <th>Telepass</th>
+                    <th>GPS</th>
+                    <th class="text-center">Stato</th>
+                    {% if canManage %}<th class="text-center">Azioni</th>{% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% if vehicles is empty %}
+                    <tr><td colspan="{{ canManage ? 10 : 9 }}" class="text-center text-slate-500 py-6">Nessun veicolo in flotta. Aggiungine uno.</td></tr>
+                {% else %}
+                    {% for v in vehicles %}
+                        <tr class="intro-x">
+                            <td class="font-semibold">{{ v.targa }}</td>
+                            <td>{{ v.modello ?: '—' }}</td>
+                            <td><span class="text-xs uppercase tracking-wide text-slate-500">{{ v.tipo }}</span></td>
+                            <td>
+                                {% if v.current_username %}
+                                    {{ fl.holder_chip(v.current_username, 'user') }}
+                                {% else %}
+                                    <span class="text-xs text-slate-400">— libero —</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ v.current_worksite_name ?: '—' }}</td>
+                            <td>
+                                {% if v.current_card_numero %}
+                                    <span class="text-xs">{{ v.current_card_fornitore }} · <b>{{ v.current_card_numero }}</b></span>
+                                {% else %}
+                                    <span class="text-xs text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if v.current_telepass_numero %}
+                                    <span class="text-xs"><b>{{ v.current_telepass_numero }}</b></span>
+                                {% else %}
+                                    <span class="text-xs text-slate-400">—</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="text-xs text-slate-500">{{ v.gps_device_id ?: '—' }}</span></td>
+                            <td class="text-center">
+                                {% if v.active %}
+                                    <span class="text-success">●</span>
+                                {% else %}
+                                    <span class="text-slate-400">○</span>
+                                {% endif %}
+                            </td>
+                            {% if canManage %}
+                            <td class="table-report__action w-72">
+                                <div class="flex justify-center items-center gap-2">
+                                    <button class="btn btn-outline-secondary py-1 px-2" data-tw-toggle="modal" data-tw-target="#vehicle-reassign-{{ v.id }}">
+                                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary py-1 px-2" data-tw-toggle="modal" data-tw-target="#vehicle-modal-{{ v.id }}">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <form method="POST" action="/fleet/vehicle/delete" class="inline" onsubmit="return confirm('Eliminare veicolo {{ v.targa }}? Le assegnazioni storiche andranno perse.');">
+                                        <input type="hidden" name="id" value="{{ v.id }}">
+                                        <button class="btn btn-outline-danger py-1 px-2"><i data-lucide="trash" class="w-4 h-4"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {# ── Modal create veicolo ────────────────────────────────────────── #}
+        {% if canManage %}
+            {% include 'fleet/_modal_vehicle.html.twig' with {v: null, modalId: 'vehicle-modal-new', worksitesForSel: worksitesForSel} only %}
+            {% for v in vehicles %}
+                {% include 'fleet/_modal_vehicle.html.twig' with {v: v, modalId: 'vehicle-modal-' ~ v.id, worksitesForSel: worksitesForSel} only %}
+                {% include 'fleet/_modal_vehicle_reassign.html.twig' with {v: v, usersForSelect: usersForSelect} only %}
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+
+    {# ═════════════════════════════════════════════════════════════════════════
+       TAB CARTE
+    ═════════════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'cards' %}
+        {% if canManage %}
+        <div class="col-span-12">
+            <button class="btn btn-primary shadow-md" data-tw-toggle="modal" data-tw-target="#card-modal-new">
+                <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Nuova Carta
+            </button>
+        </div>
+        {% endif %}
+
+        <div class="col-span-12 overflow-auto">
+            <table class="table table-report -mt-2">
+                <thead>
+                <tr>
+                    <th>Fornitore</th>
+                    <th>Numero</th>
+                    <th>Holder corrente</th>
+                    <th>Note</th>
+                    <th class="text-center">Stato</th>
+                    {% if canManage %}<th class="text-center">Azioni</th>{% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% if cards is empty %}
+                    <tr><td colspan="{{ canManage ? 6 : 5 }}" class="text-center text-slate-500 py-6">Nessuna carta carburante registrata.</td></tr>
+                {% else %}
+                    {% for c in cards %}
+                        <tr class="intro-x">
+                            <td>{{ c.fornitore }}</td>
+                            <td class="font-mono font-semibold">{{ c.numero }}</td>
+                            <td>
+                                {% if c.holder_vehicle_targa %}
+                                    {{ fl.holder_chip(c.holder_vehicle_targa, 'vehicle') }}
+                                {% elseif c.holder_username %}
+                                    {{ fl.holder_chip(c.holder_username, 'user') }}
+                                {% else %}
+                                    <span class="text-xs text-slate-400">— libera —</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-500">{{ c.notes|default('') }}</td>
+                            <td class="text-center">{{ c.active ? '●' : '○' }}</td>
+                            {% if canManage %}
+                            <td class="table-report__action w-72">
+                                <div class="flex justify-center items-center gap-2">
+                                    <button class="btn btn-outline-secondary py-1 px-2" data-tw-toggle="modal" data-tw-target="#card-reassign-{{ c.id }}">
+                                        <i data-lucide="repeat" class="w-4 h-4"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary py-1 px-2" data-tw-toggle="modal" data-tw-target="#card-modal-{{ c.id }}">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <form method="POST" action="/fleet/card/delete" class="inline" onsubmit="return confirm('Eliminare carta {{ c.numero }}?');">
+                                        <input type="hidden" name="id" value="{{ c.id }}">
+                                        <button class="btn btn-outline-danger py-1 px-2"><i data-lucide="trash" class="w-4 h-4"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if canManage %}
+            {% include 'fleet/_modal_card.html.twig' with {c: null, modalId: 'card-modal-new'} only %}
+            {% for c in cards %}
+                {% include 'fleet/_modal_card.html.twig' with {c: c, modalId: 'card-modal-' ~ c.id} only %}
+                {% include 'fleet/_modal_holder_reassign.html.twig' with {
+                    modalId: 'card-reassign-' ~ c.id,
+                    action: '/fleet/card/reassign',
+                    entityIdField: 'card_id',
+                    entityId: c.id,
+                    entityLabel: 'Carta ' ~ c.fornitore ~ ' · ' ~ c.numero,
+                    vehiclesForSel: vehiclesForSel,
+                    usersForSelect: usersForSelect
+                } only %}
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+
+    {# ═════════════════════════════════════════════════════════════════════════
+       TAB TELEPASS
+    ═════════════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'telepass' %}
+        {% if canManage %}
+        <div class="col-span-12">
+            <button class="btn btn-primary shadow-md" data-tw-toggle="modal" data-tw-target="#telepass-modal-new">
+                <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Nuovo Telepass
+            </button>
+        </div>
+        {% endif %}
+
+        <div class="col-span-12 overflow-auto">
+            <table class="table table-report -mt-2">
+                <thead>
+                <tr>
+                    <th>Numero</th>
+                    <th>Tipo</th>
+                    <th>Holder corrente</th>
+                    <th>Note</th>
+                    <th class="text-center">Stato</th>
+                    {% if canManage %}<th class="text-center">Azioni</th>{% endif %}
+                </tr>
+                </thead>
+                <tbody>
+                {% if telepasses is empty %}
+                    <tr><td colspan="{{ canManage ? 6 : 5 }}" class="text-center text-slate-500 py-6">Nessun telepass registrato.</td></tr>
+                {% else %}
+                    {% for t in telepasses %}
+                        <tr class="intro-x">
+                            <td class="font-mono font-semibold">{{ t.numero }}</td>
+                            <td class="text-xs text-slate-500">{{ t.tipo ?: '—' }}</td>
+                            <td>
+                                {% if t.holder_vehicle_targa %}
+                                    {{ fl.holder_chip(t.holder_vehicle_targa, 'vehicle') }}
+                                {% elseif t.holder_username %}
+                                    {{ fl.holder_chip(t.holder_username, 'user') }}
+                                {% else %}
+                                    <span class="text-xs text-slate-400">— libero —</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-xs text-slate-500">{{ t.notes|default('') }}</td>
+                            <td class="text-center">{{ t.active ? '●' : '○' }}</td>
+                            {% if canManage %}
+                            <td class="table-report__action w-72">
+                                <div class="flex justify-center items-center gap-2">
+                                    <button class="btn btn-outline-secondary py-1 px-2" data-tw-toggle="modal" data-tw-target="#telepass-reassign-{{ t.id }}">
+                                        <i data-lucide="repeat" class="w-4 h-4"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary py-1 px-2" data-tw-toggle="modal" data-tw-target="#telepass-modal-{{ t.id }}">
+                                        <i data-lucide="edit" class="w-4 h-4"></i>
+                                    </button>
+                                    <form method="POST" action="/fleet/telepass/delete" class="inline" onsubmit="return confirm('Eliminare telepass {{ t.numero }}?');">
+                                        <input type="hidden" name="id" value="{{ t.id }}">
+                                        <button class="btn btn-outline-danger py-1 px-2"><i data-lucide="trash" class="w-4 h-4"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if canManage %}
+            {% include 'fleet/_modal_telepass.html.twig' with {t: null, modalId: 'telepass-modal-new'} only %}
+            {% for t in telepasses %}
+                {% include 'fleet/_modal_telepass.html.twig' with {t: t, modalId: 'telepass-modal-' ~ t.id} only %}
+                {% include 'fleet/_modal_holder_reassign.html.twig' with {
+                    modalId: 'telepass-reassign-' ~ t.id,
+                    action: '/fleet/telepass/reassign',
+                    entityIdField: 'telepass_id',
+                    entityId: t.id,
+                    entityLabel: 'Telepass ' ~ t.numero,
+                    vehiclesForSel: vehiclesForSel,
+                    usersForSelect: usersForSelect
+                } only %}
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+
+</div>
+
+{# Toggle holder_type panels nei modali di riassegnazione carte/telepass.
+   Delegato a livello document per non duplicare listener per ogni modale. #}
+<script nonce="{{ cspNonce }}">
+document.addEventListener('change', function (e) {
+    var radio = e.target.closest('input[data-fleet-holder]');
+    if (!radio) return;
+    var modalId = radio.getAttribute('data-fleet-holder');
+    var val = radio.value;
+    document.querySelectorAll('[data-fleet-holder-panel][data-modal="' + modalId + '"]').forEach(function (panel) {
+        var show = panel.getAttribute('data-fleet-holder-panel') === val;
+        panel.style.display = show ? 'block' : 'none';
+    });
+});
+</script>
+{% endblock %}

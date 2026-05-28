@@ -1,0 +1,40 @@
+{# Crea/modifica telepass. Param: t (null = create), modalId #}
+<div id="{{ modalId }}" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <form method="POST" action="/fleet/telepass/save" class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">
+                    {{ t ? 'Modifica telepass ' ~ t.numero : 'Nuovo telepass' }}
+                </h2>
+            </div>
+            <div class="modal-body">
+                {% if t %}<input type="hidden" name="id" value="{{ t.id }}">{% endif %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Numero *</label>
+                        <input type="text" name="numero" class="form-control" required
+                               value="{{ t.numero|default('') }}" maxlength="64">
+                    </div>
+                    <div>
+                        <label class="form-label">Tipo (Family / Business / ...)</label>
+                        <input type="text" name="tipo" class="form-control" value="{{ t.tipo|default('') }}" maxlength="60">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Note</label>
+                        <input type="text" name="notes" class="form-control" value="{{ t.notes|default('') }}">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="active" class="form-check-input mr-2" {{ t is null or t.active ? 'checked' : '' }}>
+                            <span>Attivo</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer text-right">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
+                <button type="submit" class="btn btn-primary">Salva</button>
+            </div>
+        </form>
+    </div>
+</div>

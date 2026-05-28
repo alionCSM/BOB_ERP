@@ -1,0 +1,41 @@
+{# Cambia assegnatario veicolo. Param: v, usersForSelect #}
+<div id="vehicle-reassign-{{ v.id }}" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <form method="POST" action="/fleet/vehicle/reassign" class="modal-content">
+            <input type="hidden" name="vehicle_id" value="{{ v.id }}">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">Assegna veicolo {{ v.targa }}</h2>
+            </div>
+            <div class="modal-body">
+                <p class="text-xs text-slate-500 mb-3">
+                    {% if v.current_username %}
+                        Attualmente assegnato a <b>{{ v.current_username }}</b>. La nuova assegnazione chiude la precedente alla data scelta.
+                    {% else %}
+                        Veicolo attualmente libero.
+                    {% endif %}
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Nuovo assegnatario</label>
+                    <select name="user_id" class="form-select">
+                        <option value="">— libera il veicolo —</option>
+                        {% for u in usersForSelect %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Data inizio</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ 'now'|date('Y-m-d') }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Note (opzionale)</label>
+                    <input type="text" name="notes" class="form-control" maxlength="255">
+                </div>
+            </div>
+            <div class="modal-footer text-right">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
+                <button type="submit" class="btn btn-primary">Conferma</button>
+            </div>
+        </form>
+    </div>
+</div>

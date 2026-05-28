@@ -1,0 +1,41 @@
+{# Crea/modifica carta carburante. Param: c (null = create), modalId #}
+<div id="{{ modalId }}" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <form method="POST" action="/fleet/card/save" class="modal-content">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">
+                    {{ c ? 'Modifica carta ' ~ c.numero : 'Nuova carta carburante' }}
+                </h2>
+            </div>
+            <div class="modal-body">
+                {% if c %}<input type="hidden" name="id" value="{{ c.id }}">{% endif %}
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="form-label">Numero *</label>
+                        <input type="text" name="numero" class="form-control" required
+                               value="{{ c.numero|default('') }}" maxlength="64">
+                    </div>
+                    <div>
+                        <label class="form-label">Fornitore</label>
+                        <input type="text" name="fornitore" class="form-control"
+                               value="{{ c.fornitore|default('Q8') }}" maxlength="60">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label">Note</label>
+                        <input type="text" name="notes" class="form-control" value="{{ c.notes|default('') }}">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" name="active" class="form-check-input mr-2" {{ c is null or c.active ? 'checked' : '' }}>
+                            <span>Attiva</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer text-right">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
+                <button type="submit" class="btn btn-primary">Salva</button>
+            </div>
+        </form>
+    </div>
+</div>

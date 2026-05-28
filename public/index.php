@@ -497,6 +497,27 @@ if (str_starts_with($uri, '/api/')) {
     $router->dispatch($request, $container);
 }
 
+if ($uri === '/fleet' || str_starts_with($uri, '/fleet/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/fleet',                       [FleetController::class, 'index'])
+           ->post('/fleet/vehicle/save',         [FleetController::class, 'saveVehicle'])
+           ->post('/fleet/vehicle/delete',       [FleetController::class, 'deleteVehicle'])
+           ->post('/fleet/vehicle/reassign',     [FleetController::class, 'reassignVehicle'])
+           ->post('/fleet/card/save',            [FleetController::class, 'saveCard'])
+           ->post('/fleet/card/delete',          [FleetController::class, 'deleteCard'])
+           ->post('/fleet/card/reassign',        [FleetController::class, 'reassignCard'])
+           ->post('/fleet/telepass/save',        [FleetController::class, 'saveTelepass'])
+           ->post('/fleet/telepass/delete',      [FleetController::class, 'deleteTelepass'])
+           ->post('/fleet/telepass/reassign',    [FleetController::class, 'reassignTelepass']);
+
+    $router->dispatch($request, $container);
+}
+
 if ($uri === '/equipment' || str_starts_with($uri, '/equipment/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

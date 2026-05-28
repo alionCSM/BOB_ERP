@@ -1,0 +1,67 @@
+{# Riassegna carta/telepass a veicolo XOR utente.
+   Param: modalId, action, entityIdField (es. 'card_id'), entityId, entityLabel,
+          vehiclesForSel, usersForSelect #}
+<div id="{{ modalId }}" class="modal fade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" style="max-width: 500px;">
+        <form method="POST" action="{{ action }}" class="modal-content">
+            <input type="hidden" name="{{ entityIdField }}" value="{{ entityId }}">
+            <div class="modal-header">
+                <h2 class="font-medium text-base mr-auto">Assegna {{ entityLabel }}</h2>
+            </div>
+            <div class="modal-body">
+                {# I radio si comportano da toggle via delegated handler
+                   nel base template (data-fleet-holder + data-modal). #}
+                <div class="mb-3" data-fleet-holder-group="{{ modalId }}">
+                    <label class="form-label">Holder</label>
+                    <div class="flex gap-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="holder_type" value="vehicle" class="form-check-input mr-2" data-fleet-holder="{{ modalId }}" checked>
+                            <span>Veicolo</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="holder_type" value="user" class="form-check-input mr-2" data-fleet-holder="{{ modalId }}">
+                            <span>Persona</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="holder_type" value="none" class="form-check-input mr-2" data-fleet-holder="{{ modalId }}">
+                            <span>Libera</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div data-fleet-holder-panel="vehicle" data-modal="{{ modalId }}" class="mb-3">
+                    <label class="form-label">Veicolo</label>
+                    <select name="vehicle_id" class="form-select">
+                        <option value="">— seleziona —</option>
+                        {% for v in vehiclesForSel %}
+                            <option value="{{ v.id }}">{{ v.targa }} · {{ v.modello }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div data-fleet-holder-panel="user" data-modal="{{ modalId }}" class="mb-3" style="display:none;">
+                    <label class="form-label">Persona</label>
+                    <select name="user_id" class="form-select">
+                        <option value="">— seleziona —</option>
+                        {% for u in usersForSelect %}
+                            <option value="{{ u.id }}">{{ u.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Data inizio</label>
+                    <input type="date" name="from_date" class="form-control" value="{{ 'now'|date('Y-m-d') }}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Note (opzionale)</label>
+                    <input type="text" name="notes" class="form-control" maxlength="255">
+                </div>
+            </div>
+            <div class="modal-footer text-right">
+                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
+                <button type="submit" class="btn btn-primary">Conferma</button>
+            </div>
+        </form>
+    </div>
+</div>
