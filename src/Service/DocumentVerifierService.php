@@ -433,7 +433,9 @@ PROMPT;
         $detectedExpiry = trim((string)($a['scadenza_rilevata'] ?? ''));
         if ($declaredExpiry !== '' && $detectedExpiry !== ''
             && !$this->expiriesLooseMatch($declaredExpiry, $detectedExpiry)) {
-            $issues[] = "Scadenza dichiarata: <strong>{$declaredExpiry}</strong> &mdash; rilevata: <strong>{$detectedExpiry}</strong>";
+            $declaredFmt = $this->formatExpiryForHumans($declaredExpiry);
+            $detectedFmt = $this->formatExpiryForHumans($detectedExpiry);
+            $issues[] = "Scadenza dichiarata: <strong>{$declaredFmt}</strong> &mdash; rilevata: <strong>{$detectedFmt}</strong>";
         }
 
         return $issues;
@@ -457,6 +459,24 @@ PROMPT;
         if (empty($aTokens) || empty($bTokens)) return true; // niente da confrontare
         $shared = array_intersect($aTokens, $bTokens);
         return count($shared) >= 1;
+    }
+
+    /**
+     * Rende una scadenza in formato italiano (dd/mm/YYYY) per la mail.
+     * Lascia inalterati i valori non parsabili (es. "INDETERMINATO").
+     */
+    private function formatExpiryForHumans(string $s): string
+    {
+        $s = trim($s);
+        if ($s === '') return '';
+        if (strcasecmp($s, 'INDETERMINATO') === 0) return 'INDETERMINATO';
+        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'd.m.Y', 'd/m/y'] as $fmt) {
+            $dt = \DateTime::createFromFormat($fmt, $s);
+            if ($dt && $dt->format($fmt) === $s) {
+                return $dt->format('d/m/Y');
+            }
+        }
+        return $s;
     }
 
     private function expiriesLooseMatch(string $a, string $b): bool
