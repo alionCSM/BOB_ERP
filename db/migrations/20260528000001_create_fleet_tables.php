@@ -49,7 +49,7 @@ final class CreateFleetTables extends AbstractMigration
         // ── Assegnazioni veicolo -> utente ───────────────────────────────────
         if (!$this->hasTable('bb_fleet_vehicle_assignments')) {
             $this->table('bb_fleet_vehicle_assignments', ['id' => true, 'primary_key' => 'id'])
-                ->addColumn('vehicle_id', 'integer',  ['null' => false, 'signed' => true])
+                ->addColumn('vehicle_id', 'integer',  ['null' => false, 'signed' => false])
                 ->addColumn('user_id',    'integer',  ['null' => false, 'signed' => true])
                 ->addColumn('from_date',  'date',     ['null' => false])
                 ->addColumn('to_date',    'date',     ['null' => true])
@@ -77,8 +77,8 @@ final class CreateFleetTables extends AbstractMigration
 
         if (!$this->hasTable('bb_fleet_fuel_card_assignments')) {
             $this->table('bb_fleet_fuel_card_assignments', ['id' => true, 'primary_key' => 'id'])
-                ->addColumn('card_id',    'integer',  ['null' => false, 'signed' => true])
-                ->addColumn('vehicle_id', 'integer',  ['null' => true,  'signed' => true])
+                ->addColumn('card_id',    'integer',  ['null' => false, 'signed' => false])
+                ->addColumn('vehicle_id', 'integer',  ['null' => true,  'signed' => false])
                 ->addColumn('user_id',    'integer',  ['null' => true,  'signed' => true])
                 ->addColumn('from_date',  'date',     ['null' => false])
                 ->addColumn('to_date',    'date',     ['null' => true])
@@ -115,8 +115,8 @@ final class CreateFleetTables extends AbstractMigration
 
         if (!$this->hasTable('bb_fleet_telepass_assignments')) {
             $this->table('bb_fleet_telepass_assignments', ['id' => true, 'primary_key' => 'id'])
-                ->addColumn('telepass_id', 'integer',  ['null' => false, 'signed' => true])
-                ->addColumn('vehicle_id',  'integer',  ['null' => true,  'signed' => true])
+                ->addColumn('telepass_id', 'integer',  ['null' => false, 'signed' => false])
+                ->addColumn('vehicle_id',  'integer',  ['null' => true,  'signed' => false])
                 ->addColumn('user_id',     'integer',  ['null' => true,  'signed' => true])
                 ->addColumn('from_date',   'date',     ['null' => false])
                 ->addColumn('to_date',     'date',     ['null' => true])
