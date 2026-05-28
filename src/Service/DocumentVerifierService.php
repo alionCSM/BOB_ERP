@@ -487,7 +487,20 @@ PROMPT;
             // Una delle due non è parsabile come data — confronto stringa case-insensitive
             return strtoupper(trim($a)) === strtoupper(trim($b));
         }
-        return $aN === $bN;
+        if ($aN === $bN) return true;
+
+        // Tolleranza ±1 giorno: in Italia "validità 5 anni dal 12/11/2022"
+        // può legittimamente significare sia 12/11/2027 (X+5y) sia 11/11/2027
+        // (giorno prima, convenzione "valido fino al ..."). Entrambe le letture
+        // sono accettabili: non vale la pena segnalarle come anomalia, è solo
+        // rumore. Stesso ragionamento per OCR che spezza "01" in "02".
+        try {
+            $dA = new \DateTime($aN);
+            $dB = new \DateTime($bN);
+            return abs((int)$dA->diff($dB)->format('%a')) <= 1;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     // ── Chiamata LLM ─────────────────────────────────────────────────────────
@@ -550,6 +563,7 @@ Regole assolute:
 - Per Unilav la "scadenza" è la data di fine rapporto; se a tempo indeterminato scrivi "INDETERMINATO".
 - Per Visita medica la "scadenza" è la data della prossima visita / fine validità idoneità.
 - Per gli attestati di formazione la "scadenza" è quella indicata o calcolabile (validità tipica 5 anni dalla data corso per le abilitazioni Accordo Stato-Regioni, 3 anni per primo soccorso / antincendio).
+- Convenzione date: "validità 5 anni dal 12/11/2022" → scadenza 11/11/2027 (l'ultimo giorno valido è il giorno PRIMA della data corrispondente nell'anno successivo). NON sommare ingenuamente +5 anni alla data corso: togli sempre 1 giorno. Se invece il testo cita esplicitamente "scadenza" o "valido fino al" con una data, usa quella tale e quale.
 - Se il testo è troppo confuso o non riconosci il tipo, restituisci "Altro" e confidenza < 40.
 - Sii rigoroso: meglio bassa confidenza che invenzioni.
 PROMPT;
