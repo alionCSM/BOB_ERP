@@ -9,13 +9,18 @@ use App\Repository\Fleet\FleetRepository;
 /**
  * Modulo Flotta — step 1.
  *
- * Le tre azioni "index" (vehicles / fuelCards / telepass) caricano una
- * pagina con tab. Le mutazioni passano da endpoint POST dedicati che poi
- * redirigono sulla tab giusta.
+ * /fleet                       pagina principale (3 tab via ?tab=)
+ * POST /fleet/vehicle/save     create/update veicolo
+ * POST /fleet/vehicle/delete   elimina
+ * POST /fleet/vehicle/reassign cambia assegnatario (operaio)
+ * GET  /fleet/vehicle/{id}/history   JSON storico
+ * (idem per card e telepass)
  *
  * Permessi:
- *   - fleet_view   leggere la pagina
- *   - fleet_manage creare/modificare/riassegnare
+ *   - fleet_view   leggere la pagina + storico
+ *   - fleet_manage CRUD + riassegnazioni
+ *
+ * Assegnatari = operai (bb_workers).
  */
 final class FleetController
 {
@@ -24,7 +29,7 @@ final class FleetController
         private FleetRepository $fleet
     ) {}
 
-    // ─── Pagina principale (tab unica) ────────────────────────────────────────
+    // ─── Pagina principale ────────────────────────────────────────────────────
 
     public function index(Request $request): void
     {
@@ -35,17 +40,14 @@ final class FleetController
             $tab = 'vehicles';
         }
 
-        $canManage = $this->canManage($request);
-
         Response::view('fleet/index.html.twig', $request, [
-            'tab'             => $tab,
-            'canManage'       => $canManage,
-            'vehicles'        => $this->fleet->listVehicles(),
-            'cards'           => $this->fleet->listFuelCards(),
-            'telepasses'      => $this->fleet->listTelepass(),
-            'usersForSelect'  => $this->fleet->activeUsers(),
-            'worksitesForSel' => $this->fleet->activeWorksites(),
-            'vehiclesForSel'  => $this->fleet->activeVehicles(),
+            'tab'          => $tab,
+            'canManage'    => $this->canManage($request),
+            'vehicles'     => $this->fleet->listVehicles(),
+            'cards'        => $this->fleet->listFuelCards(),
+            'telepasses'   => $this->fleet->listTelepass(),
+            'workers'      => $this->fleet->activeWorkers(),
+            'vehiclesSel'  => $this->fleet->activeVehicles(),
         ]);
     }
 
@@ -57,13 +59,12 @@ final class FleetController
 
         $id = (int)($_POST['id'] ?? 0);
         $data = [
-            'targa'               => strtoupper(trim($_POST['targa'] ?? '')),
-            'modello'             => trim($_POST['modello'] ?? '') ?: null,
-            'tipo'                => $_POST['tipo'] ?? 'furgone',
-            'gps_device_id'       => trim($_POST['gps_device_id'] ?? '') ?: null,
-            'current_worksite_id' => !empty($_POST['current_worksite_id']) ? (int)$_POST['current_worksite_id'] : null,
-            'notes'               => trim($_POST['notes'] ?? '') ?: null,
-            'active'              => !empty($_POST['active']),
+            'targa'         => strtoupper(trim($_POST['targa'] ?? '')),
+            'modello'       => trim($_POST['modello'] ?? '') ?: null,
+            'tipo'          => $_POST['tipo'] ?? 'furgone',
+            'gps_device_id' => trim($_POST['gps_device_id'] ?? '') ?: null,
+            'notes'         => trim($_POST['notes'] ?? '') ?: null,
+            'active'        => !empty($_POST['active']),
         ];
 
         if ($data['targa'] === '') {
@@ -102,32 +103,37 @@ final class FleetController
     {
         $this->requireManage($request);
         $vehicleId = (int)($_POST['vehicle_id'] ?? 0);
-        $userId    = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null;
+        $workerId  = !empty($_POST['worker_id']) ? (int)$_POST['worker_id'] : null;
         $fromDate  = $_POST['from_date'] ?? date('Y-m-d');
         $notes     = trim($_POST['notes'] ?? '') ?: null;
 
-        if ($vehicleId <= 0) {
-            Response::error('Veicolo non valido', 400);
-        }
+        if ($vehicleId <= 0) Response::error('Veicolo non valido', 400);
 
         try {
-            $this->fleet->reassignVehicle(
-                $vehicleId,
-                $userId,
-                $fromDate,
-                $request->user()?->id ? (int)$request->user()->id : null,
-                $notes
-            );
-            $_SESSION['success'] = $userId
-                ? 'Assegnazione aggiornata.'
-                : 'Veicolo liberato.';
+            $this->fleet->reassignVehicle($vehicleId, $workerId, $fromDate, $this->currentUserId($request), $notes);
+            $_SESSION['success'] = $workerId ? 'Assegnazione aggiornata.' : 'Veicolo liberato.';
         } catch (\Throwable $e) {
             $_SESSION['error'] = 'Errore: ' . $e->getMessage();
         }
         Response::redirect('/fleet?tab=vehicles');
     }
 
-    // ─── Carte carburante ─────────────────────────────────────────────────────
+    public function vehicleHistory(Request $request): void
+    {
+        $this->requireView($request);
+        $id = $request->intParam('id');
+        if ($id <= 0) Response::error('Veicolo non valido', 400);
+
+        $vehicle = $this->fleet->findVehicle($id);
+        if (!$vehicle) Response::error('Non trovato', 404);
+
+        Response::json([
+            'vehicle' => $vehicle,
+            'history' => $this->fleet->vehicleHistory($id),
+        ]);
+    }
+
+    // ─── Carte ────────────────────────────────────────────────────────────────
 
     public function saveCard(Request $request): void
     {
@@ -174,34 +180,34 @@ final class FleetController
     {
         $this->requireManage($request);
         $cardId   = (int)($_POST['card_id'] ?? 0);
-        $holder   = $_POST['holder_type'] ?? '';   // 'vehicle' | 'user' | 'none'
+        $holder   = $_POST['holder_type'] ?? '';   // 'vehicle' | 'worker' | 'none'
         $fromDate = $_POST['from_date'] ?? date('Y-m-d');
         $notes    = trim($_POST['notes'] ?? '') ?: null;
-
         if ($cardId <= 0) Response::error('Carta non valida', 400);
 
-        $vehicleId = null;
-        $userId    = null;
-        if ($holder === 'vehicle') {
-            $vehicleId = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : null;
-            if (!$vehicleId) { $_SESSION['error'] = 'Selezionare un veicolo.'; Response::redirect('/fleet?tab=cards'); }
-        } elseif ($holder === 'user') {
-            $userId = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null;
-            if (!$userId) { $_SESSION['error'] = 'Selezionare un utente.'; Response::redirect('/fleet?tab=cards'); }
-        }
-        // holder === 'none' => entrambi null => libera la carta
+        [$vehicleId, $workerId] = $this->resolveHolder($holder, '/fleet?tab=cards');
 
         try {
-            $this->fleet->reassignFuelCard(
-                $cardId, $vehicleId, $userId, $fromDate,
-                $request->user()?->id ? (int)$request->user()->id : null,
-                $notes
-            );
+            $this->fleet->reassignFuelCard($cardId, $vehicleId, $workerId, $fromDate, $this->currentUserId($request), $notes);
             $_SESSION['success'] = 'Assegnazione carta aggiornata.';
         } catch (\Throwable $e) {
             $_SESSION['error'] = 'Errore: ' . $e->getMessage();
         }
         Response::redirect('/fleet?tab=cards');
+    }
+
+    public function cardHistory(Request $request): void
+    {
+        $this->requireView($request);
+        $id = $request->intParam('id');
+        if ($id <= 0) Response::error('Carta non valida', 400);
+        $card = $this->fleet->findFuelCard($id);
+        if (!$card) Response::error('Non trovata', 404);
+
+        Response::json([
+            'card'    => $card,
+            'history' => $this->fleet->fuelCardHistory($id),
+        ]);
     }
 
     // ─── Telepass ─────────────────────────────────────────────────────────────
@@ -256,27 +262,61 @@ final class FleetController
         $notes    = trim($_POST['notes'] ?? '') ?: null;
         if ($tpId <= 0) Response::error('Telepass non valido', 400);
 
-        $vehicleId = null;
-        $userId    = null;
-        if ($holder === 'vehicle') {
-            $vehicleId = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : null;
-            if (!$vehicleId) { $_SESSION['error'] = 'Selezionare un veicolo.'; Response::redirect('/fleet?tab=telepass'); }
-        } elseif ($holder === 'user') {
-            $userId = !empty($_POST['user_id']) ? (int)$_POST['user_id'] : null;
-            if (!$userId) { $_SESSION['error'] = 'Selezionare un utente.'; Response::redirect('/fleet?tab=telepass'); }
-        }
+        [$vehicleId, $workerId] = $this->resolveHolder($holder, '/fleet?tab=telepass');
 
         try {
-            $this->fleet->reassignTelepass(
-                $tpId, $vehicleId, $userId, $fromDate,
-                $request->user()?->id ? (int)$request->user()->id : null,
-                $notes
-            );
+            $this->fleet->reassignTelepass($tpId, $vehicleId, $workerId, $fromDate, $this->currentUserId($request), $notes);
             $_SESSION['success'] = 'Assegnazione telepass aggiornata.';
         } catch (\Throwable $e) {
             $_SESSION['error'] = 'Errore: ' . $e->getMessage();
         }
         Response::redirect('/fleet?tab=telepass');
+    }
+
+    public function telepassHistory(Request $request): void
+    {
+        $this->requireView($request);
+        $id = $request->intParam('id');
+        if ($id <= 0) Response::error('Telepass non valido', 400);
+        $tp = $this->fleet->findTelepass($id);
+        if (!$tp) Response::error('Non trovato', 404);
+
+        Response::json([
+            'telepass' => $tp,
+            'history'  => $this->fleet->telepassHistory($id),
+        ]);
+    }
+
+    // ─── Internals ────────────────────────────────────────────────────────────
+
+    /** Estrae (vehicleId, workerId) dalla scelta del radio "holder_type" e
+     *  fa redirect-con-errore se mancante. Centralizza la validazione XOR. */
+    private function resolveHolder(string $holder, string $redirectOnError): array
+    {
+        if ($holder === 'vehicle') {
+            $vehicleId = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : null;
+            if (!$vehicleId) {
+                $_SESSION['error'] = 'Selezionare un veicolo.';
+                Response::redirect($redirectOnError);
+            }
+            return [$vehicleId, null];
+        }
+        if ($holder === 'worker') {
+            $workerId = !empty($_POST['worker_id']) ? (int)$_POST['worker_id'] : null;
+            if (!$workerId) {
+                $_SESSION['error'] = 'Selezionare un operaio.';
+                Response::redirect($redirectOnError);
+            }
+            return [null, $workerId];
+        }
+        // 'none' o vuoto => libera
+        return [null, null];
+    }
+
+    private function currentUserId(Request $request): ?int
+    {
+        $u = $request->user();
+        return ($u && isset($u->id)) ? (int)$u->id : null;
     }
 
     // ─── Permission guards ────────────────────────────────────────────────────
@@ -299,15 +339,11 @@ final class FleetController
 
     private function requireView(Request $request): void
     {
-        if (!$this->canView($request)) {
-            Response::error('Accesso negato al modulo Flotta.', 403);
-        }
+        if (!$this->canView($request)) Response::error('Accesso negato al modulo Flotta.', 403);
     }
 
     private function requireManage(Request $request): void
     {
-        if (!$this->canManage($request)) {
-            Response::error('Permesso fleet_manage richiesto.', 403);
-        }
+        if (!$this->canManage($request)) Response::error('Permesso fleet_manage richiesto.', 403);
     }
 }

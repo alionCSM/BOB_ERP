@@ -1,0 +1,24 @@
+{# Modale storico — riusato per veicoli, carte, telepass.
+   Il body viene popolato via fetch JSON da fleet.js.
+   Param: modalId, title, sub #}
+<div id="{{ modalId }}" class="fl-modal">
+    <div class="fl-modal-backdrop"></div>
+    <div class="fl-modal-dialog is-lg">
+        <div class="fl-modal-head">
+            <div class="fl-modal-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+                <h3 class="fl-modal-title">{{ title }}</h3>
+                <p class="fl-modal-sub">{{ sub }}</p>
+            </div>
+            <button type="button" class="fl-modal-close" data-fl-close>&times;</button>
+        </div>
+        <div class="fl-modal-body" data-fl-history-body>
+            <div class="fl-tl-empty">Apri il modale dalla riga per caricare lo storico…</div>
+        </div>
+        <div class="fl-modal-foot">
+            <button type="button" class="fl-btn-cancel" data-fl-close>Chiudi</button>
+        </div>
+    </div>
+</div>

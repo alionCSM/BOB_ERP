@@ -504,16 +504,19 @@ if ($uri === '/fleet' || str_starts_with($uri, '/fleet/')) {
     $request = new \App\Http\Request();
     $router  = new \App\Http\Router();
 
-    $router->get('/fleet',                       [FleetController::class, 'index'])
-           ->post('/fleet/vehicle/save',         [FleetController::class, 'saveVehicle'])
-           ->post('/fleet/vehicle/delete',       [FleetController::class, 'deleteVehicle'])
-           ->post('/fleet/vehicle/reassign',     [FleetController::class, 'reassignVehicle'])
-           ->post('/fleet/card/save',            [FleetController::class, 'saveCard'])
-           ->post('/fleet/card/delete',          [FleetController::class, 'deleteCard'])
-           ->post('/fleet/card/reassign',        [FleetController::class, 'reassignCard'])
-           ->post('/fleet/telepass/save',        [FleetController::class, 'saveTelepass'])
-           ->post('/fleet/telepass/delete',      [FleetController::class, 'deleteTelepass'])
-           ->post('/fleet/telepass/reassign',    [FleetController::class, 'reassignTelepass']);
+    $router->get('/fleet',                          [FleetController::class, 'index'])
+           ->post('/fleet/vehicle/save',            [FleetController::class, 'saveVehicle'])
+           ->post('/fleet/vehicle/delete',          [FleetController::class, 'deleteVehicle'])
+           ->post('/fleet/vehicle/reassign',        [FleetController::class, 'reassignVehicle'])
+           ->get('/fleet/vehicle/{id}/history',     [FleetController::class, 'vehicleHistory'])
+           ->post('/fleet/card/save',               [FleetController::class, 'saveCard'])
+           ->post('/fleet/card/delete',             [FleetController::class, 'deleteCard'])
+           ->post('/fleet/card/reassign',           [FleetController::class, 'reassignCard'])
+           ->get('/fleet/card/{id}/history',        [FleetController::class, 'cardHistory'])
+           ->post('/fleet/telepass/save',           [FleetController::class, 'saveTelepass'])
+           ->post('/fleet/telepass/delete',         [FleetController::class, 'deleteTelepass'])
+           ->post('/fleet/telepass/reassign',       [FleetController::class, 'reassignTelepass'])
+           ->get('/fleet/telepass/{id}/history',    [FleetController::class, 'telepassHistory']);
 
     $router->dispatch($request, $container);
 }

@@ -1,40 +1,43 @@
 {# Crea/modifica telepass. Param: t (null = create), modalId #}
-<div id="{{ modalId }}" class="modal fade" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog" style="max-width: 500px;">
-        <form method="POST" action="/fleet/telepass/save" class="modal-content">
-            <div class="modal-header">
-                <h2 class="font-medium text-base mr-auto">
-                    {{ t ? 'Modifica telepass ' ~ t.numero : 'Nuovo telepass' }}
-                </h2>
+<div id="{{ modalId }}" class="fl-modal">
+    <div class="fl-modal-backdrop"></div>
+    <form method="POST" action="/fleet/telepass/save" class="fl-modal-dialog">
+        <div class="fl-modal-head">
+            <div class="fl-modal-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>
             </div>
-            <div class="modal-body">
-                {% if t %}<input type="hidden" name="id" value="{{ t.id }}">{% endif %}
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="form-label">Numero *</label>
-                        <input type="text" name="numero" class="form-control" required
-                               value="{{ t.numero|default('') }}" maxlength="64">
-                    </div>
-                    <div>
-                        <label class="form-label">Tipo (Family / Business / ...)</label>
-                        <input type="text" name="tipo" class="form-control" value="{{ t.tipo|default('') }}" maxlength="60">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Note</label>
-                        <input type="text" name="notes" class="form-control" value="{{ t.notes|default('') }}">
-                    </div>
-                    <div class="col-span-2">
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" name="active" class="form-check-input mr-2" {{ t is null or t.active ? 'checked' : '' }}>
-                            <span>Attivo</span>
-                        </label>
-                    </div>
+            <div>
+                <h3 class="fl-modal-title">{{ t ? 'Modifica telepass ' ~ t.numero : 'Nuovo telepass' }}</h3>
+                <p class="fl-modal-sub">Catalogo telepass — assegnazione separata</p>
+            </div>
+            <button type="button" class="fl-modal-close" data-fl-close>&times;</button>
+        </div>
+        <div class="fl-modal-body">
+            {% if t %}<input type="hidden" name="id" value="{{ t.id }}">{% endif %}
+            <div class="fl-grid-2">
+                <div class="fl-field">
+                    <label>Numero *</label>
+                    <input type="text" name="numero" class="fl-input" required maxlength="64" value="{{ t.numero|default('') }}">
+                </div>
+                <div class="fl-field">
+                    <label>Tipo</label>
+                    <input type="text" name="tipo" class="fl-input" maxlength="60" value="{{ t.tipo|default('') }}" placeholder="Family / Business / ...">
+                </div>
+                <div class="fl-field is-full">
+                    <label>Note</label>
+                    <input type="text" name="notes" class="fl-input" value="{{ t.notes|default('') }}">
+                </div>
+                <div class="fl-field is-full">
+                    <label class="fl-check">
+                        <input type="checkbox" name="active" {{ t is null or t.active ? 'checked' : '' }}>
+                        <span>Attivo</span>
+                    </label>
                 </div>
             </div>
-            <div class="modal-footer text-right">
-                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
-                <button type="submit" class="btn btn-primary">Salva</button>
-            </div>
-        </form>
-    </div>
+        </div>
+        <div class="fl-modal-foot">
+            <button type="button" class="fl-btn-cancel" data-fl-close>Annulla</button>
+            <button type="submit" class="fl-btn-submit">Salva</button>
+        </div>
+    </form>
 </div>

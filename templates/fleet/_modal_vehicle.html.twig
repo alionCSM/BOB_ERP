@@ -1,62 +1,56 @@
-{# Crea/modifica veicolo. Param: v (null = create), modalId, worksitesForSel #}
-<div id="{{ modalId }}" class="modal fade" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog" style="max-width: 600px;">
-        <form method="POST" action="/fleet/vehicle/save" class="modal-content">
-            <div class="modal-header">
-                <h2 class="font-medium text-base mr-auto">
-                    {{ v ? 'Modifica veicolo ' ~ v.targa : 'Nuovo veicolo' }}
-                </h2>
+{# Crea/modifica veicolo. Param: v (null = create), modalId #}
+<div id="{{ modalId }}" class="fl-modal">
+    <div class="fl-modal-backdrop"></div>
+    <form method="POST" action="/fleet/vehicle/save" class="fl-modal-dialog">
+        <div class="fl-modal-head">
+            <div class="fl-modal-icon">
+                <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
             </div>
-            <div class="modal-body">
-                {% if v %}<input type="hidden" name="id" value="{{ v.id }}">{% endif %}
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="form-label">Targa *</label>
-                        <input type="text" name="targa" class="form-control uppercase" required
-                               value="{{ v.targa|default('') }}" maxlength="16">
-                    </div>
-                    <div>
-                        <label class="form-label">Tipo</label>
-                        <select name="tipo" class="form-select">
-                            {% for t in ['furgone','auto','camion','altro'] %}
-                                <option value="{{ t }}" {{ v.tipo|default('furgone') == t ? 'selected' : '' }}>{{ t|capitalize }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Modello</label>
-                        <input type="text" name="modello" class="form-control" value="{{ v.modello|default('') }}">
-                    </div>
-                    <div>
-                        <label class="form-label">GPS device id</label>
-                        <input type="text" name="gps_device_id" class="form-control" value="{{ v.gps_device_id|default('') }}">
-                    </div>
-                    <div>
-                        <label class="form-label">Cantiere corrente</label>
-                        <select name="current_worksite_id" class="form-select">
-                            <option value="">— nessuno —</option>
-                            {% for w in worksitesForSel %}
-                                <option value="{{ w.id }}" {{ v.current_worksite_id|default(0) == w.id ? 'selected' : '' }}>{{ w.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-span-2">
-                        <label class="form-label">Note</label>
-                        <textarea name="notes" class="form-control" rows="2">{{ v.notes|default('') }}</textarea>
-                    </div>
-                    <div class="col-span-2">
-                        <label class="inline-flex items-center">
-                            <input type="checkbox" name="active" class="form-check-input mr-2" {{ v is null or v.active ? 'checked' : '' }}>
-                            <span>Attivo in flotta</span>
-                        </label>
-                    </div>
+            <div>
+                <h3 class="fl-modal-title">{{ v ? 'Modifica veicolo ' ~ v.targa : 'Nuovo veicolo' }}</h3>
+                <p class="fl-modal-sub">{{ v ? 'Aggiorna i dati anagrafici del veicolo' : 'Aggiungi un veicolo alla flotta' }}</p>
+            </div>
+            <button type="button" class="fl-modal-close" data-fl-close>&times;</button>
+        </div>
+        <div class="fl-modal-body">
+            {% if v %}<input type="hidden" name="id" value="{{ v.id }}">{% endif %}
+            <div class="fl-grid-2">
+                <div class="fl-field">
+                    <label>Targa *</label>
+                    <input type="text" name="targa" class="fl-input" required maxlength="16"
+                           value="{{ v.targa|default('') }}" style="text-transform:uppercase">
+                </div>
+                <div class="fl-field">
+                    <label>Tipo</label>
+                    <select name="tipo" class="fl-select">
+                        {% for t in ['furgone','auto','camion','altro'] %}
+                            <option value="{{ t }}" {{ v.tipo|default('furgone') == t ? 'selected' : '' }}>{{ t|capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="fl-field is-full">
+                    <label>Modello</label>
+                    <input type="text" name="modello" class="fl-input" value="{{ v.modello|default('') }}" placeholder="Es. Fiat Ducato 35 L3H2">
+                </div>
+                <div class="fl-field is-full">
+                    <label>GPS device id</label>
+                    <input type="text" name="gps_device_id" class="fl-input" value="{{ v.gps_device_id|default('') }}" placeholder="Identificativo del tracker GPS">
+                </div>
+                <div class="fl-field is-full">
+                    <label>Note</label>
+                    <textarea name="notes" class="fl-textarea" rows="2">{{ v.notes|default('') }}</textarea>
+                </div>
+                <div class="fl-field is-full">
+                    <label class="fl-check">
+                        <input type="checkbox" name="active" {{ v is null or v.active ? 'checked' : '' }}>
+                        <span>Attivo in flotta</span>
+                    </label>
                 </div>
             </div>
-            <div class="modal-footer text-right">
-                <button type="button" data-tw-dismiss="modal" class="btn btn-outline-secondary mr-2">Annulla</button>
-                <button type="submit" class="btn btn-primary">Salva</button>
-            </div>
-        </form>
-    </div>
+        </div>
+        <div class="fl-modal-foot">
+            <button type="button" class="fl-btn-cancel" data-fl-close>Annulla</button>
+            <button type="submit" class="fl-btn-submit">Salva</button>
+        </div>
+    </form>
 </div>
