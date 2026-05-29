@@ -5,9 +5,17 @@
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" placeholder="Cerca per veicolo, operaio, regola..." data-fl-filter=".fl-table">
     </div>
-    <div style="display:flex;gap:6px;">
+    <div style="display:flex;gap:6px;align-items:center;">
         <a href="/fleet?tab=anomalies&status=open" class="fl-tab" style="padding:6px 12px;">Aperte</a>
         <a href="/fleet?tab=anomalies&status=dismissed" class="fl-tab" style="padding:6px 12px;">Archiviate</a>
+        {% if canManage %}
+            <form method="POST" action="/fleet/analyze" style="display:inline;" onsubmit="return confirm('Lanciare una nuova analisi su tutti i dati importati?');">
+                <button type="submit" class="fl-btn-primary" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
+                    <svg viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    Ri-analizza tutto
+                </button>
+            </form>
+        {% endif %}
     </div>
 </div>
 

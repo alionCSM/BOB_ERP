@@ -8,6 +8,7 @@ use App\Repository\Fleet\FleetRepository;
 use App\Repository\Fleet\FleetTelemetryRepository;
 use App\Service\Fleet\GpsRiepilogoTratteImporter;
 use App\Service\Fleet\Q8FuelInvoiceImporter;
+use App\Service\Fleet\FleetReconciliationService;
 
 /**
  * Modulo Flotta — step 1.
@@ -97,7 +98,8 @@ final class FleetController
     {
         $this->requireManage($request);
         Response::view('fleet/import.html.twig', $request, [
-            'canManage' => true,
+            'canManage'   => true,
+            'vehiclesSel' => $this->fleet->activeVehicles(),
         ]);
     }
 
@@ -164,6 +166,28 @@ final class FleetController
             }
         }
         return $dest;
+    }
+
+    public function analyze(Request $request): void
+    {
+        $this->requireManage($request);
+
+        $from = $_POST['from'] ?? null;
+        $to   = $_POST['to']   ?? null;
+        $vehicleId = !empty($_POST['vehicle_id']) ? (int)$_POST['vehicle_id'] : null;
+
+        $svc = new FleetReconciliationService($this->conn);
+        try {
+            $r = $svc->run($from, $to, $vehicleId, $this->currentUserId($request));
+            $_SESSION['success'] = sprintf(
+                'Analisi completata in %dms: %d anomalie su %d transazioni Q8 e %d tratte GPS.',
+                $r['duration_ms'], $r['anomalies'], $r['tx'], $r['trips']
+            );
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Analisi fallita: ' . $e->getMessage();
+            Response::redirect('/fleet/import');
+        }
+        Response::redirect('/fleet?tab=anomalies');
     }
 
     public function dismissAnomaly(Request $request): void

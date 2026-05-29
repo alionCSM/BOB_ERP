@@ -86,10 +86,55 @@
 
     </div>
 
-    <div style="margin-top:24px;padding:16px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe;font-size:13px;color:#1e40af;">
-        <b>Workflow:</b> dopo l'import, vai sulla tab <a href="/fleet?tab=trips" style="text-decoration:underline;color:#1d4ed8;">Tratte GPS</a>
-        o <a href="/fleet?tab=fuel" style="text-decoration:underline;color:#1d4ed8;">Rifornimenti Q8</a> per vedere i dati grezzi,
-        e su <a href="/fleet?tab=anomalies" style="text-decoration:underline;color:#1d4ed8;">Anomalie</a> per il risultato della riconciliazione.
+    {# ── ANALIZZA: lancia engine di riconciliazione su tutti i dati importati ── #}
+    <form method="POST" action="/fleet/analyze" class="fl-table-wrap" style="margin-top:24px;padding:24px;background:linear-gradient(135deg,#fafbfc 0%, #fff7ed 100%);border:1.5px solid #fed7aa;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+            <div class="fl-modal-icon" style="background:#fff;color:#dc2626;">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            </div>
+            <div style="flex:1;">
+                <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">Lancia analisi riconciliazione</h3>
+                <p style="margin:2px 0 0;font-size:13px;color:#475569;">
+                    Confronta tutto: Q8 ↔ GPS ↔ assegnazioni veicolo/operaio ↔ presenze ↔ cantieri.
+                    Le anomalie rilevate finiscono in tab <b>Anomalie</b>.
+                </p>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr) auto;gap:12px;align-items:end;">
+            <div class="fl-field">
+                <label>Da (opzionale)</label>
+                <input type="date" name="from" class="fl-input">
+            </div>
+            <div class="fl-field">
+                <label>A (opzionale)</label>
+                <input type="date" name="to" class="fl-input">
+            </div>
+            <div class="fl-field">
+                <label>Veicolo (opzionale)</label>
+                <select name="vehicle_id" class="fl-select">
+                    <option value="">— tutti i veicoli —</option>
+                    {% for v in vehiclesSel|default([]) %}
+                        <option value="{{ v.id }}">{{ v.targa }} · {{ v.modello }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="fl-btn-submit" style="padding:12px 20px;background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
+                <svg viewBox="0 0 24 24" width="16" height="16" style="display:inline-block;vertical-align:-3px;margin-right:6px;fill:none;stroke:currentColor;stroke-width:2;"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                Analizza tutto
+            </button>
+        </div>
+
+        <p class="fl-small" style="margin:12px 0 0;">
+            Senza filtri → analizza tutto il periodo coperto dagli import. Le regole attive sono 8
+            (Q8 senza GPS, GPS senza Q8, citta' mismatch, consumo outlier, multiple TX, presenze, ...).
+        </p>
+    </form>
+
+    <div style="margin-top:14px;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;font-size:12px;color:#1e40af;">
+        <b>Tip:</b> dopo l'import vai su <a href="/fleet?tab=trips" style="text-decoration:underline;">Tratte GPS</a>
+        o <a href="/fleet?tab=fuel" style="text-decoration:underline;">Rifornimenti Q8</a> per vedere i dati grezzi.
+        Lancia l'analisi quando hai caricato sia GPS che Q8 per il periodo che ti interessa.
     </div>
 
 </div>
