@@ -41,6 +41,9 @@ final class FleetReconciliationService
     private const CONSUMPTION_LP100KM_MAX  = 25.0;
     private const MULTIPLE_TX_THRESHOLD    = 2;
     private const MIN_KM_FOR_CONSUMPTION   = 30.0;
+    /** I GPS contano spesso "rifornimento" anche eventi a 0L (motore off generico).
+     *  Soglia per ignorare il rumore e considerare solo refuel reali. */
+    private const MIN_REFUEL_LITERS_FOR_RULE = 5.0;
 
     /** evita anomalie duplicate nella stessa run su (rule_code, vehicle, day). */
     private array $emittedDedup = [];
@@ -92,8 +95,11 @@ final class FleetReconciliationService
         }
 
         // 6) regole trip-driven (con dedup per (vehicle, day))
+        // Solo refuel con litri sensati: il GPS spesso conta come "refuel"
+        // anche eventi a 0L (motore spento generico, rumore del sensore).
         foreach ($trips as $trip) {
-            if ((int)$trip['refuels_count'] > 0) {
+            if ((int)$trip['refuels_count'] > 0
+                && (float)$trip['refuels_liters'] >= self::MIN_REFUEL_LITERS_FOR_RULE) {
                 $anomalies += $this->checkGpsRefuelVsQ8($runId, $trip, $txByVehicleDay);
             }
         }
@@ -134,6 +140,10 @@ final class FleetReconciliationService
                 $anomalies += $this->checkDailyAggregates($runId, $canonical, $day, $uniqueTxs, $uniqueTrips);
             }
         }
+
+        // 8) vehicle-level: veicoli con trip nel periodo ma SENZA carte
+        //    assegnate → anomalia HIGH "configura assegnazione" (una sola).
+        $anomalies += $this->checkVehiclesWithoutCard($runId, $from, $to, $vehicleId);
 
         $durationMs = (int)round((microtime(true) - $t0) * 1000);
         $stmt = $this->conn->prepare("
@@ -512,34 +522,117 @@ final class FleetReconciliationService
      *  Dedup: una sola anomalia per (vehicle, day) anche se ci sono N trip con refuels. */
     private function checkGpsRefuelVsQ8(int $runId, array $trip, array $txByVehDay): int
     {
-        // Anche se il veicolo non e' ancora registrato, usa la targa
         $day = substr($trip['start_at'], 0, 10);
+        $vehicleId = $trip['vehicle_id'] ? (int)$trip['vehicle_id'] : null;
+        $targa = $trip['vehicle_targa'] ?? '';
+
         $candKeys = [];
-        if ($trip['vehicle_id']) $candKeys[] = 'id:' . $trip['vehicle_id'];
-        if (!empty($trip['vehicle_targa'])) $candKeys[] = 'targa:' . strtoupper($trip['vehicle_targa']);
+        if ($vehicleId) $candKeys[] = 'id:' . $vehicleId;
+        if ($targa)     $candKeys[] = 'targa:' . strtoupper($targa);
         if (empty($candKeys)) return 0;
 
-        // se per QUALSIASI key c'e' tx → niente anomalia
+        // tx assegnate a QUESTO veicolo nel giorno?
+        $hasTxForVehicle = false;
         foreach ($candKeys as $k) {
-            if (!empty($txByVehDay[$k][$day] ?? [])) return 0;
+            if (!empty($txByVehDay[$k][$day] ?? [])) {
+                $hasTxForVehicle = true;
+                break;
+            }
         }
+        if ($hasTxForVehicle) return 0;
 
         $dedupKey = "GPS_REFUEL_NO_Q8|{$candKeys[0]}|{$day}";
         if (isset($this->emittedDedup[$dedupKey])) return 0;
         $this->emittedDedup[$dedupKey] = true;
 
+        // Analisi smart per spiegare la causa REALE:
+        $analysis = $this->analyzeWhyNoTxForVehicle($vehicleId, $targa, $day);
+
         $this->insertAnomaly($runId, [
-            'vehicle_id'  => $trip['vehicle_id'] ? (int)$trip['vehicle_id'] : null,
+            'vehicle_id'  => $vehicleId,
             'rule_code'   => 'GPS_REFUEL_NO_Q8',
-            'severity'    => 'medium',
+            'severity'    => $analysis['severity'],
             'event_at'    => $trip['start_at'],
-            'summary'     => sprintf('GPS rileva %d rifornimenti (%sL) sul veicolo %s ma nessuna TX Q8 quel giorno',
-                                     $trip['refuels_count'], $trip['refuels_liters'],
-                                     $trip['vehicle_targa'] ?? '?'),
-            'detail'      => 'Possibili cause: carta non Q8 (altro fornitore), rifornimento privato, carta non assegnata al veicolo in quel periodo.',
+            'summary'     => sprintf('GPS: %d rifornimento (%sL) su %s — %s',
+                                     $trip['refuels_count'], $trip['refuels_liters'], $targa ?: '?',
+                                     $analysis['short_cause']),
+            'detail'      => $analysis['detail'],
             'ref_trip_id' => (int)$trip['id'],
         ]);
         return 1;
+    }
+
+    /**
+     * Quando un trip ha refuel ma niente Q8 per il veicolo, spiega PERCHE'.
+     * Possibili scenari:
+     *   a) Veicolo non ha nessuna carta assegnata in BOB           → high
+     *      "Assegna una carta a questo veicolo"
+     *   b) Veicolo ha una carta assegnata ma quella carta non ha tx nel giorno  → medium
+     *      "La carta assegnata non ha avuto transazioni: forse usata carta sbagliata?"
+     *   c) Q8 ha tx quel giorno ma di carte non collegate a nessun veicolo  → high
+     *      "Ci sono N tx Q8 quel giorno con carte non assegnate: probabilmente una e' di questo veicolo"
+     */
+    private function analyzeWhyNoTxForVehicle(?int $vehicleId, string $targa, string $day): array
+    {
+        if (!$vehicleId) {
+            return [
+                'severity' => 'low',
+                'short_cause' => 'veicolo non in catalogo',
+                'detail' => sprintf('Il veicolo %s non e\' registrato in bb_fleet_vehicles → impossibile risalire alla carta. Registra il veicolo e assegnali la carta giusta.', $targa ?: '?'),
+            ];
+        }
+
+        // a) il veicolo ha carte assegnate al giorno?
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) FROM bb_fleet_fuel_card_assignments
+            WHERE vehicle_id = ? AND from_date <= ? AND (to_date IS NULL OR to_date >= ?)
+        ");
+        $stmt->execute([$vehicleId, $day, $day]);
+        $cardsAssigned = (int)$stmt->fetchColumn();
+
+        // c) quante tx Q8 quel giorno hanno carta senza assegnazione?
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(DISTINCT tx.id), GROUP_CONCAT(DISTINCT tx.card_numero SEPARATOR ', ')
+            FROM bb_fleet_fuel_tx tx
+            LEFT JOIN bb_fleet_fuel_card_assignments fca
+              ON fca.card_id = tx.card_id
+             AND fca.from_date <= DATE(tx.tx_at)
+             AND (fca.to_date IS NULL OR fca.to_date >= DATE(tx.tx_at))
+            WHERE DATE(tx.tx_at) = ?
+              AND fca.id IS NULL
+        ");
+        $stmt->execute([$day]);
+        [$unassignedTxCount, $unassignedCards] = $stmt->fetch(\PDO::FETCH_NUM);
+        $unassignedTxCount = (int)$unassignedTxCount;
+
+        if ($cardsAssigned === 0) {
+            return [
+                'severity' => 'high',
+                'short_cause' => 'NESSUNA carta assegnata al veicolo',
+                'detail' => sprintf(
+                    'Il veicolo %s non ha nessuna carta carburante assegnata in BOB per il %s.%s Assegna la carta corretta da /fleet?tab=cards (icona riassegna su ogni riga).',
+                    $targa ?: '?',
+                    $day,
+                    $unassignedTxCount > 0
+                        ? sprintf(' In Q8 quel giorno ci sono %d transazioni con carte NON assegnate (Card No: %s) — una di queste e\' probabilmente di %s.',
+                                  $unassignedTxCount, $unassignedCards, $targa)
+                        : ''
+                ),
+            ];
+        }
+
+        // ha carte assegnate ma niente tx
+        return [
+            'severity' => 'medium',
+            'short_cause' => 'carta assegnata ma niente Q8',
+            'detail' => sprintf(
+                'Il veicolo %s ha %d carta/e assegnata/e al %s ma nessuna di esse risulta tra le tx Q8 del giorno.%s Verifica se l\'autista ha usato una carta diversa.',
+                $targa ?: '?', $cardsAssigned, $day,
+                $unassignedTxCount > 0
+                    ? sprintf(' (Q8 del giorno ha anche %d tx con carte non in BOB: %s).', $unassignedTxCount, $unassignedCards)
+                    : ''
+            ),
+        ];
     }
 
     /** Delta litri GPS vs Q8 + consumo L/100km per (veicolo, giorno). */
@@ -593,6 +686,51 @@ final class FleetReconciliationService
                 ]);
                 $count++;
             }
+        }
+        return $count;
+    }
+
+    /**
+     * Emette una sola anomalia VEHICLE_NO_CARD_LINK per ogni veicolo che ha
+     * tratte nel periodo ma a cui non e' mai stata assegnata una carta.
+     * E' l'azione che lo user deve fare PRIMA di poter scoprire altre anomalie.
+     */
+    private function checkVehiclesWithoutCard(int $runId, string $from, string $to, ?int $vehicleFilter): int
+    {
+        $params = [':from' => $from . ' 00:00:00', ':to' => $to . ' 23:59:59'];
+        $vFilter = '';
+        if ($vehicleFilter) {
+            $vFilter = ' AND v.id = :vid';
+            $params[':vid'] = $vehicleFilter;
+        }
+        $stmt = $this->conn->prepare("
+            SELECT v.id, v.targa, COUNT(DISTINCT DATE(t.start_at)) AS trip_days
+            FROM bb_fleet_gps_trips t
+            JOIN bb_fleet_vehicles v ON v.id = t.vehicle_id
+            WHERE t.start_at BETWEEN :from AND :to
+              AND NOT EXISTS (
+                SELECT 1 FROM bb_fleet_fuel_card_assignments fca
+                WHERE fca.vehicle_id = v.id
+                  AND fca.from_date <= DATE(:to)
+                  AND (fca.to_date IS NULL OR fca.to_date >= DATE(:from))
+              )
+              {$vFilter}
+            GROUP BY v.id
+            HAVING trip_days > 0
+        ");
+        $stmt->execute($params);
+        $count = 0;
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $this->insertAnomaly($runId, [
+                'vehicle_id' => (int)$r['id'],
+                'rule_code'  => 'VEHICLE_NO_CARD_LINK',
+                'severity'   => 'high',
+                'event_at'   => $from . ' 00:00:00',
+                'summary'    => sprintf('Veicolo %s ha %d giorni di tratte ma NESSUNA carta carburante assegnata in BOB',
+                                        $r['targa'], $r['trip_days']),
+                'detail'     => 'Senza assegnazione carta non possiamo correlare i rifornimenti Q8. Vai su /fleet?tab=cards, trova la carta usata dall\'autista di questo veicolo, clicca riassegna e collegala al veicolo. Poi ri-analizza.',
+            ]);
+            $count++;
         }
         return $count;
     }
