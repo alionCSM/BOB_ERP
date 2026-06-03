@@ -32,9 +32,13 @@
                     <label>Modello</label>
                     <input type="text" name="modello" class="fl-input" value="{{ v.modello|default('') }}" placeholder="Es. Fiat Ducato 35 L3H2">
                 </div>
-                <div class="fl-field is-full">
+                <div class="fl-field">
                     <label>GPS device id</label>
-                    <input type="text" name="gps_device_id" class="fl-input" value="{{ v.gps_device_id|default('') }}" placeholder="Identificativo del tracker GPS">
+                    <input type="text" name="gps_device_id" class="fl-input" value="{{ v.gps_device_id|default('') }}" placeholder="Tracker GPS">
+                </div>
+                <div class="fl-field">
+                    <label>Alias Q8 (Plate number)</label>
+                    <input type="text" name="plate_alias_q8" class="fl-input" value="{{ v.plate_alias_q8|default('') }}" placeholder="Es. JOLLY 2">
                 </div>
                 <div class="fl-field is-full">
                     <label>Note</label>

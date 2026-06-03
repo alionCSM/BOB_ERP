@@ -111,13 +111,14 @@
                     <th>Carta Q8</th>
                     <th>Telepass</th>
                     <th>GPS id</th>
+                    <th>Q8 alias</th>
                     <th class="center">Attivo</th>
                     <th class="center">Azioni</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% if vehicles is empty %}
-                    <tr><td colspan="9">
+                    <tr><td colspan="10">
                         <div class="fl-empty">
                             <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
                             <p class="fl-empty-text">Nessun veicolo in flotta. Aggiungine uno per iniziare.</p>
@@ -148,6 +149,7 @@
                                 {% else %}<span class="fl-muted">—</span>{% endif %}
                             </td>
                             <td><span class="fl-small">{{ v.gps_device_id ?: '—' }}</span></td>
+                            <td>{% if v.plate_alias_q8 %}<span class="fl-mono" style="font-size:12px;color:#b45309;">{{ v.plate_alias_q8 }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
                             <td class="center"><span class="fl-status-dot {{ v.active ? 'is-on' : 'is-off' }}"></span></td>
                             <td class="center">
                                 <div class="fl-actions">

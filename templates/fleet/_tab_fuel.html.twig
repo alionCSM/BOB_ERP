@@ -35,6 +35,7 @@
             <th>Data</th>
             <th>Ora</th>
             <th>Carta</th>
+            <th>Q8 alias</th>
             <th>Distributore</th>
             <th>Carburante</th>
             <th>Litri</th>
@@ -44,7 +45,7 @@
         </thead>
         <tbody>
         {% if fuelTx is empty %}
-            <tr><td colspan="8">
+            <tr><td colspan="9">
                 <div class="fl-empty">
                     <svg viewBox="0 0 24 24"><path d="M3 22V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v18"/><path d="M3 22h13"/></svg>
                     <p class="fl-empty-text">Nessuna transazione importata. Carica una fattura Q8 (Excel/CSV).</p>
@@ -56,6 +57,7 @@
                     <td>{{ tx.tx_at|date('d/m/Y') }}</td>
                     <td class="fl-small">{{ tx.tx_at|date('H:i') }}</td>
                     <td><span class="fl-mono">{{ tx.card_numero }}</span></td>
+                    <td>{% if tx.plate_alias_q8 %}<span class="fl-mono" style="font-size:11px;color:#b45309;">{{ tx.plate_alias_q8 }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
                     <td>
                         <div>{{ tx.city ?: '—' }}{% if tx.prov %} ({{ tx.prov }}){% endif %}</div>
                         <div class="fl-small" title="{{ tx.distributore }}">{{ tx.distributore|slice(0, 50) }}{% if tx.distributore|length > 50 %}…{% endif %}</div>

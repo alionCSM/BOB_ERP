@@ -76,14 +76,15 @@ final class FleetRepository
     public function createVehicle(array $data): int
     {
         $stmt = $this->conn->prepare(
-            "INSERT INTO bb_fleet_vehicles (targa, modello, tipo, gps_device_id, notes, active)
-             VALUES (:targa, :modello, :tipo, :gps, :notes, :active)"
+            "INSERT INTO bb_fleet_vehicles (targa, modello, tipo, gps_device_id, plate_alias_q8, notes, active)
+             VALUES (:targa, :modello, :tipo, :gps, :alias, :notes, :active)"
         );
         $stmt->execute([
             ':targa'  => $data['targa'],
             ':modello'=> $data['modello'] ?? null,
             ':tipo'   => $data['tipo']    ?? 'furgone',
             ':gps'    => $data['gps_device_id'] ?? null,
+            ':alias'  => $data['plate_alias_q8'] ?? null,
             ':notes'  => $data['notes']   ?? null,
             ':active' => !empty($data['active']) ? 1 : 0,
         ]);
@@ -95,7 +96,8 @@ final class FleetRepository
         $stmt = $this->conn->prepare(
             "UPDATE bb_fleet_vehicles SET
                 targa = :targa, modello = :modello, tipo = :tipo,
-                gps_device_id = :gps, notes = :notes, active = :active
+                gps_device_id = :gps, plate_alias_q8 = :alias,
+                notes = :notes, active = :active
              WHERE id = :id"
         );
         return $stmt->execute([
@@ -103,6 +105,7 @@ final class FleetRepository
             ':modello'=> $data['modello'] ?? null,
             ':tipo'   => $data['tipo']    ?? 'furgone',
             ':gps'    => $data['gps_device_id'] ?? null,
+            ':alias'  => $data['plate_alias_q8'] ?? null,
             ':notes'  => $data['notes']   ?? null,
             ':active' => !empty($data['active']) ? 1 : 0,
             ':id'     => $id,

@@ -8,16 +8,29 @@ use PDO;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Importer per il file Excel/CSV scaricato dal portale Q8.
+ * Importer per il file Excel della fattura Q8 ("Q8 Fleet transactions").
  *
- * Senza un sample del file ufficiale, il parser e' "permissive":
- * scansiona le prime 10 righe per trovare l'header, poi mappa per
- * keyword (data, ora, importo, litri, carta, distributore, ...).
+ * Layout reale (verificato su fattura PJ11539032):
+ *  - Sheet "Q8 Fleet transactions"
+ *  - Riga 0: vuota
+ *  - Riga 1: header
+ *  - Riga 2+: dati (1 riga = 1 rifornimento)
  *
- * Quando arrivera' il sample reale, sara' sufficiente affinare il
- * mapping in HEADER_ALIASES — il resto della pipeline e' generico.
+ * Colonne chiave:
+ *  - Card No.       numero carta breve (es "00025") → bb_fleet_fuel_cards.numero
+ *  - Card PAN       codice completo carta (16-19 cifre, fallback se No. mancante)
+ *  - Date           datetime completo (gia' include ora)
+ *  - Plate number   ALIAS Q8 del veicolo (es "JOLLY", "JOLLY 2") — NON la targa fisica
+ *                   match via bb_fleet_vehicles.plate_alias_q8
+ *  - Prod.          carburante (es "GASOLIO")
+ *  - Volume         litri (campo critico)
+ *  - Full amount    importo lordo €
+ *  - Discounted price  €/L effettivo (scontato)
+ *  - Address        indirizzo distributore (concat con Petrol station code)
+ *  - City           citta' (gia' pulita, niente parsing)
+ *  - Km             contachilometri dichiarato dal driver
  *
- * Dedup: raw_hash = sha1(carta|tx_at|litri|importo).
+ * Dedup: raw_hash = sha1(card_pan|tx_at|litri|importo).
  */
 final class Q8FuelInvoiceImporter
 {
@@ -32,34 +45,38 @@ final class Q8FuelInvoiceImporter
         $sheet = $spreadsheet->getActiveSheet();
         $rows = $sheet->toArray(null, true, true, true);
 
-        // detect header riga
+        // detect header riga — cerca "Card No." (la fattura Q8 standard)
         $headerIdx = null;
         foreach (array_slice($rows, 0, 12, true) as $idx => $r) {
             foreach ($r as $cell) {
                 if (!is_string($cell)) continue;
-                $low = mb_strtolower($cell);
-                if (str_contains($low, 'carta') || str_contains($low, 'litri') ||
-                    str_contains($low, 'distributore') || str_contains($low, 'numero card')) {
+                $low = mb_strtolower(trim($cell));
+                if ($low === 'card no.' || $low === 'card pan' ||
+                    str_contains($low, 'numero card') || $low === 'volume') {
                     $headerIdx = $idx;
                     break 2;
                 }
             }
         }
         if ($headerIdx === null) {
-            return ['rows_total'=>0,'rows_imported'=>0,'rows_skipped'=>0,
-                    'errors'=>['Header non riconosciuto (cerca: carta / litri / distributore)'],
-                    'period_from'=>null,'period_to'=>null];
+            return $this->emptyResult('Header non riconosciuto (cerca: Card No. / Card PAN / Volume)');
         }
         $headerRow = $rows[$headerIdx];
         $colMap = $this->buildColumnMap($headerRow);
 
-        if (empty($colMap['card']) || empty($colMap['date']) || empty($colMap['litri'])) {
-            return ['rows_total'=>0,'rows_imported'=>0,'rows_skipped'=>0,
-                    'errors'=>['Colonne minime mancanti (carta/data/litri). Trovate: '.implode(',', array_keys($colMap))],
-                    'period_from'=>null,'period_to'=>null];
+        // colonne minime
+        $missing = [];
+        foreach (['card_no','date','litri','importo'] as $req) {
+            if (empty($colMap[$req])) $missing[] = $req;
+        }
+        if ($missing) {
+            return $this->emptyResult('Colonne mancanti: ' . implode(',', $missing) .
+                                      '. Trovate: ' . implode(',', array_keys($colMap)));
         }
 
-        $cardMap = $this->loadCardMap();
+        // mappe lookup
+        $cardMap     = $this->loadCardMap();        // numero → id
+        $plateMap    = $this->loadPlateAliasMap();  // alias Q8 → vehicle_id
 
         $imported = 0; $skipped = 0; $total = 0;
         $errors = [];
@@ -67,12 +84,12 @@ final class Q8FuelInvoiceImporter
 
         $stmt = $this->conn->prepare("
             INSERT IGNORE INTO bb_fleet_fuel_tx (
-                import_id, card_numero, card_id, tx_at,
-                importo, litri, prezzo_unit, carburante,
+                import_id, card_numero, plate_alias_q8, card_id, vehicle_id_at_tx,
+                tx_at, importo, litri, prezzo_unit, carburante,
                 distributore, city, prov, km_dichiarati, raw_hash
             ) VALUES (
-                :import_id, :card_numero, :card_id, :tx_at,
-                :importo, :litri, :prezzo, :carb,
+                :import_id, :card_no, :plate_alias, :card_id, :vehicle_id,
+                :tx_at, :importo, :litri, :prezzo, :carb,
                 :distrib, :city, :prov, :km, :raw_hash
             )
         ");
@@ -83,47 +100,52 @@ final class Q8FuelInvoiceImporter
                 if ($idx <= $headerIdx) continue;
                 $total++;
 
-                $cardRaw = $this->str($r, $colMap, 'card');
-                if ($cardRaw === '') { $skipped++; continue; }
-                $cardNum = $this->normalizeCardNumber($cardRaw);
+                // numero carta: preferisci "Card No." (corto, leggibile)
+                $cardNo  = $this->str($r, $colMap, 'card_no');
+                $cardPan = $this->str($r, $colMap, 'card_pan');
+                if ($cardNo === '' && $cardPan === '') { $skipped++; continue; }
+                $cardKey = $this->normalizeCardNumber($cardNo ?: $cardPan);
 
-                $txAt = $this->parseDateAndTime(
-                    $this->get($r, $colMap, 'date'),
-                    $this->get($r, $colMap, 'time')
-                );
+                $txAt = $this->parseDateTime($this->get($r, $colMap, 'date'));
                 if (!$txAt) { $skipped++; continue; }
 
                 $litri = $this->num($r, $colMap, 'litri') ?? 0;
                 if ($litri <= 0) { $skipped++; continue; }
 
                 $importo = $this->num($r, $colMap, 'importo') ?? 0;
-                $prezzo  = $this->num($r, $colMap, 'prezzo');
-                if ($prezzo === null && $litri > 0 && $importo > 0) {
-                    $prezzo = round($importo / $litri, 3);
-                }
+                $prezzo  = $this->num($r, $colMap, 'prezzo_disc')
+                        ?? $this->num($r, $colMap, 'prezzo')
+                        ?? ($importo > 0 ? round($importo / $litri, 3) : null);
 
-                $distrib = $this->str($r, $colMap, 'distrib') ?: null;
-                $carb    = $this->str($r, $colMap, 'carb')    ?: null;
-                $km      = $this->num($r, $colMap, 'km');
+                $plateAlias = $this->str($r, $colMap, 'plate') ?: null;
+                $vehicleId  = $plateAlias ? ($plateMap[strtoupper(trim($plateAlias))] ?? null) : null;
 
-                [$city, $prov] = $this->parseDistribLocation($distrib ?? '');
+                $distribCode = $this->str($r, $colMap, 'distrib_code');
+                $distribAddr = $this->str($r, $colMap, 'distrib_addr');
+                $distrib = trim(($distribCode ? "PV {$distribCode} · " : '') . $distribAddr) ?: null;
 
-                $rawHash = sha1($cardNum.'|'.$txAt.'|'.$litri.'|'.$importo);
+                $city = $this->str($r, $colMap, 'city');
+                $carb = $this->str($r, $colMap, 'carb');
+                $km   = $this->num($r, $colMap, 'km');
+
+                $rawHash = sha1(($cardPan ?: $cardNo) . '|' . $txAt . '|' . $litri . '|' . $importo);
 
                 try {
                     $stmt->execute([
                         ':import_id'   => $importId,
-                        ':card_numero' => $cardNum,
-                        ':card_id'     => $cardMap[$cardNum] ?? null,
+                        ':card_no'     => $cardKey,
+                        ':plate_alias' => $plateAlias,
+                        ':card_id'     => $cardMap[$cardKey] ?? null,
+                        ':vehicle_id'  => $vehicleId,
                         ':tx_at'       => $txAt,
                         ':importo'     => $importo,
                         ':litri'       => $litri,
                         ':prezzo'      => $prezzo,
-                        ':carb'        => $carb,
+                        ':carb'        => $carb ?: null,
                         ':distrib'     => $distrib ? mb_substr($distrib, 0, 255) : null,
-                        ':city'        => $city,
-                        ':prov'        => $prov,
-                        ':km'          => $km !== null ? (int)$km : null,
+                        ':city'        => $city ? ucfirst(mb_strtolower($city)) : null,
+                        ':prov'        => null, // Q8 non fornisce sigla provincia
+                        ':km'          => ($km !== null && $km > 0) ? (int)$km : null,
                         ':raw_hash'    => $rawHash,
                     ]);
                     if ($stmt->rowCount() === 1) {
@@ -155,28 +177,38 @@ final class Q8FuelInvoiceImporter
         ];
     }
 
+    // Alias header: chiave logica → array di varianti accettate.
+    // Match case-insensitive, su uguaglianza o substring (per esports diversi).
     private const HEADER_ALIASES = [
-        'card'    => ['numero card', 'numero carta', 'carta', 'card number', 'cardnumber'],
-        'date'    => ['data transazione', 'data', 'date'],
-        'time'    => ['ora transazione', 'ora', 'time'],
-        'importo' => ['importo totale', 'importo lordo', 'importo', 'totale', 'amount'],
-        'litri'   => ['litri', 'quantita', 'liters', 'volume'],
-        'prezzo'  => ['prezzo unitario', 'prezzo unit', 'prezzo', 'price per liter'],
-        'carb'    => ['prodotto', 'carburante', 'fuel type', 'tipo carburante'],
-        'distrib' => ['distributore', 'punto vendita', 'pv', 'station', 'indirizzo pv'],
-        'km'      => ['chilometraggio', 'km dichiarati', 'km', 'mileage'],
+        'card_no'      => ['card no.', 'card no', 'numero carta', 'numero card'],
+        'card_pan'     => ['card pan', 'pan'],
+        'date'         => ['date', 'data'],
+        'time'         => ['time'],
+        'carb'         => ['prod.', 'prodotto', 'product', 'carburante'],
+        'plate'        => ['plate number', 'plate', 'targa'],
+        'km'           => ['km'],
+        'distrib_code' => ['petrol station', 'cod. impianto', 'codice pv'],
+        'distrib_addr' => ['address', 'indirizzo'],
+        'city'         => ['city', 'citta', 'localita'],
+        'importo'      => ['full amount', 'importo lordo', 'importo totale', 'importo'],
+        'litri'        => ['volume', 'litri', 'quantita'],
+        'prezzo'       => ['prezzo eur/l', 'prezzo eur', 'prezzo unitario'],
+        'prezzo_disc'  => ['discounted price', 'prezzo scontato'],
     ];
 
     private function buildColumnMap(array $headerRow): array
     {
         $map = [];
-        foreach (self::HEADER_ALIASES as $key => $aliases) {
-            foreach ($headerRow as $col => $val) {
-                if (!is_string($val)) continue;
-                $low = mb_strtolower($val);
+        foreach ($headerRow as $col => $val) {
+            if (!is_string($val)) continue;
+            $low = mb_strtolower(trim($val));
+            foreach (self::HEADER_ALIASES as $key => $aliases) {
+                if (isset($map[$key])) continue;
                 foreach ($aliases as $a) {
-                    if (str_contains($low, $a)) {
-                        if (!isset($map[$key])) $map[$key] = $col;
+                    // match esatto OR contains-as-word (per evitare collisioni
+                    // tra "Volume" e "Full amount, no VAT" che e' diverso)
+                    if ($low === $a || str_contains($low, $a)) {
+                        $map[$key] = $col;
                         break;
                     }
                 }
@@ -184,6 +216,8 @@ final class Q8FuelInvoiceImporter
         }
         return $map;
     }
+
+    // ─── Cell readers ────────────────────────────────────────────────────────
 
     private function get(array $row, array $map, string $key) {
         $col = $map[$key] ?? null;
@@ -197,9 +231,9 @@ final class Q8FuelInvoiceImporter
         $v = $this->get($row, $map, $key);
         if ($v === null || $v === '') return null;
         if (is_numeric($v)) return (float)$v;
-        $s = str_replace([' €', '€', ' L', 'L'], '', (string)$v);
-        $s = trim($s);
-        // formato italiano
+        $s = (string)$v;
+        $s = preg_replace('/[^\d.,\-]/', '', $s);
+        // formato italiano "1.234,56"
         if (preg_match('/^-?\d{1,3}(\.\d{3})*(,\d+)?$/', $s)) {
             $s = str_replace(['.', ','], ['', '.'], $s);
         } else {
@@ -208,65 +242,25 @@ final class Q8FuelInvoiceImporter
         return is_numeric($s) ? (float)$s : null;
     }
 
-    /** Combina cella data (eventualmente con time) + cella ora separata. */
-    private function parseDateAndTime($d, $t): ?string
+    private function parseDateTime($v): ?string
     {
-        if ($d === null || $d === '') return null;
-
-        // 1) numero serial Excel
-        if (is_numeric($d)) {
-            $unix = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToTimestamp((float)$d);
-            $dateStr = date('Y-m-d', $unix);
-            // se ha frazione, contiene gia' l'ora
-            if (((float)$d - floor((float)$d)) > 0) {
-                return date('Y-m-d H:i:s', $unix);
-            }
-            return $dateStr . ' ' . $this->parseTime($t);
+        if ($v === null || $v === '') return null;
+        if (is_numeric($v)) {
+            $unix = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToTimestamp((float)$v);
+            return date('Y-m-d H:i:s', $unix);
         }
-
-        $dStr = trim((string)$d);
-        // gia' include ora?
-        $ts = strtotime($dStr);
-        if ($ts === false) return null;
-        $hasTime = (bool)preg_match('/\d{1,2}:\d{2}/', $dStr);
-        if ($hasTime) return date('Y-m-d H:i:s', $ts);
-
-        return date('Y-m-d', $ts) . ' ' . $this->parseTime($t);
-    }
-
-    private function parseTime($t): string
-    {
-        if ($t === null || $t === '') return '00:00:00';
-        if (is_numeric($t)) {
-            // frazione di giorno
-            $sec = (int)round(((float)$t) * 86400);
-            return sprintf('%02d:%02d:%02d', intdiv($sec, 3600), intdiv($sec % 3600, 60), $sec % 60);
-        }
-        $s = trim((string)$t);
-        if (preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
-            return sprintf('%02d:%02d:%02d', (int)$m[1], (int)$m[2], (int)($m[3] ?? 0));
-        }
-        return '00:00:00';
+        $s = trim((string)$v);
+        $ts = strtotime($s);
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
 
     private function normalizeCardNumber(string $raw): string
     {
-        // alcuni esport hanno apici/spazi per non far perdere zeri
+        // togli spazi, apostrofi (anti-cast Excel), e zero-leading non significativi
         return preg_replace('/[\s\']/', '', $raw);
     }
 
-    private function parseDistribLocation(string $s): array
-    {
-        if ($s === '') return [null, null];
-        // pattern grezzo: cerca "(XX)" provincia, e l'ultima parola capitalizzata
-        $prov = null;
-        if (preg_match('/\(([A-Z]{2})\)/', $s, $m)) $prov = $m[1];
-        $city = null;
-        if (preg_match('/\b([A-ZÀÈÉÌÒÙ][a-zA-ZÀ-ÿ]{3,})\b\s*(?:\([A-Z]{2}\))?$/u', $s, $m)) {
-            $city = $m[1];
-        }
-        return [$city, $prov];
-    }
+    // ─── Lookups ─────────────────────────────────────────────────────────────
 
     private function loadCardMap(): array
     {
@@ -276,5 +270,26 @@ final class Q8FuelInvoiceImporter
             $map[$this->normalizeCardNumber($r['numero'])] = (int)$r['id'];
         }
         return $map;
+    }
+
+    /** alias Q8 → bb_fleet_vehicles.id. Case-insensitive, trimmed. */
+    private function loadPlateAliasMap(): array
+    {
+        $stmt = $this->conn->query("
+            SELECT id, plate_alias_q8
+            FROM bb_fleet_vehicles
+            WHERE plate_alias_q8 IS NOT NULL AND plate_alias_q8 <> ''
+        ");
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $map[strtoupper(trim($r['plate_alias_q8']))] = (int)$r['id'];
+        }
+        return $map;
+    }
+
+    private function emptyResult(string $err): array
+    {
+        return ['rows_total'=>0,'rows_imported'=>0,'rows_skipped'=>0,
+                'errors'=>[$err], 'period_from'=>null, 'period_to'=>null];
     }
 }
