@@ -50,6 +50,14 @@ final class FleetReconciliationService
      *  Soglia per ignorare il rumore e considerare solo refuel reali. */
     private const MIN_REFUEL_LITERS_FOR_RULE = 5.0;
 
+    /**
+     * Regole basate sul sensore SERBATOIO del GPS sono DISABILITATE di default
+     * perche' su molte flotte (verificato sui dati reali utente) il sensore
+     * spesso riporta 0L o valori inaffidabili. Generano puro rumore.
+     * Riattiva true se hai un GPS evoluto con sensore litri preciso.
+     */
+    private const ENABLE_GPS_TANK_SENSOR_RULES = false;
+
     /** evita anomalie duplicate nella stessa run su (rule_code, vehicle, day). */
     private array $emittedDedup = [];
 
@@ -99,13 +107,15 @@ final class FleetReconciliationService
             $anomalies += $this->checkTxCityVsWorksite($runId, $tx);
         }
 
-        // 6) regole trip-driven (con dedup per (vehicle, day))
-        // Solo refuel con litri sensati: il GPS spesso conta come "refuel"
-        // anche eventi a 0L (motore spento generico, rumore del sensore).
-        foreach ($trips as $trip) {
-            if ((int)$trip['refuels_count'] > 0
-                && (float)$trip['refuels_liters'] >= self::MIN_REFUEL_LITERS_FOR_RULE) {
-                $anomalies += $this->checkGpsRefuelVsQ8($runId, $trip, $txByVehicleDay);
+        // 6) regole trip-driven basate sul sensore GPS serbatoio.
+        //    Disabilitate di default perche' su molte flotte il sensore
+        //    riporta 0L sistematicamente. Riattivabili da const sopra.
+        if (self::ENABLE_GPS_TANK_SENSOR_RULES) {
+            foreach ($trips as $trip) {
+                if ((int)$trip['refuels_count'] > 0
+                    && (float)$trip['refuels_liters'] >= self::MIN_REFUEL_LITERS_FOR_RULE) {
+                    $anomalies += $this->checkGpsRefuelVsQ8($runId, $trip, $txByVehicleDay);
+                }
             }
         }
 
@@ -767,8 +777,8 @@ final class FleetReconciliationService
         $gpsLiters = array_sum(array_map(fn($r) => (float)$r['refuels_liters'], $dayTrips));
         $gpsKm     = array_sum(array_map(fn($r) => (float)$r['km_done'], $dayTrips));
 
-        // delta litri (solo se entrambi rilevati e sufficienti per essere significativi)
-        if ($gpsLiters > 0 && $txLiters > 0) {
+        // delta litri (solo se sensore GPS attendibile)
+        if (self::ENABLE_GPS_TANK_SENSOR_RULES && $gpsLiters > 0 && $txLiters > 0) {
             $delta = abs($gpsLiters - $txLiters);
             if ($delta > self::LITERS_DELTA_THRESHOLD) {
                 $vehTarga = $dayTxs[0]['vehicle_targa'] ?? '?';

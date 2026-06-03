@@ -115,6 +115,23 @@
 
     </div>
 
+    {# ── MAPPATURA SUGGERITA: passo intermedio fra import e analisi ─── #}
+    <a href="/fleet/suggest-mappings" class="fl-table-wrap" style="display:block;margin-top:18px;padding:18px 22px;text-decoration:none;background:linear-gradient(135deg,#fafbfc 0%,#ecfdf5 100%);border:1.5px solid #6ee7b7;">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <div class="fl-modal-icon" style="background:#fff;color:#047857;">
+                <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="10"/><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div style="flex:1;">
+                <h3 style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">Mappatura suggerita carte → veicoli</h3>
+                <p style="margin:2px 0 0;font-size:12px;color:#475569;">
+                    Dopo aver caricato GPS+Q8, l'AI ti propone in automatico quale veicolo guida quale carta.
+                    Approvi in 30 secondi, poi puoi analizzare.
+                </p>
+            </div>
+            <div style="font-size:13px;color:#047857;font-weight:700;">Vai &rsaquo;</div>
+        </div>
+    </a>
+
     {# ── ANALIZZA: lancia engine di riconciliazione su tutti i dati importati ── #}
     <form method="POST" action="/fleet/analyze" class="fl-table-wrap" style="margin-top:24px;padding:24px;background:linear-gradient(135deg,#fafbfc 0%, #fff7ed 100%);border:1.5px solid #fed7aa;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">

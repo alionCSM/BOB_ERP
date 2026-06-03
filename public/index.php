@@ -520,7 +520,9 @@ if ($uri === '/fleet' || str_starts_with($uri, '/fleet/')) {
            ->get('/fleet/import',                   [FleetController::class, 'importForm'])
            ->post('/fleet/import',                  [FleetController::class, 'importUpload'])
            ->post('/fleet/anomaly/dismiss',         [FleetController::class, 'dismissAnomaly'])
-           ->post('/fleet/analyze',                 [FleetController::class, 'analyze']);
+           ->post('/fleet/analyze',                 [FleetController::class, 'analyze'])
+           ->get('/fleet/suggest-mappings',         [FleetController::class, 'suggestMappings'])
+           ->post('/fleet/mapping/accept',          [FleetController::class, 'acceptMapping']);
 
     $router->dispatch($request, $container);
 }

@@ -9,6 +9,7 @@ use App\Repository\Fleet\FleetTelemetryRepository;
 use App\Service\Fleet\GpsRiepilogoTratteImporter;
 use App\Service\Fleet\Q8FuelInvoiceImporter;
 use App\Service\Fleet\FleetReconciliationService;
+use App\Service\Fleet\CardVehicleMappingSuggester;
 
 /**
  * Modulo Flotta — step 1.
@@ -185,6 +186,50 @@ final class FleetController
             }
         }
         return $dest;
+    }
+
+    // ─── Mappatura suggerita carta → veicolo ──────────────────────────────────
+
+    public function suggestMappings(Request $request): void
+    {
+        $this->requireManage($request);
+        $from = $_GET['from'] ?? null;
+        $to   = $_GET['to']   ?? null;
+
+        $suggester = new CardVehicleMappingSuggester($this->conn);
+        $suggestions = $suggester->suggestAll($from, $to);
+
+        Response::view('fleet/mapping_suggest.html.twig', $request, [
+            'suggestions' => $suggestions,
+            'canManage'   => true,
+            'from'        => $from,
+            'to'          => $to,
+        ]);
+    }
+
+    public function acceptMapping(Request $request): void
+    {
+        $this->requireManage($request);
+        $cardId    = (int)($_POST['card_id'] ?? 0);
+        $vehicleId = (int)($_POST['vehicle_id'] ?? 0);
+        $fromDate  = $_POST['from_date'] ?? date('Y-m-01');
+
+        if ($cardId <= 0 || $vehicleId <= 0) {
+            $_SESSION['error'] = 'Parametri mancanti.';
+            Response::redirect('/fleet/suggest-mappings');
+        }
+
+        try {
+            $this->fleet->reassignFuelCard(
+                $cardId, $vehicleId, null, $fromDate,
+                $this->currentUserId($request),
+                'Accettata da suggerimento automatico'
+            );
+            $_SESSION['success'] = 'Assegnazione creata. Continua coi prossimi suggerimenti.';
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Errore: ' . $e->getMessage();
+        }
+        Response::redirect('/fleet/suggest-mappings');
     }
 
     public function analyze(Request $request): void
