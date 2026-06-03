@@ -38,9 +38,14 @@ final class FleetReconciliationService
     /** soglie configurabili */
     private const TX_VS_TRIP_WINDOW_HOURS  = 3;
     private const LITERS_DELTA_THRESHOLD   = 10.0;  // 5L → 10L (sensore GPS rumoroso)
-    private const CONSUMPTION_LP100KM_MAX  = 25.0;
+    /** Soglia consumo tank-to-tank in L/100km. Sopra → anomalia.
+     *  Furgone normale: 10-15. Camion full-load: 25-30. Soglia 20 lascia
+     *  margine abbondante per evitare falsi positivi su carichi pesanti. */
+    private const CONSUMPTION_LP100KM_MAX  = 20.0;
+    /** Km minimi fra due rifornimenti per ritenere il calcolo affidabile.
+     *  Sotto questa soglia il rapporto e' rumoroso e ignoriamo. */
+    private const MIN_KM_BETWEEN_REFILLS   = 100.0;
     private const MULTIPLE_TX_THRESHOLD    = 2;
-    private const MIN_KM_FOR_CONSUMPTION   = 30.0;
     /** I GPS contano spesso "rifornimento" anche eventi a 0L (motore off generico).
      *  Soglia per ignorare il rumore e considerare solo refuel reali. */
     private const MIN_REFUEL_LITERS_FOR_RULE = 5.0;
@@ -141,7 +146,13 @@ final class FleetReconciliationService
             }
         }
 
-        // 8) vehicle-level: veicoli con trip nel periodo ma SENZA carte
+        // 8) consumo tank-to-tank: per ogni veicolo, ordina tx per data e
+        //    calcola L/100km fra rifornimenti consecutivi. E' il metodo
+        //    corretto perche' i litri immessi al pieno N+1 = ai litri
+        //    consumati fra pieno N e pieno N+1.
+        $anomalies += $this->checkTankToTankConsumption($runId, $txs, $trips);
+
+        // 9) vehicle-level: veicoli con trip nel periodo ma SENZA carte
         //    assegnate → anomalia HIGH "configura assegnazione" (una sola).
         $anomalies += $this->checkVehiclesWithoutCard($runId, $from, $to, $vehicleId);
 
@@ -776,27 +787,98 @@ final class FleetReconciliationService
                 $count++;
             }
         }
+        // consumo L/100km gestito da checkTankToTankConsumption (tra rifornimenti)
+        return $count;
+    }
 
-        // consumo L/100km
-        if ($gpsKm > self::MIN_KM_FOR_CONSUMPTION && $txLiters > 0) {
-            $lp100km = ($txLiters / $gpsKm) * 100;
-            if ($lp100km > self::CONSUMPTION_LP100KM_MAX) {
-                $vehTarga = $dayTxs[0]['vehicle_targa'] ?? '?';
+    /**
+     * Consumo tank-to-tank: per ogni veicolo, ordina le tx Q8 per orario e
+     * confronta ogni rifornimento col precedente. I litri immessi al pieno
+     * (N+1) approssimano i litri consumati nel tragitto fra (N) e (N+1).
+     *
+     *   consumo L/100km = litri_pieno_N+1 / km_fra_i_due_pieni * 100
+     *
+     * Skippa se km_fra < MIN_KM_BETWEEN_REFILLS (rumore: due pieni vicini sono
+     * di solito top-up, non hai consumato abbastanza).
+     */
+    private function checkTankToTankConsumption(int $runId, array $txs, array $trips): int
+    {
+        // raggruppa tx per veicolo (solo quelli risolti — niente vehicle_id, niente check)
+        $byVehicle = [];
+        foreach ($txs as $tx) {
+            if (!$tx['vehicle_id']) continue;
+            $byVehicle[(int)$tx['vehicle_id']][] = $tx;
+        }
+        // gia' ORDER BY tx_at ASC dalla query, ma riordina per sicurezza
+        foreach ($byVehicle as &$arr) {
+            usort($arr, fn($a, $b) => strcmp($a['tx_at'], $b['tx_at']));
+        }
+        unset($arr);
+
+        // indice trips per vehicle_id (e fallback per targa)
+        $tripsByVeh = [];
+        foreach ($trips as $t) {
+            if ($t['vehicle_id']) {
+                $tripsByVeh[(int)$t['vehicle_id']][] = $t;
+            }
+        }
+        foreach ($tripsByVeh as &$arr) {
+            usort($arr, fn($a, $b) => strcmp($a['start_at'], $b['start_at']));
+        }
+        unset($arr);
+
+        $count = 0;
+        foreach ($byVehicle as $vehicleId => $vehicleTxs) {
+            for ($i = 1, $n = count($vehicleTxs); $i < $n; $i++) {
+                $prev = $vehicleTxs[$i - 1];
+                $curr = $vehicleTxs[$i];
+
+                // somma km dei trip fra prev.tx_at e curr.tx_at
+                $kmBetween = $this->sumKmBetween($tripsByVeh[$vehicleId] ?? [], $prev['tx_at'], $curr['tx_at']);
+                if ($kmBetween < self::MIN_KM_BETWEEN_REFILLS) continue;  // rumore
+
+                $liters = (float)$curr['litri'];
+                if ($liters <= 0) continue;
+                $lp100 = $liters / $kmBetween * 100.0;
+                if ($lp100 <= self::CONSUMPTION_LP100KM_MAX) continue;  // dentro la norma
+
+                $vehTarga = $curr['vehicle_targa'] ?? '?';
                 $this->insertAnomaly($runId, [
                     'vehicle_id' => $vehicleId,
                     'rule_code'  => 'CONSUMPTION_OUTLIER',
-                    'severity'   => 'medium',
-                    'event_at'   => $day . ' 12:00:00',
-                    'summary'    => sprintf('Consumo anomalo veicolo %s: %.1fL/100km (soglia %.0fL/100km)',
-                                            $vehTarga, $lp100km, self::CONSUMPTION_LP100KM_MAX),
-                    'detail'     => sprintf('%sL Q8 / %sKm GPS nel giorno. Verifica se possibile travaso, guasto consumo, o uso non lavorativo.',
-                                            number_format($txLiters, 1), number_format($gpsKm, 0)),
-                    'ref_tx_id'  => (int)$dayTxs[0]['id'],
+                    'severity'   => $lp100 > 35 ? 'high' : 'medium',
+                    'event_at'   => $curr['tx_at'],
+                    'summary'    => sprintf('Consumo anomalo su %s tra due rifornimenti: %.1f L/100km',
+                                            $vehTarga, $lp100),
+                    'detail'     => sprintf(
+                        "Rifornimento precedente: %s · %sL\n".
+                        "Rifornimento attuale:    %s · %sL\n".
+                        "Km percorsi tra i due:   %s km\n".
+                        "Consumo calcolato:       %.1f L/100km (soglia %.0f)\n\n".
+                        "Possibili cause: travaso, fuga carburante, autista che ha messo gasolio in altra auto, errore lettura.",
+                        $prev['tx_at'], number_format((float)$prev['litri'], 1),
+                        $curr['tx_at'], number_format($liters, 1),
+                        number_format($kmBetween, 0),
+                        $lp100, self::CONSUMPTION_LP100KM_MAX
+                    ),
+                    'ref_tx_id'  => (int)$curr['id'],
                 ]);
                 $count++;
             }
         }
         return $count;
+    }
+
+    /** Somma km_done dei trip con start_at strettamente fra $afterDt e $beforeDt. */
+    private function sumKmBetween(array $sortedTrips, string $afterDt, string $beforeDt): float
+    {
+        $sum = 0.0;
+        foreach ($sortedTrips as $t) {
+            if ($t['start_at'] <= $afterDt) continue;
+            if ($t['start_at'] >  $beforeDt) break;   // sorted, possiamo uscire
+            $sum += (float)$t['km_done'];
+        }
+        return $sum;
     }
 
     /**
