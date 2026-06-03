@@ -74,9 +74,11 @@ final class Q8FuelInvoiceImporter
                                       '. Trovate: ' . implode(',', array_keys($colMap)));
         }
 
-        // mappe lookup
-        $cardMap     = $this->loadCardMap();        // numero → id
-        $plateMap    = $this->loadPlateAliasMap();  // alias Q8 → vehicle_id
+        // mappe lookup. NON usiamo Plate number per risolvere il veicolo:
+        // i driver lo compilano a caso (vedi "JOLLY 2", "1", numeri random).
+        // Il match veicolo passa via Card No. → bb_fleet_fuel_card_assignments
+        // a runtime nell'engine di riconciliazione. Qui salviamo solo il card_id.
+        $cardMap = $this->loadCardMap();
 
         $imported = 0; $skipped = 0; $total = 0;
         $errors = [];
@@ -117,8 +119,10 @@ final class Q8FuelInvoiceImporter
                         ?? $this->num($r, $colMap, 'prezzo')
                         ?? ($importo > 0 ? round($importo / $litri, 3) : null);
 
+                // Salviamo l'alias raw solo per diagnostica (vederlo nella lista);
+                // non lo usiamo per il match veicolo.
                 $plateAlias = $this->str($r, $colMap, 'plate') ?: null;
-                $vehicleId  = $plateAlias ? ($plateMap[strtoupper(trim($plateAlias))] ?? null) : null;
+                $vehicleId  = null;
 
                 $distribCode = $this->str($r, $colMap, 'distrib_code');
                 $distribAddr = $this->str($r, $colMap, 'distrib_addr');
@@ -145,6 +149,9 @@ final class Q8FuelInvoiceImporter
                         ':distrib'     => $distrib ? mb_substr($distrib, 0, 255) : null,
                         ':city'        => $city ? ucfirst(mb_strtolower($city)) : null,
                         ':prov'        => null, // Q8 non fornisce sigla provincia
+                        // Km dichiarato dal driver — inaffidabile (vedi "1", "12345").
+                        // Lo salviamo solo come dato grezzo, NON viene usato per
+                        // anomalie di consumo (per quello il GPS km_done e' la verita').
                         ':km'          => ($km !== null && $km > 0) ? (int)$km : null,
                         ':raw_hash'    => $rawHash,
                     ]);
@@ -268,21 +275,6 @@ final class Q8FuelInvoiceImporter
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $map[$this->normalizeCardNumber($r['numero'])] = (int)$r['id'];
-        }
-        return $map;
-    }
-
-    /** alias Q8 → bb_fleet_vehicles.id. Case-insensitive, trimmed. */
-    private function loadPlateAliasMap(): array
-    {
-        $stmt = $this->conn->query("
-            SELECT id, plate_alias_q8
-            FROM bb_fleet_vehicles
-            WHERE plate_alias_q8 IS NOT NULL AND plate_alias_q8 <> ''
-        ");
-        $map = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $map[strtoupper(trim($r['plate_alias_q8']))] = (int)$r['id'];
         }
         return $map;
     }

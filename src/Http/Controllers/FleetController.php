@@ -210,13 +210,12 @@ final class FleetController
 
         $id = (int)($_POST['id'] ?? 0);
         $data = [
-            'targa'          => strtoupper(trim($_POST['targa'] ?? '')),
-            'modello'        => trim($_POST['modello'] ?? '') ?: null,
-            'tipo'           => $_POST['tipo'] ?? 'furgone',
-            'gps_device_id'  => trim($_POST['gps_device_id'] ?? '') ?: null,
-            'plate_alias_q8' => trim($_POST['plate_alias_q8'] ?? '') ?: null,
-            'notes'          => trim($_POST['notes'] ?? '') ?: null,
-            'active'         => !empty($_POST['active']),
+            'targa'         => strtoupper(trim($_POST['targa'] ?? '')),
+            'modello'       => trim($_POST['modello'] ?? '') ?: null,
+            'tipo'          => $_POST['tipo'] ?? 'furgone',
+            'gps_device_id' => trim($_POST['gps_device_id'] ?? '') ?: null,
+            'notes'         => trim($_POST['notes'] ?? '') ?: null,
+            'active'        => !empty($_POST['active']),
         ];
 
         if ($data['targa'] === '') {
