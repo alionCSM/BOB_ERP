@@ -228,15 +228,21 @@ final class FleetReconciliationService
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rawRows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // normalizza vehicle_id finale: SOLO via fca (Plate number Q8 non e' affidabile)
-        // vehicle_targa = la targa del veicolo a cui la carta era assegnata
-        foreach ($rows as &$r) {
-            $r['vehicle_id'] = $r['fca_vehicle_id'] ? (int)$r['fca_vehicle_id'] : null;
-            // vehicle_targa proviene gia' dal JOIN su v (es. 'vehicle_targa' colonna)
+        // Dedup per tx.id. I LEFT JOIN su bb_presenze (e potenziali assignment
+        // sovrapposti) possono restituire la stessa tx 2+ volte. Tieni la prima
+        // riga per id, le altre vengono droppate.
+        $seen = [];
+        $rows = [];
+        foreach ($rawRows as $r) {
+            $id = (int)$r['id'];
+            if (isset($seen[$id])) continue;
+            $seen[$id] = true;
+            $r['vehicle_id']  = $r['fca_vehicle_id'] ? (int)$r['fca_vehicle_id'] : null;
             $r['holder_type'] = $r['fca_vehicle_id'] ? 'vehicle'
                               : ($r['fca_worker_id'] ? 'worker' : 'none');
+            $rows[] = $r;
         }
         return $rows;
     }
@@ -419,7 +425,12 @@ final class FleetReconciliationService
         return 1;
     }
 
-    /** TX Q8 con citta' che NON appare negli indirizzi dei trip del veicolo nel giorno. */
+    /** TX Q8 con citta' che NON appare negli indirizzi dei trip del veicolo nel giorno.
+     *  Tre livelli di tolleranza per evitare falsi positivi su transit:
+     *   1) Match substring diretto (city del tx contenuta in addr/city dei trip)
+     *   2) Match per regione italiana (citta' nella stessa regione di un endpoint)
+     *   3) Skip se cumulato km trip > TRANSIT_KM (autostrada, refuel ovunque OK)
+     */
     private function checkTxCityVsTrip(int $runId, array $tx, array $tripsIdx): int
     {
         if (!$tx['vehicle_id'] || empty($tx['city'])) return 0;
@@ -428,31 +439,103 @@ final class FleetReconciliationService
         foreach ($this->lookupKeysForVehicle($tx) as $key) {
             $tripsToday = array_merge($tripsToday, $tripsIdx[$key][$day] ?? []);
         }
-        // dedup
+        // dedup trips per id
         $seen = []; $tripsToday = array_filter($tripsToday, function($t) use (&$seen) {
             $id = (int)$t['id']; if (isset($seen[$id])) return false; $seen[$id] = true; return true;
         });
         if (empty($tripsToday)) return 0;  // gia' coperto da NO_GPS_TRIP_NEAR
 
         $txCity = mb_strtolower(trim($tx['city']));
-        if (mb_strlen($txCity) < 3) return 0;  // troppo corto, evita falsi positivi
+        if (mb_strlen($txCity) < 3) return 0;
+
+        // 1) match substring diretto
         foreach ($tripsToday as $t) {
             $blob = mb_strtolower(($t['start_address'] ?? '') . ' ' . ($t['end_address'] ?? '') . ' ' .
                                   ($t['start_city'] ?? '')    . ' ' . ($t['end_city']   ?? ''));
             if (str_contains($blob, $txCity)) return 0;
         }
+
+        // 2) match per regione: la citta' del tx e' nella stessa regione di
+        //    un endpoint dei trip → probabilmente sulla stessa direttrice
+        $txRegion = $this->cityToRegion($txCity);
+        if ($txRegion) {
+            foreach ($tripsToday as $t) {
+                $startReg = $this->cityToRegion(mb_strtolower($t['start_city'] ?? ''));
+                $endReg   = $this->cityToRegion(mb_strtolower($t['end_city']   ?? ''));
+                if ($startReg === $txRegion || $endReg === $txRegion) return 0;
+            }
+        }
+
+        // 3) trip in transit (cumulato km elevato) → impossibile sapere
+        //    esattamente le citta' attraversate, troppi falsi positivi.
+        $totalKm = array_sum(array_map(fn($t) => (float)$t['km_done'], $tripsToday));
+        if ($totalKm >= self::TRANSIT_KM_THRESHOLD) return 0;
+
         $this->insertAnomaly($runId, [
             'vehicle_id' => (int)$tx['vehicle_id'],
             'rule_code'  => 'Q8_CITY_VS_TRIP_CITY',
-            'severity'   => 'medium',
+            'severity'   => 'low',          // declassato: rule rumorosa senza geocoding
             'event_at'   => $tx['tx_at'],
             'summary'    => 'Rifornimento in ' . ucfirst($tx['city']) . ' ma il veicolo ' . ($tx['vehicle_targa'] ?? '?') . ' non e\' transitato in quella citta\'',
-            'detail'     => sprintf('Distributore: %s · Tratte GPS del giorno: %s',
-                                    $tx['distributore'] ?? '?',
-                                    implode(' / ', array_map(fn($t) => ($t['start_city']??'?').'→'.($t['end_city']??'?'), $tripsToday))),
+            'detail'     => sprintf(
+                "Distributore: %s · Tratte GPS del giorno: %s · Km totali: %s.\n\nNota: il match e' su nome citta'/regione, senza geocoding. Se il distributore e' su autostrada/superstrada lungo il percorso (es. ADS, FI-PI-LI, A1), e' falso positivo — archivia.",
+                $tx['distributore'] ?? '?',
+                implode(' / ', array_map(fn($t) => ($t['start_city']??'?').'→'.($t['end_city']??'?'), $tripsToday)),
+                number_format($totalKm, 0)
+            ),
             'ref_tx_id'  => (int)$tx['id'],
         ]);
         return 1;
+    }
+
+    /** Soglia km cumulato per considerare la giornata "in transito" (autostrada). */
+    private const TRANSIT_KM_THRESHOLD = 100.0;
+
+    /**
+     * Mappa citta' italiane → regione (lowercase).
+     * Inclusi capoluoghi e comuni piu' frequenti per copertura wide. Match
+     * case-insensitive sul nome esatto (no fuzzy per evitare collisioni).
+     */
+    private function cityToRegion(string $cityLower): ?string
+    {
+        $city = mb_strtolower(trim($cityLower));
+        if ($city === '') return null;
+        static $map = null;
+        if ($map === null) $map = self::buildCityToRegionMap();
+        return $map[$city] ?? null;
+    }
+
+    private static function buildCityToRegionMap(): array
+    {
+        // Province italiane raggruppate per regione. La key e' il nome
+        // del capoluogo lowercase. Per comuni non capoluogo importanti,
+        // aggiungiamo voci esplicite.
+        $regions = [
+            'piemonte'        => ['torino','alessandria','asti','biella','cuneo','novara','verbania','vercelli'],
+            'lombardia'       => ['milano','bergamo','brescia','como','cremona','lecco','lodi','monza','mantova','pavia','sondrio','varese'],
+            'liguria'         => ['genova','imperia','spezia','la spezia','savona'],
+            'veneto'          => ['venezia','belluno','padova','rovigo','treviso','vicenza','verona','mestre','marghera'],
+            'friuli'          => ['trieste','gorizia','pordenone','udine'],
+            'trentino'        => ['trento','bolzano'],
+            'emilia-romagna'  => ['bologna','ferrara','forli','forli-cesena','modena','piacenza','parma','ravenna','reggio emilia','rimini','cesena','castenaso','budrio','imola'],
+            'toscana'         => ['firenze','arezzo','grosseto','livorno','lucca','massa','massa-carrara','pisa','prato','pistoia','siena','pontedera','empoli','viareggio','piombino','scarperia','sesto fiorentino'],
+            'umbria'          => ['perugia','terni','assisi','foligno','spoleto'],
+            'marche'          => ['ancona','ascoli','ascoli piceno','fermo','macerata','pesaro','urbino','senigallia','jesi'],
+            'lazio'           => ['roma','frosinone','latina','rieti','viterbo','fiumicino','tivoli','aprilia','pomezia'],
+            'abruzzo'         => ['aquila','l\'aquila','chieti','pescara','teramo'],
+            'molise'          => ['campobasso','isernia'],
+            'campania'        => ['napoli','avellino','benevento','caserta','salerno','torre del greco','giugliano','aversa','pozzuoli','battipaglia','nocera','nola','marcianise'],
+            'puglia'          => ['bari','brindisi','barletta','foggia','lecce','taranto','andria','trani','altamura','molfetta','bisceglie','manfredonia'],
+            'basilicata'      => ['potenza','matera'],
+            'calabria'        => ['catanzaro','cosenza','crotone','reggio calabria','vibo','vibo valentia','lamezia','rende','corigliano'],
+            'sicilia'         => ['palermo','agrigento','caltanissetta','catania','enna','messina','ragusa','siracusa','trapani','marsala','gela','vittoria','bagheria','acireale'],
+            'sardegna'        => ['cagliari','nuoro','oristano','sassari','olbia','alghero','quartu'],
+        ];
+        $map = [];
+        foreach ($regions as $region => $cities) {
+            foreach ($cities as $c) $map[mb_strtolower($c)] = $region;
+        }
+        return $map;
     }
 
     /** Carta usata ma l'operaio assegnato non risulta in presenza quel giorno.
@@ -503,19 +586,45 @@ final class FleetReconciliationService
             if (str_contains($txCity, $provSigla)) return 0;
         }
 
+        // 3) match per regione italiana: stesso macro-area → probabilmente
+        //    rifornimento legittimo nel tragitto tra cantiere e casa/altro lavoro
+        $txRegion = $this->cityToRegion($txCity);
+        $wsRegion = $this->extractRegionFromWorksite($wsLoc);
+        if ($txRegion && $wsRegion && $txRegion === $wsRegion) return 0;
+
         $this->insertAnomaly($runId, [
             'vehicle_id' => $tx['vehicle_id'] ? (int)$tx['vehicle_id'] : null,
             'worker_id'  => (int)$tx['resolved_worker_id'],
             'rule_code'  => 'TX_CITY_VS_WORKSITE',
-            'severity'   => 'medium',
+            'severity'   => 'low',           // declassato: senza geocoding e' rumorosa
             'event_at'   => $tx['tx_at'],
             'summary'    => 'Rifornimento in ' . ucfirst($tx['city']) . ' ma operaio era al cantiere "' . $tx['worker_worksite_name'] . '"',
-            'detail'     => sprintf('Cantiere location: %s · TX in: %s · Distributore: %s',
+            'detail'     => sprintf("Cantiere: %s · TX in: %s · Distributore: %s.\n\nNota: match basato su nome citta'/regione. Possibile falso positivo se l'operaio ha fatto tragitto andata-ritorno o lavora su piu' siti.",
                                     $tx['worker_worksite_location'], ucfirst($tx['city']),
                                     $tx['distributore'] ?? '?'),
             'ref_tx_id'  => (int)$tx['id'],
         ]);
         return 1;
+    }
+
+    /** Cerca una citta' nota nella stringa location del cantiere → regione. */
+    private function extractRegionFromWorksite(string $wsLoc): ?string
+    {
+        // prova prima sigla provincia
+        if (preg_match('/\(([a-z]{2})\)/i', $wsLoc, $m)) {
+            $cap = $this->expandProvSigla(mb_strtolower($m[1]));
+            if ($cap) {
+                $r = $this->cityToRegion($cap);
+                if ($r) return $r;
+            }
+        }
+        // scan parole della location contro la mappa citta'
+        $words = preg_split('/[\s,;]+/', mb_strtolower($wsLoc));
+        foreach ($words as $w) {
+            $r = $this->cityToRegion(trim($w, " .-'"));
+            if ($r) return $r;
+        }
+        return null;
     }
 
     /** GPS segnala refuel ma il giorno non ci sono TX Q8 per quel veicolo.
