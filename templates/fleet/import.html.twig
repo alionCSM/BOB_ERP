@@ -61,6 +61,11 @@
                 <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
             </div>
 
+            <label class="fl-check" style="margin-top:14px;padding:10px 12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;width:100%;">
+                <input type="checkbox" name="auto_create_stubs" value="1" checked>
+                <span><b>Auto-crea veicoli mancanti</b> &mdash; per ogni targa non ancora registrata, crea un veicolo stub. Lo completi dopo.</span>
+            </label>
+
             <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
                 <li>Match automatico veicolo per <b>targa</b> (colonna "Veicolo")</li>
                 <li>Dedup: tratte già importate vengono saltate</li>
@@ -91,11 +96,16 @@
                 <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
             </div>
 
+            <label class="fl-check" style="margin-top:14px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;width:100%;">
+                <input type="checkbox" name="auto_create_stubs" value="1" checked>
+                <span><b>Auto-crea carte mancanti</b> &mdash; per ogni "Card No." Q8 non registrato, crea una carta stub. La assegni a un veicolo dopo.</span>
+            </label>
+
             <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
-                <li>Match veicolo <b>via tabella assegnazioni carte</b> (non da "Plate number")</li>
-                <li>Numero carta (Q8 "Card No.") matcha <a href="/fleet?tab=cards" style="color:#0369a1;">Carte registrate</a></li>
+                <li>Match carta tramite <b>Card No.</b> Q8 (intero piccolo, sempre affidabile)</li>
+                <li>PAN salvato come dato secondario (Excel a volte ne perde precisione)</li>
                 <li>"Plate number" e "Km" Q8 sono auto-dichiarati dall'autista, <b>ignorati per il match</b></li>
-                <li>Dedup su (PAN + timestamp + litri + importo)</li>
+                <li>Dedup su (PAN o Card No + timestamp + litri + importo)</li>
             </ul>
 
             <button type="submit" class="fl-btn-submit" style="width:100%;margin-top:16px;padding:12px;background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);">

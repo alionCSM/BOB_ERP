@@ -220,7 +220,8 @@
                 <thead>
                 <tr>
                     <th>Fornitore</th>
-                    <th>Numero</th>
+                    <th>Card No.</th>
+                    <th>PAN</th>
                     <th>Holder corrente</th>
                     <th>Note</th>
                     <th class="center">Attiva</th>
@@ -229,7 +230,7 @@
                 </thead>
                 <tbody>
                 {% if cards is empty %}
-                    <tr><td colspan="6">
+                    <tr><td colspan="7">
                         <div class="fl-empty">
                             <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                             <p class="fl-empty-text">Nessuna carta carburante registrata.</p>
@@ -237,9 +238,10 @@
                     </td></tr>
                 {% else %}
                     {% for c in cards %}
-                        <tr data-fl-row data-fl-search="{{ c.numero }} {{ c.fornitore }} {{ c.holder_vehicle_targa }} {{ c.holder_first_name }} {{ c.holder_last_name }}">
+                        <tr data-fl-row data-fl-search="{{ c.numero }} {{ c.card_no }} {{ c.pan }} {{ c.fornitore }} {{ c.holder_vehicle_targa }} {{ c.holder_first_name }} {{ c.holder_last_name }}">
                             <td><span class="fl-tipo">{{ c.fornitore }}</span></td>
-                            <td><span class="fl-mono">{{ c.numero }}</span></td>
+                            <td><span class="fl-mono">{{ c.card_no ?: c.numero }}</span></td>
+                            <td>{% if c.pan %}<span class="fl-small fl-mono" style="font-size:10px;color:#94a3b8;" title="{{ c.pan }}">…{{ c.pan|slice(-7) }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
                             <td>
                                 {% if c.holder_vehicle_targa %}
                                     {{ fl.chip_holder(c.holder_vehicle_targa, 'vehicle') }}

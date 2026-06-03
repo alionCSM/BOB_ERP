@@ -167,6 +167,7 @@ final class FleetRepository
     public function listFuelCards(bool $activeOnly = true): array
     {
         $where = $activeOnly ? "WHERE c.active = 1" : "";
+        // c.* gia' include card_no e pan dopo la migration 20260603000002
         $sql = "
             SELECT
                 c.*,
@@ -201,11 +202,13 @@ final class FleetRepository
     public function createFuelCard(array $data): int
     {
         $stmt = $this->conn->prepare(
-            "INSERT INTO bb_fleet_fuel_cards (numero, fornitore, notes, active)
-             VALUES (:numero, :fornitore, :notes, :active)"
+            "INSERT INTO bb_fleet_fuel_cards (numero, card_no, pan, fornitore, notes, active)
+             VALUES (:numero, :card_no, :pan, :fornitore, :notes, :active)"
         );
         $stmt->execute([
             ':numero'    => $data['numero'],
+            ':card_no'   => $data['card_no']   ?? null,
+            ':pan'       => $data['pan']       ?? null,
             ':fornitore' => $data['fornitore'] ?? 'Q8',
             ':notes'     => $data['notes']     ?? null,
             ':active'    => !empty($data['active']) ? 1 : 0,
@@ -217,11 +220,14 @@ final class FleetRepository
     {
         $stmt = $this->conn->prepare(
             "UPDATE bb_fleet_fuel_cards
-             SET numero = :numero, fornitore = :fornitore, notes = :notes, active = :active
+             SET numero = :numero, card_no = :card_no, pan = :pan,
+                 fornitore = :fornitore, notes = :notes, active = :active
              WHERE id = :id"
         );
         return $stmt->execute([
             ':numero'    => $data['numero'],
+            ':card_no'   => $data['card_no']   ?? null,
+            ':pan'       => $data['pan']       ?? null,
             ':fornitore' => $data['fornitore'] ?? 'Q8',
             ':notes'     => $data['notes']     ?? null,
             ':active'    => !empty($data['active']) ? 1 : 0,

@@ -33,9 +33,12 @@ final class GpsRiepilogoTratteImporter
     /**
      * @param string $filePath Path assoluto al file xlsx.
      * @param int    $importId id della riga bb_fleet_imports gia' creata.
-     * @return array{rows_total:int, rows_imported:int, rows_skipped:int, errors:array, period_from:?string, period_to:?string}
+     * @param bool   $autoCreateStubs se true, crea automaticamente bb_fleet_vehicles
+     *               stub per ogni targa GPS non ancora registrata. Evita lo scenario
+     *               "5000 trip senza vehicle_id" al primo import.
+     * @return array{rows_total:int, rows_imported:int, rows_skipped:int, errors:array, period_from:?string, period_to:?string, vehicles_created:int}
      */
-    public function import(string $filePath, int $importId): array
+    public function import(string $filePath, int $importId, bool $autoCreateStubs = false): array
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
@@ -70,7 +73,7 @@ final class GpsRiepilogoTratteImporter
         // 3) cache targhe -> vehicle_id (un solo SELECT)
         $vehicleMap = $this->loadVehicleMap();
 
-        $imported = 0; $skipped = 0; $total = 0;
+        $imported = 0; $skipped = 0; $total = 0; $vehiclesCreated = 0;
         $errors = [];
         $minDate = null; $maxDate = null;
 
@@ -101,6 +104,13 @@ final class GpsRiepilogoTratteImporter
                 $targa = $this->get($r, $colMap, 'targa');
                 if (!$targa) { $skipped++; continue; }
                 $targa = strtoupper(trim((string)$targa));
+
+                // auto-stub: registra il veicolo se non esiste
+                if ($autoCreateStubs && !isset($vehicleMap[$targa])) {
+                    $newId = $this->createStubVehicle($targa);
+                    $vehicleMap[$targa] = $newId;
+                    $vehiclesCreated++;
+                }
 
                 $startAt = $this->parseDateTime($this->get($r, $colMap, 'start_at'));
                 $endAt   = $this->parseDateTime($this->get($r, $colMap, 'end_at'));
@@ -164,13 +174,25 @@ final class GpsRiepilogoTratteImporter
         }
 
         return [
-            'rows_total'    => $total,
-            'rows_imported' => $imported,
-            'rows_skipped'  => $skipped,
-            'errors'        => $errors,
-            'period_from'   => $minDate ? substr($minDate, 0, 10) : null,
-            'period_to'     => $maxDate ? substr($maxDate, 0, 10) : null,
+            'rows_total'      => $total,
+            'rows_imported'   => $imported,
+            'rows_skipped'    => $skipped,
+            'errors'          => $errors,
+            'period_from'     => $minDate ? substr($minDate, 0, 10) : null,
+            'period_to'       => $maxDate ? substr($maxDate, 0, 10) : null,
+            'vehicles_created'=> $vehiclesCreated,
         ];
+    }
+
+    private function createStubVehicle(string $targa): int
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO bb_fleet_vehicles (targa, tipo, active, notes)
+            VALUES (?, 'furgone', 1, ?)
+        ");
+        $note = 'Auto-creato da import GPS il ' . date('d/m/Y H:i') . ' — completa modello/tipo e assegna a un operaio';
+        $stmt->execute([$targa, $note]);
+        return (int)$this->conn->lastInsertId();
     }
 
     // ─── Header mapping ───────────────────────────────────────────────────────

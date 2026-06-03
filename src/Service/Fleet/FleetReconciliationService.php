@@ -98,15 +98,40 @@ final class FleetReconciliationService
             }
         }
 
-        // 7) regole aggregate per (veicolo, giorno)
+        // 7) regole aggregate per (veicolo, giorno).
+        // L'index ha multiple keys per tx (id: e targa:) → usiamo una canonical
+        // key per (veicolo, giorno) per evitare di processare 2 volte lo stesso.
+        $seenAggregate = [];
         foreach ($txByVehicleDay as $vehKey => $byDay) {
             foreach ($byDay as $day => $dayTxs) {
-                if (count($dayTxs) > self::MULTIPLE_TX_THRESHOLD) {
-                    $anomalies += $this->emitMultipleTx($runId, $vehKey, $day, $dayTxs);
+                $first = $dayTxs[0];
+                $canonical = $first['vehicle_id']
+                    ? 'id:' . $first['vehicle_id']
+                    : (!empty($first['vehicle_targa']) ? 'targa:' . strtoupper($first['vehicle_targa'])
+                                                       : 'card:' . $first['card_numero']);
+                $dedupKey = $canonical . '|' . $day;
+                if (isset($seenAggregate[$dedupKey])) continue;
+                $seenAggregate[$dedupKey] = true;
+
+                // dedup tx per id (lo stesso tx puo' comparire sotto piu' keys)
+                $ids = [];
+                $uniqueTxs = array_values(array_filter($dayTxs, function($t) use (&$ids) {
+                    if (isset($ids[$t['id']])) return false; $ids[$t['id']] = true; return true;
+                }));
+
+                if (count($uniqueTxs) > self::MULTIPLE_TX_THRESHOLD) {
+                    $anomalies += $this->emitMultipleTx($runId, $canonical, $day, $uniqueTxs);
                 }
-                // litri delta + consumption (solo se vehKey e' un id veicolo risolto)
-                $dayTrips = $tripsByVehicleDay[$vehKey][$day] ?? [];
-                $anomalies += $this->checkDailyAggregates($runId, $vehKey, $day, $dayTxs, $dayTrips);
+                // raccogli trip da entrambe le keys
+                $allTrips = array_merge(
+                    $tripsByVehicleDay['id:' . ($first['vehicle_id'] ?? 0)][$day]  ?? [],
+                    $tripsByVehicleDay['targa:' . strtoupper($first['vehicle_targa'] ?? '')][$day] ?? []
+                );
+                $tids = [];
+                $uniqueTrips = array_values(array_filter($allTrips, function($t) use (&$tids) {
+                    if (isset($tids[$t['id']])) return false; $tids[$t['id']] = true; return true;
+                }));
+                $anomalies += $this->checkDailyAggregates($runId, $canonical, $day, $uniqueTxs, $uniqueTrips);
             }
         }
 
@@ -196,8 +221,10 @@ final class FleetReconciliationService
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // normalizza vehicle_id finale: SOLO via fca (Plate number Q8 non e' affidabile)
+        // vehicle_targa = la targa del veicolo a cui la carta era assegnata
         foreach ($rows as &$r) {
             $r['vehicle_id'] = $r['fca_vehicle_id'] ? (int)$r['fca_vehicle_id'] : null;
+            // vehicle_targa proviene gia' dal JOIN su v (es. 'vehicle_targa' colonna)
             $r['holder_type'] = $r['fca_vehicle_id'] ? 'vehicle'
                               : ($r['fca_worker_id'] ? 'worker' : 'none');
         }
@@ -227,26 +254,56 @@ final class FleetReconciliationService
 
     /**
      * @return array<string, array<string, array>>  $map[vehicleKey][YYYY-MM-DD] = trips[]
-     *   vehicleKey: 'id:N' se vehicle_id presente, altrimenti 'targa:XYZ'
+     *   I trip vengono indicizzati con DUE chiavi: 'id:N' (se risolto) e
+     *   'targa:XYZ' (sempre). Cosi' tx con vehicle_id risolto possono
+     *   matchare trip con stessa targa ma vehicle_id null (e viceversa).
      */
     private function indexTripsByVehicleDay(array $trips): array
     {
         $map = [];
         foreach ($trips as $t) {
-            $key = $t['vehicle_id'] ? 'id:' . $t['vehicle_id'] : 'targa:' . $t['vehicle_targa'];
             $day = substr($t['start_at'], 0, 10);
-            $map[$key][$day][] = $t;
+            // sempre via targa (univoca per veicolo fisico)
+            if ($t['vehicle_targa']) {
+                $map['targa:' . strtoupper($t['vehicle_targa'])][$day][] = $t;
+            }
+            // anche via id se risolto
+            if ($t['vehicle_id']) {
+                $map['id:' . $t['vehicle_id']][$day][] = $t;
+            }
         }
         return $map;
     }
 
+    /** Restituisce le candidate keys per cercare i trip dato un veicolo risolto. */
+    private function lookupKeysForVehicle(array $tx): array
+    {
+        $keys = [];
+        if ($tx['vehicle_id'])     $keys[] = 'id:' . $tx['vehicle_id'];
+        if ($tx['vehicle_targa'])  $keys[] = 'targa:' . strtoupper($tx['vehicle_targa']);
+        return $keys;
+    }
+
+    /**
+     * Indicizza tx con DUE keys:
+     *   'id:N'         se vehicle_id risolto
+     *   'targa:XYZ'    se vehicle_targa noto (da resolved_vehicle)
+     *   'card:CN'      fallback per tx senza veicolo risolto
+     */
     private function indexTxByVehicleDay(array $txs): array
     {
         $map = [];
         foreach ($txs as $tx) {
-            $key = $tx['vehicle_id'] ? 'id:' . $tx['vehicle_id'] : 'card:' . $tx['card_numero'];
             $day = substr($tx['tx_at'], 0, 10);
-            $map[$key][$day][] = $tx;
+            if ($tx['vehicle_id']) {
+                $map['id:' . $tx['vehicle_id']][$day][] = $tx;
+            }
+            if (!empty($tx['vehicle_targa'])) {
+                $map['targa:' . strtoupper($tx['vehicle_targa'])][$day][] = $tx;
+            }
+            if (!$tx['vehicle_id'] && empty($tx['vehicle_targa'])) {
+                $map['card:' . $tx['card_numero']][$day][] = $tx;
+            }
         }
         return $map;
     }
@@ -293,18 +350,23 @@ final class FleetReconciliationService
     private function checkTxNoTrip(int $runId, array $tx, array $tripsIdx): int
     {
         if (!$tx['vehicle_id']) return 0;   // carta a operaio diretto → non controllabile via GPS-veicolo
-        $key = 'id:' . $tx['vehicle_id'];
+        $keys = $this->lookupKeysForVehicle($tx);
         $day = substr($tx['tx_at'], 0, 10);
-        $candidates = $tripsIdx[$key][$day] ?? [];
-
-        // estendi a giorni adiacenti per coprire tx notturne / cross-midnight
         $prev = date('Y-m-d', strtotime($day . ' -1 day'));
         $next = date('Y-m-d', strtotime($day . ' +1 day'));
-        $candidates = array_merge(
-            $candidates,
-            $tripsIdx[$key][$prev] ?? [],
-            $tripsIdx[$key][$next] ?? []
-        );
+        $candidates = [];
+        foreach ($keys as $key) {
+            $candidates = array_merge(
+                $candidates,
+                $tripsIdx[$key][$day]  ?? [],
+                $tripsIdx[$key][$prev] ?? [],
+                $tripsIdx[$key][$next] ?? []
+            );
+        }
+        // dedup by trip.id (stesso trip può comparire sotto chiavi diverse)
+        $seen = []; $candidates = array_filter($candidates, function($t) use (&$seen) {
+            $id = (int)$t['id']; if (isset($seen[$id])) return false; $seen[$id] = true; return true;
+        });
 
         if (empty($candidates)) {
             $this->insertAnomaly($runId, [
@@ -351,9 +413,15 @@ final class FleetReconciliationService
     private function checkTxCityVsTrip(int $runId, array $tx, array $tripsIdx): int
     {
         if (!$tx['vehicle_id'] || empty($tx['city'])) return 0;
-        $key = 'id:' . $tx['vehicle_id'];
         $day = substr($tx['tx_at'], 0, 10);
-        $tripsToday = $tripsIdx[$key][$day] ?? [];
+        $tripsToday = [];
+        foreach ($this->lookupKeysForVehicle($tx) as $key) {
+            $tripsToday = array_merge($tripsToday, $tripsIdx[$key][$day] ?? []);
+        }
+        // dedup
+        $seen = []; $tripsToday = array_filter($tripsToday, function($t) use (&$seen) {
+            $id = (int)$t['id']; if (isset($seen[$id])) return false; $seen[$id] = true; return true;
+        });
         if (empty($tripsToday)) return 0;  // gia' coperto da NO_GPS_TRIP_NEAR
 
         $txCity = mb_strtolower(trim($tx['city']));
@@ -444,24 +512,31 @@ final class FleetReconciliationService
      *  Dedup: una sola anomalia per (vehicle, day) anche se ci sono N trip con refuels. */
     private function checkGpsRefuelVsQ8(int $runId, array $trip, array $txByVehDay): int
     {
-        if (!$trip['vehicle_id']) return 0;
-        $key = 'id:' . $trip['vehicle_id'];
+        // Anche se il veicolo non e' ancora registrato, usa la targa
         $day = substr($trip['start_at'], 0, 10);
-        if (!empty($txByVehDay[$key][$day] ?? [])) return 0;
+        $candKeys = [];
+        if ($trip['vehicle_id']) $candKeys[] = 'id:' . $trip['vehicle_id'];
+        if (!empty($trip['vehicle_targa'])) $candKeys[] = 'targa:' . strtoupper($trip['vehicle_targa']);
+        if (empty($candKeys)) return 0;
 
-        $dedupKey = "GPS_REFUEL_NO_Q8|{$key}|{$day}";
+        // se per QUALSIASI key c'e' tx → niente anomalia
+        foreach ($candKeys as $k) {
+            if (!empty($txByVehDay[$k][$day] ?? [])) return 0;
+        }
+
+        $dedupKey = "GPS_REFUEL_NO_Q8|{$candKeys[0]}|{$day}";
         if (isset($this->emittedDedup[$dedupKey])) return 0;
         $this->emittedDedup[$dedupKey] = true;
 
         $this->insertAnomaly($runId, [
-            'vehicle_id'  => (int)$trip['vehicle_id'],
+            'vehicle_id'  => $trip['vehicle_id'] ? (int)$trip['vehicle_id'] : null,
             'rule_code'   => 'GPS_REFUEL_NO_Q8',
             'severity'    => 'medium',
             'event_at'    => $trip['start_at'],
             'summary'     => sprintf('GPS rileva %d rifornimenti (%sL) sul veicolo %s ma nessuna TX Q8 quel giorno',
                                      $trip['refuels_count'], $trip['refuels_liters'],
                                      $trip['vehicle_targa'] ?? '?'),
-            'detail'      => 'Possibili cause: carta non Q8 (altro fornitore), rifornimento privato, carta non registrata in BOB.',
+            'detail'      => 'Possibili cause: carta non Q8 (altro fornitore), rifornimento privato, carta non assegnata al veicolo in quel periodo.',
             'ref_trip_id' => (int)$trip['id'],
         ]);
         return 1;
@@ -470,9 +545,10 @@ final class FleetReconciliationService
     /** Delta litri GPS vs Q8 + consumo L/100km per (veicolo, giorno). */
     private function checkDailyAggregates(int $runId, string $vehKey, string $day, array $dayTxs, array $dayTrips): int
     {
-        if (!str_starts_with($vehKey, 'id:')) return 0;
+        // accettiamo solo chiavi che identificano un veicolo univoco
+        if (!str_starts_with($vehKey, 'id:') && !str_starts_with($vehKey, 'targa:')) return 0;
         $count = 0;
-        $vehicleId = (int)substr($vehKey, 3);
+        $vehicleId = str_starts_with($vehKey, 'id:') ? (int)substr($vehKey, 3) : null;
 
         $txLiters  = array_sum(array_map(fn($r) => (float)$r['litri'], $dayTxs));
         $gpsLiters = array_sum(array_map(fn($r) => (float)$r['refuels_liters'], $dayTrips));

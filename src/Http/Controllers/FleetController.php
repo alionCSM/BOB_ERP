@@ -130,6 +130,7 @@ final class FleetController
 
         $tmpPath  = $_FILES['file']['tmp_name'];
         $origName = $_FILES['file']['name'];
+        $autoStub = !empty($_POST['auto_create_stubs']);
 
         // salva il file in storage/fleet_imports/YYYY-MM/...
         $storedPath = $this->moveUploadedFile($tmpPath, $origName, $source);
@@ -138,15 +139,22 @@ final class FleetController
 
         try {
             $result = $source === 'gps'
-                ? (new GpsRiepilogoTratteImporter($this->conn))->import($storedPath, $importId)
-                : (new Q8FuelInvoiceImporter($this->conn))->import($storedPath, $importId);
+                ? (new GpsRiepilogoTratteImporter($this->conn))->import($storedPath, $importId, $autoStub)
+                : (new Q8FuelInvoiceImporter($this->conn))->import($storedPath, $importId, $autoStub);
 
             $this->telemetry->finalizeImport($importId, $result);
 
+            $extra = '';
+            if (($result['vehicles_created'] ?? 0) > 0) {
+                $extra .= sprintf(' · %d veicoli auto-creati', $result['vehicles_created']);
+            }
+            if (($result['cards_created'] ?? 0) > 0) {
+                $extra .= sprintf(' · %d carte auto-create', $result['cards_created']);
+            }
             $_SESSION['success'] = sprintf(
-                'Import %s completato: %d righe importate, %d saltate (su %d totali).',
+                'Import %s completato: %d importate, %d saltate (su %d)%s.',
                 strtoupper($source),
-                $result['rows_imported'], $result['rows_skipped'], $result['rows_total']
+                $result['rows_imported'], $result['rows_skipped'], $result['rows_total'], $extra
             );
         } catch (\Throwable $e) {
             $this->telemetry->finalizeImport($importId, [
@@ -301,14 +309,19 @@ final class FleetController
     {
         $this->requireManage($request);
         $id = (int)($_POST['id'] ?? 0);
+        $cardNo = trim($_POST['card_no'] ?? '');
+        $pan    = trim($_POST['pan'] ?? '');
         $data = [
-            'numero'    => trim($_POST['numero'] ?? ''),
+            // "numero" e' il legacy: lo riempiamo col card_no per retrocompat
+            'numero'    => $cardNo,
+            'card_no'   => $cardNo ?: null,
+            'pan'       => $pan    ?: null,
             'fornitore' => trim($_POST['fornitore'] ?? 'Q8') ?: 'Q8',
             'notes'     => trim($_POST['notes'] ?? '') ?: null,
             'active'    => !empty($_POST['active']),
         ];
-        if ($data['numero'] === '') {
-            $_SESSION['error'] = 'Numero carta obbligatorio.';
+        if ($data['card_no'] === null) {
+            $_SESSION['error'] = 'Card No. obbligatorio.';
             Response::redirect('/fleet?tab=cards');
         }
         try {

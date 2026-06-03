@@ -8,46 +8,44 @@ use PDO;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Importer per il file Excel della fattura Q8 ("Q8 Fleet transactions").
+ * Importer fattura Q8 "Q8 Fleet transactions".
  *
- * Layout reale (verificato su fattura PJ11539032):
- *  - Sheet "Q8 Fleet transactions"
- *  - Riga 0: vuota
- *  - Riga 1: header
- *  - Riga 2+: dati (1 riga = 1 rifornimento)
+ * IMPORTANTE — perche' usiamo Card No. e NON Card PAN come chiave primaria:
  *
- * Colonne chiave:
- *  - Card No.       numero carta breve (es "00025") → bb_fleet_fuel_cards.numero
- *  - Card PAN       codice completo carta (16-19 cifre, fallback se No. mancante)
- *  - Date           datetime completo (gia' include ora)
- *  - Plate number   ALIAS Q8 del veicolo (es "JOLLY", "JOLLY 2") — NON la targa fisica
- *                   match via bb_fleet_vehicles.plate_alias_q8
- *  - Prod.          carburante (es "GASOLIO")
- *  - Volume         litri (campo critico)
- *  - Full amount    importo lordo €
- *  - Discounted price  €/L effettivo (scontato)
- *  - Address        indirizzo distributore (concat con Petrol station code)
- *  - City           citta' (gia' pulita, niente parsing)
- *  - Km             contachilometri dichiarato dal driver
+ *   Il Card PAN e' un intero a 19 cifre (es. 7028012731700025018).
+ *   Excel lo salva come numerico, PhpSpreadsheet lo legge come float PHP,
+ *   e i float PHP hanno solo ~15.95 cifre di precisione → le ultime
+ *   3-4 cifre vengono perse e il match diventa impossibile.
  *
- * Dedup: raw_hash = sha1(card_pan|tx_at|litri|importo).
+ *   Il Card No. invece e' un intero piccolo (1-7 cifre) → entra
+ *   perfettamente nei float, niente precisione persa, match 100% affidabile.
+ *
+ * Il PAN viene comunque letto e salvato (con la precisione disponibile)
+ * per display e per il dedup hash. Le carte in BOB hanno due colonne:
+ *   - card_no  (chiave matching, breve)
+ *   - pan      (display + dedup)
+ *
+ * Auto-stub: se $autoCreateStubs e' true, le carte sconosciute vengono
+ * inserite automaticamente in bb_fleet_fuel_cards (status active) cosi'
+ * il primo import non genera 82 anomalie "carta non registrata" e
+ * l'utente puo' poi assegnarle ai veicoli da UI.
  */
 final class Q8FuelInvoiceImporter
 {
     public function __construct(private PDO $conn) {}
 
     /**
-     * @return array{rows_total:int, rows_imported:int, rows_skipped:int, errors:array, period_from:?string, period_to:?string}
+     * @return array{rows_total:int, rows_imported:int, rows_skipped:int, errors:array, period_from:?string, period_to:?string, cards_created:int}
      */
-    public function import(string $filePath, int $importId): array
+    public function import(string $filePath, int $importId, bool $autoCreateStubs = false): array
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
         $rows = $sheet->toArray(null, true, true, true);
 
-        // detect header riga — cerca "Card No." (la fattura Q8 standard)
+        // 1) detect header
         $headerIdx = null;
-        foreach (array_slice($rows, 0, 12, true) as $idx => $r) {
+        foreach (array_slice($rows, 0, 15, true) as $idx => $r) {
             foreach ($r as $cell) {
                 if (!is_string($cell)) continue;
                 $low = mb_strtolower(trim($cell));
@@ -61,28 +59,27 @@ final class Q8FuelInvoiceImporter
         if ($headerIdx === null) {
             return $this->emptyResult('Header non riconosciuto (cerca: Card No. / Card PAN / Volume)');
         }
-        $headerRow = $rows[$headerIdx];
-        $colMap = $this->buildColumnMap($headerRow);
+        $colMap = $this->buildColumnMap($rows[$headerIdx]);
 
-        // colonne minime
+        // 2) colonne minime
         $missing = [];
-        foreach (['card_no','date','litri','importo'] as $req) {
+        foreach (['card_no', 'date', 'litri', 'importo'] as $req) {
             if (empty($colMap[$req])) $missing[] = $req;
         }
         if ($missing) {
-            return $this->emptyResult('Colonne mancanti: ' . implode(',', $missing) .
-                                      '. Trovate: ' . implode(',', array_keys($colMap)));
+            return $this->emptyResult(
+                'Colonne mancanti: ' . implode(',', $missing) .
+                '. Trovate: ' . implode(',', array_keys($colMap))
+            );
         }
 
-        // mappe lookup. NON usiamo Plate number per risolvere il veicolo:
-        // i driver lo compilano a caso (vedi "JOLLY 2", "1", numeri random).
-        // Il match veicolo passa via Card No. → bb_fleet_fuel_card_assignments
-        // a runtime nell'engine di riconciliazione. Qui salviamo solo il card_id.
+        // 3) lookup carte: BOTH card_no e pan (e legacy numero)
         $cardMap = $this->loadCardMap();
 
-        $imported = 0; $skipped = 0; $total = 0;
+        $imported = 0; $skipped = 0; $total = 0; $cardsCreated = 0;
         $errors = [];
         $minDate = null; $maxDate = null;
+        $seenCardsThisRun = [];
 
         $stmt = $this->conn->prepare("
             INSERT IGNORE INTO bb_fleet_fuel_tx (
@@ -102,13 +99,26 @@ final class Q8FuelInvoiceImporter
                 if ($idx <= $headerIdx) continue;
                 $total++;
 
-                // Card identifier: usiamo il PAN (lungo, univoco per carta fisica).
-                // "Card No." e' un alias breve riassegnabile (Q8 lo riusa quando una
-                // carta scade), il PAN no. Fallback a Card No. se PAN manca.
-                $cardPan = $this->str($r, $colMap, 'card_pan');
-                $cardNo  = $this->str($r, $colMap, 'card_no');
-                if ($cardPan === '' && $cardNo === '') { $skipped++; continue; }
-                $cardKey = $this->normalizeCardNumber($cardPan ?: $cardNo);
+                // Card No. (intero piccolo, esce dalle problematiche di precisione)
+                $cardNoRaw = $this->get($r, $colMap, 'card_no');
+                if ($cardNoRaw === null || $cardNoRaw === '') { $skipped++; continue; }
+                $cardNo = $this->intLikeToString($cardNoRaw);
+
+                // PAN: lo leggiamo MA sappiamo che potrebbe avere precisione persa
+                $panRaw = $this->get($r, $colMap, 'card_pan');
+                $pan = $panRaw !== null ? $this->intLikeToString($panRaw) : '';
+
+                // resolve card_id: primo tentativo via card_no, poi via pan
+                $cardId = $this->resolveCardId($cardMap, $cardNo, $pan);
+
+                // auto-stub
+                if (!$cardId && $autoCreateStubs && !isset($seenCardsThisRun[$cardNo])) {
+                    $cardId = $this->createStubCard($cardNo, $pan);
+                    $cardMap['no:' . $cardNo] = $cardId;
+                    if ($pan !== '') $cardMap['pan:' . $pan] = $cardId;
+                    $cardsCreated++;
+                    $seenCardsThisRun[$cardNo] = true;
+                }
 
                 $txAt = $this->parseDateTime($this->get($r, $colMap, 'date'));
                 if (!$txAt) { $skipped++; continue; }
@@ -121,35 +131,25 @@ final class Q8FuelInvoiceImporter
                         ?? $this->num($r, $colMap, 'prezzo')
                         ?? ($importo > 0 ? round($importo / $litri, 3) : null);
 
-                // Salviamo l'alias raw solo per diagnostica (vederlo nella lista);
-                // non lo usiamo per il match veicolo.
                 $plateAlias = $this->str($r, $colMap, 'plate') ?: null;
-                $vehicleId  = null;
-
                 $distribCode = $this->str($r, $colMap, 'distrib_code');
                 $distribAddr = $this->str($r, $colMap, 'distrib_addr');
                 $distrib = trim(($distribCode ? "PV {$distribCode} · " : '') . $distribAddr) ?: null;
-
                 $city = $this->str($r, $colMap, 'city');
                 $carb = $this->str($r, $colMap, 'carb');
                 $km   = $this->num($r, $colMap, 'km');
 
-                // resolve card_id: primo tentativo match esatto col PAN,
-                // se fallisce e abbiamo un Card No. corto, ritenta su quello.
-                $cardId = $cardMap[$cardKey] ?? null;
-                if (!$cardId && $cardNo !== '') {
-                    $cardId = $cardMap[$this->normalizeCardNumber($cardNo)] ?? null;
-                }
-
-                $rawHash = sha1(($cardPan ?: $cardNo) . '|' . $txAt . '|' . $litri . '|' . $importo);
+                // dedup hash: usa pan se disponibile (piu' preciso), altrimenti card_no
+                $hashKey = $pan !== '' ? $pan : $cardNo;
+                $rawHash = sha1($hashKey . '|' . $txAt . '|' . $litri . '|' . $importo);
 
                 try {
                     $stmt->execute([
                         ':import_id'   => $importId,
-                        ':card_no'     => $cardKey,
+                        ':card_no'     => $cardNo,
                         ':plate_alias' => $plateAlias,
                         ':card_id'     => $cardId,
-                        ':vehicle_id'  => $vehicleId,
+                        ':vehicle_id'  => null,   // non risolviamo da Plate number, sempre via fca runtime
                         ':tx_at'       => $txAt,
                         ':importo'     => $importo,
                         ':litri'       => $litri,
@@ -157,10 +157,7 @@ final class Q8FuelInvoiceImporter
                         ':carb'        => $carb ?: null,
                         ':distrib'     => $distrib ? mb_substr($distrib, 0, 255) : null,
                         ':city'        => $city ? ucfirst(mb_strtolower($city)) : null,
-                        ':prov'        => null, // Q8 non fornisce sigla provincia
-                        // Km dichiarato dal driver — inaffidabile (vedi "1", "12345").
-                        // Lo salviamo solo come dato grezzo, NON viene usato per
-                        // anomalie di consumo (per quello il GPS km_done e' la verita').
+                        ':prov'        => null,
                         ':km'          => ($km !== null && $km > 0) ? (int)$km : null,
                         ':raw_hash'    => $rawHash,
                     ]);
@@ -190,11 +187,12 @@ final class Q8FuelInvoiceImporter
             'errors'        => $errors,
             'period_from'   => $minDate ? substr($minDate, 0, 10) : null,
             'period_to'     => $maxDate ? substr($maxDate, 0, 10) : null,
+            'cards_created' => $cardsCreated,
         ];
     }
 
-    // Alias header: chiave logica → array di varianti accettate.
-    // Match case-insensitive, su uguaglianza o substring (per esports diversi).
+    // ─── Header mapping ───────────────────────────────────────────────────────
+
     private const HEADER_ALIASES = [
         'card_no'      => ['card no.', 'card no', 'numero carta', 'numero card'],
         'card_pan'     => ['card pan', 'pan'],
@@ -220,13 +218,20 @@ final class Q8FuelInvoiceImporter
             $low = mb_strtolower(trim($val));
             foreach (self::HEADER_ALIASES as $key => $aliases) {
                 if (isset($map[$key])) continue;
+                // priorita' alias: uguaglianza esatta vince su substring
                 foreach ($aliases as $a) {
-                    // match esatto OR contains-as-word (per evitare collisioni
-                    // tra "Volume" e "Full amount, no VAT" che e' diverso)
-                    if ($low === $a || str_contains($low, $a)) {
-                        $map[$key] = $col;
-                        break;
-                    }
+                    if ($low === $a) { $map[$key] = $col; break 2; }
+                }
+            }
+        }
+        // fallback substring per header con suffissi/varianti
+        foreach ($headerRow as $col => $val) {
+            if (!is_string($val)) continue;
+            $low = mb_strtolower(trim($val));
+            foreach (self::HEADER_ALIASES as $key => $aliases) {
+                if (isset($map[$key])) continue;
+                foreach ($aliases as $a) {
+                    if (str_contains($low, $a)) { $map[$key] = $col; break; }
                 }
             }
         }
@@ -249,13 +254,32 @@ final class Q8FuelInvoiceImporter
         if (is_numeric($v)) return (float)$v;
         $s = (string)$v;
         $s = preg_replace('/[^\d.,\-]/', '', $s);
-        // formato italiano "1.234,56"
         if (preg_match('/^-?\d{1,3}(\.\d{3})*(,\d+)?$/', $s)) {
             $s = str_replace(['.', ','], ['', '.'], $s);
         } else {
             $s = str_replace(',', '.', $s);
         }
         return is_numeric($s) ? (float)$s : null;
+    }
+
+    /**
+     * Converte un valore Excel che dovrebbe essere un intero in una stringa
+     * di sole cifre. Tollera:
+     *   - int     "25"                       → "25"
+     *   - float   25.0                       → "25"
+     *   - float   7.0280127317E+18 (perso!)  → "7028012731700025024" (warning loss)
+     *   - string  "00025"                    → "00025" → trim zeros → "25"
+     *   - string  "7028012731700025018"      → "7028012731700025018" (preciso!)
+     */
+    private function intLikeToString($v): string
+    {
+        if ($v === null) return '';
+        if (is_int($v))   return (string)$v;
+        if (is_float($v)) return sprintf('%.0F', $v);   // niente scientific
+        $s = trim((string)$v);
+        // a volte Excel mette apostrofo per forzare stringa: "'00025"
+        $s = preg_replace("/[\s'\-]/", '', $s);
+        return $s;
     }
 
     private function parseDateTime($v): ?string
@@ -270,50 +294,98 @@ final class Q8FuelInvoiceImporter
         return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
 
-    /**
-     * Normalizza il PAN/Card No.
-     *  - togli spazi, apostrofi (anti-cast Excel), trattini
-     *  - i PAN sono numerici → strip tutto il resto
-     *  - mantiene zeri leading (significativi)
-     */
-    private function normalizeCardNumber(string $raw): string
-    {
-        $s = preg_replace('/[\s\'\-]/', '', $raw);
-        // Se il valore e' interamente numerico (o numerico con leading zeros),
-        // tieni solo le cifre. Altrimenti lascia stare (potrebbe essere un
-        // identificativo alfanumerico custom).
-        if (preg_match('/^\d+$/', $s)) {
-            return $s;
-        }
-        return $s;
-    }
-
-    // ─── Lookups ─────────────────────────────────────────────────────────────
+    // ─── Card matching ───────────────────────────────────────────────────────
 
     /**
-     * @return array<string,int>  card_pan_normalized → bb_fleet_fuel_cards.id
-     *
-     * Match a doppia chiave: il numero che l'utente ha registrato in BOB
-     * potrebbe essere il PAN completo OPPURE il Card No. corto.
-     * Indicizziamo entrambe le possibili lookup key cosi' il match funziona
-     * comunque, evitando di forzare l'utente a riscrivere tutte le carte.
+     * cardMap ha keys multiple per ogni carta:
+     *   - "no:<normalized_card_no>"   → id
+     *   - "pan:<normalized_pan>"      → id
+     *   - "legacy:<normalized_numero>" → id  (per chi ha registrato pre-split)
      */
     private function loadCardMap(): array
     {
-        $stmt = $this->conn->query("SELECT id, numero FROM bb_fleet_fuel_cards");
+        $stmt = $this->conn->query("
+            SELECT id,
+                   COALESCE(card_no, '') AS card_no,
+                   COALESCE(pan, '')     AS pan,
+                   COALESCE(numero, '')  AS numero
+            FROM bb_fleet_fuel_cards
+        ");
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $key = $this->normalizeCardNumber((string)$r['numero']);
-            if ($key !== '') {
-                $map[$key] = (int)$r['id'];
+            $id = (int)$r['id'];
+            if ($r['card_no'] !== '') {
+                $map['no:' . $this->normalize($r['card_no'])] = $id;
+            }
+            if ($r['pan'] !== '') {
+                $map['pan:' . $this->normalize($r['pan'])] = $id;
+            }
+            if ($r['numero'] !== '') {
+                $n = $this->normalize($r['numero']);
+                $map['legacy:' . $n] = $id;
+                // doppia indicizzazione: se "numero" e' lungo, indicizza anche come pan
+                if (strlen($n) >= 13) $map['pan:' . $n] = $id;
+                // e anche come no
+                if (strlen($n) <= 9)  $map['no:'  . ltrim($n, '0') ?: '0'] = $id;
             }
         }
         return $map;
     }
 
+    /**
+     * Tenta nell'ordine:
+     *   1) match esatto via card_no (chiave primaria, sempre affidabile)
+     *   2) match esatto via PAN (potrebbe fallire per precisione persa)
+     *   3) legacy: campo "numero" pre-split
+     */
+    private function resolveCardId(array $cardMap, string $cardNo, string $pan): ?int
+    {
+        $cardNoKey = ltrim($this->normalize($cardNo), '0') ?: '0';
+
+        // 1) card_no diretto
+        if (isset($cardMap['no:' . $cardNoKey])) return $cardMap['no:' . $cardNoKey];
+
+        // 2) PAN diretto (se preciso)
+        if ($pan !== '') {
+            $panKey = $this->normalize($pan);
+            if (isset($cardMap['pan:' . $panKey])) return $cardMap['pan:' . $panKey];
+        }
+
+        // 3) legacy "numero" (utenti che hanno registrato prima del split)
+        if (isset($cardMap['legacy:' . $cardNoKey])) return $cardMap['legacy:' . $cardNoKey];
+        if ($pan !== '') {
+            $panKey = $this->normalize($pan);
+            if (isset($cardMap['legacy:' . $panKey])) return $cardMap['legacy:' . $panKey];
+        }
+
+        return null;
+    }
+
+    private function normalize(string $raw): string
+    {
+        return preg_replace('/[^0-9]/', '', $raw);
+    }
+
+    private function createStubCard(string $cardNo, string $pan): int
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO bb_fleet_fuel_cards (numero, card_no, pan, fornitore, notes, active)
+            VALUES (?, ?, ?, 'Q8', ?, 1)
+        ");
+        $note = 'Auto-creata da import Q8 il ' . date('d/m/Y H:i') . ' — assegnala a un veicolo';
+        $stmt->execute([
+            $cardNo,                       // legacy "numero" = card_no per compat
+            ltrim($cardNo, '0') ?: '0',
+            $pan ?: null,
+            $note,
+        ]);
+        return (int)$this->conn->lastInsertId();
+    }
+
     private function emptyResult(string $err): array
     {
-        return ['rows_total'=>0,'rows_imported'=>0,'rows_skipped'=>0,
-                'errors'=>[$err], 'period_from'=>null, 'period_to'=>null];
+        return ['rows_total'=>0, 'rows_imported'=>0, 'rows_skipped'=>0,
+                'errors'=>[$err], 'period_from'=>null, 'period_to'=>null,
+                'cards_created'=>0];
     }
 }

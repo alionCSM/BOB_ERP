@@ -7,33 +7,43 @@
                 <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             </div>
             <div>
-                <h3 class="fl-modal-title">{{ c ? 'Modifica carta ' ~ c.numero : 'Nuova carta carburante' }}</h3>
+                <h3 class="fl-modal-title">{{ c ? 'Modifica carta ' ~ (c.card_no ?: c.numero) : 'Nuova carta carburante' }}</h3>
                 <p class="fl-modal-sub">Catalogo carte — l'assegnazione si gestisce separatamente</p>
             </div>
             <button type="button" class="fl-modal-close" data-fl-close>&times;</button>
         </div>
         <div class="fl-modal-body">
             {% if c %}<input type="hidden" name="id" value="{{ c.id }}">{% endif %}
+
             <div class="fl-grid-2">
-                <div class="fl-field is-full">
-                    <label>PAN (Card PAN) *</label>
-                    <input type="text" name="numero" class="fl-input" required maxlength="64"
-                           value="{{ c.numero|default('') }}"
-                           placeholder="Es. 7028012731700025018">
-                </div>
-                <div class="fl-field is-full">
-                    <p class="fl-small" style="background:#eff6ff;color:#1e40af;padding:8px 12px;border-radius:8px;margin:-2px 0 4px;line-height:1.5;">
-                        <b>Importante:</b> usa il <b>Card PAN</b> della fattura Q8 (16-19 cifre, colonna "Card PAN"),
-                        non il "Card No." corto. Il PAN identifica univocamente la carta fisica.
-                    </p>
+                <div class="fl-field">
+                    <label>Card No. * <span class="fl-small" style="color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">(es. 25)</span></label>
+                    <input type="text" name="card_no" class="fl-input" required maxlength="32"
+                           value="{{ c.card_no|default(c.numero|default('')) }}"
+                           placeholder="Es. 25">
                 </div>
                 <div class="fl-field">
                     <label>Fornitore</label>
                     <input type="text" name="fornitore" class="fl-input" maxlength="60" value="{{ c.fornitore|default('Q8') }}">
                 </div>
-                <div class="fl-field">
-                    <label>Note</label>
-                    <input type="text" name="notes" class="fl-input" value="{{ c.notes|default('') }}">
+
+                <div class="fl-field is-full">
+                    <label>Card PAN <span class="fl-small" style="color:#94a3b8;font-weight:400;text-transform:none;letter-spacing:0;">(opzionale, per display)</span></label>
+                    <input type="text" name="pan" class="fl-input" maxlength="32"
+                           value="{{ c.pan|default('') }}"
+                           placeholder="Es. 7028012731700025018">
+                </div>
+
+                <div class="fl-field is-full">
+                    <div style="background:#eff6ff;color:#1e40af;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5;">
+                        <b>Come compilare:</b><br>
+                        &bull; <b>Card No.</b> = la colonna "Card No." della fattura Q8 (intero piccolo, es. 25). <b>Usata per il match.</b><br>
+                        &bull; <b>Card PAN</b> = la colonna "Card PAN" (19 cifre). Opzionale, salvato per riferimento.
+                    </div>
+                </div>
+
+                <div class="fl-field is-full">
+                    <input type="text" name="notes" class="fl-input" value="{{ c.notes|default('') }}" placeholder="Note (opzionale)">
                 </div>
                 <div class="fl-field is-full">
                     <label class="fl-check">
