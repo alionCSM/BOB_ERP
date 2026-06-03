@@ -15,15 +15,23 @@
         <div class="fl-modal-body">
             {% if c %}<input type="hidden" name="id" value="{{ c.id }}">{% endif %}
             <div class="fl-grid-2">
-                <div class="fl-field">
-                    <label>Numero *</label>
-                    <input type="text" name="numero" class="fl-input" required maxlength="64" value="{{ c.numero|default('') }}">
+                <div class="fl-field is-full">
+                    <label>PAN (Card PAN) *</label>
+                    <input type="text" name="numero" class="fl-input" required maxlength="64"
+                           value="{{ c.numero|default('') }}"
+                           placeholder="Es. 7028012731700025018">
+                </div>
+                <div class="fl-field is-full">
+                    <p class="fl-small" style="background:#eff6ff;color:#1e40af;padding:8px 12px;border-radius:8px;margin:-2px 0 4px;line-height:1.5;">
+                        <b>Importante:</b> usa il <b>Card PAN</b> della fattura Q8 (16-19 cifre, colonna "Card PAN"),
+                        non il "Card No." corto. Il PAN identifica univocamente la carta fisica.
+                    </p>
                 </div>
                 <div class="fl-field">
                     <label>Fornitore</label>
                     <input type="text" name="fornitore" class="fl-input" maxlength="60" value="{{ c.fornitore|default('Q8') }}">
                 </div>
-                <div class="fl-field is-full">
+                <div class="fl-field">
                     <label>Note</label>
                     <input type="text" name="notes" class="fl-input" value="{{ c.notes|default('') }}">
                 </div>

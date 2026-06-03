@@ -102,11 +102,13 @@ final class Q8FuelInvoiceImporter
                 if ($idx <= $headerIdx) continue;
                 $total++;
 
-                // numero carta: preferisci "Card No." (corto, leggibile)
-                $cardNo  = $this->str($r, $colMap, 'card_no');
+                // Card identifier: usiamo il PAN (lungo, univoco per carta fisica).
+                // "Card No." e' un alias breve riassegnabile (Q8 lo riusa quando una
+                // carta scade), il PAN no. Fallback a Card No. se PAN manca.
                 $cardPan = $this->str($r, $colMap, 'card_pan');
-                if ($cardNo === '' && $cardPan === '') { $skipped++; continue; }
-                $cardKey = $this->normalizeCardNumber($cardNo ?: $cardPan);
+                $cardNo  = $this->str($r, $colMap, 'card_no');
+                if ($cardPan === '' && $cardNo === '') { $skipped++; continue; }
+                $cardKey = $this->normalizeCardNumber($cardPan ?: $cardNo);
 
                 $txAt = $this->parseDateTime($this->get($r, $colMap, 'date'));
                 if (!$txAt) { $skipped++; continue; }
@@ -132,6 +134,13 @@ final class Q8FuelInvoiceImporter
                 $carb = $this->str($r, $colMap, 'carb');
                 $km   = $this->num($r, $colMap, 'km');
 
+                // resolve card_id: primo tentativo match esatto col PAN,
+                // se fallisce e abbiamo un Card No. corto, ritenta su quello.
+                $cardId = $cardMap[$cardKey] ?? null;
+                if (!$cardId && $cardNo !== '') {
+                    $cardId = $cardMap[$this->normalizeCardNumber($cardNo)] ?? null;
+                }
+
                 $rawHash = sha1(($cardPan ?: $cardNo) . '|' . $txAt . '|' . $litri . '|' . $importo);
 
                 try {
@@ -139,7 +148,7 @@ final class Q8FuelInvoiceImporter
                         ':import_id'   => $importId,
                         ':card_no'     => $cardKey,
                         ':plate_alias' => $plateAlias,
-                        ':card_id'     => $cardMap[$cardKey] ?? null,
+                        ':card_id'     => $cardId,
                         ':vehicle_id'  => $vehicleId,
                         ':tx_at'       => $txAt,
                         ':importo'     => $importo,
@@ -261,20 +270,43 @@ final class Q8FuelInvoiceImporter
         return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
 
+    /**
+     * Normalizza il PAN/Card No.
+     *  - togli spazi, apostrofi (anti-cast Excel), trattini
+     *  - i PAN sono numerici → strip tutto il resto
+     *  - mantiene zeri leading (significativi)
+     */
     private function normalizeCardNumber(string $raw): string
     {
-        // togli spazi, apostrofi (anti-cast Excel), e zero-leading non significativi
-        return preg_replace('/[\s\']/', '', $raw);
+        $s = preg_replace('/[\s\'\-]/', '', $raw);
+        // Se il valore e' interamente numerico (o numerico con leading zeros),
+        // tieni solo le cifre. Altrimenti lascia stare (potrebbe essere un
+        // identificativo alfanumerico custom).
+        if (preg_match('/^\d+$/', $s)) {
+            return $s;
+        }
+        return $s;
     }
 
     // ─── Lookups ─────────────────────────────────────────────────────────────
 
+    /**
+     * @return array<string,int>  card_pan_normalized → bb_fleet_fuel_cards.id
+     *
+     * Match a doppia chiave: il numero che l'utente ha registrato in BOB
+     * potrebbe essere il PAN completo OPPURE il Card No. corto.
+     * Indicizziamo entrambe le possibili lookup key cosi' il match funziona
+     * comunque, evitando di forzare l'utente a riscrivere tutte le carte.
+     */
     private function loadCardMap(): array
     {
         $stmt = $this->conn->query("SELECT id, numero FROM bb_fleet_fuel_cards");
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $map[$this->normalizeCardNumber($r['numero'])] = (int)$r['id'];
+            $key = $this->normalizeCardNumber((string)$r['numero']);
+            if ($key !== '') {
+                $map[$key] = (int)$r['id'];
+            }
         }
         return $map;
     }

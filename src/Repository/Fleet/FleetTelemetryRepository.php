@@ -184,25 +184,64 @@ final class FleetTelemetryRepository
             $where[] = 'a.severity = :sev';
             $params[':sev'] = $filter['severity'];
         }
+        if (!empty($filter['rule_code'])) {
+            $where[] = 'a.rule_code = :rc';
+            $params[':rc'] = $filter['rule_code'];
+        }
+        if (!empty($filter['only_last_run'])) {
+            $where[] = 'a.run_id = (SELECT MAX(id) FROM bb_fleet_reconciliation_runs)';
+        }
         if (!empty($filter['status'])) {
             $where[] = 'a.status = :st';
             $params[':st'] = $filter['status'];
         } else {
             $where[] = "a.status = 'open'";
         }
-        $limit = (int)($filter['limit'] ?? 100);
+        $limit = (int)($filter['limit'] ?? 200);
         $sql = "
             SELECT a.*, v.targa AS vehicle_targa,
-                   TRIM(CONCAT(COALESCE(w.first_name,''),' ',COALESCE(w.last_name,''))) AS worker_name
+                   TRIM(CONCAT(COALESCE(w.first_name,''),' ',COALESCE(w.last_name,''))) AS worker_name,
+                   r.started_at AS run_started_at
             FROM bb_fleet_anomalies a
             LEFT JOIN bb_fleet_vehicles v ON v.id = a.vehicle_id
             LEFT JOIN bb_workers w        ON w.id = a.worker_id
+            LEFT JOIN bb_fleet_reconciliation_runs r ON r.id = a.run_id
             WHERE " . implode(' AND ', $where) . "
             ORDER BY a.severity = 'high' DESC,
                      a.severity = 'medium' DESC,
                      a.event_at DESC
             LIMIT {$limit}
         ";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Ultima run completata: per mostrare timestamp e contatori in cima alla tab. */
+    public function lastRun(): ?array
+    {
+        $stmt = $this->conn->query("
+            SELECT * FROM bb_fleet_reconciliation_runs
+            ORDER BY id DESC LIMIT 1
+        ");
+        $r = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    }
+
+    /** Conteggio anomalie per rule_code dell'ultima run (per filtri rapidi). */
+    public function ruleCodeCounts(?int $runId = null): array
+    {
+        $sql = "
+            SELECT rule_code, severity, COUNT(*) AS n
+            FROM bb_fleet_anomalies
+            WHERE status = 'open'
+        ";
+        $params = [];
+        if ($runId) {
+            $sql .= " AND run_id = :rid";
+            $params[':rid'] = $runId;
+        }
+        $sql .= " GROUP BY rule_code, severity ORDER BY n DESC";
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

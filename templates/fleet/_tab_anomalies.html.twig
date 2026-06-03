@@ -1,43 +1,116 @@
-{# Tab Anomalie — usa anomalies (filtrate per status=open di default) #}
+{# Tab Anomalie — usa anomalies, lastRun, ruleCounts, filter* #}
 
-<div class="fl-toolbar">
-    <div class="fl-search" style="flex:1;">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" placeholder="Cerca per veicolo, operaio, regola..." data-fl-filter=".fl-table">
+{% set ruleLabels = {
+    'CARD_NOT_REGISTERED':    'Carta non in BOB',
+    'CARD_NOT_ASSIGNED':      'Carta non assegnata',
+    'Q8_NO_GPS_TRIP_NEAR':    'Q8 senza GPS',
+    'TX_WITHOUT_ATTENDANCE':  'Senza presenza',
+    'GPS_REFUEL_NO_Q8':       'GPS senza Q8',
+    'Q8_VS_GPS_LITERS_DELTA': 'Delta litri',
+    'CONSUMPTION_OUTLIER':    'Consumo outlier',
+    'Q8_CITY_VS_TRIP_CITY':   'Citta Q8 ≠ GPS',
+    'TX_CITY_VS_WORKSITE':    'Citta Q8 ≠ Cantiere',
+    'MULTIPLE_TX_SAME_DAY':   'Multipli/giorno'
+} %}
+
+{# ── Banner ultima run ───────────────────────────────────────────────────── #}
+{% if lastRun %}
+<div style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1.5px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div style="flex-shrink:0;width:36px;height:36px;background:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#b45309;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-        <a href="/fleet?tab=anomalies&status=open" class="fl-tab" style="padding:6px 12px;">Aperte</a>
-        <a href="/fleet?tab=anomalies&status=dismissed" class="fl-tab" style="padding:6px 12px;">Archiviate</a>
-        {% if canManage %}
-            <form method="POST" action="/fleet/analyze" style="display:inline;" onsubmit="return confirm('Lanciare una nuova analisi su tutti i dati importati?');">
-                <button type="submit" class="fl-btn-primary" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
-                    <svg viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                    Ri-analizza tutto
-                </button>
-            </form>
-        {% endif %}
+    <div style="flex:1;min-width:200px;">
+        <div style="font-size:13px;font-weight:700;color:#78350f;">Ultima analisi: {{ lastRun.started_at|date('d/m/Y H:i') }}</div>
+        <div style="font-size:12px;color:#92400e;">
+            {{ lastRun.anomalies }} anomalie · {{ lastRun.tx_total }} TX Q8 · {{ lastRun.trips_total }} tratte GPS · run #{{ lastRun.id }} · {{ lastRun.duration_ms }}ms
+        </div>
     </div>
+    {% if canManage %}
+    <form method="POST" action="/fleet/analyze" style="display:inline;" onsubmit="return confirm('Lanciare una nuova analisi su tutti i dati importati?');">
+        <button type="submit" class="fl-btn-primary" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Ri-analizza
+        </button>
+    </form>
+    {% endif %}
 </div>
+{% endif %}
 
+{# ── Filtri ──────────────────────────────────────────────────────────────── #}
+<form method="GET" action="/fleet" class="fl-toolbar">
+    <input type="hidden" name="tab" value="anomalies">
+
+    <div class="fl-search" style="flex:1;min-width:200px;">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Cerca per veicolo, operaio, descrizione..." data-fl-filter=".fl-table">
+    </div>
+
+    <select name="severity" class="fl-select" style="width:auto;" onchange="this.form.submit()">
+        <option value="">Tutte severita</option>
+        <option value="high"   {{ filterSeverity == 'high'   ? 'selected' : '' }}>Solo HIGH</option>
+        <option value="medium" {{ filterSeverity == 'medium' ? 'selected' : '' }}>Solo MEDIUM</option>
+        <option value="low"    {{ filterSeverity == 'low'    ? 'selected' : '' }}>Solo LOW</option>
+    </select>
+
+    <select name="rule_code" class="fl-select" style="width:auto;min-width:180px;" onchange="this.form.submit()">
+        <option value="">Tutte le regole</option>
+        {% for r, label in ruleLabels %}
+            <option value="{{ r }}" {{ filterRuleCode == r ? 'selected' : '' }}>{{ label }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="status" class="fl-select" style="width:auto;" onchange="this.form.submit()">
+        <option value="open"      {{ filterStatus == 'open'      ? 'selected' : '' }}>Aperte</option>
+        <option value="dismissed" {{ filterStatus == 'dismissed' ? 'selected' : '' }}>Archiviate</option>
+    </select>
+
+    <label class="fl-check" style="margin-left:6px;">
+        <input type="checkbox" name="only_last_run" value="1" {{ filterLastRun ? 'checked' : '' }} onchange="this.form.submit()">
+        <span>Solo ultima run</span>
+    </label>
+</form>
+
+{# ── Quick stats per rule_code ──────────────────────────────────────────── #}
+{% if ruleCounts and filterRuleCode is empty %}
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+    {% for rc in ruleCounts %}
+        {% set bg = rc.severity == 'high'   ? '#fee2e2'
+                  : rc.severity == 'medium' ? '#fef3c7'
+                  : '#dbeafe' %}
+        {% set fg = rc.severity == 'high'   ? '#b91c1c'
+                  : rc.severity == 'medium' ? '#92400e'
+                  : '#1e40af' %}
+        <a href="?tab=anomalies&rule_code={{ rc.rule_code }}{{ filterLastRun ? '&only_last_run=1' : '' }}"
+           style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:{{ bg }};color:{{ fg }};font-size:12px;font-weight:600;text-decoration:none;border:1px solid {{ bg }};">
+            {{ ruleLabels[rc.rule_code] ?? rc.rule_code }}
+            <span style="background:rgba(255,255,255,.5);padding:1px 8px;border-radius:999px;font-size:11px;">{{ rc.n }}</span>
+        </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{# ── Tabella anomalie ───────────────────────────────────────────────────── #}
 <div class="fl-table-wrap">
     <table class="fl-table">
         <thead>
         <tr>
-            <th>Severità</th>
-            <th>Quando</th>
-            <th>Veicolo</th>
-            <th>Operaio</th>
-            <th>Regola</th>
-            <th>Descrizione</th>
-            <th class="center">Azioni</th>
+            <th style="width:80px;">Sev.</th>
+            <th style="width:130px;">Quando</th>
+            <th style="width:90px;">Veicolo</th>
+            <th style="width:140px;">Operaio</th>
+            <th>Anomalia</th>
+            <th style="width:80px;" class="center">Azioni</th>
         </tr>
         </thead>
         <tbody>
         {% if anomalies is empty %}
-            <tr><td colspan="7">
+            <tr><td colspan="6">
                 <div class="fl-empty">
                     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
-                    <p class="fl-empty-text">Nessuna anomalia. Lancia una riconciliazione per verificare i dati importati.</p>
+                    <p class="fl-empty-text">
+                        {% if lastRun %}Nessuna anomalia trovata con questi filtri.
+                        {% else %}Nessuna analisi ancora eseguita. Lancia "Analizza tutto" dalla pagina <a href="/fleet/import" style="color:#3b82f6;">/fleet/import</a>.{% endif %}
+                    </p>
                 </div>
             </td></tr>
         {% else %}
@@ -48,19 +121,32 @@
                 {% set sevText  = a.severity == 'high'   ? '#b91c1c'
                               : a.severity == 'medium' ? '#92400e'
                               : a.severity == 'low'    ? '#1e40af' : '#475569' %}
-                <tr data-fl-row data-fl-search="{{ a.vehicle_targa }} {{ a.worker_name }} {{ a.rule_code }} {{ a.summary }}">
+                <tr data-fl-row data-fl-search="{{ a.vehicle_targa }} {{ a.worker_name }} {{ a.rule_code }} {{ a.summary }} {{ a.detail }}">
                     <td>
                         <span class="fl-chip" style="background:{{ sevColor }};color:{{ sevText }};border-color:{{ sevColor }};text-transform:uppercase;font-size:10px;letter-spacing:.5px;">
                             {{ a.severity }}
                         </span>
                     </td>
-                    <td class="fl-small">{{ a.event_at ? a.event_at|date('d/m/Y H:i') : '—' }}</td>
+                    <td class="fl-small">
+                        {% if a.event_at %}
+                            <div>{{ a.event_at|date('d/m/Y') }}</div>
+                            <div style="color:#94a3b8;">{{ a.event_at|date('H:i') }}</div>
+                        {% else %}—{% endif %}
+                    </td>
                     <td>{% if a.vehicle_targa %}<span class="fl-targa">{{ a.vehicle_targa }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
-                    <td class="fl-small">{{ a.worker_name|default('—') }}</td>
-                    <td><span class="fl-mono" style="font-size:11px;">{{ a.rule_code }}</span></td>
+                    <td class="fl-small">{{ a.worker_name|default('—')|trim ?: '—' }}</td>
                     <td>
-                        <div>{{ a.summary }}</div>
-                        {% if a.detail %}<div class="fl-small">{{ a.detail|slice(0, 150) }}</div>{% endif %}
+                        <div style="font-weight:600;color:#0f172a;line-height:1.4;">{{ a.summary }}</div>
+                        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+                            <span class="fl-mono" style="font-size:10px;color:#94a3b8;background:#f1f5f9;padding:1px 6px;border-radius:4px;">{{ ruleLabels[a.rule_code] ?? a.rule_code }}</span>
+                            <span class="fl-small" style="color:#94a3b8;">run #{{ a.run_id }} · {{ a.run_started_at|date('d/m/Y H:i') }}</span>
+                        </div>
+                        {% if a.detail %}
+                            <details style="margin-top:6px;">
+                                <summary style="cursor:pointer;font-size:11px;color:#64748b;">Dettagli</summary>
+                                <div style="margin-top:6px;padding:8px 10px;background:#fafbfc;border-radius:6px;font-size:12px;color:#475569;line-height:1.5;white-space:pre-wrap;">{{ a.detail }}</div>
+                            </details>
+                        {% endif %}
                     </td>
                     <td class="center">
                         {% if a.status == 'open' and canManage %}
@@ -71,7 +157,9 @@
                                 </button>
                             </form>
                         {% elseif a.status == 'dismissed' %}
-                            <span class="fl-chip fl-chip-empty">archiviata</span>
+                            <span class="fl-small" style="color:#94a3b8;">
+                                {% if a.reviewed_at %}{{ a.reviewed_at|date('d/m H:i') }}{% endif %}
+                            </span>
                         {% endif %}
                     </td>
                 </tr>

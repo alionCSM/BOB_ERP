@@ -71,9 +71,20 @@ final class FleetController
             $payload['fuelFilter'] = $filter;
         } elseif ($tab === 'anomalies') {
             $payload['anomalies'] = $this->telemetry->listAnomalies([
-                'severity' => $_GET['severity'] ?? null,
-                'status'   => $_GET['status']   ?? 'open',
+                'severity'      => $_GET['severity']     ?? null,
+                'rule_code'     => $_GET['rule_code']    ?? null,
+                'status'        => $_GET['status']       ?? 'open',
+                'only_last_run' => !empty($_GET['only_last_run']),
             ]);
+            $payload['lastRun']         = $this->telemetry->lastRun();
+            $payload['ruleCounts']      = $this->telemetry->ruleCodeCounts(
+                                            !empty($_GET['only_last_run']) && $payload['lastRun']
+                                                ? (int)$payload['lastRun']['id'] : null
+                                          );
+            $payload['filterSeverity']  = $_GET['severity']     ?? null;
+            $payload['filterRuleCode']  = $_GET['rule_code']    ?? null;
+            $payload['filterStatus']    = $_GET['status']       ?? 'open';
+            $payload['filterLastRun']   = !empty($_GET['only_last_run']);
         } elseif ($tab === 'imports') {
             $payload['imports'] = $this->telemetry->listImports();
         }
