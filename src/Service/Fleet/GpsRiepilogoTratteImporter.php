@@ -42,7 +42,9 @@ final class GpsRiepilogoTratteImporter
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
-        $rows = $sheet->toArray(null, true, true, true); // col letters as keys
+        // formatData=FALSE: date come Excel serial, le convertiamo manualmente
+        // preservando il wall clock. Vedi parseDateTime() per dettagli.
+        $rows = $sheet->toArray(null, true, false, true);
 
         // 1) trova riga header
         $headerRow = null;
@@ -268,15 +270,36 @@ final class GpsRiepilogoTratteImporter
     }
     private function intOrNull(?float $n): ?int { return $n === null ? null : (int)$n; }
 
+    /**
+     * Parse date robusto. Stessa logica di Q8FuelInvoiceImporter:
+     *  - Excel serial → wall-clock preserved (no timezone shift)
+     *  - ISO yyyy-mm-dd → parse esplicito
+     *  - Italiano dd/mm/yyyy → parse esplicito (PHP strtotime lo legge US)
+     */
     private function parseDateTime($v): ?string
     {
         if ($v === null || $v === '') return null;
-        // PhpSpreadsheet a volte ritorna stringa, a volte serial Excel
+
         if (is_numeric($v)) {
-            $unix = (\PhpOffice\PhpSpreadsheet\Shared\Date::excelToTimestamp((float)$v));
-            return date('Y-m-d H:i:s', $unix);
+            $dt = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$v);
+            return $dt->format('Y-m-d H:i:s');
         }
+
         $s = trim((string)$v);
+        if ($s === '') return null;
+
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+                $m[1], $m[2], $m[3], $m[4] ?? 0, $m[5] ?? 0, $m[6] ?? 0);
+        }
+
+        if (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/', $s, $m)) {
+            $year = (int)$m[3];
+            if ($year < 100) $year += 2000;
+            return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+                $year, (int)$m[2], (int)$m[1], $m[4] ?? 0, $m[5] ?? 0, $m[6] ?? 0);
+        }
+
         $ts = strtotime($s);
         return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }

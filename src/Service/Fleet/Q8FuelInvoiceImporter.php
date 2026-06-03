@@ -41,7 +41,11 @@ final class Q8FuelInvoiceImporter
     {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
-        $rows = $sheet->toArray(null, true, true, true);
+        // formatData=FALSE: i numeri tornano grezzi (float). Cosi' le date
+        // arrivano come serial Excel (es. 45813.234) e le convertiamo noi
+        // manualmente preservando il wall clock. Niente dd/mm vs mm/dd
+        // ambiguity, niente timezone shift.
+        $rows = $sheet->toArray(null, true, false, true);
 
         // 1) detect header
         $headerIdx = null;
@@ -282,14 +286,45 @@ final class Q8FuelInvoiceImporter
         return $s;
     }
 
+    /**
+     * Parse date robusto:
+     *   1) Excel serial (float)  → conversione manuale wall-clock-preserving
+     *   2) ISO "YYYY-MM-DD ..."  → strtotime e' affidabile
+     *   3) Italiano "DD/MM/YYYY" → parse esplicito (PHP strtotime lo interpreta
+     *      come US MM/DD/YYYY → bug grave senza parse manuale)
+     */
     private function parseDateTime($v): ?string
     {
         if ($v === null || $v === '') return null;
+
+        // 1) Excel serial date (numero)
         if (is_numeric($v)) {
-            $unix = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToTimestamp((float)$v);
-            return date('Y-m-d H:i:s', $unix);
+            // excelToDateTimeObject ritorna DateTime in UTC,
+            // ma noi vogliamo solo il "wall clock" che era nella cella.
+            // ->format() usa la timezone dell'oggetto (UTC) → preserva
+            // esattamente le ore/minuti che il cliente vede in Excel.
+            $dt = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$v);
+            return $dt->format('Y-m-d H:i:s');
         }
+
         $s = trim((string)$v);
+        if ($s === '') return null;
+
+        // 2) ISO format (yyyy-mm-dd opzionalmente con orario)
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/', $s, $m)) {
+            return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+                $m[1], $m[2], $m[3], $m[4] ?? 0, $m[5] ?? 0, $m[6] ?? 0);
+        }
+
+        // 3) Italian DD/MM/YYYY (anche con separatori . - / e orario opzionale)
+        if (preg_match('/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/', $s, $m)) {
+            $year = (int)$m[3];
+            if ($year < 100) $year += 2000;
+            return sprintf('%04d-%02d-%02d %02d:%02d:%02d',
+                $year, (int)$m[2], (int)$m[1], $m[4] ?? 0, $m[5] ?? 0, $m[6] ?? 0);
+        }
+
+        // 4) fallback strtotime
         $ts = strtotime($s);
         return $ts ? date('Y-m-d H:i:s', $ts) : null;
     }
