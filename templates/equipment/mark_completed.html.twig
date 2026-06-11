@@ -9,7 +9,7 @@
     {% if message %}
         <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
             <span>{{ message }}</span>
-            <button type="button" onclick="this.parentElement.style.display='none';" class="text-green-800 font-bold ml-4">&times;</button>
+            <button type="button" data-dismiss-alert class="text-green-800 font-bold ml-4">&times;</button>
         </div>
     {% endif %}
 
@@ -36,7 +36,7 @@
                                 type="checkbox"
                                 name="selected[]"
                                 value="{{ i }}"
-                                onchange="toggleRow({{ i }})"
+                                data-toggle-row="{{ i }}"
                         >
                         <input
                                 type="hidden"
