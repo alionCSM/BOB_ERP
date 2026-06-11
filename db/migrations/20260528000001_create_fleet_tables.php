@@ -56,7 +56,8 @@ final class CreateFleetTables extends AbstractMigration
                 ->addColumn('notes',      'string',   ['limit' => 255, 'null' => true])
                 ->addColumn('created_at', 'datetime', ['default' => 'CURRENT_TIMESTAMP'])
                 ->addColumn('created_by', 'integer',  ['null' => true, 'signed' => true])
-                ->addForeignKey('vehicle_id', 'bb_fleet_vehicles', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
+                // NB: niente FK su vehicle_id — alcuni utenti DB su prod
+                // non hanno il privilegio REFERENCES. Integrita' a livello PHP.
                 ->addIndex(['vehicle_id', 'to_date'], ['name' => 'idx_vehicle_current'])
                 ->addIndex(['user_id', 'to_date'],    ['name' => 'idx_user_current'])
                 ->create();
@@ -85,7 +86,7 @@ final class CreateFleetTables extends AbstractMigration
                 ->addColumn('notes',      'string',   ['limit' => 255, 'null' => true])
                 ->addColumn('created_at', 'datetime', ['default' => 'CURRENT_TIMESTAMP'])
                 ->addColumn('created_by', 'integer',  ['null' => true, 'signed' => true])
-                ->addForeignKey('card_id', 'bb_fleet_fuel_cards', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
+                // niente FK (vedi nota sopra)
                 ->addIndex(['card_id', 'to_date'],    ['name' => 'idx_card_current'])
                 ->addIndex(['vehicle_id', 'to_date'], ['name' => 'idx_vehicle_card'])
                 ->addIndex(['user_id', 'to_date'],    ['name' => 'idx_user_card'])
@@ -123,7 +124,7 @@ final class CreateFleetTables extends AbstractMigration
                 ->addColumn('notes',       'string',   ['limit' => 255, 'null' => true])
                 ->addColumn('created_at',  'datetime', ['default' => 'CURRENT_TIMESTAMP'])
                 ->addColumn('created_by',  'integer',  ['null' => true, 'signed' => true])
-                ->addForeignKey('telepass_id', 'bb_fleet_telepass', 'id', ['delete' => 'CASCADE', 'update' => 'NO_ACTION'])
+                // niente FK (vedi nota sopra)
                 ->addIndex(['telepass_id', 'to_date'], ['name' => 'idx_telepass_current'])
                 ->addIndex(['vehicle_id', 'to_date'],  ['name' => 'idx_vehicle_telepass'])
                 ->addIndex(['user_id', 'to_date'],     ['name' => 'idx_user_telepass'])
