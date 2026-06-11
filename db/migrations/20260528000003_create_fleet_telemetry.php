@@ -71,7 +71,7 @@ final class CreateFleetTelemetry extends AbstractMigration
                 ->addIndex(['vehicle_targa','start_at'], ['name' => 'idx_targa_date'])
                 ->addIndex(['vehicle_id','start_at'],    ['name' => 'idx_vehicle_date'])
                 ->addIndex(['raw_hash'], ['unique' => true, 'name' => 'uk_raw_hash'])
-                ->addForeignKey('import_id', 'bb_fleet_imports', 'id', ['delete' => 'CASCADE'])
+                ->addIndex(['import_id'], ['name' => 'idx_import'])
                 ->create();
         }
 
@@ -96,7 +96,7 @@ final class CreateFleetTelemetry extends AbstractMigration
                 ->addIndex(['card_numero','tx_at'], ['name' => 'idx_card_date'])
                 ->addIndex(['tx_at'], ['name' => 'idx_date'])
                 ->addIndex(['raw_hash'], ['unique' => true, 'name' => 'uk_raw_hash'])
-                ->addForeignKey('import_id', 'bb_fleet_imports', 'id', ['delete' => 'CASCADE'])
+                ->addIndex(['import_id'], ['name' => 'idx_import'])
                 ->create();
         }
 
@@ -137,7 +137,7 @@ final class CreateFleetTelemetry extends AbstractMigration
                 ->addIndex(['run_id'], ['name' => 'idx_run'])
                 ->addIndex(['vehicle_id','event_at'], ['name' => 'idx_vehicle_event'])
                 ->addIndex(['severity','status'], ['name' => 'idx_sev_status'])
-                ->addForeignKey('run_id', 'bb_fleet_reconciliation_runs', 'id', ['delete' => 'CASCADE'])
+                // niente FK: alcuni utenti DB su prod non hanno REFERENCES
                 ->create();
         }
     }
