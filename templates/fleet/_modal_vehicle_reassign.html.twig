@@ -1,0 +1,49 @@
+{# Riassegnazione veicolo a un operaio. Param: v, workers #}
+<div id="vehicle-reassign-{{ v.id }}" class="fl-modal">
+    <div class="fl-modal-backdrop"></div>
+    <form method="POST" action="/fleet/vehicle/reassign" class="fl-modal-dialog">
+        <input type="hidden" name="vehicle_id" value="{{ v.id }}">
+        <div class="fl-modal-head">
+            <div class="fl-modal-icon">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            </div>
+            <div>
+                <h3 class="fl-modal-title">Assegna veicolo {{ v.targa }}</h3>
+                <p class="fl-modal-sub">
+                    {% if v.worker_id %}
+                        Attualmente di <strong>{{ (v.first_name ~ ' ' ~ v.last_name)|trim }}</strong>
+                        — la nuova assegnazione chiude la precedente.
+                    {% else %}
+                        Veicolo attualmente libero.
+                    {% endif %}
+                </p>
+            </div>
+            <button type="button" class="fl-modal-close" data-fl-close>&times;</button>
+        </div>
+        <div class="fl-modal-body">
+            <div class="fl-field" style="margin-bottom:14px;">
+                <label>Nuovo assegnatario (operaio)</label>
+                <select name="worker_id" class="fl-select">
+                    <option value="">— libera il veicolo —</option>
+                    {% for w in workers %}
+                        <option value="{{ w.id }}">{{ w.full_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="fl-grid-2">
+                <div class="fl-field">
+                    <label>Data inizio</label>
+                    <input type="date" name="from_date" class="fl-input" value="{{ 'now'|date('Y-m-d') }}">
+                </div>
+                <div class="fl-field">
+                    <label>Note (opzionale)</label>
+                    <input type="text" name="notes" class="fl-input" maxlength="255">
+                </div>
+            </div>
+        </div>
+        <div class="fl-modal-foot">
+            <button type="button" class="fl-btn-cancel" data-fl-close>Annulla</button>
+            <button type="submit" class="fl-btn-submit">Conferma</button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,92 @@
+{# Tab Tratte GPS — usa tripsStats, trips, tripsFilter, vehiclesSel #}
+
+<div class="fl-toolbar">
+    <form method="GET" action="/fleet" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1;">
+        <input type="hidden" name="tab" value="trips">
+        <select name="vehicle_id" class="fl-select" style="width:auto;min-width:160px;">
+            <option value="">Tutti i veicoli</option>
+            {% for v in vehiclesSel %}
+                <option value="{{ v.id }}" {{ tripsFilter.vehicle_id == v.id ? 'selected' : '' }}>{{ v.targa }} · {{ v.modello }}</option>
+            {% endfor %}
+        </select>
+        <input type="date" name="from" class="fl-input" style="width:auto;" value="{{ tripsFilter.from }}">
+        <input type="date" name="to"   class="fl-input" style="width:auto;" value="{{ tripsFilter.to }}">
+        <button type="submit" class="fl-btn-primary">Filtra</button>
+    </form>
+</div>
+
+{# stats grid #}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Tratte totali</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ tripsStats.total_trips ?? 0 }}</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Veicoli visti</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ tripsStats.vehicles_seen ?? 0 }}</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Km totali</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ tripsStats.total_km|default(0)|number_format(0, ',', '.') }}</div>
+    </div>
+    <div class="fl-table-wrap" style="padding:14px 18px;">
+        <div class="fl-small">Litri rilevati (GPS)</div>
+        <div style="font-size:22px;font-weight:800;color:#0f172a;">{{ tripsStats.total_liters_gps|default(0)|number_format(0, ',', '.') }} L</div>
+    </div>
+</div>
+
+<div class="fl-table-wrap">
+    <table class="fl-table">
+        <thead>
+        <tr>
+            <th>Targa</th>
+            <th>Giorno</th>
+            <th>Partenza</th>
+            <th>Arrivo</th>
+            <th>Da</th>
+            <th>A</th>
+            <th>Km</th>
+            <th>Vel. media</th>
+            <th>Operaio (GPS)</th>
+            <th class="center">Rifornimento</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if trips is empty %}
+            <tr><td colspan="10">
+                <div class="fl-empty">
+                    <svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M9 21V9h6v12"/></svg>
+                    <p class="fl-empty-text">Nessuna tratta importata. Carica un file GPS per iniziare.</p>
+                </div>
+            </td></tr>
+        {% else %}
+            {% for t in trips %}
+                <tr>
+                    <td><span class="fl-targa">{{ t.vehicle_targa }}</span></td>
+                    <td class="fl-small">{{ t.start_at|date('d/m/Y') }}</td>
+                    <td class="fl-small">{{ t.start_at|date('H:i') }}</td>
+                    <td class="fl-small">{{ t.end_at|date('H:i') }}</td>
+                    <td>
+                        <div>{{ t.start_city ?: '—' }}</div>
+                        <div class="fl-small" title="{{ t.start_address }}">{{ t.start_address|slice(0, 40) }}{% if t.start_address|length > 40 %}…{% endif %}</div>
+                    </td>
+                    <td>
+                        <div>{{ t.end_city ?: '—' }}</div>
+                        <div class="fl-small" title="{{ t.end_address }}">{{ t.end_address|slice(0, 40) }}{% if t.end_address|length > 40 %}…{% endif %}</div>
+                    </td>
+                    <td><b>{{ t.km_done|default(0)|number_format(0, ',', '.') }}</b></td>
+                    <td class="fl-small">{{ t.avg_speed|default(0) }} km/h</td>
+                    <td class="fl-small">{{ t.driver_name ?: '—' }}</td>
+                    <td class="center">
+                        {% if t.refuels_count > 0 %}
+                            <span class="fl-chip fl-chip-vehicle">⛽ {{ t.refuels_count }}× · {{ t.refuels_liters }}L</span>
+                        {% else %}
+                            <span class="fl-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</div>

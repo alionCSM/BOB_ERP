@@ -245,6 +245,18 @@
             <li class="side-nav__devider my-6"></li>
         {% endif %}
 
+        {# ── FLOTTA (veicoli aziendali, Q8, telepass) ── #}
+        {% if user.canAccess('fleet_view') or user.canAccess('fleet_manage') %}
+            {% set fleetActive = currentPath starts with '/fleet' %}
+            <li>
+                <a href="/fleet" class="side-menu {{ fleetActive ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="truck"></i></div>
+                    <div class="side-menu__title">Flotta</div>
+                </a>
+            </li>
+            <li class="side-nav__devider my-6"></li>
+        {% endif %}
+
         {# ── PRENOTAZIONI ── #}
         {% if user.canAccess('bookings') %}
             {% set bookingsActive = currentPath starts with '/bookings' %}

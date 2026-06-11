@@ -1,0 +1,187 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/fleet/fleet.css">
+{% endblock %}
+
+{% block content %}
+<div class="fl-page">
+
+    <div class="fl-hero">
+        <div class="fl-hero-content">
+            <div class="fl-hero-left">
+                <div class="fl-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <div>
+                    <h1 class="fl-hero-title">Carica file flotta</h1>
+                    <p class="fl-hero-sub">Importa "Riepilogo tratte" GPS o fattura Q8 — i dati restano in BOB per analisi e riconciliazione</p>
+                </div>
+            </div>
+            <a href="/fleet" class="fl-btn-primary" style="background:rgba(255,255,255,.12);box-shadow:none;border:1px solid rgba(255,255,255,.18);">← Torna a Flotta</a>
+        </div>
+    </div>
+
+    {# ── Pre-requisiti per analisi corretta ──────────────────────────────── #}
+    <div style="background:#fff;border:1.5px solid #fde68a;border-radius:12px;padding:18px 22px;margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" style="fill:none;stroke:#b45309;stroke-width:2;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <h3 style="margin:0;font-size:14px;font-weight:700;color:#78350f;">Prima di analizzare</h3>
+        </div>
+        <p style="margin:0 0 8px;font-size:13px;color:#451a03;line-height:1.5;">
+            Il match Q8 ↔ veicolo ↔ operaio passa <b>esclusivamente</b> dalle nostre tabelle assegnazioni.
+            I campi Q8 "Plate number" e "Km" sono dell'autista e <b>non vengono usati</b>.
+        </p>
+        <ul style="margin:0;padding-left:20px;font-size:12px;color:#78350f;line-height:1.9;">
+            <li>Ogni <a href="/fleet?tab=cards" style="color:#0369a1;font-weight:600;">carta Q8</a> deve essere registrata con <b>numero esatto</b> uguale al "Card No." della fattura (es. <code>00025</code>)</li>
+            <li>Ogni carta deve avere un'<b>assegnazione a veicolo</b> attiva nel periodo (icona ↺ sulla riga carta)</li>
+            <li>Ogni veicolo deve avere un'<b>assegnazione a operaio</b> attiva nel periodo (icona ↺ sulla riga veicolo)</li>
+            <li>Le <b>presenze</b> degli operai sui cantieri devono essere registrate (BOB Presenze)</li>
+        </ul>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+
+        {# ── GPS upload card ────────────────────────────────────────────── #}
+        <form method="POST" action="/fleet/import" enctype="multipart/form-data" class="fl-table-wrap" style="padding:24px;">
+            <input type="hidden" name="source" value="gps">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div class="fl-modal-icon" style="background:#eff6ff;color:#1d4ed8;">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Riepilogo tratte (GPS)</h3>
+                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;">File Excel esportato dal portale GPS — una riga per tratta</p>
+                </div>
+            </div>
+
+            <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:30px;text-align:center;background:#fafbfc;">
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required
+                       style="display:block;margin:0 auto;font-size:13px;">
+                <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
+            </div>
+
+            <label class="fl-check" style="margin-top:14px;padding:10px 12px;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;width:100%;">
+                <input type="checkbox" name="auto_create_stubs" value="1" checked>
+                <span><b>Auto-crea veicoli mancanti</b> &mdash; per ogni targa non ancora registrata, crea un veicolo stub. Lo completi dopo.</span>
+            </label>
+
+            <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
+                <li>Match automatico veicolo per <b>targa</b> (colonna "Veicolo")</li>
+                <li>Dedup: tratte già importate vengono saltate</li>
+                <li>Citta/provincia estratte dall'indirizzo (best-effort)</li>
+            </ul>
+
+            <button type="submit" class="fl-btn-submit" style="width:100%;margin-top:16px;padding:12px;">
+                Importa file GPS
+            </button>
+        </form>
+
+        {# ── Q8 upload card ─────────────────────────────────────────────── #}
+        <form method="POST" action="/fleet/import" enctype="multipart/form-data" class="fl-table-wrap" style="padding:24px;">
+            <input type="hidden" name="source" value="q8">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <div class="fl-modal-icon" style="background:#fef3c7;color:#b45309;">
+                    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 22V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v18"/><path d="M16 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V8l-3-3"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:700;color:#0f172a;">Fattura/transazioni Q8</h3>
+                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Excel scaricato dal portale Q8 — una riga per rifornimento</p>
+                </div>
+            </div>
+
+            <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:30px;text-align:center;background:#fafbfc;">
+                <input type="file" name="file" accept=".xlsx,.xls,.csv" required
+                       style="display:block;margin:0 auto;font-size:13px;">
+                <p class="fl-small" style="margin-top:10px;">.xlsx / .xls / .csv — max 20 MB</p>
+            </div>
+
+            <label class="fl-check" style="margin-top:14px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;width:100%;">
+                <input type="checkbox" name="auto_create_stubs" value="1" checked>
+                <span><b>Auto-crea carte mancanti</b> &mdash; per ogni "Card No." Q8 non registrato, crea una carta stub. La assegni a un veicolo dopo.</span>
+            </label>
+
+            <ul style="margin:14px 0 0;padding-left:18px;font-size:12px;color:#64748b;line-height:1.7;">
+                <li>Match carta tramite <b>Card No.</b> Q8 (intero piccolo, sempre affidabile)</li>
+                <li>PAN salvato come dato secondario (Excel a volte ne perde precisione)</li>
+                <li>"Plate number" e "Km" Q8 sono auto-dichiarati dall'autista, <b>ignorati per il match</b></li>
+                <li>Dedup su (PAN o Card No + timestamp + litri + importo)</li>
+            </ul>
+
+            <button type="submit" class="fl-btn-submit" style="width:100%;margin-top:16px;padding:12px;background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);">
+                Importa fattura Q8
+            </button>
+        </form>
+
+    </div>
+
+    {# ── MAPPATURA SUGGERITA: passo intermedio fra import e analisi ─── #}
+    <a href="/fleet/suggest-mappings" class="fl-table-wrap" style="display:block;margin-top:18px;padding:18px 22px;text-decoration:none;background:linear-gradient(135deg,#fafbfc 0%,#ecfdf5 100%);border:1.5px solid #6ee7b7;">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <div class="fl-modal-icon" style="background:#fff;color:#047857;">
+                <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="10"/><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            </div>
+            <div style="flex:1;">
+                <h3 style="margin:0;font-size:15px;font-weight:700;color:#0f172a;">Mappatura suggerita carte → veicoli</h3>
+                <p style="margin:2px 0 0;font-size:12px;color:#475569;">
+                    Dopo aver caricato GPS+Q8, l'AI ti propone in automatico quale veicolo guida quale carta.
+                    Approvi in 30 secondi, poi puoi analizzare.
+                </p>
+            </div>
+            <div style="font-size:13px;color:#047857;font-weight:700;">Vai &rsaquo;</div>
+        </div>
+    </a>
+
+    {# ── ANALIZZA: lancia engine di riconciliazione su tutti i dati importati ── #}
+    <form method="POST" action="/fleet/analyze" class="fl-table-wrap" style="margin-top:24px;padding:24px;background:linear-gradient(135deg,#fafbfc 0%, #fff7ed 100%);border:1.5px solid #fed7aa;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+            <div class="fl-modal-icon" style="background:#fff;color:#dc2626;">
+                <svg viewBox="0 0 24 24" width="22" height="22"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            </div>
+            <div style="flex:1;">
+                <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">Lancia analisi riconciliazione</h3>
+                <p style="margin:2px 0 0;font-size:13px;color:#475569;">
+                    Confronta tutto: Q8 ↔ GPS ↔ assegnazioni veicolo/operaio ↔ presenze ↔ cantieri.
+                    Le anomalie rilevate finiscono in tab <b>Anomalie</b>.
+                </p>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr) auto;gap:12px;align-items:end;">
+            <div class="fl-field">
+                <label>Da (opzionale)</label>
+                <input type="date" name="from" class="fl-input">
+            </div>
+            <div class="fl-field">
+                <label>A (opzionale)</label>
+                <input type="date" name="to" class="fl-input">
+            </div>
+            <div class="fl-field">
+                <label>Veicolo (opzionale)</label>
+                <select name="vehicle_id" class="fl-select">
+                    <option value="">— tutti i veicoli —</option>
+                    {% for v in vehiclesSel|default([]) %}
+                        <option value="{{ v.id }}">{{ v.targa }} · {{ v.modello }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="fl-btn-submit" style="padding:12px 20px;background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
+                <svg viewBox="0 0 24 24" width="16" height="16" style="display:inline-block;vertical-align:-3px;margin-right:6px;fill:none;stroke:currentColor;stroke-width:2;"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                Analizza tutto
+            </button>
+        </div>
+
+        <p class="fl-small" style="margin:12px 0 0;">
+            Senza filtri → analizza tutto il periodo coperto dagli import. Le regole attive sono 8
+            (Q8 senza GPS, GPS senza Q8, citta' mismatch, consumo outlier, multiple TX, presenze, ...).
+        </p>
+    </form>
+
+    <div style="margin-top:14px;padding:14px 16px;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;font-size:12px;color:#1e40af;">
+        <b>Tip:</b> dopo l'import vai su <a href="/fleet?tab=trips" style="text-decoration:underline;">Tratte GPS</a>
+        o <a href="/fleet?tab=fuel" style="text-decoration:underline;">Rifornimenti Q8</a> per vedere i dati grezzi.
+        Lancia l'analisi quando hai caricato sia GPS che Q8 per il periodo che ti interessa.
+    </div>
+
+</div>
+{% endblock %}

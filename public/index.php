@@ -497,6 +497,36 @@ if (str_starts_with($uri, '/api/')) {
     $router->dispatch($request, $container);
 }
 
+if ($uri === '/fleet' || str_starts_with($uri, '/fleet/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/fleet',                          [FleetController::class, 'index'])
+           ->post('/fleet/vehicle/save',            [FleetController::class, 'saveVehicle'])
+           ->post('/fleet/vehicle/delete',          [FleetController::class, 'deleteVehicle'])
+           ->post('/fleet/vehicle/reassign',        [FleetController::class, 'reassignVehicle'])
+           ->get('/fleet/vehicle/{id}/history',     [FleetController::class, 'vehicleHistory'])
+           ->post('/fleet/card/save',               [FleetController::class, 'saveCard'])
+           ->post('/fleet/card/delete',             [FleetController::class, 'deleteCard'])
+           ->post('/fleet/card/reassign',           [FleetController::class, 'reassignCard'])
+           ->get('/fleet/card/{id}/history',        [FleetController::class, 'cardHistory'])
+           ->post('/fleet/telepass/save',           [FleetController::class, 'saveTelepass'])
+           ->post('/fleet/telepass/delete',         [FleetController::class, 'deleteTelepass'])
+           ->post('/fleet/telepass/reassign',       [FleetController::class, 'reassignTelepass'])
+           ->get('/fleet/telepass/{id}/history',    [FleetController::class, 'telepassHistory'])
+           ->get('/fleet/import',                   [FleetController::class, 'importForm'])
+           ->post('/fleet/import',                  [FleetController::class, 'importUpload'])
+           ->post('/fleet/anomaly/dismiss',         [FleetController::class, 'dismissAnomaly'])
+           ->post('/fleet/analyze',                 [FleetController::class, 'analyze'])
+           ->get('/fleet/suggest-mappings',         [FleetController::class, 'suggestMappings'])
+           ->post('/fleet/mapping/accept',          [FleetController::class, 'acceptMapping']);
+
+    $router->dispatch($request, $container);
+}
+
 if ($uri === '/equipment' || str_starts_with($uri, '/equipment/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

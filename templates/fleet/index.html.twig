@@ -1,0 +1,448 @@
+{% extends 'layout/base.html.twig' %}
+
+{# ───────────────────────────────────────────────────────────────────────────
+   Fleet — pagina principale (3 tab: veicoli / carte Q8 / telepass).
+   Stile BOB (fl-) coerente con billing/clients.
+   ─────────────────────────────────────────────────────────────────────── #}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/fleet/fleet.css">
+{% endblock %}
+
+{% macro chip_holder(label, type) %}
+    {% if type == 'vehicle' %}
+        <span class="fl-chip fl-chip-vehicle">
+            <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+            {{ label }}
+        </span>
+    {% elseif type == 'worker' %}
+        <span class="fl-chip fl-chip-worker">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            {{ label }}
+        </span>
+    {% else %}
+        <span class="fl-chip fl-chip-empty">libero</span>
+    {% endif %}
+{% endmacro %}
+
+{% import _self as fl %}
+
+{% block content %}
+<div class="fl-page">
+
+    {# ── Hero ──────────────────────────────────────────────────────────── #}
+    <div class="fl-hero">
+        <div class="fl-hero-content">
+            <div class="fl-hero-left">
+                <div class="fl-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                </div>
+                <div>
+                    <h1 class="fl-hero-title">Flotta</h1>
+                    <p class="fl-hero-sub">Veicoli, carte carburante e telepass — assegnatari e storico</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Tabs ──────────────────────────────────────────────────────────── #}
+    <div class="fl-tabs">
+        <a href="/fleet?tab=vehicles" class="fl-tab {{ tab == 'vehicles' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+            Veicoli <span class="fl-tab-count">{{ vehicles|length }}</span>
+        </a>
+        <a href="/fleet?tab=cards" class="fl-tab {{ tab == 'cards' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Carte Q8 <span class="fl-tab-count">{{ cards|length }}</span>
+        </a>
+        <a href="/fleet?tab=telepass" class="fl-tab {{ tab == 'telepass' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>
+            Telepass <span class="fl-tab-count">{{ telepasses|length }}</span>
+        </a>
+        <a href="/fleet?tab=trips" class="fl-tab {{ tab == 'trips' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M9 21V9h6v12"/></svg>
+            Tratte GPS
+        </a>
+        <a href="/fleet?tab=fuel" class="fl-tab {{ tab == 'fuel' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><path d="M3 22V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v18"/><path d="M16 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V8l-3-3"/><path d="M3 22h13"/></svg>
+            Rifornimenti Q8
+        </a>
+        <a href="/fleet?tab=anomalies" class="fl-tab {{ tab == 'anomalies' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Anomalie
+        </a>
+        <a href="/fleet?tab=imports" class="fl-tab {{ tab == 'imports' ? 'is-active' : '' }}">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Storico Import
+        </a>
+        {% if canManage %}
+        <a href="/fleet/import" class="fl-tab" style="margin-left:auto;background:#ecfdf5;color:#047857;border:1px dashed #6ee7b7;">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Carica file
+        </a>
+        {% endif %}
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB VEICOLI
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'vehicles' %}
+        <div class="fl-toolbar">
+            <div class="fl-search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Cerca per targa, modello, operaio..." data-fl-filter="#fl-table-vehicles">
+            </div>
+            {% if canManage %}
+            <button type="button" class="fl-btn-primary" data-fl-open="vehicle-modal-new">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuovo veicolo
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="fl-table-wrap">
+            <table class="fl-table" id="fl-table-vehicles">
+                <thead>
+                <tr>
+                    <th>Targa</th>
+                    <th>Modello</th>
+                    <th>Tipo</th>
+                    <th>Operaio assegnato</th>
+                    <th>Carta Q8</th>
+                    <th>Telepass</th>
+                    <th>GPS id</th>
+                    <th class="center">Attivo</th>
+                    <th class="center">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if vehicles is empty %}
+                    <tr><td colspan="9">
+                        <div class="fl-empty">
+                            <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                            <p class="fl-empty-text">Nessun veicolo in flotta. Aggiungine uno per iniziare.</p>
+                        </div>
+                    </td></tr>
+                {% else %}
+                    {% for v in vehicles %}
+                        <tr data-fl-row data-fl-search="{{ v.targa }} {{ v.modello }} {{ v.first_name }} {{ v.last_name }}">
+                            <td><span class="fl-targa">{{ v.targa }}</span></td>
+                            <td>{{ v.modello ?: '<span class="fl-muted">—</span>'|raw }}</td>
+                            <td><span class="fl-tipo">{{ v.tipo }}</span></td>
+                            <td>
+                                {% if v.worker_id %}
+                                    {{ fl.chip_holder((v.first_name ~ ' ' ~ v.last_name)|trim, 'worker') }}
+                                {% else %}
+                                    {{ fl.chip_holder('', 'none') }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if v.current_card_numero %}
+                                    <span class="fl-mono">{{ v.current_card_numero }}</span>
+                                    <div class="fl-small">{{ v.current_card_fornitore }}</div>
+                                {% else %}<span class="fl-muted">—</span>{% endif %}
+                            </td>
+                            <td>
+                                {% if v.current_telepass_numero %}
+                                    <span class="fl-mono">{{ v.current_telepass_numero }}</span>
+                                {% else %}<span class="fl-muted">—</span>{% endif %}
+                            </td>
+                            <td><span class="fl-small">{{ v.gps_device_id ?: '—' }}</span></td>
+                            <td class="center"><span class="fl-status-dot {{ v.active ? 'is-on' : 'is-off' }}"></span></td>
+                            <td class="center">
+                                <div class="fl-actions">
+                                    <button type="button" class="fl-act" title="Storico"
+                                            data-fl-open="vehicle-history-modal"
+                                            data-fl-history="/fleet/vehicle/{{ v.id }}/history">
+                                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    </button>
+                                    {% if canManage %}
+                                    <button type="button" class="fl-act" title="Riassegna"
+                                            data-fl-open="vehicle-reassign-{{ v.id }}">
+                                        <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                                    </button>
+                                    <button type="button" class="fl-act" title="Modifica"
+                                            data-fl-open="vehicle-modal-{{ v.id }}">
+                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <form method="POST" action="/fleet/vehicle/delete" class="inline" onsubmit="return confirm('Eliminare veicolo {{ v.targa }}? Le assegnazioni storiche andranno perse.');">
+                                        <input type="hidden" name="id" value="{{ v.id }}">
+                                        <button type="submit" class="fl-act is-danger" title="Elimina">
+                                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Modali create + edit per ogni veicolo #}
+        {% if canManage %}
+            {% include 'fleet/_modal_vehicle.html.twig' with {v: null, modalId: 'vehicle-modal-new'} only %}
+            {% for v in vehicles %}
+                {% include 'fleet/_modal_vehicle.html.twig' with {v: v, modalId: 'vehicle-modal-' ~ v.id} only %}
+                {% include 'fleet/_modal_vehicle_reassign.html.twig' with {v: v, workers: workers} only %}
+            {% endfor %}
+        {% endif %}
+
+        {# Modale storico (riusato per qualsiasi veicolo, popolato via fetch) #}
+        {% include 'fleet/_modal_history.html.twig' with {
+            modalId: 'vehicle-history-modal',
+            title: 'Storico assegnazioni veicolo',
+            sub: 'Chi ha guidato questo veicolo, in ordine cronologico'
+        } only %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB CARTE Q8
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'cards' %}
+        <div class="fl-toolbar">
+            <div class="fl-search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Cerca per numero o holder..." data-fl-filter="#fl-table-cards">
+            </div>
+            {% if canManage %}
+            <a href="/fleet/suggest-mappings" class="fl-btn-primary" style="background:linear-gradient(135deg,#047857 0%,#065f46 100%);">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 11 12 14 22 4"/></svg>
+                Suggerimenti AI
+            </a>
+            <button type="button" class="fl-btn-primary" data-fl-open="card-modal-new">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuova carta
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="fl-table-wrap">
+            <table class="fl-table" id="fl-table-cards">
+                <thead>
+                <tr>
+                    <th>Fornitore</th>
+                    <th>Card No.</th>
+                    <th>PAN</th>
+                    <th>Holder corrente</th>
+                    <th>Note</th>
+                    <th class="center">Attiva</th>
+                    <th class="center">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if cards is empty %}
+                    <tr><td colspan="7">
+                        <div class="fl-empty">
+                            <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                            <p class="fl-empty-text">Nessuna carta carburante registrata.</p>
+                        </div>
+                    </td></tr>
+                {% else %}
+                    {% for c in cards %}
+                        <tr data-fl-row data-fl-search="{{ c.numero }} {{ c.card_no }} {{ c.pan }} {{ c.fornitore }} {{ c.holder_vehicle_targa }} {{ c.holder_first_name }} {{ c.holder_last_name }}">
+                            <td><span class="fl-tipo">{{ c.fornitore }}</span></td>
+                            <td><span class="fl-mono">{{ c.card_no ?: c.numero }}</span></td>
+                            <td>{% if c.pan %}<span class="fl-small fl-mono" style="font-size:10px;color:#94a3b8;" title="{{ c.pan }}">…{{ c.pan|slice(-7) }}</span>{% else %}<span class="fl-muted">—</span>{% endif %}</td>
+                            <td>
+                                {% if c.holder_vehicle_targa %}
+                                    {{ fl.chip_holder(c.holder_vehicle_targa, 'vehicle') }}
+                                {% elseif c.worker_id %}
+                                    {{ fl.chip_holder((c.holder_first_name ~ ' ' ~ c.holder_last_name)|trim, 'worker') }}
+                                {% else %}
+                                    {{ fl.chip_holder('', 'none') }}
+                                {% endif %}
+                            </td>
+                            <td class="fl-small">{{ c.notes|default('') }}</td>
+                            <td class="center"><span class="fl-status-dot {{ c.active ? 'is-on' : 'is-off' }}"></span></td>
+                            <td class="center">
+                                <div class="fl-actions">
+                                    <button type="button" class="fl-act" title="Storico"
+                                            data-fl-open="card-history-modal"
+                                            data-fl-history="/fleet/card/{{ c.id }}/history">
+                                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    </button>
+                                    {% if canManage %}
+                                    <button type="button" class="fl-act" title="Riassegna" data-fl-open="card-reassign-{{ c.id }}">
+                                        <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                    </button>
+                                    <button type="button" class="fl-act" title="Modifica" data-fl-open="card-modal-{{ c.id }}">
+                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <form method="POST" action="/fleet/card/delete" class="inline" onsubmit="return confirm('Eliminare carta {{ c.numero }}?');">
+                                        <input type="hidden" name="id" value="{{ c.id }}">
+                                        <button type="submit" class="fl-act is-danger" title="Elimina">
+                                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if canManage %}
+            {% include 'fleet/_modal_card.html.twig' with {c: null, modalId: 'card-modal-new'} only %}
+            {% for c in cards %}
+                {% include 'fleet/_modal_card.html.twig' with {c: c, modalId: 'card-modal-' ~ c.id} only %}
+                {% include 'fleet/_modal_holder_reassign.html.twig' with {
+                    modalId: 'card-reassign-' ~ c.id,
+                    action: '/fleet/card/reassign',
+                    entityIdField: 'card_id', entityId: c.id,
+                    entityLabel: 'Carta ' ~ c.fornitore ~ ' ' ~ c.numero,
+                    vehicles: vehiclesSel, workers: workers
+                } only %}
+            {% endfor %}
+        {% endif %}
+
+        {% include 'fleet/_modal_history.html.twig' with {
+            modalId: 'card-history-modal',
+            title: 'Storico assegnazioni carta',
+            sub: 'Veicoli e operai a cui è stata assegnata'
+        } only %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB TELEPASS
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'telepass' %}
+        <div class="fl-toolbar">
+            <div class="fl-search">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" placeholder="Cerca per numero o holder..." data-fl-filter="#fl-table-telepass">
+            </div>
+            {% if canManage %}
+            <button type="button" class="fl-btn-primary" data-fl-open="telepass-modal-new">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuovo telepass
+            </button>
+            {% endif %}
+        </div>
+
+        <div class="fl-table-wrap">
+            <table class="fl-table" id="fl-table-telepass">
+                <thead>
+                <tr>
+                    <th>Numero</th>
+                    <th>Tipo</th>
+                    <th>Holder corrente</th>
+                    <th>Note</th>
+                    <th class="center">Attivo</th>
+                    <th class="center">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if telepasses is empty %}
+                    <tr><td colspan="6">
+                        <div class="fl-empty">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>
+                            <p class="fl-empty-text">Nessun telepass registrato.</p>
+                        </div>
+                    </td></tr>
+                {% else %}
+                    {% for t in telepasses %}
+                        <tr data-fl-row data-fl-search="{{ t.numero }} {{ t.tipo }} {{ t.holder_vehicle_targa }} {{ t.holder_first_name }} {{ t.holder_last_name }}">
+                            <td><span class="fl-mono">{{ t.numero }}</span></td>
+                            <td class="fl-small">{{ t.tipo ?: '—' }}</td>
+                            <td>
+                                {% if t.holder_vehicle_targa %}
+                                    {{ fl.chip_holder(t.holder_vehicle_targa, 'vehicle') }}
+                                {% elseif t.worker_id %}
+                                    {{ fl.chip_holder((t.holder_first_name ~ ' ' ~ t.holder_last_name)|trim, 'worker') }}
+                                {% else %}
+                                    {{ fl.chip_holder('', 'none') }}
+                                {% endif %}
+                            </td>
+                            <td class="fl-small">{{ t.notes|default('') }}</td>
+                            <td class="center"><span class="fl-status-dot {{ t.active ? 'is-on' : 'is-off' }}"></span></td>
+                            <td class="center">
+                                <div class="fl-actions">
+                                    <button type="button" class="fl-act" title="Storico"
+                                            data-fl-open="telepass-history-modal"
+                                            data-fl-history="/fleet/telepass/{{ t.id }}/history">
+                                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    </button>
+                                    {% if canManage %}
+                                    <button type="button" class="fl-act" title="Riassegna" data-fl-open="telepass-reassign-{{ t.id }}">
+                                        <svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                    </button>
+                                    <button type="button" class="fl-act" title="Modifica" data-fl-open="telepass-modal-{{ t.id }}">
+                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <form method="POST" action="/fleet/telepass/delete" class="inline" onsubmit="return confirm('Eliminare telepass {{ t.numero }}?');">
+                                        <input type="hidden" name="id" value="{{ t.id }}">
+                                        <button type="submit" class="fl-act is-danger" title="Elimina">
+                                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if canManage %}
+            {% include 'fleet/_modal_telepass.html.twig' with {t: null, modalId: 'telepass-modal-new'} only %}
+            {% for t in telepasses %}
+                {% include 'fleet/_modal_telepass.html.twig' with {t: t, modalId: 'telepass-modal-' ~ t.id} only %}
+                {% include 'fleet/_modal_holder_reassign.html.twig' with {
+                    modalId: 'telepass-reassign-' ~ t.id,
+                    action: '/fleet/telepass/reassign',
+                    entityIdField: 'telepass_id', entityId: t.id,
+                    entityLabel: 'Telepass ' ~ t.numero,
+                    vehicles: vehiclesSel, workers: workers
+                } only %}
+            {% endfor %}
+        {% endif %}
+
+        {% include 'fleet/_modal_history.html.twig' with {
+            modalId: 'telepass-history-modal',
+            title: 'Storico assegnazioni telepass',
+            sub: 'Veicoli e operai a cui è stato assegnato'
+        } only %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB TRATTE GPS
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'trips' %}
+        {% include 'fleet/_tab_trips.html.twig' %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB RIFORNIMENTI Q8
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'fuel' %}
+        {% include 'fleet/_tab_fuel.html.twig' %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB ANOMALIE
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'anomalies' %}
+        {% include 'fleet/_tab_anomalies.html.twig' %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════════════
+       TAB STORICO IMPORT
+       ═══════════════════════════════════════════════════════════════════ #}
+    {% if tab == 'imports' %}
+        {% include 'fleet/_tab_imports.html.twig' %}
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/fleet/fleet.js" nonce="{{ cspNonce }}"></script>
+{% endblock %}
