@@ -239,13 +239,15 @@ final class EquipmentRepository
         $stati      = $data['stato']        ?? [];
         $quantita   = $data['quantita']     ?? [];
 
-        for ($i = 0; $i < count($ids); $i++) {
-            $current = $this->getRentalById($ids[$i]);
+        for ($i = 0, $n = count($ids); $i < $n; $i++) {
+            $rentalId = (int)$ids[$i];
+            if ($rentalId <= 0) continue;
+            $current = $this->getRentalById($rentalId);
             if (!$current) {
                 continue;
             }
             $this->updateRentalDetailsWithStatus(
-                (int)$ids[$i],
+                $rentalId,
                 (float)$costi[$i],
                 $tipi[$i],
                 $dateInizio[$i],
