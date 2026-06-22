@@ -164,19 +164,121 @@ final class WorksitesController
         Response::view('worksites/my.html.twig', $request, compact('worksites'));
     }
 
-    // ── Drafts (admin only) ────────────────────────────────────────────────────
+    // ── Drafts (permission worksites_drafts) ──────────────────────────────────
 
-    public function drafts(Request $request): void
+    /** Check unico per accesso alla gestione bozze. */
+    private function requireDraftsAccess(\App\Http\Request $request): void
     {
         $user = $request->user();
+        if (!$user) Response::error('Accesso negato', 403);
+        if ((int)$user->id === 1) return;                   // superadmin bypass
+        if ($user->canAccess('worksites_drafts')) return;   // permesso granulare
+        Response::error('Permesso worksites_drafts richiesto per gestire le bozze cantieri', 403);
+    }
 
-        if ($user->getCompanyId() != 1) {
-            Response::error('Access denied', 403);
+    public function drafts(\App\Http\Request $request): void
+    {
+        $this->requireDraftsAccess($request);
+
+        $drafts       = $this->worksiteRepo->getDrafts();
+        $canSeePrices = $request->user() ? $request->user()->canSeePrices() : false;
+
+        Response::view('worksites/drafts.html.twig', $request, compact('drafts', 'canSeePrices'));
+    }
+
+    public function editDraft(\App\Http\Request $request): void
+    {
+        $this->requireDraftsAccess($request);
+        $id = $request->intParam('id');
+        if ($id <= 0) Response::error('ID non valido', 400);
+
+        $draft = $this->worksiteRepo->findDraft($id);
+        if (!$draft) Response::error('Bozza non trovata', 404);
+
+        $clientStmt = $this->conn->prepare("SELECT id, name FROM bb_clients ORDER BY name ASC");
+        $clientStmt->execute();
+        $clients = $clientStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        $canSeePrices = $request->user()->canSeePrices();
+
+        Response::view('worksites/draft_edit.html.twig', $request, compact('draft', 'clients', 'canSeePrices'));
+    }
+
+    public function updateDraft(\App\Http\Request $request): void
+    {
+        $this->requireDraftsAccess($request);
+        $id = $request->intParam('id');
+        if ($id <= 0) Response::error('ID non valido', 400);
+
+        $draft = $this->worksiteRepo->findDraft($id);
+        if (!$draft) Response::error('Bozza non trovata', 404);
+
+        $companyId = (int)($draft['company_id'] ?? 0);
+        $user = $request->user();
+        $canSeePrices = $user->canSeePrices();
+
+        $data = [
+            'name'           => trim($_POST['name'] ?? ''),
+            'client_id'      => (int)($_POST['client_id'] ?? 0),
+            'location'       => trim($_POST['location'] ?? '') ?: null,
+            'descrizione'    => trim($_POST['descrizione'] ?? '') ?: null,
+            'ext_descrizione'=> trim($_POST['ext_descrizione'] ?? '') ?: null,
+            'company_id'     => $companyId,
+        ];
+
+        // Tipo contratto + importi: solo se l'utente vede i prezzi
+        if ($canSeePrices) {
+            $data['is_consuntivo']  = (($_POST['is_consuntivo'] ?? '0') === '1') ? 1 : 0;
+            $data['prezzo_persona'] = ($data['is_consuntivo'] && !empty($_POST['prezzo_persona']))
+                ? $this->toDecimal($_POST['prezzo_persona']) : null;
+            if ($companyId == 1) {
+                $data['total_offer'] = $this->toDecimal($_POST['total_offer'] ?? '0');
+            } else {
+                $data['ext_total_offer'] = $this->toDecimal($_POST['ext_total_offer'] ?? '0');
+            }
+        } else {
+            // preserva valori esistenti
+            $data['is_consuntivo']  = (int)($draft['is_consuntivo'] ?? 0);
+            $data['prezzo_persona'] = $draft['prezzo_persona'] ?? null;
+            $data['total_offer']    = $draft['total_offer']     ?? null;
+            $data['ext_total_offer']= $draft['ext_total_offer'] ?? null;
         }
 
-        $drafts = $this->worksiteRepo->getDrafts();
+        // Dati ordine sempre modificabili
+        if ($companyId == 1) {
+            $data['order_number'] = trim($_POST['order_number'] ?? '') ?: null;
+            $data['commessa']     = trim($_POST['commessa'] ?? '')     ?: null;
+            $data['order_date']   = empty($_POST['order_date']) ? null : $_POST['order_date'];
+        } else {
+            $data['ext_order_number'] = trim($_POST['ext_order_number'] ?? '') ?: null;
+            $data['ext_order_date']   = empty($_POST['ext_order_date']) ? null : $_POST['ext_order_date'];
+        }
 
-        Response::view('worksites/drafts.html.twig', $request, compact('drafts'));
+        if ($data['name'] === '' || $data['client_id'] <= 0) {
+            $_SESSION['error'] = 'Nome cantiere e cliente sono obbligatori.';
+            Response::redirect("/worksites/drafts/{$id}/edit");
+        }
+
+        $this->worksiteRepo->updateDraft($id, $data);
+
+        // se l'utente clicca "Salva e attiva", proviamo subito a creare su YARD
+        if (!empty($_POST['activate_after_save'])) {
+            Response::redirect("/worksites/{$id}/activate");
+        }
+
+        $_SESSION['success'] = 'Bozza aggiornata.';
+        Response::redirect('/worksites/drafts');
+    }
+
+    public function deleteDraft(\App\Http\Request $request): never
+    {
+        $this->requireDraftsAccess($request);
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) Response::error('ID non valido', 400);
+
+        $this->worksiteRepo->deleteDraft($id);
+        $_SESSION['success'] = 'Bozza eliminata.';
+        Response::redirect('/worksites/drafts');
     }
 
     // ── Export Excel Presenze ──────────────────────────────────────────────────
@@ -2107,12 +2209,7 @@ final class WorksitesController
 
     public function activateDraft(Request $request): never
     {
-        $user      = $request->user();
-        $companyId = $user->getCompanyId();
-
-        if ($companyId != 1) {
-            Response::error('Accesso non autorizzato', 403);
-        }
+        $this->requireDraftsAccess($request);
 
         $draftId = $request->intParam('id');
         if ($draftId <= 0) {

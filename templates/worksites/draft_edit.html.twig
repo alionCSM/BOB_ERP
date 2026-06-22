@@ -1,0 +1,187 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/worksites/create_worksite.css">
+<style>
+  .wd-banner {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border: 1.5px solid #f59e0b;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      display: flex; align-items: center; gap: 12px;
+  }
+  .wd-banner svg { flex-shrink: 0; width: 22px; height: 22px; stroke: #b45309; fill: none; stroke-width: 2; }
+  .wd-banner-title { font-weight: 700; color: #78350f; margin: 0; font-size: 14px; }
+  .wd-banner-sub { font-size: 12px; color: #92400e; margin: 2px 0 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wcf-page" style="margin-top:16px;">
+
+    <div class="wd-banner">
+        <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div>
+            <p class="wd-banner-title">Bozza cantiere — {{ draft.worksite_code ?: '#' ~ draft.id }}</p>
+            <p class="wd-banner-sub">
+                Motivo bozza: {{ draft.draft_reason|default('non specificato')|replace({'_':' '})|lower|capitalize }}.
+                Puoi modificare tutti i campi e poi <strong>"Salva e attiva"</strong> per crearlo su YARD,
+                oppure <strong>"Salva"</strong> per tenere come bozza.
+            </p>
+        </div>
+    </div>
+
+    <form method="POST" action="/worksites/drafts/{{ draft.id }}/edit" class="wcf-form">
+
+        {# ── Sezione 1: Anagrafica ── #}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6"/><path d="M23 11h-6"/></svg>
+                Cliente e Anagrafica
+            </div>
+            <div class="wcf-section-body">
+                <div class="wcf-grid-2">
+                    <div class="wcf-field wcf-span-2">
+                        <label>Cliente *</label>
+                        <select name="client_id" id="client_search" required>
+                            {% for c in clients %}
+                                <option value="{{ c.id }}" {{ draft.client_id == c.id ? 'selected' : '' }}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <p style="font-size:11px;color:#64748b;margin:6px 0 0;">
+                            Se il cliente corretto non è in lista, devi prima crearlo da
+                            <a href="/clients" style="color:#3b82f6;">/clients</a>.
+                        </p>
+                    </div>
+                    <div class="wcf-field wcf-span-2">
+                        <label>Nome cantiere *</label>
+                        <input type="text" name="name" required value="{{ draft.name }}">
+                    </div>
+                    <div class="wcf-field wcf-span-2">
+                        <label>Località / indirizzo</label>
+                        <input type="text" name="location" value="{{ draft.location }}">
+                    </div>
+                    {% if draft.company_id == 1 %}
+                    <div class="wcf-field wcf-span-2">
+                        <label>Descrizione</label>
+                        <textarea name="descrizione" rows="3">{{ draft.descrizione }}</textarea>
+                    </div>
+                    {% else %}
+                    <div class="wcf-field wcf-span-2">
+                        <label>Descrizione</label>
+                        <textarea name="ext_descrizione" rows="3">{{ draft.ext_descrizione }}</textarea>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ── Sezione 2: Contratto ── #}
+        {% if draft.company_id == 1 %}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                {{ canSeePrices ? 'Contratto e Valore' : 'Contratto' }}
+            </div>
+            <div class="wcf-section-body">
+                {% if canSeePrices %}
+                    <div class="wcf-type-toggle">
+                        <div class="wcf-type-option">
+                            <input type="radio" name="is_consuntivo" id="tipo_contratto" value="0" {% if not draft.is_consuntivo %}checked{% endif %}>
+                            <label class="wcf-type-label" for="tipo_contratto">
+                                <div class="wcf-type-text">
+                                    <strong>Contratto fisso</strong>
+                                    <span>Valore totale definito</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="wcf-type-option">
+                            <input type="radio" name="is_consuntivo" id="tipo_consuntivo" value="1" {% if draft.is_consuntivo %}checked{% endif %}>
+                            <label class="wcf-type-label" for="tipo_consuntivo">
+                                <div class="wcf-type-text">
+                                    <strong>Consuntivo</strong>
+                                    <span>Ricavo da presenze x tariffa</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="wcf-grid-2">
+                    {% if canSeePrices %}
+                        <div class="wcf-field" id="total_offer_wrap" style="{{ draft.is_consuntivo ? 'display:none;' : '' }}">
+                            <label>Totale Contratto (€)</label>
+                            <input type="text" name="total_offer" id="total_offer"
+                                   value="{{ draft.total_offer|number_format(2, ',', '.') }}"
+                                   placeholder="Es. 150.000,00">
+                        </div>
+                        <div class="wcf-field" id="prezzo_persona_wrap" style="{{ draft.is_consuntivo ? '' : 'display:none;' }}">
+                            <label>Tariffa/persona (€/giorno)</label>
+                            <input type="number" name="prezzo_persona" id="prezzo_persona" step="0.01" min="0"
+                                   value="{{ draft.prezzo_persona ? draft.prezzo_persona|number_format(2, '.', '') : '' }}">
+                        </div>
+                    {% endif %}
+                    <div class="wcf-field">
+                        <label>Numero Ordine</label>
+                        <input type="text" name="order_number" value="{{ draft.order_number }}">
+                    </div>
+                    <div class="wcf-field">
+                        <label>Commessa</label>
+                        <input type="text" name="commessa" value="{{ draft.commessa }}">
+                    </div>
+                    <div class="wcf-field">
+                        <label>Data Ordine</label>
+                        <input type="date" name="order_date" value="{{ draft.order_date }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="wcf-section">
+            <div class="wcf-section-title">
+                <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/></svg>
+                {{ canSeePrices ? 'Dati Economici' : 'Dati Ordine' }}
+            </div>
+            <div class="wcf-section-body">
+                <div class="wcf-grid-2">
+                    {% if canSeePrices %}
+                    <div class="wcf-field">
+                        <label>Totale Offerta (€)</label>
+                        <input type="text" name="ext_total_offer" value="{{ draft.ext_total_offer|number_format(2, ',', '.') }}">
+                    </div>
+                    {% endif %}
+                    <div class="wcf-field">
+                        <label>Numero Ordine</label>
+                        <input type="text" name="ext_order_number" value="{{ draft.ext_order_number }}">
+                    </div>
+                    <div class="wcf-field">
+                        <label>Data Ordine</label>
+                        <input type="date" name="ext_order_date" value="{{ draft.ext_order_date }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── Azioni ── #}
+        <div class="wcf-section" style="margin-bottom:0;">
+            <div class="wcf-actions" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                <a href="/worksites/drafts" class="wcf-btn-cancel">Annulla</a>
+                <button type="submit" class="wcf-btn-submit" style="background:linear-gradient(135deg,#64748b 0%,#475569 100%);">
+                    Salva (resta in bozza)
+                </button>
+                <button type="submit" name="activate_after_save" value="1" class="wcf-btn-submit" style="background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);">
+                    <svg viewBox="0 0 24 24" width="16" height="16" style="fill:none;stroke:currentColor;stroke-width:2;"><polyline points="20 6 9 17 4 12"/></svg>
+                    Salva e Attiva su YARD
+                </button>
+            </div>
+        </div>
+
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/worksites/edit_worksite.js" nonce="{{ cspNonce }}"></script>
+{% endblock %}

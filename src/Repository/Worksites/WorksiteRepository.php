@@ -151,8 +151,90 @@ final class WorksiteRepository
     public function getDrafts(): array
     {
         return $this->conn
-            ->query("SELECT * FROM bb_worksites WHERE is_draft = 1 ORDER BY created_at DESC")
+            ->query("
+                SELECT w.*,
+                       c.name AS client_name,
+                       u.username AS created_by_username
+                FROM bb_worksites w
+                LEFT JOIN bb_clients c ON c.id = w.client_id
+                LEFT JOIN bb_users   u ON u.id = w.created_by
+                WHERE w.is_draft = 1
+                ORDER BY w.created_at DESC
+            ")
             ->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Singola bozza con nome cliente per la pagina di edit. */
+    public function findDraft(int $id): ?array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT w.*, c.name AS client_name
+            FROM bb_worksites w
+            LEFT JOIN bb_clients c ON c.id = w.client_id
+            WHERE w.id = :id AND w.is_draft = 1
+        ");
+        $stmt->execute([':id' => $id]);
+        $r = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $r ?: null;
+    }
+
+    /**
+     * Update di una bozza. Non tocca is_draft / draft_reason (l'attivazione
+     * passa da activateDraft()). $data e' simile al payload di update normale,
+     * ma con client_id sempre modificabile (a differenza dell'update standard).
+     */
+    public function updateDraft(int $id, array $data): bool
+    {
+        $sql = "UPDATE bb_worksites SET
+                    name           = :name,
+                    client_id      = :client_id,
+                    location       = :location,
+                    descrizione    = :descrizione,
+                    ext_descrizione= :ext_descrizione,
+                    is_consuntivo  = :is_consuntivo,
+                    prezzo_persona = :prezzo_persona";
+        if (($data['company_id'] ?? 0) == 1) {
+            $sql .= ",
+                    total_offer  = :total_offer,
+                    order_number = :order_number,
+                    commessa     = :commessa,
+                    order_date   = :order_date";
+        } else {
+            $sql .= ",
+                    ext_total_offer  = :ext_total_offer,
+                    ext_order_number = :ext_order_number,
+                    ext_order_date   = :ext_order_date";
+        }
+        $sql .= " WHERE id = :id AND is_draft = 1";
+
+        $params = [
+            ':id'             => $id,
+            ':name'           => $data['name'],
+            ':client_id'      => $data['client_id'],
+            ':location'       => $data['location'] ?? null,
+            ':descrizione'    => $data['descrizione'] ?? null,
+            ':ext_descrizione'=> $data['ext_descrizione'] ?? null,
+            ':is_consuntivo'  => !empty($data['is_consuntivo']) ? 1 : 0,
+            ':prezzo_persona' => $data['prezzo_persona'] ?? null,
+        ];
+        if (($data['company_id'] ?? 0) == 1) {
+            $params[':total_offer']  = $data['total_offer']  ?? null;
+            $params[':order_number'] = $data['order_number'] ?? null;
+            $params[':commessa']     = $data['commessa']     ?? null;
+            $params[':order_date']   = empty($data['order_date']) ? null : $data['order_date'];
+        } else {
+            $params[':ext_total_offer']  = $data['ext_total_offer']  ?? null;
+            $params[':ext_order_number'] = $data['ext_order_number'] ?? null;
+            $params[':ext_order_date']   = empty($data['ext_order_date']) ? null : $data['ext_order_date'];
+        }
+        $stmt = $this->conn->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    public function deleteDraft(int $id): bool
+    {
+        $stmt = $this->conn->prepare("DELETE FROM bb_worksites WHERE id = :id AND is_draft = 1");
+        return $stmt->execute([':id' => $id]);
     }
 
     public function activateDraft(int $id, int $yardWorksiteId): bool
