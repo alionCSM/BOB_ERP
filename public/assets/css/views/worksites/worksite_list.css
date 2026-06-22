@@ -194,6 +194,20 @@
 .wl-muted { color: #94a3b8; }
 .wl-price { font-weight: 700; color: #0f172a; }
 
+/* Badge presenze / mezzi sotto il nome cantiere */
+.wl-badges { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.wl-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .3px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+.wl-badge svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; }
+.wl-badge-ok  { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.wl-badge-off { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+
 /* Actions */
 .wl-actions { display: flex; align-items: center; gap: 4px; justify-content: center; }
 .wl-action-btn {

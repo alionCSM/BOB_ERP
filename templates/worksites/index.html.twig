@@ -200,6 +200,30 @@
                     <a href="/worksites/{{ w.id }}" class="wl-name">
                         {{ w.worksite_name }}
                     </a>
+                    <div class="wl-badges">
+                        {% if w.has_presenze %}
+                            <span class="wl-badge wl-badge-ok" title="Sono state registrate presenze su questo cantiere">
+                                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                Presenze
+                            </span>
+                        {% else %}
+                            <span class="wl-badge wl-badge-off" title="Nessuna presenza ancora registrata">
+                                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                No presenze
+                            </span>
+                        {% endif %}
+                        {% if w.has_mezzi %}
+                            <span class="wl-badge wl-badge-ok" title="Mezzi di sollevamento noleggiati su questo cantiere">
+                                <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                                Mezzi
+                            </span>
+                        {% else %}
+                            <span class="wl-badge wl-badge-off" title="Nessun mezzo di sollevamento associato">
+                                <svg viewBox="0 0 24 24"><path d="M3 17h2l1-4h12l1 4h2"/><path d="M5 17v2h3v-2"/><path d="M16 17v2h3v-2"/></svg>
+                                No mezzi
+                            </span>
+                        {% endif %}
+                    </div>
                 </td>
                 <td class="center">
                     <span class="wl-code">{{ w.worksite_code }}</span>

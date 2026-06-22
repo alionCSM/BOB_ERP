@@ -61,6 +61,10 @@ final class WorksiteRepository
         string $search   = '',
         int    $limit    = 200
     ): array {
+        // Flag derivati (EXISTS molto piu' veloce di JOIN+GROUP BY per booleani):
+        //   - has_presenze: presenze interne OPPURE consorziate
+        //   - has_mezzi:    almeno un noleggio di mezzi sollevamento attivo o storico
+        // Servono sia per ordinamento ("attivi in cima") sia per i badge UI.
         $query = "
             SELECT
                 w.id,
@@ -78,7 +82,19 @@ final class WorksiteRepository
                 w.prezzo_persona,
                 w.status,
                 c.name AS client_name,
-                fs.margin
+                fs.margin,
+                (
+                    EXISTS (SELECT 1 FROM bb_presenze              p  WHERE p.worksite_id  = w.id)
+                 OR EXISTS (SELECT 1 FROM bb_presenze_consorziate  pc WHERE pc.worksite_id = w.id)
+                ) AS has_presenze,
+                EXISTS (SELECT 1 FROM bb_worksite_lifting wl WHERE wl.worksite_id = w.id) AS has_mezzi,
+                /* Ultima data di presenza (interne OR consorziate) per ordinamento
+                   per recenza. NB: nomi colonne diversi sulle 2 tabelle:
+                   bb_presenze.data vs bb_presenze_consorziate.data_presenza. */
+                GREATEST(
+                    COALESCE((SELECT MAX(p.data)           FROM bb_presenze              p  WHERE p.worksite_id  = w.id), '1900-01-01'),
+                    COALESCE((SELECT MAX(pc.data_presenza) FROM bb_presenze_consorziate  pc WHERE pc.worksite_id = w.id), '1900-01-01')
+                ) AS last_presenza_at
             FROM bb_worksites w
             LEFT JOIN bb_clients c ON w.client_id = c.id
             LEFT JOIN bb_worksite_financial_status fs ON fs.worksite_id = w.id
@@ -129,8 +145,16 @@ final class WorksiteRepository
         }
 
         $query .= ' WHERE ' . implode(' AND ', $conditions);
+        // Ordinamento "attivi-recenti prima":
+        //   1) status = 'In corso' in cima (gli altri sotto)
+        //   2) all'interno: data ultima presenza DESC (chi e' attivo adesso prima)
+        //   3) cantieri senza presenze finiscono in fondo via last_presenza_at = 1900-01-01
+        //   4) tiebreak su worksite_code (anno DESC, sequenza DESC)
         $query .= "
             ORDER BY
+                (w.status = 'In corso') DESC,
+                last_presenza_at DESC,
+                has_presenze DESC,
                 CAST(SUBSTRING(w.worksite_code, 2, 2) AS UNSIGNED) DESC,
                 CAST(SUBSTRING_INDEX(w.worksite_code, '-', -1) AS UNSIGNED) DESC
             LIMIT :limit
