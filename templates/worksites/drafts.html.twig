@@ -1,36 +1,222 @@
 {% extends 'layout/base.html.twig' %}
 
+{% block head %}
+<style>
+  .wd-page { margin-top: 16px; }
+
+  /* Hero (allineato a fl-/bc-) */
+  .wd-hero {
+      position: relative; overflow: hidden;
+      border-radius: 18px;
+      padding: 26px 30px 22px;
+      background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+      color: #fff; margin-bottom: 18px;
+  }
+  .wd-hero::before {
+      content: ''; position: absolute; top: -80px; right: -40px;
+      width: 220px; height: 220px; border-radius: 50%;
+      background: rgba(239,68,68,.12); pointer-events: none;
+  }
+  .wd-hero-content {
+      position: relative; z-index: 1;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 14px;
+  }
+  .wd-hero-left { display: flex; align-items: center; gap: 14px; }
+  .wd-hero-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: center;
+  }
+  .wd-hero-icon svg { width: 22px; height: 22px; stroke: #fff; stroke-width: 1.5; fill: none; }
+  .wd-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 2px; }
+  .wd-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+
+  .wd-btn-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 16px; border-radius: 10px;
+      background: rgba(255,255,255,.12); color: #fff;
+      font-size: 13px; font-weight: 600;
+      border: 1px solid rgba(255,255,255,.18);
+      text-decoration: none; transition: all .15s;
+  }
+  .wd-btn-back:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* Card list */
+  .wd-card {
+      background: #fff; border-radius: 14px;
+      border: 1.5px solid #fde68a;
+      padding: 18px 22px;
+      margin-bottom: 12px;
+      position: relative;
+  }
+  .wd-card::before {
+      content: ''; position: absolute; top: 0; left: 0; bottom: 0;
+      width: 4px; background: #f59e0b;
+      border-radius: 14px 0 0 14px;
+  }
+  .wd-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 14px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .wd-card-title {
+      font-size: 16px; font-weight: 700; color: #0f172a;
+      margin: 0 0 4px;
+  }
+  .wd-card-sub {
+      font-size: 12px; color: #64748b;
+      display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .wd-card-sub span { display: inline-flex; align-items: center; gap: 4px; }
+
+  .wd-reason-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      background: #fef3c7; color: #b45309;
+      border: 1px solid #fde68a;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .3px;
+  }
+
+  .wd-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px; margin: 12px 0;
+  }
+  .wd-field { font-size: 12px; }
+  .wd-field-label { color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; font-size: 10px; }
+  .wd-field-value { color: #0f172a; font-weight: 600; margin-top: 2px; }
+  .wd-field-value.is-muted { color: #cbd5e1; font-weight: 400; }
+
+  .wd-actions {
+      display: flex; gap: 8px; flex-wrap: wrap;
+      margin-top: 14px; padding-top: 14px; border-top: 1px solid #f1f5f9;
+  }
+  .wd-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      border: 1.5px solid; cursor: pointer;
+      text-decoration: none; transition: all .12s;
+  }
+  .wd-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+  .wd-btn-edit    { background: #fff; color: #2563eb; border-color: #bfdbfe; }
+  .wd-btn-edit:hover { background: #eff6ff; }
+  .wd-btn-activate{ background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: #fff; border-color: transparent; }
+  .wd-btn-activate:hover { box-shadow: 0 4px 12px rgba(22,163,74,.25); color: #fff; }
+  .wd-btn-delete  { background: #fff; color: #dc2626; border-color: #fca5a5; }
+  .wd-btn-delete:hover { background: #fee2e2; }
+
+  /* Empty */
+  .wd-empty {
+      background: #fff; border-radius: 14px;
+      border: 1.5px solid #e8edf3;
+      padding: 60px 20px; text-align: center;
+  }
+  .wd-empty svg { width: 40px; height: 40px; stroke: #cbd5e1; fill: none; opacity: .5; margin: 0 auto 12px; display: block; }
+  .wd-empty-text { font-size: 14px; color: #94a3b8; margin: 0; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="intro-y box p-5">
-    <h2 class="text-lg font-medium mb-4">Cantieri in bozza</h2>
+<div class="wd-page">
+
+    <div class="wd-hero">
+        <div class="wd-hero-content">
+            <div class="wd-hero-left">
+                <div class="wd-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div>
+                    <h1 class="wd-hero-title">Cantieri in bozza</h1>
+                    <p class="wd-hero-sub">{{ drafts|length }} cantiere/i in attesa di attivazione su YARD</p>
+                </div>
+            </div>
+            <a href="/worksites" class="wd-btn-back">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Torna a Cantieri
+            </a>
+        </div>
+    </div>
 
     {% if drafts is empty %}
-        <div class="text-slate-500">Nessun cantiere in attesa.</div>
+        <div class="wd-empty">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+            <p class="wd-empty-text">Nessuna bozza in attesa.</p>
+        </div>
     {% else %}
-        <table class="table table-sm">
-            <thead>
-            <tr>
-                <th>Cantiere</th>
-                <th>Cliente</th>
-                <th>Motivo</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for d in drafts %}
-                <tr>
-                    <td>{{ d.name }}</td>
-                    <td>{{ d.client_id }}</td>
-                    <td>{{ d.draft_reason }}</td>
-                    <td class="text-right">
-                        <a href="/worksites/drafts/{{ d.id }}/activate" class="btn btn-sm btn-primary">
-                            Attiva
-                        </a>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        {% for d in drafts %}
+            <div class="wd-card">
+                <div class="wd-card-head">
+                    <div>
+                        <h3 class="wd-card-title">{{ d.worksite_code ? '[' ~ d.worksite_code ~ '] ' : '' }}{{ d.name }}</h3>
+                        <div class="wd-card-sub">
+                            <span>👤 Cliente: <b>{{ d.client_name ?: '— (id ' ~ d.client_id ~ ')' }}</b></span>
+                            {% if d.location %}<span>📍 {{ d.location }}</span>{% endif %}
+                            <span>📅 Creato: {{ d.created_at|date('d/m/Y H:i') }}</span>
+                            {% if d.created_by_username %}<span>👷 da {{ d.created_by_username }}</span>{% endif %}
+                        </div>
+                    </div>
+                    {% if d.draft_reason %}
+                        <span class="wd-reason-chip">
+                            ⚠️ {{ d.draft_reason|replace({'_': ' '})|lower|capitalize }}
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="wd-grid">
+                    {% if canSeePrices %}
+                    <div class="wd-field">
+                        <div class="wd-field-label">{% if d.is_consuntivo %}Tariffa/persona{% else %}Totale contratto{% endif %}</div>
+                        <div class="wd-field-value {{ (d.is_consuntivo ? d.prezzo_persona : d.total_offer) ?: 'is-muted' }}">
+                            {% set val = d.company_id == 1
+                                ? (d.is_consuntivo ? d.prezzo_persona : d.total_offer)
+                                : d.ext_total_offer %}
+                            {{ val ? '€ ' ~ val|number_format(2, ',', '.') : '—' }}
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="wd-field">
+                        <div class="wd-field-label">N° ordine</div>
+                        <div class="wd-field-value {{ (d.order_number ?: d.ext_order_number) ? '' : 'is-muted' }}">
+                            {{ d.order_number ?: d.ext_order_number ?: '—' }}
+                        </div>
+                    </div>
+                    <div class="wd-field">
+                        <div class="wd-field-label">Data ordine</div>
+                        <div class="wd-field-value {{ (d.order_date ?: d.ext_order_date) ? '' : 'is-muted' }}">
+                            {{ d.order_date ? d.order_date|date('d/m/Y') : (d.ext_order_date ? d.ext_order_date|date('d/m/Y') : '—') }}
+                        </div>
+                    </div>
+                    {% if d.commessa %}
+                    <div class="wd-field">
+                        <div class="wd-field-label">Commessa</div>
+                        <div class="wd-field-value">{{ d.commessa }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="wd-actions">
+                    <a href="/worksites/drafts/{{ d.id }}/edit" class="wd-btn wd-btn-edit">
+                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Modifica
+                    </a>
+                    <a href="/worksites/{{ d.id }}/activate" class="wd-btn wd-btn-activate"
+                       onclick="return confirm('Attivare il cantiere &quot;{{ d.name|e('js') }}&quot;? Verra' creato su YARD.');">
+                        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Attiva su YARD
+                    </a>
+                    <form method="POST" action="/worksites/drafts/delete" style="display:inline;"
+                          onsubmit="return confirm('Eliminare definitivamente la bozza &quot;{{ d.name|e('js') }}&quot;? Non si puo' annullare.');">
+                        <input type="hidden" name="id" value="{{ d.id }}">
+                        <button type="submit" class="wd-btn wd-btn-delete">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Elimina
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
     {% endif %}
+
 </div>
 {% endblock %}
