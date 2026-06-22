@@ -2,6 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/worksites/create_worksite.css">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
 <style>
   .wd-banner {
       background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
@@ -183,5 +184,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js" nonce="{{ cspNonce }}"></script>
 <script src="/assets/js/views/worksites/edit_worksite.js" nonce="{{ cspNonce }}"></script>
 {% endblock %}
