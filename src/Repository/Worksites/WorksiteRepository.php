@@ -61,6 +61,10 @@ final class WorksiteRepository
         string $search   = '',
         int    $limit    = 200
     ): array {
+        // Flag derivati (EXISTS molto piu' veloce di JOIN+GROUP BY per booleani):
+        //   - has_presenze: presenze interne OPPURE consorziate
+        //   - has_mezzi:    almeno un noleggio di mezzi sollevamento attivo o storico
+        // Servono sia per ordinamento ("attivi in cima") sia per i badge UI.
         $query = "
             SELECT
                 w.id,
@@ -78,7 +82,12 @@ final class WorksiteRepository
                 w.prezzo_persona,
                 w.status,
                 c.name AS client_name,
-                fs.margin
+                fs.margin,
+                (
+                    EXISTS (SELECT 1 FROM bb_presenze              p  WHERE p.worksite_id  = w.id)
+                 OR EXISTS (SELECT 1 FROM bb_presenze_consorziate  pc WHERE pc.worksite_id = w.id)
+                ) AS has_presenze,
+                EXISTS (SELECT 1 FROM bb_worksite_lifting wl WHERE wl.worksite_id = w.id) AS has_mezzi
             FROM bb_worksites w
             LEFT JOIN bb_clients c ON w.client_id = c.id
             LEFT JOIN bb_worksite_financial_status fs ON fs.worksite_id = w.id
@@ -129,8 +138,12 @@ final class WorksiteRepository
         }
 
         $query .= ' WHERE ' . implode(' AND ', $conditions);
+        // Ordinamento: prima cantieri con presenze (= operativi), poi i nuovi
+        // senza presenze. A parita' di "has_presenze" usa il codice cantiere
+        // decrescente (i piu' recenti per anno+seq sopra).
         $query .= "
             ORDER BY
+                has_presenze DESC,
                 CAST(SUBSTRING(w.worksite_code, 2, 2) AS UNSIGNED) DESC,
                 CAST(SUBSTRING_INDEX(w.worksite_code, '-', -1) AS UNSIGNED) DESC
             LIMIT :limit
