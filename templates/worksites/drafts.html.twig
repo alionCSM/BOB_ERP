@@ -153,7 +153,6 @@
                             <span>👤 Cliente: <b>{{ d.client_name ?: '— (id ' ~ d.client_id ~ ')' }}</b></span>
                             {% if d.location %}<span>📍 {{ d.location }}</span>{% endif %}
                             <span>📅 Creato: {{ d.created_at|date('d/m/Y H:i') }}</span>
-                            {% if d.created_by_username %}<span>👷 da {{ d.created_by_username }}</span>{% endif %}
                         </div>
                     </div>
                     {% if d.draft_reason %}

@@ -150,14 +150,12 @@ final class WorksiteRepository
 
     public function getDrafts(): array
     {
+        // NB: bb_worksites NON ha colonna created_by → niente JOIN su users.
         return $this->conn
             ->query("
-                SELECT w.*,
-                       c.name AS client_name,
-                       u.username AS created_by_username
+                SELECT w.*, c.name AS client_name
                 FROM bb_worksites w
                 LEFT JOIN bb_clients c ON c.id = w.client_id
-                LEFT JOIN bb_users   u ON u.id = w.created_by
                 WHERE w.is_draft = 1
                 ORDER BY w.created_at DESC
             ")

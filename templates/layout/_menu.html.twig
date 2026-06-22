@@ -182,7 +182,7 @@
                     <li><a href="/worksites/create" class="side-menu {{ currentPath == '/worksites/create' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="plus"></i></div><div class="side-menu__title">Crea Cantiere</div></a></li>
                     <li><a href="/worksites" class="side-menu {{ currentPath == '/worksites' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="list"></i></div><div class="side-menu__title">Lista Cantieri</div></a></li>
                     {% if user.canAccess('worksites_drafts') or user.id == 1 %}
-                        <li><a href="/worksites/drafts" class="side-menu {{ currentPath starts with '/worksites/drafts' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="file-clock"></i></div><div class="side-menu__title">Bozze cantieri</div></a></li>
+                        <li><a href="/worksites/drafts" class="side-menu {{ currentPath starts with '/worksites/drafts' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="alert-circle"></i></div><div class="side-menu__title">Bozze cantieri</div></a></li>
                     {% endif %}
                 </ul>
             </li>
