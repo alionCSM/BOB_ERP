@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOB Zone — {{ worksite.name }}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
@@ -207,7 +207,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     {# ── Header ── #}
     <header class="bz-header">
         <a href="/worksites/{{ worksite_id }}" class="bz-back">
-            <i class="ti ti-arrow-left"></i> Cantiere
+            <i class="fas fa-arrow-left"></i> Cantiere
         </a>
         <div class="bz-sep"></div>
         <div class="bz-brand">
@@ -221,7 +221,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire</span>
             {% elseif fieldwire_enabled %}
                 <button class="bz-fw-btn" id="btn-fw-connect">
-                    <i class="ti ti-link" style="font-size:14px"></i> Collega Fieldwire
+                    <i class="fas fa-link" style="font-size:14px"></i> Collega Fieldwire
                 </button>
             {% endif %}
         </div>
@@ -231,17 +231,17 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     <div class="bz-toolbar">
         <div class="bz-view-switcher">
             <button class="bz-view-btn active" data-view="kanban">
-                <i class="ti ti-layout-columns"></i> Kanban
+                <i class="fas fa-columns"></i> Kanban
             </button>
             <button class="bz-view-btn" data-view="gantt">
-                <i class="ti ti-chart-gantt"></i> Gantt
+                <i class="fas fa-chart-bar"></i> Gantt
             </button>
             <button class="bz-view-btn" data-view="calendar">
-                <i class="ti ti-calendar"></i> Calendario
+                <i class="fas fa-calendar-alt"></i> Calendario
             </button>
         </div>
         <button class="bz-new-btn" id="btn-new-task">
-            <i class="ti ti-plus"></i> Nuovo Task
+            <i class="fas fa-plus"></i> Nuovo Task
         </button>
     </div>
 
@@ -251,7 +251,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Kanban #}
         <div class="bz-view active" id="view-kanban">
             <div class="bz-kanban" id="bz-kanban">
-                <div class="bz-empty"><i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i></div>
+                <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
             </div>
         </div>
 
@@ -259,7 +259,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-view" id="view-gantt">
             <div class="bz-gantt">
                 <div class="bz-gantt-wrap" id="bz-gantt-content">
-                    <div class="bz-gantt-empty"><i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i></div>
+                    <div class="bz-gantt-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
                 </div>
             </div>
         </div>
@@ -270,9 +270,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-cal-header">
                     <div class="bz-cal-title" id="cal-title"></div>
                     <div class="bz-cal-nav">
-                        <button onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button>
+                        <button onclick="calNav(-1)"><i class="fas fa-chevron-left"></i></button>
                         <button onclick="calNav(0)">Oggi</button>
-                        <button onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button>
+                        <button onclick="calNav(1)"><i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
                 <div class="bz-cal-grid" id="bz-cal-grid"></div>
@@ -283,13 +283,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-detail-wrap closed" id="bz-detail-wrap">
             <div class="bz-detail-topbar">
                 <span style="font-size:12px;font-weight:600;color:#475569;">Dettaglio Task</span>
-                <button class="bz-detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
+                <button class="bz-detail-close" onclick="closeDetail()"><i class="fas fa-times"></i></button>
             </div>
             <div class="bz-detail-inner" id="bz-detail-inner"></div>
             <div class="bz-comment-input-wrap">
                 <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"
                           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendComment()}"></textarea>
-                <button class="bz-comment-send" onclick="sendComment()"><i class="ti ti-send"></i></button>
+                <button class="bz-comment-send" onclick="sendComment()"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
 
@@ -357,8 +357,15 @@ let calMonth = new Date().getMonth();
 
 /* ── API ── */
 async function api(url, opts = {}) {
-    const r = await fetch(url, { ...opts });
-    return r.json();
+    try {
+        const r = await fetch(url, { ...opts });
+        const text = await r.text();
+        try { return JSON.parse(text); }
+        catch { console.error('Non-JSON response from', url, text.slice(0, 200)); return { ok: false, error: 'Risposta non valida dal server' }; }
+    } catch (e) {
+        console.error('Fetch error', url, e);
+        return { ok: false, error: e.message };
+    }
 }
 
 /* ── Data ── */
@@ -403,7 +410,7 @@ function renderKanban() {
             </div>
             <div class="bz-col-add">
                 <button class="bz-col-add-btn" onclick="quickAdd('${col.key}')">
-                    <i class="ti ti-plus" style="font-size:13px"></i> Aggiungi
+                    <i class="fas fa-plus" style="font-size:13px"></i> Aggiungi
                 </button>
             </div>
         </div>
@@ -416,8 +423,8 @@ function cardHtml(t) {
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" onclick="openTask(${t.id})">
             <div class="bz-card-name">${t.name}</div>
             <div class="bz-card-foot">
-                ${t.assignee_name ? `<span class="bz-card-user"><i class="ti ti-user" style="font-size:11px"></i>${t.assignee_name}</span>` : ''}
-                ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="ti ti-calendar" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
+                ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${t.assignee_name}</span>` : ''}
+                ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
             </div>
         </div>`;
 }
@@ -565,9 +572,9 @@ async function openTask(id) {
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Info</div>
-            ${task.assignee_name ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="ti ti-user" style="font-size:13px;vertical-align:-2px"></i> ${task.assignee_name}</div>` : ''}
-            ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="ti ti-calendar" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
-            ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="ti ti-calendar-due" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
+            ${task.assignee_name ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i> ${task.assignee_name}</div>` : ''}
+            ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-calendar-alt" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
+            ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="fas fa-calendar-check" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
             ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5">${task.description}</p>` : ''}
         </div>
 
@@ -578,7 +585,7 @@ async function openTask(id) {
             </div>
             <div class="bz-check-add">
                 <input id="new-check-input" placeholder="Nuovo elemento..." onkeydown="if(event.key==='Enter')addCheck(${id})">
-                <button onclick="addCheck(${id})"><i class="ti ti-plus"></i></button>
+                <button onclick="addCheck(${id})"><i class="fas fa-plus"></i></button>
             </div>
         </div>
 
@@ -775,10 +782,9 @@ document.querySelectorAll('.bz-view-btn').forEach(btn => {
     });
 });
 
-document.getElementById('btn-new-task').addEventListener('click', openModal);
+document.getElementById('btn-new-task')?.addEventListener('click', openModal);
 
-// Close modal on backdrop click
-document.getElementById('task-modal').addEventListener('click', e => {
+document.getElementById('task-modal')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
 });
 
