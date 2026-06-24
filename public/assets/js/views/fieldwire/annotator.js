@@ -107,6 +107,20 @@
         dom.svg.addEventListener('pointerdown', onPointerDown);
         dom.svg.addEventListener('pointermove', onPointerMove);
         dom.svg.addEventListener('pointerup', onPointerUp);
+        // zoom con rotella, ancorato al cursore
+        dom.stagewrap.addEventListener('wheel', e => {
+            if (!S || !dom.ov.classList.contains('open')) return;
+            e.preventDefault();
+            const before = dom.stage.getBoundingClientRect();
+            const fx = (e.clientX - before.left) / before.width;
+            const fy = (e.clientY - before.top) / before.height;
+            const prev = S.zoom;
+            setZoom(S.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15));
+            if (S.zoom === prev) return; // clamp raggiunto
+            const after = dom.stage.getBoundingClientRect();
+            dom.stagewrap.scrollLeft += (after.left + fx * after.width)  - e.clientX;
+            dom.stagewrap.scrollTop  += (after.top  + fy * after.height) - e.clientY;
+        }, { passive: false });
         // ESC chiude
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape' && S && dom.ov.classList.contains('open')) close();
@@ -247,13 +261,17 @@
 
     function applyStageSize() {
         const wrapW = dom.stagewrap.clientWidth - 48;
-        const baseW = Math.min(wrapW, S.natW); // non oltre la larghezza naturale
+        // SVG vettoriale (DWG/DXF): riempi la larghezza disponibile, nessun cap
+        // (lo zoom non sgrana). Raster (PDF/immagine): non upscalare oltre il
+        // naturale per non sfocare.
+        const baseW = S.dwg ? wrapW : Math.min(wrapW, S.natW || wrapW);
         const w = Math.max(200, baseW * S.zoom);
         dom.stage.style.width = w + 'px';
     }
 
     function setZoom(z) {
-        S.zoom = Math.max(0.25, Math.min(6, z));
+        // i disegni CAD richiedono molto zoom per leggere i dettagli
+        S.zoom = Math.max(0.25, Math.min(40, z));
         applyStageSize();
     }
 
