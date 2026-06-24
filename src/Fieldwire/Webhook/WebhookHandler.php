@@ -3,20 +3,26 @@ declare(strict_types=1);
 
 namespace App\Fieldwire\Webhook;
 
-use App\Repository\Fieldwire\FwBubbleRepository;
-use App\Repository\Fieldwire\FwCheckItemRepository;
 use App\Repository\Fieldwire\FwFloorplanRepository;
-use App\Repository\Fieldwire\FwTaskRepository;
+use App\Repository\Fieldwire\ZoneTaskRepository;
 use App\Repository\Worksites\WorksiteRepository;
 use RuntimeException;
 
+/**
+ * Aggiorna le tabelle BOB-native (bb_zone_*) ricevendo eventi Fieldwire.
+ *
+ * Resolution chain per ogni evento:
+ *   project_id (Fieldwire) → worksite_id (BOB) via WorksiteRepo
+ *   task fw_id              → bb_zone_tasks.id   via ZoneTaskRepo::findByFwId()
+ *
+ * Per i floorplans usiamo ancora bb_fw_floorplans perche' non hanno
+ * controparte BOB-native (sono metadata link).
+ */
 class WebhookHandler
 {
     public function __construct(
         private WorksiteRepository    $worksiteRepo,
-        private FwTaskRepository      $taskRepo,
-        private FwCheckItemRepository $checkRepo,
-        private FwBubbleRepository    $bubbleRepo,
+        private ZoneTaskRepository    $zoneRepo,
         private FwFloorplanRepository $floorplanRepo
     ) {}
 
@@ -42,85 +48,96 @@ class WebhookHandler
         };
     }
 
-    // ── Resolves worksite_id from the Fieldwire project_id in the payload ──────
-
     private function worksiteId(array $event): ?int
     {
         $fwProjectId = $event['project_id'] ?? null;
         if (!$fwProjectId) return null;
-
-        $stmt = $this->worksiteRepo->findByFieldwireProjectId($fwProjectId);
-        return $stmt ? (int) $stmt['id'] : null;
+        $row = $this->worksiteRepo->findByFieldwireProjectId($fwProjectId);
+        return $row ? (int)$row['id'] : null;
     }
 
-    // ── Handlers ──────────────────────────────────────────────────────────────
+    /** Risolve l'id BOB del task dato il fw_id (per check items/bubbles). */
+    private function bobTaskId(string $fwTaskId): ?int
+    {
+        if ($fwTaskId === '') return null;
+        $row = $this->zoneRepo->findByFwId($fwTaskId);
+        return $row ? (int)$row['id'] : null;
+    }
+
+    // ─── Tasks ────────────────────────────────────────────────────────────────
 
     private function onTask(array $event): string
     {
         $type = $event['event_type'];
         $data = $event['data'] ?? [];
         $wid  = $this->worksiteId($event);
-
         if (!$wid || empty($data['id'])) return "task:skip";
 
         if ($type === 'task.deleted') {
-            $this->taskRepo->deleteByFwId($data['id']);
+            $this->zoneRepo->deleteByFwId((string)$data['id']);
             return 'task:deleted';
         }
-
-        $this->taskRepo->upsert($wid, $data);
+        $this->zoneRepo->upsertFromFieldwire($wid, $data);
         return "task:{$type}";
     }
+
+    // ─── Check items ──────────────────────────────────────────────────────────
 
     private function onCheckItem(array $event): string
     {
         $type = $event['event_type'];
         $data = $event['data'] ?? [];
-        $wid  = $this->worksiteId($event);
-
-        if (!$wid || empty($data['id'])) return "check_item:skip";
+        if (empty($data['id'])) return "check_item:skip";
 
         if ($type === 'check_item.deleted') {
-            $this->checkRepo->deleteByFwId($data['id']);
+            $this->zoneRepo->deleteChecklistItemByFwId((string)$data['id']);
             return 'check_item:deleted';
         }
 
-        $fwTaskId = $data['task_id'] ?? '';
-        $this->checkRepo->upsert($wid, $fwTaskId, $data);
+        $bobTaskId = $this->bobTaskId((string)($data['task_id'] ?? ''));
+        if (!$bobTaskId) return "check_item:no-task";
+
+        $this->zoneRepo->upsertChecklistItemFromFieldwire($bobTaskId, $data);
         return "check_item:{$type}";
     }
+
+    // ─── Bubbles (comments) ───────────────────────────────────────────────────
 
     private function onBubble(array $event): string
     {
         $type = $event['event_type'];
         $data = $event['data'] ?? [];
-        $wid  = $this->worksiteId($event);
-
-        if (!$wid || empty($data['id'])) return "bubble:skip";
+        if (empty($data['id'])) return "bubble:skip";
 
         if ($type === 'bubble.deleted') {
-            $this->bubbleRepo->deleteByFwId($data['id']);
+            $this->zoneRepo->deleteCommentByFwId((string)$data['id']);
             return 'bubble:deleted';
         }
 
-        $fwTaskId = $data['task_id'] ?? '';
-        $this->bubbleRepo->upsert($wid, $fwTaskId, $data);
+        // Solo i comment vengono importati come comment BOB. Photo/attachment
+        // li lasciamo come future enhancement (servono i file URL gestiti).
+        if (($data['kind'] ?? 'comment') !== 'comment') return "bubble:skip-kind";
+
+        $bobTaskId = $this->bobTaskId((string)($data['task_id'] ?? ''));
+        if (!$bobTaskId) return "bubble:no-task";
+
+        $this->zoneRepo->upsertCommentFromFieldwire($bobTaskId, $data);
         return "bubble:{$type}";
     }
+
+    // ─── Floorplans (cache locale) ────────────────────────────────────────────
 
     private function onFloorplan(array $event): string
     {
         $type = $event['event_type'];
         $data = $event['data'] ?? [];
         $wid  = $this->worksiteId($event);
-
         if (!$wid || empty($data['id'])) return "floorplan:skip";
 
         if ($type === 'floorplan.deleted') {
-            $this->floorplanRepo->deleteByFwId($data['id']);
+            $this->floorplanRepo->deleteByFwId((string)$data['id']);
             return 'floorplan:deleted';
         }
-
         $this->floorplanRepo->upsert($wid, $data);
         return "floorplan:{$type}";
     }

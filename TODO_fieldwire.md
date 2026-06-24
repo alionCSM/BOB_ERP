@@ -289,10 +289,10 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
 
 ### 🔴 Prima di poter usare in produzione
 
-- [ ] Configurare `.env`: `FIELDWIRE_API_TOKEN` e `FIELDWIRE_REGION=eu`
-- [ ] Eseguire `vendor/bin/phinx migrate` su produzione (3 migration)
-- [ ] In `WorksitesController::show()` passare `fieldwire_project_id` e `fieldwire_enabled`
-      alla view `worksites/view.html.twig` (serve per mostrare il badge "collegato" nel bottone)
+- [ ] Configurare `.env`: `FIELDWIRE_API_TOKEN` e `FIELDWIRE_REGION=eu` (opzionale — BOB Zone funziona anche senza)
+- [ ] Eseguire `vendor/bin/phinx migrate` su produzione (4 migration)
+- [x] In `WorksitesController::show()` passare `fieldwire_project_id` e `fieldwire_enabled` alla view
+- [x] Badge "FW" sul bottone BOB Zone quando il cantiere è collegato
 - [ ] Testare e verificare che il bottone BOB Zone funzioni su server reale
 - [ ] Verificare che la pagina BOB Zone carichi correttamente (task vuoti = 4 colonne Kanban)
 - [ ] Testare creazione task da BOB Zone
@@ -304,22 +304,20 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
       `app.fieldwire.com` → Impostazioni account → Webhooks → aggiungi URL
 - [ ] Verificare che `InitialSyncService` non vada in timeout (se molti task)
       Soluzione: aggiungere paginazione o eseguire in background
-- [ ] Fare il push dei task `bb_zone_tasks` esistenti → Fieldwire al momento della connessione
-- [ ] `WebhookHandler` aggiornare anche `bb_zone_tasks` oltre a `bb_fw_tasks`
-      quando arrivano eventi da Fieldwire
+- [x] Fare il push dei task `bb_zone_tasks` esistenti → Fieldwire al momento della connessione (OutboundSyncService)
+- [x] `WebhookHandler` aggiornare `bb_zone_*` (riscritto in base alla nuova architettura)
+- [x] Architettura unificata: bb_zone_* sono la SoT, bb_fw_tasks/check_items/bubbles deprecate
 
-### 🟡 BOB Zone UX mancante
+### 🟡 BOB Zone UX
 
-- [ ] **Modifica task** — form per aggiornare nome, assegnatario, date, categoria
-      - Aggiungere endpoint `POST /zone/tasks/{id}/update`
-      - UI: bottone "Modifica" nel pannello dettaglio
-- [ ] **Elimina task** — bottone con conferma nel pannello dettaglio
-- [ ] **Elimina commento** — bottone X su ogni commento
-- [ ] **Elimina elemento checklist** — bottone X su ogni riga
-- [ ] **Drag & drop Kanban** — spostare card tra colonne aggiorna status
-      (attualmente si cambia status solo dai bottoni nel dettaglio)
-- [ ] **Filtri** — per status, assegnatario, data nel Kanban
-- [ ] **Assegnatario** — dropdown utenti BOB invece di testo libero
+- [x] **Modifica task** — endpoint `POST /zone/tasks/{id}/update` + modal "Modifica" nel pannello dettaglio
+- [x] **Elimina task** — bottone con conferma + push delete su Fieldwire
+- [x] **Elimina commento** — endpoint + bottone × + push delete su Fieldwire
+- [x] **Elimina elemento checklist** — endpoint + bottone × + push delete su Fieldwire
+- [x] **Drag & drop Kanban** — drag card tra colonne aggiorna status
+- [x] **Assegnatario** — dropdown utenti BOB via endpoint `/zone/users`
+- [ ] **Filtri Kanban** — per status, assegnatario, data
+- [ ] **Ricerca task** per testo
 
 ### 🟡 Tavole (Floorplans)
 

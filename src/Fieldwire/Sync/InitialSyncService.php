@@ -7,14 +7,15 @@ use App\Fieldwire\Api\BubblesApi;
 use App\Fieldwire\Api\CheckItemsApi;
 use App\Fieldwire\Api\FloorplansApi;
 use App\Fieldwire\Api\TasksApi;
-use App\Repository\Fieldwire\FwBubbleRepository;
-use App\Repository\Fieldwire\FwCheckItemRepository;
 use App\Repository\Fieldwire\FwFloorplanRepository;
-use App\Repository\Fieldwire\FwTaskRepository;
+use App\Repository\Fieldwire\ZoneTaskRepository;
 
 /**
- * Pulls all existing Fieldwire data into BOB's local tables.
- * Called once when a worksite is first connected to Fieldwire.
+ * Pull dei dati Fieldwire dentro le tabelle BOB-native (bb_zone_*).
+ * Eseguito una sola volta quando un cantiere viene collegato a Fieldwire.
+ *
+ * NB: i floorplans restano su bb_fw_floorplans perche' non hanno una
+ * controparte BOB-native (sono solo metadati per linkare ai sheet Fieldwire).
  */
 class InitialSyncService
 {
@@ -23,42 +24,53 @@ class InitialSyncService
         private CheckItemsApi         $checkItemsApi,
         private BubblesApi            $bubblesApi,
         private FloorplansApi         $floorplansApi,
-        private FwTaskRepository      $taskRepo,
-        private FwCheckItemRepository $checkRepo,
-        private FwBubbleRepository    $bubbleRepo,
+        private ZoneTaskRepository    $zoneRepo,
         private FwFloorplanRepository $floorplanRepo
     ) {}
 
-    public function run(int $worksiteId, string $fwProjectId): void
+    /**
+     * @return array{tasks_imported:int, checks_imported:int, comments_imported:int, floorplans_imported:int}
+     */
+    public function run(int $worksiteId, string $fwProjectId): array
     {
-        $this->syncTasks($worksiteId, $fwProjectId);
-        $this->syncFloorplans($worksiteId, $fwProjectId);
-    }
+        $stats = ['tasks_imported' => 0, 'checks_imported' => 0, 'comments_imported' => 0, 'floorplans_imported' => 0];
 
-    private function syncTasks(int $worksiteId, string $fwProjectId): void
-    {
+        // tasks + figli
         $tasks = $this->tasksApi->all($fwProjectId);
-
         foreach ($tasks as $task) {
-            $this->taskRepo->upsert($worksiteId, $task);
+            try {
+                $bobTaskId = $this->zoneRepo->upsertFromFieldwire($worksiteId, $task);
+                $stats['tasks_imported']++;
 
-            $checkItems = $this->checkItemsApi->allForTask($fwProjectId, $task['id']);
-            foreach ($checkItems as $ci) {
-                $this->checkRepo->upsert($worksiteId, $task['id'], $ci);
-            }
+                // check items
+                foreach ($this->checkItemsApi->allForTask($fwProjectId, $task['id']) as $ci) {
+                    $this->zoneRepo->upsertChecklistItemFromFieldwire($bobTaskId, $ci);
+                    $stats['checks_imported']++;
+                }
 
-            $bubbles = $this->bubblesApi->allForTask($fwProjectId, $task['id']);
-            foreach ($bubbles as $b) {
-                $this->bubbleRepo->upsert($worksiteId, $task['id'], $b);
+                // bubbles → solo i comment (kind=comment), photo/attachment li lasciamo
+                // ai webhook successivi per ora
+                foreach ($this->bubblesApi->allForTask($fwProjectId, $task['id']) as $b) {
+                    if (($b['kind'] ?? 'comment') !== 'comment') continue;
+                    $this->zoneRepo->upsertCommentFromFieldwire($bobTaskId, $b);
+                    $stats['comments_imported']++;
+                }
+            } catch (\Throwable $e) {
+                // un singolo task rotto non deve bloccare l'intera sync
+                error_log("[Fieldwire InitialSync] task {$task['id']} skipped: " . $e->getMessage());
             }
         }
-    }
 
-    private function syncFloorplans(int $worksiteId, string $fwProjectId): void
-    {
-        $floorplans = $this->floorplansApi->all($fwProjectId);
-        foreach ($floorplans as $fp) {
-            $this->floorplanRepo->upsert($worksiteId, $fp);
+        // floorplans (cache locale, non BOB-native)
+        foreach ($this->floorplansApi->all($fwProjectId) as $fp) {
+            try {
+                $this->floorplanRepo->upsert($worksiteId, $fp);
+                $stats['floorplans_imported']++;
+            } catch (\Throwable $e) {
+                error_log("[Fieldwire InitialSync] floorplan {$fp['id']} skipped: " . $e->getMessage());
+            }
         }
+
+        return $stats;
     }
 }

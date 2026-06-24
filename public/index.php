@@ -366,13 +366,17 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/disable',                                                 [FieldwireController::class, 'disable'])
            ->get( '/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'tasks'])
            ->post('/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'createTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/update',                                   [FieldwireController::class, 'updateTask'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/status',                                   [FieldwireController::class, 'updateTaskStatus'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/delete',                                   [FieldwireController::class, 'deleteTask'])
            ->get( '/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'comments'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'postComment'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments/{commentId}/delete',              [FieldwireController::class, 'deleteComment'])
            ->get( '/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'checklist'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'addChecklistItem'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
+           ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
            ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans']);
 
     $router->dispatch($request, $container);

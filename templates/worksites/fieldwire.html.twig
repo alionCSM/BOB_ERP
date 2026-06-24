@@ -325,7 +325,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-modal-row">
             <div class="bz-modal-field">
                 <label>Assegnato a</label>
-                <input type="text" id="task-assignee" placeholder="Nome persona">
+                <select id="task-assignee">
+                    <option value="">— nessuno —</option>
+                </select>
             </div>
             <div class="bz-modal-field">
                 <label>Scadenza</label>
@@ -341,6 +343,67 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="btn-modal-cancel">Annulla</button>
             <button class="bz-modal-submit" id="btn-modal-submit">Crea Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════ EDIT TASK MODAL ════════ -->
+<div class="bz-overlay hidden" id="task-edit-modal">
+    <div class="bz-modal">
+        <h3>Modifica Task</h3>
+        <input type="hidden" id="edit-task-id">
+        <div class="bz-modal-field">
+            <label>Nome *</label>
+            <input type="text" id="edit-task-name">
+        </div>
+        <div class="bz-modal-field">
+            <label>Descrizione</label>
+            <textarea id="edit-task-desc"></textarea>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Status</label>
+                <select id="edit-task-status">
+                    <option value="open">Aperto</option>
+                    <option value="in_progress">In corso</option>
+                    <option value="complete">Completato</option>
+                    <option value="verified">Verificato</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Categoria</label>
+                <input type="text" id="edit-task-cat">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Assegnato a</label>
+                <select id="edit-task-assignee">
+                    <option value="">— nessuno —</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Scadenza</label>
+                <input type="date" id="edit-task-due">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Data inizio</label>
+                <input type="date" id="edit-task-start">
+            </div>
+            <div class="bz-modal-field">
+                <label>Priorità</label>
+                <select id="edit-task-priority">
+                    <option value="0">Normale</option>
+                    <option value="1">Alta</option>
+                    <option value="2">Urgente</option>
+                </select>
+            </div>
+        </div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="btn-edit-cancel">Annulla</button>
+            <button class="bz-modal-submit" id="btn-edit-submit">Salva modifiche</button>
         </div>
     </div>
 </div>
@@ -420,10 +483,10 @@ function renderKanban() {
 function cardHtml(t) {
     const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete';
     return `
-        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}">
-            <div class="bz-card-name">${t.name}</div>
+        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
+            <div class="bz-card-name">${escHtml(t.name)}</div>
             <div class="bz-card-foot">
-                ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${t.assignee_name}</span>` : ''}
+                ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
             </div>
         </div>`;
@@ -554,9 +617,17 @@ async function openTask(id) {
     const inner = document.getElementById('bz-detail-inner');
     inner.innerHTML = `
         <div class="bz-detail-section">
-            <input class="bz-detail-title-input" value="${task.name}"
+            <input class="bz-detail-title-input" value="${escHtml(task.name)}"
                    data-task-name-id="${id}">
-            ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${task.category}</div>` : ''}
+            ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${escHtml(task.category)}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="bz-task-action-btn" data-edit-task="${id}" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-pen" style="font-size:11px"></i> Modifica
+                </button>
+                <button class="bz-task-action-btn" data-delete-task="${id}" style="background:#1e293b;color:#fca5a5;border:1px solid #471515;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-trash" style="font-size:11px"></i> Elimina
+                </button>
+            </div>
         </div>
 
         <div class="bz-detail-section">
@@ -622,15 +693,7 @@ async function setStatus(taskId, status) {
     });
 }
 
-function updateTaskName(taskId, name) {
-    if (!name.trim()) return;
-    const task = allTasks.find(t => t.id == taskId);
-    if (task) task.name = name;
-    api(`/worksites/${WID}/zone/tasks/${taskId}/status`, { // reuse status endpoint (name update not yet needed as separate endpoint)
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: task?.status || 'open' }),
-    });
-}
+/* updateTaskName moved below, ora usa /update con il payload completo */
 
 /* ── Checklist ── */
 async function loadChecklist(taskId) {
@@ -640,10 +703,13 @@ async function loadChecklist(taskId) {
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
     if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun elemento.</div>'; return; }
     el.innerHTML = items.map(c => `
-        <div class="bz-check-row" id="crow-${c.id}">
+        <div class="bz-check-row" id="crow-${c.id}" style="display:flex;align-items:center;gap:6px;">
             <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
                    data-toggle-check="${taskId}:${c.id}">
-            <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}">${c.name}</label>
+            <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}" style="flex:1;">${escHtml(c.name)}</label>
+            <button class="bz-x-btn" data-delete-check="${taskId}:${c.id}"
+                    title="Elimina elemento"
+                    style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:2px 6px;line-height:1;">×</button>
         </div>`).join('');
 }
 
@@ -669,6 +735,115 @@ async function addCheck(taskId) {
     if (res.ok) { inp.value = ''; loadChecklist(taskId); }
 }
 
+async function deleteCheck(taskId, itemId) {
+    if (!confirm('Eliminare questo elemento della checklist?')) return;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist/${itemId}/delete`, { method: 'POST' });
+    loadChecklist(taskId);
+}
+
+async function deleteComment(taskId, commentId) {
+    if (!confirm('Eliminare questo commento?')) return;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/comments/${commentId}/delete`, { method: 'POST' });
+    loadComments(taskId);
+}
+
+async function deleteTask(taskId) {
+    if (!confirm('Eliminare definitivamente questo task? Tutti i commenti e checklist saranno persi.')) return;
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/delete`, { method: 'POST' });
+    if (res.ok) {
+        allTasks = allTasks.filter(t => t.id != taskId);
+        closeDetail();
+        renderCurrentView();
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile eliminare'));
+    }
+}
+
+/* ══════════ EDIT TASK MODAL ══════════ */
+function openEditModal(taskId) {
+    const t = allTasks.find(x => x.id == taskId);
+    if (!t) return;
+    document.getElementById('edit-task-id').value       = t.id;
+    document.getElementById('edit-task-name').value     = t.name || '';
+    document.getElementById('edit-task-desc').value     = t.description || '';
+    document.getElementById('edit-task-status').value   = t.status || 'open';
+    document.getElementById('edit-task-cat').value      = t.category || '';
+    document.getElementById('edit-task-due').value      = t.due_date   || '';
+    document.getElementById('edit-task-start').value    = t.start_date || '';
+    document.getElementById('edit-task-priority').value = String(t.priority ?? 0);
+    // assignee select: aggiungi opzione fittizia se non c'e' (es. nome libero da Fieldwire)
+    const sel = document.getElementById('edit-task-assignee');
+    if (t.assignee_name && ![...sel.options].some(o => o.value === t.assignee_name)) {
+        const opt = document.createElement('option');
+        opt.value = t.assignee_name;
+        opt.textContent = t.assignee_name + ' (custom)';
+        sel.appendChild(opt);
+    }
+    sel.value = t.assignee_name || '';
+    document.getElementById('task-edit-modal').classList.remove('hidden');
+    document.getElementById('edit-task-name').focus();
+}
+function closeEditModal() {
+    document.getElementById('task-edit-modal').classList.add('hidden');
+}
+
+async function submitEdit() {
+    const id = parseInt(document.getElementById('edit-task-id').value);
+    const body = {
+        name:          document.getElementById('edit-task-name').value.trim(),
+        description:   document.getElementById('edit-task-desc').value,
+        status:        document.getElementById('edit-task-status').value,
+        category:      document.getElementById('edit-task-cat').value || null,
+        assignee_name: document.getElementById('edit-task-assignee').value || null,
+        due_date:      document.getElementById('edit-task-due').value   || null,
+        start_date:    document.getElementById('edit-task-start').value || null,
+        priority:      parseInt(document.getElementById('edit-task-priority').value || '0'),
+    };
+    if (!body.name) { document.getElementById('edit-task-name').focus(); return; }
+
+    const btn = document.getElementById('btn-edit-submit');
+    btn.disabled = true; btn.textContent = '...';
+    const res = await api(`/worksites/${WID}/zone/tasks/${id}/update`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    btn.disabled = false; btn.textContent = 'Salva modifiche';
+
+    if (res.ok) {
+        // sostituisci il task locale
+        const idx = allTasks.findIndex(t => t.id == id);
+        if (idx >= 0) allTasks[idx] = res.data;
+        closeEditModal();
+        renderCurrentView();
+        openTask(id);
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile aggiornare'));
+    }
+}
+
+/* Override updateTaskName per usare l'endpoint giusto (era bacato — chiamava /status) */
+function updateTaskName(taskId, name) {
+    if (!name.trim()) return;
+    const task = allTasks.find(t => t.id == taskId);
+    if (!task) return;
+    task.name = name;
+    api(`/worksites/${WID}/zone/tasks/${taskId}/update`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, name }),
+    });
+}
+
+/* ══════════ BOB USERS DROPDOWN ══════════ */
+async function loadBobUsers() {
+    const res = await api(`/worksites/${WID}/zone/users`);
+    if (!res.ok || !Array.isArray(res.data)) return;
+    const html = res.data.map(u => `<option value="${escAttr(u.label)}">${escHtml(u.label)}</option>`).join('');
+    document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
+        // mantieni l'opzione vuota di default
+        sel.innerHTML = '<option value="">— nessuno —</option>' + html;
+    });
+}
+
 /* ── Comments ── */
 async function loadComments(taskId) {
     const res  = await api(`/worksites/${WID}/zone/tasks/${taskId}/comments`);
@@ -681,10 +856,13 @@ async function loadComments(taskId) {
             <div class="bz-comment-avatar">${initials(c.author_name)}</div>
             <div class="bz-comment-body">
                 <div class="bz-comment-meta">
-                    <span class="bz-comment-author">${c.author_name || '?'}</span>
+                    <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
+                    <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
+                            title="Elimina commento"
+                            style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
                 </div>
-                <div class="bz-comment-text">${c.text || ''}</div>
+                <div class="bz-comment-text">${escHtml(c.text || '')}</div>
             </div>
         </div>`).join('');
     el.scrollTop = el.scrollHeight;
@@ -810,9 +988,34 @@ document.getElementById('btn-fw-connect')?.addEventListener('click', async () =>
     else { alert('Errore: ' + (res.error || 'sconosciuto')); if (btn) btn.disabled = false; }
 });
 
+// Edit modal buttons
+document.getElementById('btn-edit-cancel')?.addEventListener('click', () => closeEditModal());
+document.getElementById('btn-edit-submit')?.addEventListener('click', () => submitEdit());
+document.getElementById('task-edit-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeEditModal();
+});
+
 // Event delegation for dynamically generated elements
 document.addEventListener('click', e => {
     const t = e.target;
+
+    // X buttons FIRST (otherwise the card/task-id wrapper catches the click)
+    const delCheck = t.closest('[data-delete-check]');
+    if (delCheck) {
+        e.stopPropagation();
+        const [tid, iid] = delCheck.dataset.deleteCheck.split(':').map(Number);
+        deleteCheck(tid, iid); return;
+    }
+    const delComment = t.closest('[data-delete-comment]');
+    if (delComment) {
+        e.stopPropagation();
+        const [tid, cid] = delComment.dataset.deleteComment.split(':').map(Number);
+        deleteComment(tid, cid); return;
+    }
+    const editTask = t.closest('[data-edit-task]');
+    if (editTask) { e.stopPropagation(); openEditModal(parseInt(editTask.dataset.editTask)); return; }
+    const delTask = t.closest('[data-delete-task]');
+    if (delTask)  { e.stopPropagation(); deleteTask(parseInt(delTask.dataset.deleteTask)); return; }
 
     // Open task from card / gantt / calendar
     const taskEl = t.closest('[data-task-id]');
@@ -829,6 +1032,52 @@ document.addEventListener('click', e => {
     // Add checklist item button
     const acEl = t.closest('[data-add-check]');
     if (acEl) { addCheck(parseInt(acEl.dataset.addCheck)); return; }
+});
+
+/* ══════════ DRAG & DROP KANBAN ══════════ */
+let dragTaskId = null;
+
+document.addEventListener('dragstart', e => {
+    const card = e.target.closest && e.target.closest('.bz-card');
+    if (!card) return;
+    dragTaskId = parseInt(card.dataset.taskId);
+    card.style.opacity = '0.4';
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+});
+document.addEventListener('dragend', e => {
+    const card = e.target.closest && e.target.closest('.bz-card');
+    if (card) card.style.opacity = '';
+    dragTaskId = null;
+    document.querySelectorAll('.bz-cards.dnd-over').forEach(el => el.classList.remove('dnd-over'));
+});
+document.addEventListener('dragover', e => {
+    const col = e.target.closest && e.target.closest('.bz-cards');
+    if (!col || dragTaskId === null) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.bz-cards.dnd-over').forEach(el => el.classList.remove('dnd-over'));
+    col.classList.add('dnd-over');
+});
+document.addEventListener('drop', e => {
+    const col = e.target.closest && e.target.closest('.bz-cards');
+    if (!col || dragTaskId === null) return;
+    e.preventDefault();
+    col.classList.remove('dnd-over');
+
+    // ricava lo status dalla colonna (id="col-<status>")
+    const status = (col.id || '').replace('col-', '');
+    if (!status) return;
+    const taskId = dragTaskId;
+    dragTaskId = null;
+
+    // ottimistico: muovi il task in memoria + ridisegna
+    const task = allTasks.find(t => t.id == taskId);
+    if (task && task.status !== status) {
+        task.status = status;
+        renderCurrentView();
+        // poi server
+        setStatus(taskId, status);
+    }
 });
 
 document.addEventListener('change', e => {
@@ -852,6 +1101,11 @@ document.addEventListener('blur', e => {
 }, true);
 
 /* ══════════ UTILS ══════════ */
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escAttr(s) { return escHtml(s); }
+
 function initials(name) {
     return (name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -871,6 +1125,15 @@ function fmtDate(str) {
 /* ══════════ INIT ══════════ */
 loadTasks();
 renderCalendar();
+loadBobUsers();
 </script>
+
+<style>
+/* Drag & drop highlight per le colonne Kanban (style inline per non dover
+   toccare il CSS principale; safe perche' usato solo in BOB Zone). */
+.bz-cards.dnd-over { background: rgba(96, 165, 250, 0.10); outline: 2px dashed rgba(96, 165, 250, 0.45); outline-offset: -4px; border-radius: 8px; }
+.bz-card[draggable="true"] { cursor: grab; }
+.bz-card[draggable="true"]:active { cursor: grabbing; }
+</style>
 </body>
 </html>
