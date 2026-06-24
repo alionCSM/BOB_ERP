@@ -11,6 +11,7 @@ use App\Fieldwire\Sync\InitialSyncService;
 use App\Fieldwire\Sync\ProjectSync;
 use App\Fieldwire\Webhook\WebhookHandler;
 use App\Http\Request;
+use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Repository\Fieldwire\FwBubbleRepository;
 use App\Repository\Fieldwire\FwCheckItemRepository;
@@ -28,8 +29,7 @@ final class FieldwireController
     public function __construct(
         private Config             $config,
         private WorksiteRepository $worksiteRepo,
-        private \PDO               $conn,
-        private \Twig\Environment  $twig
+        private \PDO               $conn
     ) {
         $this->taskRepo      = new FwTaskRepository($conn);
         $this->checkRepo     = new FwCheckItemRepository($conn);
@@ -46,11 +46,10 @@ final class FieldwireController
 
         if (!$worksite) {
             http_response_code(404);
-            echo $this->twig->render('errors/404.html.twig');
-            return;
+            exit;
         }
 
-        echo $this->twig->render('worksites/fieldwire.html.twig', [
+        Response::view('worksites/fieldwire.html.twig', $request, [
             'worksite_id'          => $worksiteId,
             'worksite'             => $worksite,
             'fieldwire_project_id' => $worksite['fieldwire_project_id'] ?? null,
