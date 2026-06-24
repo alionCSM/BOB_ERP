@@ -173,22 +173,23 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 ══════════════════════════ */
 .bz-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .bz-overlay.hidden { display: none; }
-.bz-modal { background: #1e293b; border: 1px solid #273548; border-radius: 12px; padding: 24px; width: 440px; max-width: 95vw; }
-.bz-modal h3 { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 16px; }
+.bz-modal { background: #fff; border-radius: 14px; padding: 28px; width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.bz-modal h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 20px; }
 .bz-modal-field { margin-bottom: 14px; }
-.bz-modal-field label { display: block; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.bz-modal-field label { display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
 .bz-modal-field input,
 .bz-modal-field select,
-.bz-modal-field textarea { width: 100%; background: #0f172a; border: 1px solid #273548; border-radius: 7px; padding: 8px 12px; font-size: 13px; color: #e2e8f0; font-family: inherit; outline: none; transition: border-color .15s; }
+.bz-modal-field textarea { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #1e293b; font-family: inherit; outline: none; transition: border-color .15s; }
 .bz-modal-field input:focus,
 .bz-modal-field select:focus,
-.bz-modal-field textarea:focus { border-color: #334155; }
+.bz-modal-field textarea:focus { border-color: #94a3b8; background: #fff; }
 .bz-modal-field textarea { resize: vertical; min-height: 80px; }
-.bz-modal-field select option { background: #1e293b; }
 .bz-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .bz-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
-.bz-modal-cancel { background: none; border: 1px solid #273548; border-radius: 7px; padding: 8px 16px; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit; }
-.bz-modal-submit { background: #4ade80; border: none; border-radius: 7px; padding: 8px 20px; color: #0f172a; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.bz-modal-cancel { background: #f1f5f9; border: none; border-radius: 8px; padding: 9px 18px; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500; }
+.bz-modal-cancel:hover { background: #e2e8f0; }
+.bz-modal-submit { background: #0f172a; border: none; border-radius: 8px; padding: 9px 22px; color: #4ade80; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.bz-modal-submit:hover { background: #1e293b; }
 
 /* ── Misc ── */
 .bz-empty { padding: 40px; text-align: center; font-size: 13px; color: #334155; width: 100%; }
@@ -270,9 +271,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-cal-header">
                     <div class="bz-cal-title" id="cal-title"></div>
                     <div class="bz-cal-nav">
-                        <button onclick="calNav(-1)"><i class="fas fa-chevron-left"></i></button>
-                        <button onclick="calNav(0)">Oggi</button>
-                        <button onclick="calNav(1)"><i class="fas fa-chevron-right"></i></button>
+                        <button data-cal="-1"><i class="fas fa-chevron-left"></i></button>
+                        <button data-cal="0">Oggi</button>
+                        <button data-cal="1"><i class="fas fa-chevron-right"></i></button>
                     </div>
                 </div>
                 <div class="bz-cal-grid" id="bz-cal-grid"></div>
@@ -283,13 +284,12 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-detail-wrap closed" id="bz-detail-wrap">
             <div class="bz-detail-topbar">
                 <span style="font-size:12px;font-weight:600;color:#475569;">Dettaglio Task</span>
-                <button class="bz-detail-close" onclick="closeDetail()"><i class="fas fa-times"></i></button>
+                <button class="bz-detail-close" id="btn-close-detail"><i class="fas fa-times"></i></button>
             </div>
             <div class="bz-detail-inner" id="bz-detail-inner"></div>
             <div class="bz-comment-input-wrap">
-                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"
-                          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendComment()}"></textarea>
-                <button class="bz-comment-send" onclick="sendComment()"><i class="fas fa-paper-plane"></i></button>
+                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"></textarea>
+                <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
 
@@ -339,8 +339,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
         <div class="bz-modal-actions">
-            <button class="bz-modal-cancel" onclick="closeModal()">Annulla</button>
-            <button class="bz-modal-submit" onclick="submitTask()">Crea Task</button>
+            <button class="bz-modal-cancel" id="btn-modal-cancel">Annulla</button>
+            <button class="bz-modal-submit" id="btn-modal-submit">Crea Task</button>
         </div>
     </div>
 </div>
@@ -409,7 +409,7 @@ function renderKanban() {
                 ${grouped[col.key].map(t => cardHtml(t)).join('') || ''}
             </div>
             <div class="bz-col-add">
-                <button class="bz-col-add-btn" onclick="quickAdd('${col.key}')">
+                <button class="bz-col-add-btn" data-quick-add="${col.key}">
                     <i class="fas fa-plus" style="font-size:13px"></i> Aggiungi
                 </button>
             </div>
@@ -420,7 +420,7 @@ function renderKanban() {
 function cardHtml(t) {
     const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete';
     return `
-        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" onclick="openTask(${t.id})">
+        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}">
             <div class="bz-card-name">${t.name}</div>
             <div class="bz-card-foot">
                 ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${t.assignee_name}</span>` : ''}
@@ -466,7 +466,7 @@ function renderGantt() {
                     const width = Math.max(1, (end - start) / 86400000 / totalDays * 100) + (t.start_date && t.due_date ? 0 : 1);
                     const color = STATUS_COLORS[t.status] || STATUS_COLORS.open;
                     return `
-                        <tr onclick="openTask(${t.id})" style="cursor:pointer">
+                        <tr data-task-id="${t.id}" style="cursor:pointer">
                             <td><div class="bz-gantt-name" title="${t.name}">${t.name}</div></td>
                             <td>
                                 <div class="bz-gantt-timeline">
@@ -521,7 +521,7 @@ function renderCalendar() {
             <div class="bz-cal-day ${isToday ? 'today' : ''}">
                 <div class="bz-cal-day-num">${d}</div>
                 ${events.map(t => `
-                    <div class="bz-cal-event ${t.status}" onclick="openTask(${t.id})" title="${t.name}">${t.name}</div>
+                    <div class="bz-cal-event ${t.status}" data-task-id="${t.id}" title="${t.name}" style="cursor:pointer">${t.name}</div>
                 `).join('')}
                 ${(tasksByDate[key]||[]).length > 3 ? `<div style="font-size:10px;color:#334155">+${(tasksByDate[key]||[]).length - 3} altri</div>` : ''}
             </div>`;
@@ -545,7 +545,7 @@ function calNav(dir) {
 /* ══════════ DETAIL PANEL ══════════ */
 async function openTask(id) {
     activeTaskId = id;
-    document.querySelectorAll('.bz-card').forEach(c => c.classList.toggle('active', parseInt(c.closest('[onclick]')?.getAttribute('onclick')?.match(/\d+/)?.[0]) === id));
+    document.querySelectorAll('.bz-card').forEach(c => c.classList.toggle('active', parseInt(c.dataset.taskId) === id));
     document.getElementById('bz-detail-wrap').classList.remove('closed');
 
     const task = allTasks.find(t => t.id == id);
@@ -555,7 +555,7 @@ async function openTask(id) {
     inner.innerHTML = `
         <div class="bz-detail-section">
             <input class="bz-detail-title-input" value="${task.name}"
-                   onblur="updateTaskName(${id}, this.value)">
+                   data-task-name-id="${id}">
             ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${task.category}</div>` : ''}
         </div>
 
@@ -564,7 +564,7 @@ async function openTask(id) {
             <div class="bz-status-row">
                 ${Object.entries(STATUSES).map(([k,v]) => `
                     <button class="bz-status-opt ${k} ${task.status === k ? 'selected' : ''}"
-                            onclick="setStatus(${id},'${k}')">
+                            data-set-status="${k}" data-task-id="${id}">
                         ${v}
                     </button>`).join('')}
             </div>
@@ -584,8 +584,8 @@ async function openTask(id) {
                 <div style="font-size:12px;color:#334155">Caricamento...</div>
             </div>
             <div class="bz-check-add">
-                <input id="new-check-input" placeholder="Nuovo elemento..." onkeydown="if(event.key==='Enter')addCheck(${id})">
-                <button onclick="addCheck(${id})"><i class="fas fa-plus"></i></button>
+                <input id="new-check-input" placeholder="Nuovo elemento..." data-check-enter="${id}">
+                <button data-add-check="${id}"><i class="fas fa-plus"></i></button>
             </div>
         </div>
 
@@ -642,7 +642,7 @@ async function loadChecklist(taskId) {
     el.innerHTML = items.map(c => `
         <div class="bz-check-row" id="crow-${c.id}">
             <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
-                   onchange="toggleCheck(${taskId},${c.id},this)">
+                   data-toggle-check="${taskId}:${c.id}">
             <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}">${c.name}</label>
         </div>`).join('');
 }
@@ -761,17 +761,9 @@ async function submitTask() {
     }
 }
 
-/* ══════════ FIELDWIRE CONNECT ══════════ */
-document.getElementById('btn-fw-connect')?.addEventListener('click', async () => {
-    if (!confirm('Collegare questo cantiere a Fieldwire?')) return;
-    const btn = document.getElementById('btn-fw-connect');
-    btn.disabled = true;
-    const res = await api(`/worksites/${WID}/zone/enable`, { method: 'POST' });
-    if (res.ok) { window.location.reload(); }
-    else { alert('Errore: ' + (res.error || 'sconosciuto')); btn.disabled = false; }
-});
+/* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
 
-/* ══════════ VIEW SWITCHING ══════════ */
+// View switcher
 document.querySelectorAll('.bz-view-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.bz-view-btn').forEach(b => b.classList.remove('active'));
@@ -782,11 +774,82 @@ document.querySelectorAll('.bz-view-btn').forEach(btn => {
     });
 });
 
-document.getElementById('btn-new-task')?.addEventListener('click', openModal);
+// New task button
+document.getElementById('btn-new-task')?.addEventListener('click', () => openModal());
 
+// Modal cancel / submit
+document.getElementById('btn-modal-cancel')?.addEventListener('click', () => closeModal());
+document.getElementById('btn-modal-submit')?.addEventListener('click', () => submitTask());
+
+// Modal backdrop close
 document.getElementById('task-modal')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
 });
+
+// Close detail
+document.getElementById('btn-close-detail')?.addEventListener('click', () => closeDetail());
+
+// Send comment button + enter key
+document.getElementById('btn-send-comment')?.addEventListener('click', () => sendComment());
+document.getElementById('bz-comment-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); }
+});
+
+// Calendar nav
+document.querySelectorAll('[data-cal]').forEach(btn => {
+    btn.addEventListener('click', () => calNav(parseInt(btn.dataset.cal)));
+});
+
+// Fieldwire connect
+document.getElementById('btn-fw-connect')?.addEventListener('click', async () => {
+    if (!confirm('Collegare questo cantiere a Fieldwire?')) return;
+    const btn = document.getElementById('btn-fw-connect');
+    if (btn) { btn.disabled = true; btn.textContent = 'Collegamento...'; }
+    const res = await api(`/worksites/${WID}/zone/enable`, { method: 'POST' });
+    if (res.ok) { window.location.reload(); }
+    else { alert('Errore: ' + (res.error || 'sconosciuto')); if (btn) btn.disabled = false; }
+});
+
+// Event delegation for dynamically generated elements
+document.addEventListener('click', e => {
+    const t = e.target;
+
+    // Open task from card / gantt / calendar
+    const taskEl = t.closest('[data-task-id]');
+    if (taskEl) { openTask(parseInt(taskEl.dataset.taskId)); return; }
+
+    // Quick add from kanban column
+    const qaEl = t.closest('[data-quick-add]');
+    if (qaEl) { quickAdd(qaEl.dataset.quickAdd); return; }
+
+    // Status buttons in detail panel
+    const stEl = t.closest('[data-set-status]');
+    if (stEl) { setStatus(parseInt(stEl.dataset.taskId), stEl.dataset.setStatus); return; }
+
+    // Add checklist item button
+    const acEl = t.closest('[data-add-check]');
+    if (acEl) { addCheck(parseInt(acEl.dataset.addCheck)); return; }
+});
+
+document.addEventListener('change', e => {
+    const cb = e.target;
+    if (cb.dataset.toggleCheck) {
+        const [taskId, itemId] = cb.dataset.toggleCheck.split(':').map(Number);
+        toggleCheck(taskId, itemId, cb);
+    }
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.dataset.checkEnter) {
+        addCheck(parseInt(e.target.dataset.checkEnter));
+    }
+});
+
+document.addEventListener('blur', e => {
+    if (e.target.dataset.taskNameId) {
+        updateTaskName(parseInt(e.target.dataset.taskNameId), e.target.value);
+    }
+}, true);
 
 /* ══════════ UTILS ══════════ */
 function initials(name) {
