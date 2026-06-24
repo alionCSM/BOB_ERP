@@ -966,7 +966,9 @@ function renderDisegni(items, fwReady) {
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             <div class="bz-dz-actions">
-                <a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>
+                ${['pdf','png','jpg','jpeg'].includes((d.file_type||'').toLowerCase())
+                    ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
+                    : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`}
                 <a class="bz-dz-btn" href="${d.view_url}" download><i class="fas fa-download"></i></a>
                 ${fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
                 <button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>
@@ -1197,6 +1199,18 @@ document.addEventListener('click', e => {
     if (pushFw) { pushDisegnoFw(parseInt(pushFw.dataset.pushFw), pushFw); return; }
     const delDz = t.closest('[data-del-disegno]');
     if (delDz) { deleteDisegno(parseInt(delDz.dataset.delDisegno)); return; }
+    const annBtn = t.closest('[data-annot]');
+    if (annBtn && window.BZAnnotator) {
+        window.BZAnnotator.open({
+            worksiteId: WID,
+            csrf: CSRF,
+            docId: parseInt(annBtn.dataset.annot),
+            fileType: annBtn.dataset.annotType,
+            fileName: annBtn.dataset.annotName,
+            viewUrl: `/worksites/${WID}/disegni/${annBtn.dataset.annot}/view`,
+        });
+        return;
+    }
 });
 
 // Disegni: file input change → upload
@@ -1330,5 +1344,16 @@ loadBobUsers();
 .bz-dz-fw-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #4ade80; font-weight: 600; }
 .bz-dz-empty { grid-column: 1/-1; text-align: center; color: #475569; font-size: 13px; padding: 40px 0; }
 </style>
+
+<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script nonce="{{ cspNonce }}">
+  // configura il worker di PDF.js (stesso CDN)
+  if (window.pdfjsLib) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+<script src="/assets/js/views/fieldwire/annotator.js"></script>
 </body>
 </html>

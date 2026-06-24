@@ -319,14 +319,21 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
 - [ ] **Filtri Kanban** — per status, assegnatario, data
 - [ ] **Ricerca task** per testo
 
-### 🟡 Tavole (Floorplans)
+### 🟡 Tavole (Floorplans) / Disegni
 
-- [ ] Link "Apri in Fieldwire" deve puntare alla tavola specifica:
-      `https://app.fieldwire.com/projects/{fw_project_id}/sheets/{fw_floorplan_id}`
-      (attualmente porta alla homepage Fieldwire)
-- [ ] Upload tavola da BOB → Fieldwire (flusso S3 già implementato, manca UI)
-- [ ] Visualizzare anteprima della tavola in BOB (thumbnail da Fieldwire)
-- [ ] Annotazioni: creare markup da BOB su una tavola Fieldwire
+- [x] Vista "Disegni" in BOB Zone (riusa i disegni del cantiere, BOB-native)
+- [x] Upload / view / download / delete disegni da BOB Zone
+- [x] Link "Apri in Fieldwire" punta alla tavola specifica (sheets/{fw_id})
+- [x] Push disegno BOB → Fieldwire come sheet (flusso S3, FloorplanSync)
+- [x] Viewer interattivo con annotazioni: pin→task, misure, frecce,
+      rettangoli, ellissi, nuvole, testo, disegno libero
+- [x] Calibrazione scala + misure in metri
+- [ ] Sync annotazioni BOB ↔ markup Fieldwire (le annotazioni sono BOB-native;
+      il push verso i markup FW richiede il sheet_id reale, da fare quando si
+      testa contro Fieldwire live)
+- [ ] Visualizzare thumbnail della tavola FW in BOB
+- [ ] Multi-pagina: le annotazioni sono già per-pagina, testare PDF multipagina
+- [ ] PDF.js worker via CSP: verificare su collaudo (worker da cdnjs)
 
 ### 🟢 Nice to have / futuro
 
