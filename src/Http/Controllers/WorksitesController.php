@@ -1128,11 +1128,16 @@ final class WorksitesController
         }
 
         $worksiteObj = new \Worksite($this->conn, $worksiteId);
-        $targetDir   = \CloudPath::ensureDisegniPath($worksiteObj->toCloudArray(), $category);
+        try {
+            $targetDir = \CloudPath::ensureDisegniPath($worksiteObj->toCloudArray(), $category);
+        } catch (\Throwable $e) {
+            error_log('[uploadDisegno] ensureDisegniPath: ' . $e->getMessage());
+            Response::error('Cartella disegni non disponibile: ' . $e->getMessage(), 500);
+        }
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            Response::error('Errore upload file', 500);
+            Response::error('Errore upload file (codice ' . $file['error'] . ')', 500);
         }
 
         // Validate file size (50 MB max)
@@ -1164,7 +1169,9 @@ final class WorksitesController
         $target   = $targetDir . DIRECTORY_SEPARATOR . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $target)) {
-            Response::error('Impossibile salvare il file', 500);
+            $err = error_get_last()['message'] ?? 'motivo sconosciuto';
+            error_log("[uploadDisegno] move_uploaded_file fallito → {$target} ({$err})");
+            Response::error('Impossibile salvare il file in ' . $targetDir . ' (' . $err . ')', 500);
         }
 
         $relativePath = \CloudPath::relativeToRoot($target);

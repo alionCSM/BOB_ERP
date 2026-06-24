@@ -67,11 +67,26 @@ class CloudPath
         $base = self::getBaseWorksitePath($worksite);
 
         $category = self::sanitize(strtolower($category));
+        if ($category === '') {
+            $category = 'altri';
+        }
 
         $path = $base . DIRECTORY_SEPARATOR . 'Disegni' . DIRECTORY_SEPARATOR . $category;
 
         if (!is_dir($path)) {
-            mkdir($path, 0775, true);
+            // Cattura l'errore reale di mkdir invece di proseguire silenziosamente
+            // e far fallire move_uploaded_file con un messaggio generico.
+            if (!@mkdir($path, 0775, true) && !is_dir($path)) {
+                $err = error_get_last()['message'] ?? 'motivo sconosciuto';
+                throw new RuntimeException(
+                    "Impossibile creare la cartella disegni: {$path} ({$err}). "
+                    . "Verifica CLOUD_ROOT e i permessi di scrittura del web server."
+                );
+            }
+        }
+
+        if (!is_writable($path)) {
+            throw new RuntimeException("Cartella disegni non scrivibile: {$path}");
         }
 
         return $path;
