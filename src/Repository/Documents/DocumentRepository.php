@@ -20,13 +20,19 @@ final class DocumentRepository
 
     public function create(array $data): bool
     {
+        return $this->createReturningId($data) > 0;
+    }
+
+    /** Come create() ma ritorna l'id auto-increment del documento inserito. */
+    public function createReturningId(array $data): int
+    {
         $stmt = $this->conn->prepare("
             INSERT INTO {$this->table}
                 (worksite_id, file_name, file_path, file_type, category, created_by, note, subcategory, created_at)
             VALUES
                 (:worksite_id, :file_name, :file_path, :file_type, :category, :created_by, :note, :subcategory, NOW())
         ");
-        return $stmt->execute([
+        $ok = $stmt->execute([
             ':worksite_id' => $data['worksite_id'],
             ':file_name'   => $data['file_name'],
             ':file_path'   => $data['file_path'],
@@ -36,6 +42,7 @@ final class DocumentRepository
             ':note'        => $data['note'] ?? null,
             ':subcategory' => $data['subcategory'] ?? null,
         ]);
+        return $ok ? (int) $this->conn->lastInsertId() : 0;
     }
 
     public function getByWorksite(int $worksiteId): array

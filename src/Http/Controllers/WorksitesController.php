@@ -1169,6 +1169,7 @@ final class WorksitesController
 
         $relativePath = \CloudPath::relativeToRoot($target);
 
+        $savedDocId = $replaceId;
         if ($replaceId > 0) {
             $existing = $this->documentRepo->getById($replaceId);
             if ($existing && (int)$existing['worksite_id'] === $worksiteId) {
@@ -1182,7 +1183,7 @@ final class WorksitesController
                 ]);
             }
         } else {
-            $this->documentRepo->create([
+            $savedDocId = $this->documentRepo->createReturningId([
                 'worksite_id' => $worksiteId,
                 'file_name'   => $filename,
                 'file_path'   => $relativePath,
@@ -1194,7 +1195,21 @@ final class WorksitesController
             ]);
         }
 
+        // Chiamata AJAX da BOB Zone → rispondi JSON, niente redirect.
+        if ($this->wantsJson($request)) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => true, 'data' => ['id' => $savedDocId, 'file_name' => $filename]]);
+            exit;
+        }
+
         Response::redirect("/worksites/{$worksiteId}?tab=disegni");
+    }
+
+    /** Rileva richieste AJAX (header X-Requested-With o ?ajax=1). */
+    private function wantsJson(Request $request): bool
+    {
+        $xrw = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+        return strtolower($xrw) === 'xmlhttprequest' || !empty($_GET['ajax']) || !empty($_POST['ajax']);
     }
 
     public function viewDisegno(Request $request): never

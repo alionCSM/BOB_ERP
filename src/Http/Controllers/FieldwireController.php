@@ -7,6 +7,7 @@ use App\Fieldwire\Api\FloorplansApi;
 use App\Fieldwire\Api\ProjectsApi;
 use App\Fieldwire\Api\TasksApi;
 use App\Fieldwire\FieldwireClient;
+use App\Fieldwire\Sync\FloorplanSync;
 use App\Fieldwire\Sync\InitialSyncService;
 use App\Fieldwire\Sync\OutboundSyncService;
 use App\Fieldwire\Sync\ProjectSync;
@@ -370,6 +371,120 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             return $this->fwFloorplanRepo->allForWorksite($worksiteId);
+        });
+    }
+
+    // ─── Disegni / Tavole (BOB-native + Fieldwire) ────────────────────────────
+
+    /**
+     * Lista disegni BOB del cantiere (categoria Disegni) con stato sync FW,
+     * piu' le floorplan Fieldwire che non hanno corrispondenza BOB.
+     */
+    public function disegni(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $worksite   = $this->worksiteRepo->findById($worksiteId);
+            $fwProjectId = $worksite['fieldwire_project_id'] ?? null;
+
+            // disegni BOB (sorgente di verita') + stato sync
+            $stmt = $this->conn->prepare("
+                SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
+                       d.created_at,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
+                       s.fw_sheet_upload_id, s.pushed_at
+                FROM bb_worksite_documents d
+                LEFT JOIN bb_users u            ON u.id = d.created_by
+                LEFT JOIN bb_zone_disegno_sync s ON s.document_id = d.id
+                WHERE d.worksite_id = :wid AND d.is_deleted = 0
+                  AND d.file_path LIKE '%/Disegni/%'
+                ORDER BY d.created_at DESC
+            ");
+            $stmt->execute([':wid' => $worksiteId]);
+            $bob = array_map(function ($r) use ($worksiteId) {
+                return [
+                    'id'         => (int)$r['id'],
+                    'file_name'  => $r['file_name'],
+                    'file_type'  => $r['file_type'],
+                    'note'       => $r['note'],
+                    'folder'     => $r['subcategory'] ?: 'altri',
+                    'uploader'   => trim($r['uploader']) ?: '—',
+                    'created_at' => $r['created_at'],
+                    'view_url'   => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
+                    'fw_synced'  => !empty($r['pushed_at']),
+                    'fw_pushed_at' => $r['pushed_at'],
+                ];
+            }, $stmt->fetchAll(\PDO::FETCH_ASSOC));
+
+            // floorplan Fieldwire (sola lettura, con deep link)
+            $fw = [];
+            foreach ($this->fwFloorplanRepo->allForWorksite($worksiteId) as $fp) {
+                $fw[] = [
+                    'fw_id'        => $fp['fw_id'],
+                    'name'         => $fp['name'],
+                    'sheets_count' => $fp['sheets_count'],
+                    'open_url'     => $fwProjectId
+                        ? "https://app.fieldwire.com/projects/{$fwProjectId}/sheets/{$fp['fw_id']}"
+                        : null,
+                ];
+            }
+
+            return [
+                'bob'             => $bob,
+                'fieldwire'       => $fw,
+                'fieldwire_ready' => !empty($fwProjectId) && $this->config->fieldwireEnabled(),
+            ];
+        });
+    }
+
+    /** Push di un disegno BOB su Fieldwire come sheet (flusso S3). */
+    public function pushDisegno(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $docId      = (int) $request->param('docId');
+            $user       = $request->user();
+
+            $worksite = $this->worksiteRepo->findById($worksiteId);
+            if (empty($worksite['fieldwire_project_id'])) {
+                throw new \RuntimeException('Cantiere non collegato a Fieldwire');
+            }
+            if (!$this->config->fieldwireEnabled()) {
+                throw new \RuntimeException('Fieldwire non configurato (FIELDWIRE_API_TOKEN)');
+            }
+
+            // recupera il disegno + path assoluto
+            $stmt = $this->conn->prepare("
+                SELECT id, file_name, file_path
+                FROM bb_worksite_documents
+                WHERE id = :id AND worksite_id = :wid AND is_deleted = 0
+                LIMIT 1
+            ");
+            $stmt->execute([':id' => $docId, ':wid' => $worksiteId]);
+            $doc = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$doc) throw new \RuntimeException('Disegno non trovato');
+
+            $absolutePath = \CloudPath::getRoot() . DIRECTORY_SEPARATOR . $doc['file_path'];
+
+            $sync   = new FloorplanSync(new FloorplansApi($this->makeClient()));
+            $upload = $sync->pushFile($worksite['fieldwire_project_id'], $absolutePath, $doc['file_name']);
+
+            // registra/aggiorna lo stato sync
+            $this->conn->prepare("
+                INSERT INTO bb_zone_disegno_sync (document_id, worksite_id, fw_sheet_upload_id, pushed_at, pushed_by)
+                VALUES (:doc, :wid, :su, NOW(), :uid)
+                ON DUPLICATE KEY UPDATE
+                    fw_sheet_upload_id = VALUES(fw_sheet_upload_id),
+                    pushed_at          = NOW(),
+                    pushed_by          = VALUES(pushed_by)
+            ")->execute([
+                ':doc' => $docId,
+                ':wid' => $worksiteId,
+                ':su'  => $upload,
+                ':uid' => (int)($user?->id ?? 0),
+            ]);
+
+            return ['pushed' => true, 'sheet_upload_id' => $upload];
         });
     }
 
