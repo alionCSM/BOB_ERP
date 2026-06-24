@@ -42,6 +42,21 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-new-btn:hover { opacity: .88; }
 .bz-new-btn i { font-size: 14px; }
 
+/* ── Main + Sidebar ── */
+.bz-main { flex: 1; display: flex; overflow: hidden; }
+.bz-sidebar { width: 190px; flex-shrink: 0; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 12px 10px; }
+.bz-nav { display: flex; flex-direction: column; gap: 2px; }
+.bz-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; border: none; background: none; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: left; text-decoration: none; width: 100%; }
+.bz-nav-item i { width: 18px; text-align: center; font-size: 15px; }
+.bz-nav-item:hover { background: #1e293b; color: #e2e8f0; }
+.bz-nav-item.active { background: #334155; color: #f1f5f9; }
+.bz-nav-sep { height: 1px; background: #1e293b; margin: 10px 4px; }
+.bz-nav-actions .bz-nav-item { color: #cbd5e1; }
+.bz-nav-spacer { flex: 1; }
+.bz-nav-fw { padding-top: 10px; border-top: 1px solid #1e293b; }
+.bz-nav-fw-btn { color: #4ade80 !important; }
+.bz-fw-off { font-size: 11px; color: #475569; padding: 8px 12px; display: block; line-height: 1.4; }
+
 /* ── Body ── */
 .bz-body { flex: 1; overflow: hidden; display: flex; }
 .bz-view { display: none; flex: 1; overflow: hidden; }
@@ -205,7 +220,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <body>
 <div class="bz">
 
-    {# ── Header ── #}
+    {# ── Header (sottile) ── #}
     <header class="bz-header">
         <a href="/worksites/{{ worksite_id }}" class="bz-back">
             <i class="fas fa-arrow-left"></i> Cantiere
@@ -217,41 +232,35 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-sep"></div>
         <span class="bz-wname">{{ worksite.name }}</span>
-        <div class="bz-header-right">
-            {% if fieldwire_project_id %}
-                <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire</span>
-            {% elseif fieldwire_enabled %}
-                <button class="bz-fw-btn" id="btn-fw-connect">
-                    <i class="fas fa-link" style="font-size:14px"></i> Collega Fieldwire
-                </button>
-            {% endif %}
-        </div>
     </header>
 
-    {# ── Toolbar ── #}
-    <div class="bz-toolbar">
-        <div class="bz-view-switcher">
-            <button class="bz-view-btn active" data-view="kanban">
-                <i class="fas fa-columns"></i> Kanban
-            </button>
-            <button class="bz-view-btn" data-view="gantt">
-                <i class="fas fa-chart-bar"></i> Gantt
-            </button>
-            <button class="bz-view-btn" data-view="calendar">
-                <i class="fas fa-calendar-alt"></i> Calendario
-            </button>
-            <button class="bz-view-btn" data-view="disegni">
-                <i class="fas fa-drafting-compass"></i> Disegni
-            </button>
-        </div>
-        <a class="bz-new-btn" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"
-           style="background:#1e293b;color:#cbd5e1;border:1px solid #273548;margin-left:auto;text-decoration:none;">
-            <i class="fas fa-file-pdf"></i> Report PDF
-        </a>
-        <button class="bz-new-btn" id="btn-new-task" style="margin-left:8px;">
-            <i class="fas fa-plus"></i> Nuovo Task
-        </button>
-    </div>
+    {# ── Main: sidebar + body ── #}
+    <div class="bz-main">
+
+        {# Side menu #}
+        <aside class="bz-sidebar">
+            <nav class="bz-nav">
+                <button class="bz-nav-item bz-view-btn active" data-view="kanban"><i class="fas fa-columns"></i><span>Kanban</span></button>
+                <button class="bz-nav-item bz-view-btn" data-view="gantt"><i class="fas fa-chart-bar"></i><span>Gantt</span></button>
+                <button class="bz-nav-item bz-view-btn" data-view="calendar"><i class="fas fa-calendar-alt"></i><span>Calendario</span></button>
+                <button class="bz-nav-item bz-view-btn" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
+            </nav>
+            <div class="bz-nav-sep"></div>
+            <div class="bz-nav-actions">
+                <button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>
+                <a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>
+            </div>
+            <div class="bz-nav-spacer"></div>
+            <div class="bz-nav-fw">
+                {% if fieldwire_project_id %}
+                    <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire collegato</span>
+                {% elseif fieldwire_enabled %}
+                    <button class="bz-nav-item bz-nav-fw-btn" id="btn-fw-connect"><i class="fas fa-link"></i><span>Collega Fieldwire</span></button>
+                {% else %}
+                    <span class="bz-fw-off"><i class="fas fa-info-circle"></i> Fieldwire non configurato (manca il token in .env)</span>
+                {% endif %}
+            </div>
+        </aside>
 
     {# ── Body ── #}
     <div class="bz-body">
@@ -333,7 +342,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
 
-    </div>
+    </div>{# /bz-body #}
+    </div>{# /bz-main #}
 </div>
 
 {# ── New task modal ── #}
@@ -1457,9 +1467,17 @@ loadBobUsers();
 @media (max-width: 820px) {
     .bz-header { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
     .bz-wname { display: none; }
-    .bz-toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px; }
-    .bz-view-switcher { flex-wrap: wrap; }
-    .bz-new-btn { margin-left: 0; }
+    /* sidebar → barra orizzontale scrollabile sopra il body */
+    .bz-main { flex-direction: column; }
+    .bz-sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 6px 8px; gap: 4px; border-right: none; border-bottom: 1px solid #1e293b; align-items: center; }
+    .bz-nav { flex-direction: row; gap: 4px; }
+    .bz-nav-item { white-space: nowrap; padding: 7px 10px; }
+    .bz-nav-item span { display: none; }      /* solo icone su mobile */
+    .bz-nav-actions { display: flex; flex-direction: row; gap: 4px; }
+    .bz-nav-sep, .bz-nav-spacer { display: none; }
+    .bz-nav-fw { padding: 0; border: none; }
+    .bz-nav-fw .bz-fw-off { display: none; }
+    .bz-nav-fw-btn span { display: inline; }   /* il connect FW mostra il testo */
     /* pannello dettaglio task: overlay a tutto schermo */
     .bz-detail-wrap { position: fixed; inset: 0; width: 100% !important; z-index: 50; border-left: none; }
     .bz-detail-wrap.closed { width: 0 !important; display: none; }
