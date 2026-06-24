@@ -316,8 +316,12 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
 - [x] **Elimina elemento checklist** — endpoint + bottone × + push delete su Fieldwire
 - [x] **Drag & drop Kanban** — drag card tra colonne aggiorna status
 - [x] **Assegnatario** — dropdown utenti BOB via endpoint `/zone/users`
-- [ ] **Filtri Kanban** — per status, assegnatario, data
-- [ ] **Ricerca task** per testo
+- [x] **Filtri Kanban** — ricerca testo + assegnatario + categoria
+- [x] **Foto sui task** — upload + fotocamera mobile, thumbnail nei commenti
+- [x] **Notifiche** — notifica BOB all'assegnatario su create/cambio assegnazione
+- [x] **Mobile-friendly** — layout responsive (header/toolbar/kanban/detail/annotator)
+- [ ] **Report PDF / Punch list** — export lista task con foto (dompdf) — DA FARE
+- [ ] Notifica anche su nuovo commento (oltre assegnazione)
 
 ### 🟡 Tavole (Floorplans) / Disegni
 

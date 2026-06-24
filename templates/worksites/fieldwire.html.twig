@@ -254,8 +254,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
         {# Kanban #}
         <div class="bz-view active" id="view-kanban">
-            <div class="bz-kanban" id="bz-kanban">
-                <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+            <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                <div class="bz-kanban-filters">
+                    <input type="text" id="bz-filter-search" placeholder="Cerca task...">
+                    <select id="bz-filter-assignee"><option value="">Tutti gli assegnatari</option></select>
+                    <select id="bz-filter-cat"><option value="">Tutte le categorie</option></select>
+                    <button type="button" id="bz-filter-clear" title="Azzera filtri"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="bz-kanban" id="bz-kanban" style="flex:1;">
+                    <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
             </div>
         </div>
 
@@ -494,11 +502,37 @@ const COLS = [
     { key: 'verified',    label: 'Verificato',   dot: 'dot-verified' },
 ];
 
+let kFilter = { q: '', assignee: '', cat: '' };
+
+function filteredTasks() {
+    const q = kFilter.q.toLowerCase();
+    return allTasks.filter(t => {
+        if (kFilter.assignee && (t.assignee_name || '') !== kFilter.assignee) return false;
+        if (kFilter.cat && (t.category || '') !== kFilter.cat) return false;
+        if (q) {
+            const blob = `${t.name||''} ${t.assignee_name||''} ${t.category||''} ${t.description||''}`.toLowerCase();
+            if (!blob.includes(q)) return false;
+        }
+        return true;
+    });
+}
+
+function refreshKanbanFilterOptions() {
+    const aSel = document.getElementById('bz-filter-assignee');
+    const cSel = document.getElementById('bz-filter-cat');
+    if (!aSel || !cSel) return;
+    const assignees = [...new Set(allTasks.map(t => t.assignee_name).filter(Boolean))].sort();
+    const cats      = [...new Set(allTasks.map(t => t.category).filter(Boolean))].sort();
+    aSel.innerHTML = '<option value="">Tutti gli assegnatari</option>' + assignees.map(a=>`<option ${a===kFilter.assignee?'selected':''}>${escHtml(a)}</option>`).join('');
+    cSel.innerHTML = '<option value="">Tutte le categorie</option>' + cats.map(c=>`<option ${c===kFilter.cat?'selected':''}>${escHtml(c)}</option>`).join('');
+}
+
 function renderKanban() {
+    refreshKanbanFilterOptions();
     const board = document.getElementById('bz-kanban');
     const grouped = {};
     COLS.forEach(c => grouped[c.key] = []);
-    allTasks.forEach(t => { if (grouped[t.status] !== undefined) grouped[t.status].push(t); else grouped['open'].push(t); });
+    filteredTasks().forEach(t => { if (grouped[t.status] !== undefined) grouped[t.status].push(t); else grouped['open'].push(t); });
 
     board.innerHTML = COLS.map(col => `
         <div class="bz-col">
@@ -812,15 +846,16 @@ function openEditModal(taskId) {
     document.getElementById('edit-task-due').value      = t.due_date   || '';
     document.getElementById('edit-task-start').value    = t.start_date || '';
     document.getElementById('edit-task-priority').value = String(t.priority ?? 0);
-    // assignee select: aggiungi opzione fittizia se non c'e' (es. nome libero da Fieldwire)
+    // assignee select per user_id; se il task ha un nome FW senza id, lo
+    // aggiungo come opzione "custom" (value vuoto, solo display) cosi' si vede.
     const sel = document.getElementById('edit-task-assignee');
-    if (t.assignee_name && ![...sel.options].some(o => o.value === t.assignee_name)) {
-        const opt = document.createElement('option');
-        opt.value = t.assignee_name;
-        opt.textContent = t.assignee_name + ' (custom)';
-        sel.appendChild(opt);
+    if (t.assignee_user_id) {
+        sel.value = String(t.assignee_user_id);
+    } else if (t.assignee_name) {
+        sel.value = '';
+    } else {
+        sel.value = '';
     }
-    sel.value = t.assignee_name || '';
     document.getElementById('task-edit-modal').classList.remove('hidden');
     document.getElementById('edit-task-name').focus();
 }
@@ -830,15 +865,17 @@ function closeEditModal() {
 
 async function submitEdit() {
     const id = parseInt(document.getElementById('edit-task-id').value);
+    const eSel = document.getElementById('edit-task-assignee');
     const body = {
-        name:          document.getElementById('edit-task-name').value.trim(),
-        description:   document.getElementById('edit-task-desc').value,
-        status:        document.getElementById('edit-task-status').value,
-        category:      document.getElementById('edit-task-cat').value || null,
-        assignee_name: document.getElementById('edit-task-assignee').value || null,
-        due_date:      document.getElementById('edit-task-due').value   || null,
-        start_date:    document.getElementById('edit-task-start').value || null,
-        priority:      parseInt(document.getElementById('edit-task-priority').value || '0'),
+        name:            document.getElementById('edit-task-name').value.trim(),
+        description:     document.getElementById('edit-task-desc').value,
+        status:          document.getElementById('edit-task-status').value,
+        category:        document.getElementById('edit-task-cat').value || null,
+        assignee_user_id: eSel.value || null,
+        assignee_name:   eSel.value ? (eSel.options[eSel.selectedIndex]?.text || null) : null,
+        due_date:        document.getElementById('edit-task-due').value   || null,
+        start_date:      document.getElementById('edit-task-start').value || null,
+        priority:        parseInt(document.getElementById('edit-task-priority').value || '0'),
     };
     if (!body.name) { document.getElementById('edit-task-name').focus(); return; }
 
@@ -878,9 +915,9 @@ function updateTaskName(taskId, name) {
 async function loadBobUsers() {
     const res = await api(`/worksites/${WID}/zone/users`);
     if (!res.ok || !Array.isArray(res.data)) return;
-    const html = res.data.map(u => `<option value="${escAttr(u.label)}">${escHtml(u.label)}</option>`).join('');
+    const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label)}</option>`).join('');
     document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
-        // mantieni l'opzione vuota di default
+        // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
         sel.innerHTML = '<option value="">— nessuno —</option>' + html;
     });
 }
@@ -1079,14 +1116,16 @@ async function submitTask() {
     const name = document.getElementById('task-name').value.trim();
     if (!name) { document.getElementById('task-name').focus(); return; }
 
+    const aSel = document.getElementById('task-assignee');
     const body = {
         name,
-        description:   document.getElementById('task-desc').value,
-        status:        document.getElementById('task-status').value,
-        category:      document.getElementById('task-cat').value,
-        assignee_name: document.getElementById('task-assignee').value,
-        due_date:      document.getElementById('task-due').value || null,
-        start_date:    document.getElementById('task-start').value || null,
+        description:      document.getElementById('task-desc').value,
+        status:          document.getElementById('task-status').value,
+        category:        document.getElementById('task-cat').value,
+        assignee_user_id: aSel.value || null,
+        assignee_name:   aSel.value ? (aSel.options[aSel.selectedIndex]?.text || null) : null,
+        due_date:        document.getElementById('task-due').value || null,
+        start_date:      document.getElementById('task-start').value || null,
     };
 
     const btn = document.querySelector('.bz-modal-submit');
@@ -1124,6 +1163,16 @@ document.querySelectorAll('.bz-view-btn').forEach(btn => {
 
 // New task button
 document.getElementById('btn-new-task')?.addEventListener('click', () => openModal());
+
+// Filtri Kanban
+document.getElementById('bz-filter-search')?.addEventListener('input', e => { kFilter.q = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-assignee')?.addEventListener('change', e => { kFilter.assignee = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-cat')?.addEventListener('change', e => { kFilter.cat = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-clear')?.addEventListener('click', () => {
+    kFilter = { q: '', assignee: '', cat: '' };
+    const s = document.getElementById('bz-filter-search'); if (s) s.value = '';
+    renderKanban();
+});
 
 // Modal cancel / submit
 document.getElementById('btn-modal-cancel')?.addEventListener('click', () => closeModal());
@@ -1387,11 +1436,37 @@ loadBobUsers();
 .bz-dz-fw-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #4ade80; font-weight: 600; }
 .bz-dz-empty { grid-column: 1/-1; text-align: center; color: #475569; font-size: 13px; padding: 40px 0; }
 
+/* Filtri Kanban */
+.bz-kanban-filters { display:flex; gap:8px; padding:10px 20px; flex-shrink:0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #1e293b; }
+.bz-kanban-filters input, .bz-kanban-filters select { background:#1e293b; border:1px solid #273548; border-radius:7px; padding:6px 10px; color:#e2e8f0; font-size:12px; font-family:inherit; }
+.bz-kanban-filters input { min-width:180px; }
+.bz-kanban-filters button { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:7px; width:32px; height:32px; cursor:pointer; }
+.bz-kanban-filters button:hover { color:#e2e8f0; }
+
 /* Foto su commenti */
 .bz-comment-photo { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; flex-shrink:0; border-radius:8px; background:#1e293b; border:1px solid #273548; color:#94a3b8; cursor:pointer; transition:all .12s; }
 .bz-comment-photo:hover { color:#e2e8f0; border-color:#334155; }
 .bz-comment-photo.uploading { opacity:.5; pointer-events:none; }
 .bz-comment-photo-thumb { margin-top:6px; max-width:100%; max-height:180px; border-radius:8px; border:1px solid #273548; display:block; }
+
+/* ── Mobile / tablet ── */
+@media (max-width: 820px) {
+    .bz-header { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
+    .bz-wname { display: none; }
+    .bz-toolbar { flex-wrap: wrap; height: auto; padding: 8px 12px; }
+    .bz-view-switcher { flex-wrap: wrap; }
+    .bz-new-btn { margin-left: 0; }
+    /* pannello dettaglio task: overlay a tutto schermo */
+    .bz-detail-wrap { position: fixed; inset: 0; width: 100% !important; z-index: 50; border-left: none; }
+    .bz-detail-wrap.closed { width: 0 !important; display: none; }
+    /* kanban: colonne piu' strette, scroll orizzontale */
+    .bz-col { min-width: 78vw; }
+    .bz-kanban-filters input { min-width: 0; flex: 1; }
+    /* annotator: toolbar e pannello adattati */
+    .bza-top { flex-wrap: wrap; height: auto; padding: 8px; gap: 6px; }
+    .bza-side { position: fixed; inset: 0; width: 100% !important; z-index: 60; }
+    .bza-tools { order: 3; width: 100%; justify-content: center; }
+}
 </style>
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">

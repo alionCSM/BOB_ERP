@@ -87,6 +87,12 @@ final class FieldwireController
             $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user?->id ?? 0));
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
+            // notifica all'assegnatario
+            if (!empty($body['assignee_user_id'])) {
+                $this->notifyAssignee($worksiteId, (int)$body['assignee_user_id'],
+                    $body['name'] ?? 'Task', (int)($user?->id ?? 0));
+            }
+
             return $this->zoneRepo->find($taskId);
         });
     }
@@ -103,6 +109,14 @@ final class FieldwireController
 
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
+
+            // notifica se l'assegnatario e' cambiato
+            $newAssignee = !empty($body['assignee_user_id']) ? (int)$body['assignee_user_id'] : null;
+            $oldAssignee = !empty($existing['assignee_user_id']) ? (int)$existing['assignee_user_id'] : null;
+            if ($newAssignee && $newAssignee !== $oldAssignee) {
+                $this->notifyAssignee($worksiteId, $newAssignee,
+                    $merged['name'] ?? 'Task', (int)($request->user()?->id ?? 0));
+            }
 
             // push update su Fieldwire se collegato
             if (!empty($existing['fw_id'])) {
@@ -827,6 +841,29 @@ final class FieldwireController
             'due_date'      => $bob['due_date']      ?? null,
             'priority'      => (int)($bob['priority'] ?? 0),
         ], fn($v) => $v !== null);
+    }
+
+    /** Inserisce una notifica BOB per l'operaio/utente assegnato a un task. */
+    private function notifyAssignee(int $worksiteId, int $assigneeUserId, string $taskName, int $byUserId): void
+    {
+        if ($assigneeUserId <= 0 || $assigneeUserId === $byUserId) return; // non notificare se stessi
+        try {
+            $ws = $this->worksiteRepo->findById($worksiteId);
+            $wsName = $ws['name'] ?? ('Cantiere #' . $worksiteId);
+            $stmt = $this->conn->prepare("
+                INSERT INTO bb_notifications (user_id, title, message, link, category, priority, created_by, is_read, created_at)
+                VALUES (:uid, :title, :msg, :link, 'bob_zone', 'normal', :cb, 0, NOW())
+            ");
+            $stmt->execute([
+                ':uid'   => $assigneeUserId,
+                ':title' => 'Nuovo task assegnato — BOB Zone',
+                ':msg'   => 'Ti è stato assegnato "' . mb_substr($taskName, 0, 120) . '" nel cantiere ' . $wsName,
+                ':link'  => '/worksites/' . $worksiteId . '/zone',
+                ':cb'    => $byUserId ?: null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[FW notifyAssignee] ' . $e->getMessage());
+        }
     }
 
     private function makeClient(): FieldwireClient

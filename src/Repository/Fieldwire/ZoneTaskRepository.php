@@ -51,9 +51,9 @@ final class ZoneTaskRepository
     {
         $stmt = $this->db->prepare("
             INSERT INTO bb_zone_tasks
-                (worksite_id, name, description, status, category, assignee_name, start_date, due_date, priority, created_by)
+                (worksite_id, name, description, status, category, assignee_name, assignee_user_id, start_date, due_date, priority, created_by)
             VALUES
-                (:wid, :name, :desc, :status, :cat, :assignee, :start, :due, :pri, :uid)
+                (:wid, :name, :desc, :status, :cat, :assignee, :auid, :start, :due, :pri, :uid)
         ");
         $stmt->execute([
             ':wid'      => $worksiteId,
@@ -62,6 +62,7 @@ final class ZoneTaskRepository
             ':status'   => $data['status'] ?? 'open',
             ':cat'      => $data['category'] ?? null,
             ':assignee' => $data['assignee_name'] ?? null,
+            ':auid'     => !empty($data['assignee_user_id']) ? (int)$data['assignee_user_id'] : null,
             ':start'    => $data['start_date'] ?? null,
             ':due'      => $data['due_date'] ?? null,
             ':pri'      => $data['priority'] ?? 0,
@@ -85,6 +86,7 @@ final class ZoneTaskRepository
                    status        = :status,
                    category      = :cat,
                    assignee_name = :assignee,
+                   assignee_user_id = :auid,
                    start_date    = :start,
                    due_date      = :due,
                    priority      = :pri
@@ -95,6 +97,7 @@ final class ZoneTaskRepository
             ':status'   => $data['status'] ?? 'open',
             ':cat'      => $data['category'] ?? null,
             ':assignee' => $data['assignee_name'] ?? null,
+            ':auid'     => !empty($data['assignee_user_id']) ? (int)$data['assignee_user_id'] : null,
             ':start'    => $data['start_date'] ?? null,
             ':due'      => $data['due_date'] ?? null,
             ':pri'      => $data['priority'] ?? 0,
