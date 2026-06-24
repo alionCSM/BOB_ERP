@@ -359,6 +359,36 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get('/worksites/documents/{id}/open',                              [WorksitesController::class, 'openDocument'])
            ->get('/worksites/documents/{id}/download',                         [WorksitesController::class, 'downloadDocument']);
 
+    // ── BOB Zone ──────────────────────────────────────────────────────────────
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $router->get( '/worksites/{id}/zone',                                                         [FieldwireController::class, 'page'])
+           ->post('/worksites/{id}/zone/enable',                                                  [FieldwireController::class, 'enable'])
+           ->post('/worksites/{id}/zone/disable',                                                 [FieldwireController::class, 'disable'])
+           ->get( '/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'tasks'])
+           ->post('/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'createTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/update',                                   [FieldwireController::class, 'updateTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/status',                                   [FieldwireController::class, 'updateTaskStatus'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/delete',                                   [FieldwireController::class, 'deleteTask'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'comments'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'postComment'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments/{commentId}/delete',              [FieldwireController::class, 'deleteComment'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'checklist'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'addChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
+           ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
+           ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans']);
+
+    $router->dispatch($request, $container);
+}
+
+// ── Fieldwire webhook (no auth — called by Fieldwire servers) ─────────────────
+if ($uri === '/api/fieldwire/webhook') {
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+    $request   = new \App\Http\Request();
+    $router    = new \App\Http\Router();
+    $router->post('/api/fieldwire/webhook', [FieldwireController::class, 'webhook']);
     $router->dispatch($request, $container);
 }
 

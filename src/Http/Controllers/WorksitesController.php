@@ -922,6 +922,11 @@ final class WorksitesController
             );
         }
 
+        // Fieldwire flags per il bottone BOB Zone (badge "collegato" + abilitazione)
+        $fieldwireProjectId = $worksite['fieldwire_project_id'] ?? null;
+        $fieldwireEnabled   = (new \App\Infrastructure\Config())->fieldwireEnabled();
+        $fieldwireLinked    = !empty($fieldwireProjectId);
+
         Response::view('worksites/view.html.twig', $request, compact(
             'worksite_id', 'worksite', 'isWorker',
             'offerId', 'presenze', 'presenzeCons', 'allPresenze',
@@ -939,7 +944,8 @@ final class WorksitesController
             'extrasUnbilledCount',
             'totalFatture', 'totalFattureDaEmettere',
             'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
-            'financeNotes', 'financeNotesBillingOpen'
+            'financeNotes', 'financeNotesBillingOpen',
+            'fieldwireProjectId', 'fieldwireEnabled', 'fieldwireLinked'
         ));
     }
 
