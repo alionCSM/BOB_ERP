@@ -119,35 +119,44 @@ def emit_svg(dxf_path, svg_path):
     if w <= 0 or h <= 0:
         fail("Estensione disegno non valida")
 
-    # spessore linea proporzionale all'estensione (0.1% della diagonale)
-    stroke = max(w, h) * 0.0008
+    diag = (w * w + h * h) ** 0.5
+    # spessore linea proporzionale alla diagonale
+    stroke = max(1.0, diag * 0.0006)
+    # tolleranza di appiattimento curve: meno punti = SVG piu' leggero
+    mfd = diag * 0.0008
 
-    polylines = []
-    # esplode blocchi/insert e appiattisce curve in polilinee WCS.
-    # NB: recursive_decompose vuole un iterabile di ENTITA' (msp lo è già),
-    # non il layout in una lista.
-    for prim in disassemble.to_primitives(disassemble.recursive_decompose(msp)):
+    yflip = miny + maxy  # svg_y = yflip - p.y
+
+    # UN SOLO path con tutti i sottotracciati (M..L..). Riduce drasticamente
+    # il numero di elementi DOM rispetto a migliaia di <polyline> separate.
+    segs = []
+    n = 0
+    for prim in disassemble.to_primitives(
+        disassemble.recursive_decompose(msp), max_flattening_distance=mfd
+    ):
         try:
             pts = list(prim.vertices())
         except Exception:
             continue
         if len(pts) < 2:
             continue
-        # flip Y: SVG y verso il basso -> CAD up resta up
-        coords = " ".join(f"{p.x:.4f},{(miny + maxy - p.y):.4f}" for p in pts)
-        polylines.append(coords)
+        d = "M%d %d" % (round(pts[0].x), round(yflip - pts[0].y))
+        for p in pts[1:]:
+            d += "L%d %d" % (round(p.x), round(yflip - p.y))
+        segs.append(d)
+        n += 1
 
-    if not polylines:
+    if not segs:
         fail("Nessuna geometria estraibile dal DXF")
 
-    body = "".join(
-        f'<polyline points="{c}" fill="none" stroke="#0f172a" stroke-width="{stroke:.4f}" '
-        f'stroke-linejoin="round" stroke-linecap="round"/>' for c in polylines
+    body = (
+        f'<path d="{"".join(segs)}" fill="none" stroke="#0f172a" '
+        f'stroke-width="{stroke:.2f}" stroke-linejoin="round" stroke-linecap="round"/>'
     )
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'viewBox="{minx:.4f} {miny:.4f} {w:.4f} {h:.4f}">'
-        f'<rect x="{minx:.4f}" y="{miny:.4f}" width="{w:.4f}" height="{h:.4f}" fill="#ffffff"/>'
+        f'viewBox="{minx:.2f} {miny:.2f} {w:.2f} {h:.2f}">'
+        f'<rect x="{minx:.2f}" y="{miny:.2f}" width="{w:.2f}" height="{h:.2f}" fill="#ffffff"/>'
         f'{body}</svg>'
     )
     with open(svg_path, "w", encoding="utf-8") as fh:
@@ -157,7 +166,7 @@ def emit_svg(dxf_path, svg_path):
         "minx": minx, "miny": miny, "maxx": maxx, "maxy": maxy,
         "insunits": insunits,
         "meters_per_unit": m_per_unit,
-        "entities": len(polylines),
+        "entities": n,
     }
 
 
