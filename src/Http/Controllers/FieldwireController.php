@@ -16,6 +16,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Repository\Fieldwire\FwFloorplanRepository;
+use App\Repository\Fieldwire\ZoneAnnotationRepository;
 use App\Repository\Fieldwire\ZoneTaskRepository;
 use App\Repository\Worksites\WorksiteRepository;
 
@@ -32,8 +33,9 @@ use App\Repository\Worksites\WorksiteRepository;
  */
 final class FieldwireController
 {
-    private ZoneTaskRepository    $zoneRepo;
-    private FwFloorplanRepository $fwFloorplanRepo;
+    private ZoneTaskRepository       $zoneRepo;
+    private FwFloorplanRepository    $fwFloorplanRepo;
+    private ZoneAnnotationRepository $annRepo;
 
     public function __construct(
         private Config             $config,
@@ -42,6 +44,7 @@ final class FieldwireController
     ) {
         $this->zoneRepo        = new ZoneTaskRepository($conn);
         $this->fwFloorplanRepo = new FwFloorplanRepository($conn);
+        $this->annRepo         = new ZoneAnnotationRepository($conn);
     }
 
     // ─── Pagina BOB Zone ──────────────────────────────────────────────────────
@@ -485,6 +488,94 @@ final class FieldwireController
             ]);
 
             return ['pushed' => true, 'sheet_upload_id' => $upload];
+        });
+    }
+
+    // ─── Annotazioni disegni (pin / misure / markup) ──────────────────────────
+
+    /** Lista annotazioni + calibrazione di un documento (pagina opzionale). */
+    public function annotations(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $docId = (int) $request->param('docId');
+            $page  = (int) ($_GET['page'] ?? 1);
+            return [
+                'annotations' => $this->annRepo->allForDocument($docId, $page),
+                'calibration' => $this->annRepo->getCalibration($docId, $page),
+            ];
+        });
+    }
+
+    /** Crea o aggiorna un'annotazione. Se type=pin con create_task, crea anche il task. */
+    public function saveAnnotation(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $docId      = (int) $request->param('docId');
+            $user       = $request->user();
+            $body       = $this->jsonBody();
+
+            $type = $body['type'] ?? '';
+            if ($type === '') throw new \RuntimeException('Tipo annotazione mancante');
+            if (empty($body['geom'])) throw new \RuntimeException('Geometria mancante');
+
+            $taskId = !empty($body['task_id']) ? (int)$body['task_id'] : null;
+
+            // pin che deve creare un task nuovo "qui"
+            if ($type === 'pin' && !empty($body['create_task']) && !$taskId) {
+                $taskName = trim($body['task_name'] ?? '') ?: ($body['text'] ?? 'Task da disegno');
+                $taskId = $this->zoneRepo->create($worksiteId, [
+                    'name'          => $taskName,
+                    'assignee_name' => $body['assignee_name'] ?? null,
+                    'status'        => 'open',
+                ], (int)($user?->id ?? 0));
+                // push del task su Fieldwire se collegato
+                $this->pushTaskToFieldwire($worksiteId, $taskId, []);
+            }
+
+            $data = [
+                'worksite_id' => $worksiteId,
+                'document_id' => $docId,
+                'page'        => (int)($body['page'] ?? 1),
+                'type'        => $type,
+                'geom'        => $body['geom'],
+                'task_id'     => $taskId,
+                'text'        => $body['text'] ?? null,
+                'color'       => $body['color'] ?? '#ef4444',
+                'created_by'  => (int)($user?->id ?? 0),
+            ];
+
+            if (!empty($body['id'])) {
+                $this->annRepo->update((int)$body['id'], $data);
+                $id = (int)$body['id'];
+            } else {
+                $id = $this->annRepo->create($data);
+            }
+            return $this->annRepo->find($id);
+        });
+    }
+
+    public function deleteAnnotation(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $annId = (int) $request->param('annId');
+            $this->annRepo->delete($annId);
+            return ['deleted' => true];
+        });
+    }
+
+    /** Salva la calibrazione scala (metri per frazione-larghezza). */
+    public function setCalibration(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $docId = (int) $request->param('docId');
+            $user  = $request->user();
+            $body  = $this->jsonBody();
+            $page  = (int)($body['page'] ?? 1);
+            $scale = (float)($body['m_per_wfrac'] ?? 0);
+            if ($scale <= 0) throw new \RuntimeException('Scala non valida');
+            $this->annRepo->setCalibration($docId, $page, $scale, (int)($user?->id ?? 0));
+            return ['ok' => true, 'm_per_wfrac' => $scale];
         });
     }
 

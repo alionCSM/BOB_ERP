@@ -379,7 +379,11 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
            ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans'])
            ->get( '/worksites/{id}/zone/disegni',                                                 [FieldwireController::class, 'disegni'])
-           ->post('/worksites/{id}/zone/disegni/{docId}/push-fieldwire',                          [FieldwireController::class, 'pushDisegno']);
+           ->post('/worksites/{id}/zone/disegni/{docId}/push-fieldwire',                          [FieldwireController::class, 'pushDisegno'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'annotations'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'saveAnnotation'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/annotations/{annId}/delete',              [FieldwireController::class, 'deleteAnnotation'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/calibration',                             [FieldwireController::class, 'setCalibration']);
 
     $router->dispatch($request, $container);
 }
