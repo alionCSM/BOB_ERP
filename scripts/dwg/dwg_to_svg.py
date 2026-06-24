@@ -123,8 +123,10 @@ def emit_svg(dxf_path, svg_path):
     stroke = max(w, h) * 0.0008
 
     polylines = []
-    # esplode blocchi/insert e appiattisce curve in polilinee WCS
-    for prim in disassemble.to_primitives(disassemble.recursive_decompose([msp])):
+    # esplode blocchi/insert e appiattisce curve in polilinee WCS.
+    # NB: recursive_decompose vuole un iterabile di ENTITA' (msp lo è già),
+    # non il layout in una lista.
+    for prim in disassemble.to_primitives(disassemble.recursive_decompose(msp)):
         try:
             pts = list(prim.vertices())
         except Exception:
