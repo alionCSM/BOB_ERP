@@ -922,8 +922,12 @@ final class WorksitesController
             );
         }
 
-        // Fieldwire flags per il bottone BOB Zone (badge "collegato" + abilitazione)
-        $fieldwireProjectId = $worksite['fieldwire_project_id'] ?? null;
+        // Fieldwire flags per il bottone BOB Zone (badge "collegato" + abilitazione).
+        // $worksite e' un oggetto App\Domain\Worksite (NON array), e la classe
+        // non espone fieldwire_project_id come getter → query diretta su PDO.
+        $fwStmt = $this->conn->prepare("SELECT fieldwire_project_id FROM bb_worksites WHERE id = :id");
+        $fwStmt->execute([':id' => $worksite_id]);
+        $fieldwireProjectId = $fwStmt->fetchColumn() ?: null;
         $fieldwireEnabled   = (new \App\Infrastructure\Config())->fieldwireEnabled();
         $fieldwireLinked    = !empty($fieldwireProjectId);
 
