@@ -115,6 +115,23 @@ class CloudPath
         ]);
     }
 
+    /**
+     * Cartella foto BOB Zone per un cantiere: <root>/BOBZone/<worksiteId>/photos
+     * Struttura piatta (non serve client/anno): le foto sono allegati operativi.
+     */
+    public static function ensureZonePhotosDir(int $worksiteId): string
+    {
+        $path = implode(DIRECTORY_SEPARATOR, [self::root(), 'BOBZone', (string)$worksiteId, 'photos']);
+        if (!is_dir($path) && !@mkdir($path, 0775, true) && !is_dir($path)) {
+            $err = error_get_last()['message'] ?? '?';
+            throw new RuntimeException("Impossibile creare la cartella foto: {$path} ({$err})");
+        }
+        if (!is_writable($path)) {
+            throw new RuntimeException("Cartella foto non scrivibile: {$path}");
+        }
+        return $path;
+    }
+
     public static function relativeToRoot(string $absolutePath): string
     {
         $root = rtrim(self::root(), DIRECTORY_SEPARATOR);

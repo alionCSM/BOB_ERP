@@ -312,6 +312,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
             <div class="bz-detail-inner" id="bz-detail-inner"></div>
             <div class="bz-comment-input-wrap">
+                <label class="bz-comment-photo" title="Allega foto">
+                    <i class="fas fa-camera"></i>
+                    <input type="file" id="bz-photo-input" accept="image/*" capture="environment" hidden>
+                </label>
                 <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"></textarea>
                 <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
@@ -899,7 +903,8 @@ async function loadComments(taskId) {
                             title="Elimina commento"
                             style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
                 </div>
-                <div class="bz-comment-text">${escHtml(c.text || '')}</div>
+                ${c.text ? `<div class="bz-comment-text">${escHtml(c.text)}</div>` : ''}
+                ${c.file_url ? `<a href="${escAttr(c.file_url)}" target="_blank" rel="noopener"><img class="bz-comment-photo-thumb" src="${escAttr(c.file_url)}" alt="foto" loading="lazy"></a>` : ''}
             </div>
         </div>`).join('');
     el.scrollTop = el.scrollHeight;
@@ -1138,6 +1143,27 @@ document.getElementById('bz-comment-input')?.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); }
 });
 
+// Foto sul task (allegato sul commento)
+document.getElementById('bz-photo-input')?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !activeTaskId) return;
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('text', document.getElementById('bz-comment-input')?.value?.trim() || '');
+    const lbl = document.querySelector('.bz-comment-photo');
+    if (lbl) lbl.classList.add('uploading');
+    const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/photo`, { method: 'POST', body: fd });
+    if (lbl) lbl.classList.remove('uploading');
+    if (res.ok) {
+        const inp = document.getElementById('bz-comment-input');
+        if (inp) inp.value = '';
+        loadComments(activeTaskId);
+    } else {
+        alert('Errore caricamento foto: ' + (res.error || 'sconosciuto'));
+    }
+});
+
 // Calendar nav
 document.querySelectorAll('[data-cal]').forEach(btn => {
     btn.addEventListener('click', () => calNav(parseInt(btn.dataset.cal)));
@@ -1360,6 +1386,12 @@ loadBobUsers();
 .bz-dz-btn.fw { color: #93c5fd; }
 .bz-dz-fw-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #4ade80; font-weight: 600; }
 .bz-dz-empty { grid-column: 1/-1; text-align: center; color: #475569; font-size: 13px; padding: 40px 0; }
+
+/* Foto su commenti */
+.bz-comment-photo { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; flex-shrink:0; border-radius:8px; background:#1e293b; border:1px solid #273548; color:#94a3b8; cursor:pointer; transition:all .12s; }
+.bz-comment-photo:hover { color:#e2e8f0; border-color:#334155; }
+.bz-comment-photo.uploading { opacity:.5; pointer-events:none; }
+.bz-comment-photo-thumb { margin-top:6px; max-width:100%; max-height:180px; border-radius:8px; border:1px solid #273548; display:block; }
 </style>
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">

@@ -221,6 +221,84 @@ final class FieldwireController
         });
     }
 
+    /** Upload foto su un task → crea un commento con file_url. Multipart. */
+    public function postPhoto(Request $request): void
+    {
+        // NB: multipart, non JSON. Risponde JSON.
+        header('Content-Type: application/json');
+        try {
+            $worksiteId = (int) $request->param('id');
+            $taskId     = (int) $request->param('taskId');
+            $user       = $request->user();
+
+            if (empty($_FILES['photo']) || ($_FILES['photo']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new \RuntimeException('Nessuna foto ricevuta');
+            }
+            $f = $_FILES['photo'];
+            if (($f['size'] ?? 0) > 25 * 1024 * 1024) {
+                throw new \RuntimeException('Foto troppo grande (max 25 MB)');
+            }
+            $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'heic'], true)) {
+                throw new \RuntimeException('Formato immagine non consentito');
+            }
+            $mime = (new \finfo(FILEINFO_MIME_TYPE))->file((string)$f['tmp_name']);
+            if (strpos((string)$mime, 'image/') !== 0 && $mime !== 'application/octet-stream') {
+                throw new \RuntimeException('Il file non è un\'immagine');
+            }
+
+            $dir  = \CloudPath::ensureZonePhotosDir($worksiteId);
+            $name = 't' . $taskId . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
+            $dest = $dir . DIRECTORY_SEPARATOR . $name;
+            if (!move_uploaded_file($f['tmp_name'], $dest)) {
+                throw new \RuntimeException('Salvataggio foto fallito');
+            }
+            $rel = \CloudPath::relativeToRoot($dest);
+
+            $authorName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''))
+                         ?: ($user->username ?? 'Utente');
+            $text = trim($_POST['text'] ?? '');
+            $fileUrl = "/worksites/{$worksiteId}/zone/photo?f=" . rawurlencode($rel);
+
+            $id = $this->zoneRepo->addComment($taskId, $text, $authorName, $fileUrl);
+
+            echo json_encode(['ok' => true, 'data' => [
+                'id' => $id, 'text' => $text, 'author_name' => $authorName,
+                'file_url' => $fileUrl, 'created_at' => date('Y-m-d H:i:s'),
+            ]]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** Stream di una foto BOB Zone (path relativo in ?f=). */
+    public function zonePhoto(Request $request): void
+    {
+        $worksiteId = (int) $request->param('id');
+        $rel = (string) ($_GET['f'] ?? '');
+        // sicurezza: deve stare sotto BOBZone/<worksiteId>/ e niente traversal
+        $expectedPrefix = 'BOBZone/' . $worksiteId . '/';
+        $relNorm = str_replace('\\', '/', $rel);
+        if ($rel === '' || strpos($relNorm, '..') !== false || strpos($relNorm, $expectedPrefix) !== 0) {
+            http_response_code(403); exit('Accesso negato');
+        }
+        $abs = \CloudPath::getRoot() . DIRECTORY_SEPARATOR . $rel;
+        $real = realpath($abs);
+        $rootReal = realpath(\CloudPath::getRoot());
+        if ($real === false || $rootReal === false || strpos($real, $rootReal) !== 0 || !is_file($real)) {
+            http_response_code(404); exit('Foto non trovata');
+        }
+        $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+        $mimeMap = ['jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','webp'=>'image/webp','heic'=>'image/heic'];
+        header('Content-Type: ' . ($mimeMap[$ext] ?? 'application/octet-stream'));
+        header('Content-Length: ' . filesize($real));
+        header('X-Frame-Options: SAMEORIGIN');
+        readfile($real);
+        exit;
+    }
+
     public function deleteComment(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
