@@ -80,7 +80,7 @@ final class FieldwireController
                 throw new \RuntimeException('Il nome del task è obbligatorio');
             }
 
-            $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user->id ?? 0));
+            $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user?->id ?? 0));
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
             return $this->zoneRepo->find($taskId);
@@ -494,14 +494,40 @@ final class FieldwireController
         return is_array($data) ? $data : [];
     }
 
+    /**
+     * Wrap controller action in JSON response.
+     *
+     * Output buffer trick: cattura qualsiasi PHP warning/notice (o output
+     * accidentale di altre includes) PRIMA che venga emesso. Senza questo,
+     * un warning silenzioso bombarda il JSON e il frontend mostra
+     * "Risposta non valida dal server".
+     */
     private function jsonResponse(callable $fn): void
     {
-        header('Content-Type: application/json');
+        // pulisce eventuali buffer ereditati
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        ob_start();
+
         try {
-            echo json_encode(['ok' => true, 'data' => $fn()]);
+            $data = $fn();
+            $stray = ob_get_clean();
+            if ($stray !== '') {
+                error_log('[FieldwireController] stray output before JSON: ' . substr($stray, 0, 500));
+            }
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
         } catch (\Throwable $e) {
+            ob_end_clean();
+            error_log('[FieldwireController] ' . $e::class . ': ' . $e->getMessage()
+                    . ' @ ' . $e->getFile() . ':' . $e->getLine());
             http_response_code(500);
-            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+            header('Content-Type: application/json');
+            echo json_encode([
+                'ok'    => false,
+                'error' => $e->getMessage(),
+                'type'  => $e::class,
+                'where' => basename($e->getFile()) . ':' . $e->getLine(),
+            ], JSON_UNESCAPED_UNICODE);
         }
         exit;
     }

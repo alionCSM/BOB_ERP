@@ -423,8 +423,16 @@ async function api(url, opts = {}) {
     try {
         const r = await fetch(url, { ...opts });
         const text = await r.text();
-        try { return JSON.parse(text); }
-        catch { console.error('Non-JSON response from', url, text.slice(0, 200)); return { ok: false, error: 'Risposta non valida dal server' }; }
+        try {
+            const json = JSON.parse(text);
+            if (!json.ok && json.where) {
+                console.warn('[API error]', url, json.type, json.error, '@', json.where);
+            }
+            return json;
+        } catch {
+            console.error('[Non-JSON response]', url, 'HTTP', r.status, '\n--- body ---\n', text.slice(0, 1500));
+            return { ok: false, error: 'Risposta non valida dal server (HTTP ' + r.status + ') — vedi DevTools Console' };
+        }
     } catch (e) {
         console.error('Fetch error', url, e);
         return { ok: false, error: e.message };
