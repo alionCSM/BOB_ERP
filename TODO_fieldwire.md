@@ -320,7 +320,8 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
 - [x] **Foto sui task** — upload + fotocamera mobile, thumbnail nei commenti
 - [x] **Notifiche** — notifica BOB all'assegnatario su create/cambio assegnazione
 - [x] **Mobile-friendly** — layout responsive (header/toolbar/kanban/detail/annotator)
-- [ ] **Report PDF / Punch list** — export lista task con foto (dompdf) — DA FARE
+- [x] **Report PDF / Punch list** — export lista task raggruppata per stato
+      con foto incorporate (dompdf + GD downscale)
 - [ ] Notifica anche su nuovo commento (oltre assegnazione)
 
 ### 🟡 Tavole (Floorplans) / Disegni

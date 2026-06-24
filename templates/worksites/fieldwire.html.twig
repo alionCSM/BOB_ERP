@@ -244,7 +244,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <i class="fas fa-drafting-compass"></i> Disegni
             </button>
         </div>
-        <button class="bz-new-btn" id="btn-new-task">
+        <a class="bz-new-btn" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"
+           style="background:#1e293b;color:#cbd5e1;border:1px solid #273548;margin-left:auto;text-decoration:none;">
+            <i class="fas fa-file-pdf"></i> Report PDF
+        </a>
+        <button class="bz-new-btn" id="btn-new-task" style="margin-left:8px;">
             <i class="fas fa-plus"></i> Nuovo Task
         </button>
     </div>

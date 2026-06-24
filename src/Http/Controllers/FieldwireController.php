@@ -439,6 +439,29 @@ final class FieldwireController
         });
     }
 
+    /** Report PDF (punch list) dei task del cantiere. */
+    public function report(Request $request): void
+    {
+        $worksiteId = (int) $request->param('id');
+        $worksite   = $this->worksiteRepo->findById($worksiteId);
+        if (!$worksite) { http_response_code(404); exit('Cantiere non trovato'); }
+
+        try {
+            $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate($worksiteId, $worksite);
+        } catch (\Throwable $e) {
+            error_log('[FW report] ' . $e->getMessage());
+            http_response_code(500);
+            exit('Errore generazione report: ' . $e->getMessage());
+        }
+
+        $fname = 'punchlist_' . ($worksite['worksite_code'] ?? $worksiteId) . '_' . date('Ymd') . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        header('Content-Length: ' . strlen($pdf));
+        echo $pdf;
+        exit;
+    }
+
     // ─── Lookup utenti BOB (per dropdown assignee) ────────────────────────────
 
     public function bobUsers(Request $request): void

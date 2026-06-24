@@ -379,6 +379,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
+           ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
            ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans'])
            ->get( '/worksites/{id}/zone/disegni',                                                 [FieldwireController::class, 'disegni'])
            ->post('/worksites/{id}/zone/disegni/{docId}/push-fieldwire',                          [FieldwireController::class, 'pushDisegno'])
