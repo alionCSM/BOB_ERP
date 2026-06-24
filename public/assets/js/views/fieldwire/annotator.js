@@ -141,11 +141,10 @@
         dom.side.classList.remove('open');
         setTool('select');
 
-        if ((cfg.fileType || '').toLowerCase() === 'pdf') {
-            await loadPdf();
-        } else {
-            await loadImage();
-        }
+        const ft = (cfg.fileType || '').toLowerCase();
+        if (ft === 'pdf')      await loadPdf();
+        else if (ft === 'dwg') await loadDwg();
+        else                   await loadImage();
         await loadAnnotations();
     }
 
@@ -171,6 +170,36 @@
             };
             img.onerror = () => { dom.loading.textContent = 'Impossibile caricare l\'immagine.'; resolve(); };
             img.src = S.viewUrl;
+        });
+    }
+
+    // DWG → SVG vettoriale convertito server-side. Misure esatte dalle
+    // coordinate CAD reali (extents + meters_per_unit), niente calibrazione.
+    async function loadDwg() {
+        const meta = await api(`${base()}/dwg`);
+        if (!meta.ok || meta.data.status !== 'ok' || !meta.data.svg_url) {
+            dom.loading.textContent = 'DWG non ancora convertito. Chiudi e clicca "Converti".';
+            return;
+        }
+        const m = meta.data;
+        S.dwg = {
+            minx: m.minx, miny: m.miny, maxx: m.maxx, maxy: m.maxy,
+            mpu: m.meters_per_unit, // metri per unità disegno (può essere null)
+        };
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                S.natW = img.naturalWidth || 1000;
+                S.natH = img.naturalHeight || Math.round(1000 * (m.maxy - m.miny) / Math.max(1e-6, (m.maxx - m.minx)));
+                S.pageCount = 1;
+                dom.page.innerHTML = '';
+                img.style.width = '100%';
+                dom.page.appendChild(img);
+                finishRender();
+                resolve();
+            };
+            img.onerror = () => { dom.loading.textContent = 'Impossibile caricare l\'SVG.'; resolve(); };
+            img.src = m.svg_url;
         });
     }
 
@@ -385,8 +414,15 @@
     // ── Misure / calibrazione ────────────────────────────────────────────────
     function normDist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); } // in unità width-frazione
     function measureMeters(a, b) {
-        if (!S.calibration) return null;
-        return normDist(a, b) * S.calibration.m_per_wfrac;
+        const nd = normDist(a, b);
+        // DWG: misura esatta dalle coordinate CAD (extents + meters_per_unit)
+        if (S.dwg && S.dwg.mpu) {
+            const cadUnits = nd * (S.dwg.maxx - S.dwg.minx); // unità disegno
+            return cadUnits * S.dwg.mpu;
+        }
+        // PDF/immagine: calibrazione manuale
+        if (S.calibration) return nd * S.calibration.m_per_wfrac;
+        return null;
     }
 
     function startCalibration() {

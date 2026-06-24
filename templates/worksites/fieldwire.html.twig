@@ -965,10 +965,14 @@ function renderDisegni(items, fwReady) {
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
             <div class="bz-dz-actions">
-                ${['pdf','png','jpg','jpeg'].includes((d.file_type||'').toLowerCase())
+                ${d.annotatable
                     ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
-                    : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`}
+                    : (d.is_dwg
+                        ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
+                        : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)}
                 <a class="bz-dz-btn" href="${d.view_url}" download><i class="fas fa-download"></i></a>
                 ${fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
                 <button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>
@@ -1211,7 +1215,20 @@ document.addEventListener('click', e => {
         });
         return;
     }
+    const dwgConv = t.closest('[data-dwg-convert]');
+    if (dwgConv) { convertDwg(parseInt(dwgConv.dataset.dwgConvert), dwgConv); return; }
 });
+
+async function convertDwg(docId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner bz-spin"></i> Converto...'; }
+    const res = await api(`/worksites/${WID}/zone/disegni/${docId}/dwg/convert`, { method: 'POST' });
+    if (res.ok && res.data?.status === 'ok') {
+        disegniLoaded = false; loadDisegni();
+    } else {
+        alert('Conversione DWG fallita: ' + (res.data?.error || res.error || 'errore'));
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> Converti'; }
+    }
+}
 
 // Disegni: file input change → upload
 document.getElementById('dz-file-input')?.addEventListener('change', e => {

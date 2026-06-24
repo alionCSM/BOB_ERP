@@ -383,7 +383,10 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get( '/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'annotations'])
            ->post('/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'saveAnnotation'])
            ->post('/worksites/{id}/zone/disegni/{docId}/annotations/{annId}/delete',              [FieldwireController::class, 'deleteAnnotation'])
-           ->post('/worksites/{id}/zone/disegni/{docId}/calibration',                             [FieldwireController::class, 'setCalibration']);
+           ->post('/worksites/{id}/zone/disegni/{docId}/calibration',                             [FieldwireController::class, 'setCalibration'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/dwg',                                      [FieldwireController::class, 'dwgMeta'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/dwg/convert',                             [FieldwireController::class, 'dwgConvert'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/dwg-svg',                                  [FieldwireController::class, 'dwgSvg']);
 
     $router->dispatch($request, $container);
 }

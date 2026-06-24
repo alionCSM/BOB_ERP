@@ -1202,10 +1202,24 @@ final class WorksitesController
             ]);
         }
 
+        // DWG → conversione in SVG vettoriale per il viewer BOB Zone.
+        // Best-effort: se fallisce, il disegno resta caricato (status=error).
+        $dwgRender = null;
+        if ($extension === 'dwg' && $savedDocId > 0) {
+            try {
+                $dwgRender = (new \App\Service\Fieldwire\DwgConverter($this->conn))->convert($savedDocId);
+            } catch (\Throwable $e) {
+                error_log('[uploadDisegno] DWG convert: ' . $e->getMessage());
+            }
+        }
+
         // Chiamata AJAX da BOB Zone → rispondi JSON, niente redirect.
         if ($this->wantsJson($request)) {
             header('Content-Type: application/json');
-            echo json_encode(['ok' => true, 'data' => ['id' => $savedDocId, 'file_name' => $filename]]);
+            echo json_encode(['ok' => true, 'data' => [
+                'id' => $savedDocId, 'file_name' => $filename,
+                'dwg_render' => $dwgRender['status'] ?? null,
+            ]]);
             exit;
         }
 

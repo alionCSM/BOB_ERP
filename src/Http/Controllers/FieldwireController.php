@@ -395,27 +395,37 @@ final class FieldwireController
                 SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
                        d.created_at,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
-                       s.fw_sheet_upload_id, s.pushed_at
+                       s.fw_sheet_upload_id, s.pushed_at,
+                       r.status AS dwg_status
                 FROM bb_worksite_documents d
-                LEFT JOIN bb_users u            ON u.id = d.created_by
+                LEFT JOIN bb_users u             ON u.id = d.created_by
                 LEFT JOIN bb_zone_disegno_sync s ON s.document_id = d.id
+                LEFT JOIN bb_zone_dwg_render r   ON r.document_id = d.id
                 WHERE d.worksite_id = :wid AND d.is_deleted = 0
                   AND d.file_path LIKE '%/Disegni/%'
                 ORDER BY d.created_at DESC
             ");
             $stmt->execute([':wid' => $worksiteId]);
             $bob = array_map(function ($r) use ($worksiteId) {
+                $type = strtolower($r['file_type'] ?? '');
+                $isDwg = $type === 'dwg';
                 return [
-                    'id'         => (int)$r['id'],
-                    'file_name'  => $r['file_name'],
-                    'file_type'  => $r['file_type'],
-                    'note'       => $r['note'],
-                    'folder'     => $r['subcategory'] ?: 'altri',
-                    'uploader'   => trim($r['uploader']) ?: '—',
-                    'created_at' => $r['created_at'],
-                    'view_url'   => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
-                    'fw_synced'  => !empty($r['pushed_at']),
+                    'id'           => (int)$r['id'],
+                    'file_name'    => $r['file_name'],
+                    'file_type'    => $r['file_type'],
+                    'note'         => $r['note'],
+                    'folder'       => $r['subcategory'] ?: 'altri',
+                    'uploader'     => trim($r['uploader']) ?: '—',
+                    'created_at'   => $r['created_at'],
+                    'view_url'     => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
+                    'fw_synced'    => !empty($r['pushed_at']),
                     'fw_pushed_at' => $r['pushed_at'],
+                    // DWG: stato della conversione vettoriale
+                    'is_dwg'       => $isDwg,
+                    'dwg_status'   => $isDwg ? ($r['dwg_status'] ?? 'pending') : null,
+                    // annotabile se immagine/pdf, oppure dwg convertito con successo
+                    'annotatable'  => in_array($type, ['pdf','png','jpg','jpeg'], true)
+                                      || ($isDwg && ($r['dwg_status'] ?? '') === 'ok'),
                 ];
             }, $stmt->fetchAll(\PDO::FETCH_ASSOC));
 
@@ -562,6 +572,62 @@ final class FieldwireController
             $this->annRepo->delete($annId);
             return ['deleted' => true];
         });
+    }
+
+    // ─── DWG render (SVG vettoriale + meta per misure esatte) ─────────────────
+
+    /** Stato + meta del render DWG (svg url, extents, meters_per_unit). */
+    public function dwgMeta(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $docId      = (int) $request->param('docId');
+            $conv = new \App\Service\Fieldwire\DwgConverter($this->conn);
+            $row  = $conv->status($docId);
+            if (!$row) return ['status' => 'none'];
+            return [
+                'status'          => $row['status'],
+                'error'           => $row['error'],
+                'svg_url'         => $row['status'] === 'ok'
+                    ? "/worksites/{$worksiteId}/zone/disegni/{$docId}/dwg-svg" : null,
+                'minx'            => (float)$row['minx'],
+                'miny'            => (float)$row['miny'],
+                'maxx'            => (float)$row['maxx'],
+                'maxy'            => (float)$row['maxy'],
+                'insunits'        => $row['insunits'] !== null ? (int)$row['insunits'] : null,
+                'meters_per_unit' => $row['meters_per_unit'] !== null ? (float)$row['meters_per_unit'] : null,
+            ];
+        });
+    }
+
+    /** Rilancia la conversione DWG→SVG (retry manuale). */
+    public function dwgConvert(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $docId = (int) $request->param('docId');
+            return (new \App\Service\Fieldwire\DwgConverter($this->conn))->convert($docId);
+        });
+    }
+
+    /** Stream dell'SVG generato dal DWG. */
+    public function dwgSvg(Request $request): void
+    {
+        $docId = (int) $request->param('docId');
+        $row = (new \App\Service\Fieldwire\DwgConverter($this->conn))->status($docId);
+        if (!$row || $row['status'] !== 'ok' || empty($row['svg_path'])) {
+            http_response_code(404);
+            exit('SVG non disponibile');
+        }
+        $abs = \CloudPath::getRoot() . DIRECTORY_SEPARATOR . $row['svg_path'];
+        if (!is_file($abs)) {
+            http_response_code(404);
+            exit('File SVG non trovato');
+        }
+        header('Content-Type: image/svg+xml');
+        header('Content-Length: ' . filesize($abs));
+        header('X-Frame-Options: SAMEORIGIN');
+        readfile($abs);
+        exit;
     }
 
     /** Salva la calibrazione scala (metri per frazione-larghezza). */
