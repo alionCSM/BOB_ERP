@@ -360,6 +360,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get('/worksites/documents/{id}/download',                         [WorksitesController::class, 'downloadDocument']);
 
     // ── BOB Zone (Fieldwire) ───────────────────────────────────────────────────
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
     $router->post('/api/fieldwire/webhook',                                             [FieldwireController::class, 'webhook'])
            ->get( '/worksites/{id}/zone',                                               [FieldwireController::class, 'page'])
            ->post('/worksites/{id}/zone/enable',                                   [FieldwireController::class, 'enable'])
