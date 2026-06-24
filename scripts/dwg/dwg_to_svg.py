@@ -69,12 +69,28 @@ def dwg_to_dxf(dwg_path, out_dir):
                 return os.path.join(out_dir, f)
         fail("ODA: nessun DXF prodotto")
 
-    # LibreDWG dwg2dxf
+    # LibreDWG dwg2dxf. Risolvi il path in modo robusto: l'ambiente del web
+    # server (PHP-FPM) spesso NON ha /usr/local/bin nel PATH ne' /usr/local/lib
+    # nelle librerie. Cerchiamo il binario in posizioni note e forziamo
+    # LD_LIBRARY_PATH per caricare libredwg.so.
+    from shutil import which
+    dwg2dxf = (os.environ.get("BOB_DWG2DXF", "").strip()
+               or which("dwg2dxf")
+               or next((p for p in ("/usr/local/bin/dwg2dxf", "/usr/bin/dwg2dxf") if os.path.isfile(p)), None))
+    if not dwg2dxf:
+        fail("dwg2dxf non trovato (cerca in PATH, /usr/local/bin, /usr/bin; "
+             "oppure imposta BOB_DWG2DXF / BOB_ODA_CONVERTER).")
+
+    env = dict(os.environ)
+    ld = env.get("LD_LIBRARY_PATH", "")
+    for libdir in ("/usr/local/lib", "/usr/local/lib64"):
+        if libdir not in ld.split(":"):
+            ld = (ld + ":" + libdir) if ld else libdir
+    env["LD_LIBRARY_PATH"] = ld
+
     try:
-        subprocess.run(["dwg2dxf", "-o", dxf_path, dwg_path],
-                       check=True, capture_output=True, timeout=120)
-    except FileNotFoundError:
-        fail("dwg2dxf non trovato. Installa libredwg-tools o configura BOB_ODA_CONVERTER.")
+        subprocess.run([dwg2dxf, "-o", dxf_path, dwg_path],
+                       check=True, capture_output=True, timeout=120, env=env)
     except subprocess.CalledProcessError as e:
         fail("dwg2dxf fallito: " + (e.stderr.decode("utf-8", "ignore")[:300] if e.stderr else "errore"))
     if not os.path.isfile(dxf_path):
