@@ -142,6 +142,12 @@ final class Config
     public function ollamaUrl(): string   { return $this->get('OLLAMA_URL', ''); }
     public function ollamaModel(): string { return $this->get('MODEL', ''); }
 
+    // ── Fieldwire ─────────────────────────────────────────────────────────────
+
+    public function fieldwireToken(): string  { return $this->get('FIELDWIRE_API_TOKEN', ''); }
+    public function fieldwireRegion(): string { return $this->get('FIELDWIRE_REGION', 'eu'); }
+    public function fieldwireEnabled(): bool  { return !empty($this->get('FIELDWIRE_API_TOKEN', '')); }
+
     public function attestatoUrl(): string { return rtrim($this->get('ATTESTATO_URL', 'https://docs.csmontaggi.it'), '/'); }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
