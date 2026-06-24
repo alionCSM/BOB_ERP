@@ -298,10 +298,12 @@
                 if (a1 && b1) {
                     const x1=a1.x*SCALE,y1=a1.y*SCALE,x2=b1.x*SCALE,y2=b1.y*SCALE;
                     const mx=(x1+x2)/2, my=(y1+y2)/2;
+                    const lbl = measureLabel(g);
+                    const lblW = Math.max(40, lbl.length * 9);
                     svg += `<g data-ann="${a.id}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="3"/>
                         <circle cx="${x1}" cy="${y1}" r="4" fill="${col}"/><circle cx="${x2}" cy="${y2}" r="4" fill="${col}"/>
-                        <rect x="${mx-34}" y="${my-22}" width="68" height="18" rx="4" fill="#0f172a"/>
-                        <text x="${mx}" y="${my-9}" text-anchor="middle" font-size="14" fill="#fff">${g.m != null ? g.m.toFixed(2)+' m' : '?'}</text></g>`;
+                        <rect x="${mx-lblW/2}" y="${my-22}" width="${lblW}" height="18" rx="4" fill="#0f172a"/>
+                        <text x="${mx}" y="${my-9}" text-anchor="middle" font-size="14" fill="#fff">${lbl}</text></g>`;
                 }
             } else if (a.type === 'arrow') {
                 const a1=g.a,b1=g.b;
@@ -394,8 +396,9 @@
 
         if (d.tool === 'measure') {
             if (tiny) { redraw(); return; }
-            const m = measureMeters(a, b);
-            saveAnn({ type: 'measure', geom: { a, b, m } });
+            const m  = measureMeters(a, b);
+            const cu = measureCadUnits(a, b);
+            saveAnn({ type: 'measure', geom: { a, b, m, cu } });
         } else if (d.tool === 'arrow') {
             if (tiny) { redraw(); return; }
             saveAnn({ type: 'arrow', geom: { a, b } });
@@ -413,16 +416,30 @@
 
     // ── Misure / calibrazione ────────────────────────────────────────────────
     function normDist(a, b) { return Math.hypot(b.x - a.x, b.y - a.y); } // in unità width-frazione
+
+    // distanza in unità disegno CAD (solo DWG/DXF)
+    function measureCadUnits(a, b) {
+        if (!S.dwg) return null;
+        return normDist(a, b) * (S.dwg.maxx - S.dwg.minx);
+    }
+
+    // metri, se possibile: 1) DWG con unità note 2) calibrazione manuale. Altrimenti null.
     function measureMeters(a, b) {
         const nd = normDist(a, b);
-        // DWG: misura esatta dalle coordinate CAD (extents + meters_per_unit)
-        if (S.dwg && S.dwg.mpu) {
-            const cadUnits = nd * (S.dwg.maxx - S.dwg.minx); // unità disegno
-            return cadUnits * S.dwg.mpu;
-        }
-        // PDF/immagine: calibrazione manuale
-        if (S.calibration) return nd * S.calibration.m_per_wfrac;
+        if (S.dwg && S.dwg.mpu) return measureCadUnits(a, b) * S.dwg.mpu;
+        if (S.calibration)      return nd * S.calibration.m_per_wfrac; // vale anche per DWG unitless calibrato
         return null;
+    }
+
+    // etichetta da mostrare sulla misura
+    function measureLabel(geom) {
+        if (geom.m != null)  return geom.m.toFixed(2) + ' m';
+        if (geom.cu != null) return fmtNum(geom.cu) + ' u'; // unità disegno (DWG unitless)
+        return '?';
+    }
+    function fmtNum(n) {
+        if (n >= 1000) return Math.round(n).toLocaleString('it-IT');
+        return (Math.round(n * 100) / 100).toString();
     }
 
     function startCalibration() {
@@ -505,8 +522,10 @@
                 <div style="color:#64748b;font-size:12px;">Stato: ${escapeHtml(a.task_status||'—')}${a.task_assignee?' · '+escapeHtml(a.task_assignee):''}</div></div>`;
         } else if (a.text) {
             info = `<div class="bza-field"><label>Nota</label><div style="color:#e2e8f0;font-size:13px;">${escapeHtml(a.text)}</div></div>`;
-        } else if (a.type === 'measure' && a.geom?.m != null) {
-            info = `<div class="bza-field"><label>Misura</label><div style="color:#e2e8f0;font-size:15px;font-weight:700;">${a.geom.m.toFixed(2)} m</div></div>`;
+        } else if (a.type === 'measure') {
+            info = `<div class="bza-field"><label>Misura</label><div style="color:#e2e8f0;font-size:15px;font-weight:700;">${measureLabel(a.geom || {})}</div>`
+                 + (a.geom?.m == null ? '<div class="bza-hint">Disegno senza unità: usa "Calibra" per ottenere i metri.</div>' : '')
+                 + `</div>`;
         }
         dom.side.innerHTML = `
             <h4>${labelFor(a.type)}</h4>
