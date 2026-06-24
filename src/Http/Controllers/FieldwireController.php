@@ -41,7 +41,7 @@ final class FieldwireController
 
     public function page(Request $request): void
     {
-        $worksiteId = (int) ($request->routeParam('id') ?? 0);
+        $worksiteId = (int) ($request->param('id') ?? 0);
         $worksite   = $this->worksiteRepo->findById($worksiteId);
 
         if (!$worksite) {
@@ -63,7 +63,7 @@ final class FieldwireController
     {
         $this->jsonResponse(function () use ($request) {
             $user       = $request->user();
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
+            $worksiteId = (int) ($request->param('id') ?? 0);
             $worksite   = $this->worksiteRepo->findById($worksiteId);
 
             if (!$worksite) throw new \RuntimeException('Cantiere non trovato');
@@ -82,7 +82,7 @@ final class FieldwireController
     public function disable(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
+            $worksiteId = (int) ($request->param('id') ?? 0);
             $worksite   = $this->worksiteRepo->findById($worksiteId);
 
             if (!$worksite) throw new \RuntimeException('Cantiere non trovato');
@@ -99,7 +99,7 @@ final class FieldwireController
     public function tasks(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
+            $worksiteId = (int) ($request->param('id') ?? 0);
             return $this->taskRepo->allForWorksite($worksiteId);
         });
     }
@@ -107,7 +107,7 @@ final class FieldwireController
     public function createTask(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
+            $worksiteId = (int) ($request->param('id') ?? 0);
             $worksite   = $this->worksiteRepo->findById($worksiteId);
             if (!$worksite || empty($worksite['fieldwire_project_id'])) {
                 throw new \RuntimeException('Cantiere non collegato a Fieldwire');
@@ -126,8 +126,8 @@ final class FieldwireController
     public function updateTask(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
-            $taskId     = $request->routeParam('taskId') ?? '';
+            $worksiteId = (int) ($request->param('id') ?? 0);
+            $taskId     = $request->param('taskId') ?? '';
             $worksite   = $this->worksiteRepo->findById($worksiteId);
             if (!$worksite || empty($worksite['fieldwire_project_id'])) {
                 throw new \RuntimeException('Cantiere non collegato a Fieldwire');
@@ -146,7 +146,7 @@ final class FieldwireController
     public function bubbles(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $taskId = $request->routeParam('taskId') ?? '';
+            $taskId = $request->param('taskId') ?? '';
             return $this->bubbleRepo->allForTask($taskId);
         });
     }
@@ -154,8 +154,8 @@ final class FieldwireController
     public function postBubble(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
-            $taskId     = $request->routeParam('taskId') ?? '';
+            $worksiteId = (int) ($request->param('id') ?? 0);
+            $taskId     = $request->param('taskId') ?? '';
             $worksite   = $this->worksiteRepo->findById($worksiteId);
             if (!$worksite || empty($worksite['fieldwire_project_id'])) {
                 throw new \RuntimeException('Cantiere non collegato a Fieldwire');
@@ -178,7 +178,7 @@ final class FieldwireController
     public function checkItems(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $taskId = $request->routeParam('taskId') ?? '';
+            $taskId = $request->param('taskId') ?? '';
             return $this->checkRepo->allForTask($taskId);
         });
     }
@@ -186,9 +186,9 @@ final class FieldwireController
     public function completeCheckItem(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId  = (int) ($request->routeParam('id') ?? 0);
-            $taskId      = $request->routeParam('taskId') ?? '';
-            $checkItemId = $request->routeParam('checkItemId') ?? '';
+            $worksiteId  = (int) ($request->param('id') ?? 0);
+            $taskId      = $request->param('taskId') ?? '';
+            $checkItemId = $request->param('checkItemId') ?? '';
             $worksite    = $this->worksiteRepo->findById($worksiteId);
             if (!$worksite || empty($worksite['fieldwire_project_id'])) {
                 throw new \RuntimeException('Cantiere non collegato a Fieldwire');
@@ -207,7 +207,7 @@ final class FieldwireController
     public function floorplans(Request $request): void
     {
         $this->jsonResponse(function () use ($request) {
-            $worksiteId = (int) ($request->routeParam('id') ?? 0);
+            $worksiteId = (int) ($request->param('id') ?? 0);
             return $this->floorplanRepo->allForWorksite($worksiteId);
         });
     }
