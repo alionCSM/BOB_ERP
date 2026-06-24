@@ -215,7 +215,69 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .pill-progress { background: rgba(96,165,250,.12); color: #60a5fa; }
 .pill-done { background: rgba(74,222,128,.12); color: #4ade80; }
 .pill-verified { background: rgba(167,139,250,.12); color: #a78bfa; }
+
+/* ══════════════════════════
+   TEMA CHIARO (override: il dark è il default)
+══════════════════════════ */
+[data-theme="light"] body { background: #f1f5f9; color: #1e293b; }
+[data-theme="light"] .bz-header,
+[data-theme="light"] .bz-sidebar { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .bz-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .bz-sidebar { border-right-color: #e2e8f0; }
+[data-theme="light"] .bz-sep, [data-theme="light"] .bz-nav-sep,
+[data-theme="light"] .bz-nav-fw { background: #e2e8f0; border-color: #e2e8f0; }
+[data-theme="light"] .bz-brand-zone { color: #0f172a; }
+[data-theme="light"] .bz-brand-bob, [data-theme="light"] .bz-wname,
+[data-theme="light"] .bz-back { color: #64748b; }
+[data-theme="light"] .bz-nav-item { color: #475569; }
+[data-theme="light"] .bz-nav-item:hover { background: #f1f5f9; color: #0f172a; }
+[data-theme="light"] .bz-nav-item.active { background: #e0e7ff; color: #1e3a8a; }
+[data-theme="light"] .bz-nav-actions .bz-nav-item { color: #334155; }
+[data-theme="light"] .bz-info { background: #f8fafc; border-color: #e2e8f0; }
+[data-theme="light"] .bz-info-title { color: #94a3b8; }
+[data-theme="light"] .bz-info-row { color: #475569; }
+[data-theme="light"] .bz-col, [data-theme="light"] .bz-gantt,
+[data-theme="light"] .bz-calendar, [data-theme="light"] .bz-detail-wrap { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .bz-col-head, [data-theme="light"] .bz-detail-topbar,
+[data-theme="light"] .bz-detail-section, [data-theme="light"] .bz-col-add { border-color: #e2e8f0; }
+[data-theme="light"] .bz-card { background: #f8fafc; border-color: #e2e8f0; }
+[data-theme="light"] .bz-card:hover { border-color: #cbd5e1; }
+[data-theme="light"] .bz-card-name { color: #1e293b; }
+[data-theme="light"] .bz-detail-title-input { color: #0f172a; }
+[data-theme="light"] .bz-check-row label { color: #334155; }
+[data-theme="light"] .bz-cal-day { background: #f1f5f9; }
+[data-theme="light"] .bz-cal-day.today { background: #e0e7ff; border-color: #c7d2fe; }
+[data-theme="light"] .bz-cal-title { color: #1e293b; }
+[data-theme="light"] .bz-kanban-filters { border-color: #e2e8f0; }
+[data-theme="light"] .bz-kanban-filters input,
+[data-theme="light"] .bz-kanban-filters select,
+[data-theme="light"] .bz-check-add input,
+[data-theme="light"] .bz-comment-input { background: #ffffff; border-color: #e2e8f0; color: #1e293b; }
+[data-theme="light"] .bz-comment-photo { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+[data-theme="light"] .bz-col-count { background: #f1f5f9; color: #64748b; }
+[data-theme="light"] .bz-comment-input-wrap { border-color: #e2e8f0; }
+
+/* Theme toggle button */
+.bz-theme-toggle { background: none; border: 1px solid #273548; color: #94a3b8; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.bz-theme-toggle:hover { color: #e2e8f0; }
+[data-theme="light"] .bz-theme-toggle { border-color: #e2e8f0; color: #64748b; }
+
+/* Info cantiere (sidebar) */
+.bz-info { margin-top: 12px; padding: 10px; background: #111827; border: 1px solid #1e293b; border-radius: 8px; }
+.bz-info-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #475569; margin-bottom: 8px; }
+.bz-info-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #94a3b8; margin-bottom: 5px; line-height: 1.3; }
+.bz-info-row i { width: 13px; text-align: center; color: #64748b; flex-shrink: 0; }
+.bz-info-counts { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1e293b; font-size: 11px; color: #94a3b8; }
 </style>
+<script nonce="{{ cspNonce }}">
+/* applica il tema PRIMA del render per evitare il flash */
+(function () {
+    var pref = localStorage.getItem('bzTheme') || 'system';
+    var light = pref === 'light' || (pref === 'system' && window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: light)').matches);
+    document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+})();
+</script>
 </head>
 <body>
 <div class="bz">
@@ -231,7 +293,12 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <span class="bz-brand-zone">Zone</span>
         </div>
         <div class="bz-sep"></div>
-        <span class="bz-wname">{{ worksite.name }}</span>
+        <span class="bz-wname">{{ worksite.worksite_code ? '[' ~ worksite.worksite_code ~ '] ' : '' }}{{ worksite.name }}</span>
+        <div class="bz-header-right">
+            <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
+                <i class="fas fa-circle-half-stroke"></i>
+            </button>
+        </div>
     </header>
 
     {# ── Main: sidebar + body ── #}
@@ -250,6 +317,22 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>
                 <a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>
             </div>
+
+            {# ── Info cantiere ── #}
+            <div class="bz-info">
+                <div class="bz-info-title">Cantiere</div>
+                {% if clientName %}<div class="bz-info-row"><i class="fas fa-user-tie"></i><span>{{ clientName }}</span></div>{% endif %}
+                {% if worksite.location %}<div class="bz-info-row"><i class="fas fa-location-dot"></i><span>{{ worksite.location }}</span></div>{% endif %}
+                {% if worksite.status %}<div class="bz-info-row"><i class="fas fa-circle-info"></i><span>{{ worksite.status }}</span></div>{% endif %}
+                {% if worksite.start_date %}<div class="bz-info-row"><i class="fas fa-calendar-day"></i><span>Inizio {{ worksite.start_date|date('d/m/Y') }}</span></div>{% endif %}
+                {% if worksite.order_number %}<div class="bz-info-row"><i class="fas fa-file-signature"></i><span>Ord. {{ worksite.order_number }}</span></div>{% endif %}
+                <div class="bz-info-counts">
+                    <span title="Aperti"><b style="color:#fbbf24">{{ taskCounts.open }}</b> aperti</span>
+                    <span title="In corso"><b style="color:#60a5fa">{{ taskCounts.in_progress }}</b> in corso</span>
+                    <span title="Completati"><b style="color:#4ade80">{{ taskCounts.complete }}</b> fatti</span>
+                </div>
+            </div>
+
             <div class="bz-nav-spacer"></div>
             <div class="bz-nav-fw">
                 {% if fieldwire_project_id %}
@@ -1178,6 +1261,29 @@ document.querySelectorAll('.bz-view-btn').forEach(btn => {
 // New task button
 document.getElementById('btn-new-task')?.addEventListener('click', () => openModal());
 
+// Theme toggle (system → light → dark)
+(function () {
+    const order = ['system', 'light', 'dark'];
+    const icons = { system: 'fa-circle-half-stroke', light: 'fa-sun', dark: 'fa-moon' };
+    const pref = () => localStorage.getItem('bzTheme') || 'system';
+    const resolve = p => p === 'system'
+        ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : p;
+    const apply = () => {
+        document.documentElement.setAttribute('data-theme', resolve(pref()));
+        const btn = document.getElementById('bz-theme-toggle');
+        if (btn) { btn.querySelector('i').className = 'fas ' + icons[pref()]; btn.title = 'Tema: ' + pref(); }
+    };
+    apply();
+    document.getElementById('bz-theme-toggle')?.addEventListener('click', () => {
+        const next = order[(order.indexOf(pref()) + 1) % order.length];
+        localStorage.setItem('bzTheme', next);
+        apply();
+    });
+    if (window.matchMedia) {
+        matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (pref() === 'system') apply(); });
+    }
+})();
+
 // Filtri Kanban
 document.getElementById('bz-filter-search')?.addEventListener('input', e => { kFilter.q = e.target.value; renderKanban(); });
 document.getElementById('bz-filter-assignee')?.addEventListener('change', e => { kFilter.assignee = e.target.value; renderKanban(); });
@@ -1477,6 +1583,7 @@ loadBobUsers();
     .bz-nav-sep, .bz-nav-spacer { display: none; }
     .bz-nav-fw { padding: 0; border: none; }
     .bz-nav-fw .bz-fw-off { display: none; }
+    .bz-info { display: none; }
     .bz-nav-fw-btn span { display: inline; }   /* il connect FW mostra il testo */
     /* pannello dettaglio task: overlay a tutto schermo */
     .bz-detail-wrap { position: fixed; inset: 0; width: 100% !important; z-index: 50; border-left: none; }

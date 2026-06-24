@@ -55,9 +55,28 @@ final class FieldwireController
         $worksite   = $this->worksiteRepo->findById($worksiteId);
         if (!$worksite) { http_response_code(404); exit; }
 
+        // nome cliente
+        $clientName = null;
+        if (!empty($worksite['client_id'])) {
+            $cs = $this->conn->prepare("SELECT name FROM bb_clients WHERE id = :id");
+            $cs->execute([':id' => $worksite['client_id']]);
+            $clientName = $cs->fetchColumn() ?: null;
+        }
+
+        // conteggi task per stato
+        $counts = ['open' => 0, 'in_progress' => 0, 'complete' => 0, 'verified' => 0, 'total' => 0];
+        $cstmt = $this->conn->prepare("SELECT status, COUNT(*) n FROM bb_zone_tasks WHERE worksite_id = :w GROUP BY status");
+        $cstmt->execute([':w' => $worksiteId]);
+        foreach ($cstmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            if (isset($counts[$r['status']])) $counts[$r['status']] = (int)$r['n'];
+            $counts['total'] += (int)$r['n'];
+        }
+
         Response::view('worksites/fieldwire.html.twig', $request, [
             'worksite_id'          => $worksiteId,
             'worksite'             => $worksite,
+            'clientName'           => $clientName,
+            'taskCounts'           => $counts,
             'fieldwire_project_id' => $worksite['fieldwire_project_id'] ?? null,
             'fieldwire_enabled'    => $this->config->fieldwireEnabled(),
         ]);
