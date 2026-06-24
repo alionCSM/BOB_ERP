@@ -359,10 +359,9 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get('/worksites/documents/{id}/open',                              [WorksitesController::class, 'openDocument'])
            ->get('/worksites/documents/{id}/download',                         [WorksitesController::class, 'downloadDocument']);
 
-    // ── BOB Zone (Fieldwire) ───────────────────────────────────────────────────
+    // ── BOB Zone ──────────────────────────────────────────────────────────────
     require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
-    $router->post('/api/fieldwire/webhook',                                             [FieldwireController::class, 'webhook'])
-           ->get( '/worksites/{id}/zone',                                               [FieldwireController::class, 'page'])
+    $router->get( '/worksites/{id}/zone',                                               [FieldwireController::class, 'page'])
            ->post('/worksites/{id}/zone/enable',                                   [FieldwireController::class, 'enable'])
            ->post('/worksites/{id}/zone/disable',                                  [FieldwireController::class, 'disable'])
            ->get( '/worksites/{id}/zone/tasks',                                    [FieldwireController::class, 'tasks'])
@@ -374,6 +373,16 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/tasks/{taskId}/check-items/{checkItemId}/complete', [FieldwireController::class, 'completeCheckItem'])
            ->get( '/worksites/{id}/zone/floorplans',                               [FieldwireController::class, 'floorplans']);
 
+    $router->dispatch($request, $container);
+}
+
+// ── Fieldwire webhook (no auth — called by Fieldwire servers) ─────────────────
+if ($uri === '/api/fieldwire/webhook') {
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+    $request   = new \App\Http\Request();
+    $router    = new \App\Http\Router();
+    $router->post('/api/fieldwire/webhook', [FieldwireController::class, 'webhook']);
     $router->dispatch($request, $container);
 }
 
