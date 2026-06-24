@@ -361,17 +361,19 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
 
     // ── BOB Zone ──────────────────────────────────────────────────────────────
     require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
-    $router->get( '/worksites/{id}/zone',                                               [FieldwireController::class, 'page'])
-           ->post('/worksites/{id}/zone/enable',                                   [FieldwireController::class, 'enable'])
-           ->post('/worksites/{id}/zone/disable',                                  [FieldwireController::class, 'disable'])
-           ->get( '/worksites/{id}/zone/tasks',                                    [FieldwireController::class, 'tasks'])
-           ->post('/worksites/{id}/zone/tasks',                                    [FieldwireController::class, 'createTask'])
-           ->post('/worksites/{id}/zone/tasks/{taskId}/update',                     [FieldwireController::class, 'updateTask'])
-           ->get( '/worksites/{id}/zone/tasks/{taskId}/bubbles',                   [FieldwireController::class, 'bubbles'])
-           ->post('/worksites/{id}/zone/tasks/{taskId}/bubbles',                   [FieldwireController::class, 'postBubble'])
-           ->get( '/worksites/{id}/zone/tasks/{taskId}/check-items',               [FieldwireController::class, 'checkItems'])
-           ->post('/worksites/{id}/zone/tasks/{taskId}/check-items/{checkItemId}/complete', [FieldwireController::class, 'completeCheckItem'])
-           ->get( '/worksites/{id}/zone/floorplans',                               [FieldwireController::class, 'floorplans']);
+    $router->get( '/worksites/{id}/zone',                                                         [FieldwireController::class, 'page'])
+           ->post('/worksites/{id}/zone/enable',                                                  [FieldwireController::class, 'enable'])
+           ->post('/worksites/{id}/zone/disable',                                                 [FieldwireController::class, 'disable'])
+           ->get( '/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'tasks'])
+           ->post('/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'createTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/status',                                   [FieldwireController::class, 'updateTaskStatus'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/delete',                                   [FieldwireController::class, 'deleteTask'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'comments'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'postComment'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'checklist'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'addChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
+           ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans']);
 
     $router->dispatch($request, $container);
 }

@@ -7,660 +7,782 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
 
-html, body {
-    height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-    overflow: hidden;
-}
-
-/* ── App shell ── */
-.bz-app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-}
+/* ── Shell ── */
+.bz { display: flex; flex-direction: column; height: 100vh; }
 
 /* ── Header ── */
-.bz-header {
-    height: 52px;
-    background: #0f172a;
-    border-bottom: 1px solid #1e293b;
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    gap: 16px;
-    flex-shrink: 0;
-}
-
-.bz-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    color: #475569;
-    text-decoration: none;
-    transition: color .15s;
-    white-space: nowrap;
-}
+.bz-header { height: 52px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 20px; gap: 14px; flex-shrink: 0; }
+.bz-back { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #475569; text-decoration: none; transition: color .15s; }
 .bz-back:hover { color: #94a3b8; }
-.bz-back i { font-size: 15px; }
-
-.bz-divider { width: 1px; height: 18px; background: #1e293b; flex-shrink: 0; }
-
-.bz-brand {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    flex-shrink: 0;
-}
+.bz-sep { width: 1px; height: 18px; background: #1e293b; flex-shrink: 0; }
+.bz-brand { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; }
 .bz-brand-bob  { font-size: 12px; font-weight: 500; color: #475569; letter-spacing: .04em; }
-.bz-brand-zone { font-size: 16px; font-weight: 600; color: #f1f5f9; letter-spacing: .01em; }
+.bz-brand-zone { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+.bz-wname { font-size: 13px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bz-header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-.bz-worksite-name {
-    font-size: 13px;
-    color: #64748b;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
+.bz-fw-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: #4ade80; background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.15); border-radius: 999px; padding: 4px 12px; }
+.bz-fw-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
 
-.bz-header-right {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-}
+.bz-fw-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #64748b; background: #1e293b; border: 1px solid #273548; border-radius: 7px; padding: 5px 12px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-fw-btn:hover { color: #94a3b8; border-color: #334155; }
 
-.bz-sync-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #4ade80;
-    background: rgba(74,222,128,.06);
-    border: 1px solid rgba(74,222,128,.15);
-    border-radius: 999px;
-    padding: 4px 12px;
-}
-.bz-sync-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #4ade80;
-    animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+/* ── Toolbar ── */
+.bz-toolbar { height: 48px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
+.bz-view-switcher { display: flex; background: #1e293b; border-radius: 8px; padding: 3px; gap: 2px; }
+.bz-view-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; border: none; background: none; color: #475569; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
+.bz-view-btn i { font-size: 14px; }
+.bz-view-btn:hover { color: #94a3b8; }
+.bz-view-btn.active { background: #334155; color: #f1f5f9; }
 
-.bz-connect-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #94a3b8;
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 7px;
-    padding: 6px 14px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .15s, color .15s;
-}
-.bz-connect-btn:hover { background: #273548; color: #e2e8f0; }
-.bz-connect-btn i { font-size: 14px; }
-
-/* ── Nav tabs ── */
-.bz-nav {
-    display: flex;
-    background: #0f172a;
-    border-bottom: 1px solid #1e293b;
-    padding: 0 20px;
-    flex-shrink: 0;
-    gap: 2px;
-}
-
-.bz-nav-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: color .15s;
-    white-space: nowrap;
-}
-.bz-nav-tab i { font-size: 15px; }
-.bz-nav-tab:hover { color: #94a3b8; }
-.bz-nav-tab.active { color: #f1f5f9; border-bottom-color: #4ade80; }
+.bz-new-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #4ade80; color: #0f172a; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity .15s; margin-left: auto; }
+.bz-new-btn:hover { opacity: .88; }
+.bz-new-btn i { font-size: 14px; }
 
 /* ── Body ── */
-.bz-body {
-    flex: 1;
-    overflow: hidden;
-    background: #0f172a;
-}
+.bz-body { flex: 1; overflow: hidden; display: flex; }
+.bz-view { display: none; flex: 1; overflow: hidden; }
+.bz-view.active { display: flex; }
 
-.bz-panel {
-    display: none;
-    height: 100%;
-}
-.bz-panel.active { display: flex; }
+/* ══════════════════════════
+   KANBAN
+══════════════════════════ */
+.bz-kanban { display: flex; gap: 12px; padding: 16px 20px; overflow-x: auto; overflow-y: hidden; align-items: flex-start; width: 100%; }
+.bz-kanban::-webkit-scrollbar { height: 4px; } .bz-kanban::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
 
-/* ══════════════════════════════════════
-   TASKS layout: sidebar + detail
-══════════════════════════════════════ */
-.bz-tasks-layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    height: 100%;
-    overflow: hidden;
-}
+.bz-col { display: flex; flex-direction: column; min-width: 260px; max-width: 300px; flex: 1; background: #111827; border: 1px solid #1e293b; border-radius: 10px; overflow: hidden; max-height: 100%; }
+.bz-col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
+.bz-col-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .06em; }
+.bz-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-open { background: #fbbf24; }
+.dot-progress { background: #60a5fa; }
+.dot-done { background: #4ade80; }
+.dot-verified { background: #a78bfa; }
+.bz-col-count { font-size: 11px; color: #334155; background: #1e293b; padding: 1px 7px; border-radius: 999px; }
 
-/* ── Task sidebar ── */
-.bz-sidebar {
-    background: #0f172a;
-    border-right: 1px solid #1e293b;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
+.bz-cards { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+.bz-cards::-webkit-scrollbar { width: 3px; } .bz-cards::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
 
-.bz-sidebar-head {
-    padding: 12px 16px;
-    border-bottom: 1px solid #1e293b;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-}
-.bz-sidebar-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-}
-.bz-new-task-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #4ade80;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-family: inherit;
-    transition: opacity .15s;
-}
-.bz-new-task-btn:hover { opacity: .7; }
+.bz-card { background: #1e293b; border: 1px solid #273548; border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color .15s; }
+.bz-card:hover { border-color: #334155; }
+.bz-card.active { border-color: #4ade80; }
+.bz-card-name { font-size: 13px; font-weight: 500; color: #e2e8f0; line-height: 1.4; margin-bottom: 8px; }
+.bz-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bz-card-user { font-size: 11px; color: #475569; display: flex; align-items: center; gap: 3px; }
+.bz-card-due  { font-size: 11px; color: #475569; display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.bz-card-due.overdue { color: #f87171; }
+.bz-card-progress { display: flex; align-items: center; gap: 5px; width: 100%; margin-top: 6px; }
+.bz-progress-bar { flex: 1; height: 3px; background: #273548; border-radius: 2px; overflow: hidden; }
+.bz-progress-fill { height: 100%; background: #4ade80; border-radius: 2px; transition: width .3s; }
+.bz-progress-text { font-size: 10px; color: #334155; white-space: nowrap; }
 
-.bz-task-list {
-    flex: 1;
-    overflow-y: auto;
-}
-.bz-task-list::-webkit-scrollbar { width: 3px; }
-.bz-task-list::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+.bz-col-add { padding: 8px 10px; border-top: 1px solid #1e293b; flex-shrink: 0; }
+.bz-col-add-btn { width: 100%; display: flex; align-items: center; gap: 6px; background: none; border: 1px dashed #1e293b; border-radius: 6px; padding: 7px 10px; color: #334155; font-size: 12px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-col-add-btn:hover { border-color: #273548; color: #475569; }
 
-.bz-task-item {
-    padding: 12px 16px;
-    border-bottom: 1px solid #1a2438;
-    cursor: pointer;
-    transition: background .1s;
-    border-left: 3px solid transparent;
-}
-.bz-task-item:hover  { background: #131f32; }
-.bz-task-item.active { background: #131f32; border-left-color: #4ade80; }
+/* ══════════════════════════
+   GANTT
+══════════════════════════ */
+.bz-gantt { display: flex; flex-direction: column; flex: 1; overflow: hidden; background: #111827; }
+.bz-gantt-wrap { flex: 1; overflow: auto; padding: 16px 20px; }
+.bz-gantt-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+.bz-gantt-table th { font-size: 10px; font-weight: 600; color: #334155; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+.bz-gantt-table td { padding: 6px 8px; border-bottom: 1px solid #1a2438; vertical-align: middle; }
+.bz-gantt-name { font-size: 12px; font-weight: 500; color: #94a3b8; min-width: 180px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bz-gantt-timeline { position: relative; height: 28px; }
+.bz-gantt-bar { position: absolute; height: 20px; top: 4px; border-radius: 4px; opacity: .85; display: flex; align-items: center; padding: 0 6px; font-size: 10px; font-weight: 600; color: #0f172a; overflow: hidden; white-space: nowrap; min-width: 6px; }
+.bz-gantt-empty { text-align: center; padding: 40px; font-size: 13px; color: #334155; }
 
-.bz-task-item-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: #e2e8f0;
-    line-height: 1.4;
-    margin-bottom: 6px;
-}
-.bz-task-item-foot {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
+/* ══════════════════════════
+   CALENDAR
+══════════════════════════ */
+.bz-calendar { display: flex; flex-direction: column; flex: 1; overflow: hidden; background: #111827; padding: 16px 20px; }
+.bz-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
+.bz-cal-title { font-size: 15px; font-weight: 600; color: #e2e8f0; }
+.bz-cal-nav { display: flex; gap: 6px; }
+.bz-cal-nav button { background: #1e293b; border: 1px solid #273548; color: #64748b; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-family: inherit; font-size: 13px; transition: all .15s; }
+.bz-cal-nav button:hover { color: #e2e8f0; }
+.bz-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; flex: 1; overflow: hidden; }
+.bz-cal-day-name { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; text-align: center; padding: 4px; letter-spacing: .06em; }
+.bz-cal-day { background: #1a2438; border-radius: 6px; padding: 6px; overflow: hidden; cursor: default; min-height: 80px; }
+.bz-cal-day.today { background: #1e293b; border: 1px solid #273548; }
+.bz-cal-day.other-month { opacity: .35; }
+.bz-cal-day-num { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+.bz-cal-day.today .bz-cal-day-num { color: #4ade80; }
+.bz-cal-event { font-size: 10px; font-weight: 500; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.bz-cal-event.open { background: rgba(251,191,36,.15); color: #fbbf24; }
+.bz-cal-event.in_progress { background: rgba(96,165,250,.15); color: #60a5fa; }
+.bz-cal-event.complete { background: rgba(74,222,128,.15); color: #4ade80; }
 
-/* Status pills */
-.bz-pill {
-    display: inline-flex;
-    align-items: center;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 999px;
-    white-space: nowrap;
-}
-.bz-pill-open     { background: rgba(251,191,36,.12);  color: #fbbf24; }
-.bz-pill-progress { background: rgba(96,165,250,.12);  color: #60a5fa; }
-.bz-pill-done     { background: rgba(74,222,128,.12);  color: #4ade80; }
-.bz-pill-verified { background: rgba(167,139,250,.12); color: #a78bfa; }
+/* ══════════════════════════
+   DETAIL PANEL (right side)
+══════════════════════════ */
+.bz-detail-wrap { width: 420px; flex-shrink: 0; background: #111827; border-left: 1px solid #1e293b; display: flex; flex-direction: column; overflow: hidden; transition: width .2s; }
+.bz-detail-wrap.closed { width: 0; border-left: none; overflow: hidden; }
 
-.bz-task-user {
-    font-size: 11px;
-    color: #475569;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-.bz-task-user i { font-size: 11px; }
+.bz-detail-topbar { padding: 12px 16px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.bz-detail-close { background: none; border: none; color: #475569; cursor: pointer; font-size: 20px; padding: 2px; transition: color .15s; }
+.bz-detail-close:hover { color: #94a3b8; }
 
-.bz-state-msg {
-    padding: 40px 20px;
-    text-align: center;
-    font-size: 13px;
-    color: #475569;
-}
+.bz-detail-inner { flex: 1; overflow-y: auto; }
+.bz-detail-inner::-webkit-scrollbar { width: 3px; } .bz-detail-inner::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
 
-/* ── Detail panel ── */
-.bz-detail {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: #111827;
-}
+.bz-detail-section { padding: 14px 16px; border-bottom: 1px solid #1a2438; }
+.bz-detail-section-title { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
 
-.bz-detail-empty {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #1e293b;
-    text-align: center;
-    gap: 12px;
-}
-.bz-detail-empty i  { font-size: 48px; }
-.bz-detail-empty p  { font-size: 13px; color: #334155; }
+.bz-detail-title-input { width: 100%; background: none; border: none; color: #f1f5f9; font-size: 15px; font-weight: 600; font-family: inherit; outline: none; line-height: 1.4; }
 
-.bz-detail-head {
-    padding: 16px 20px;
-    border-bottom: 1px solid #1e293b;
-    flex-shrink: 0;
-}
-.bz-detail-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #f1f5f9;
-    margin-bottom: 8px;
-    line-height: 1.4;
-}
-.bz-detail-attrs {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.bz-detail-attr {
-    font-size: 12px;
-    color: #64748b;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.bz-detail-attr i { font-size: 13px; }
+.bz-status-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.bz-status-opt { padding: 5px 12px; border-radius: 999px; border: 1px solid transparent; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-status-opt.open     { background: rgba(251,191,36,.1);  color: #fbbf24; border-color: rgba(251,191,36,.2); }
+.bz-status-opt.in_progress { background: rgba(96,165,250,.1); color: #60a5fa; border-color: rgba(96,165,250,.2); }
+.bz-status-opt.complete  { background: rgba(74,222,128,.1); color: #4ade80; border-color: rgba(74,222,128,.2); }
+.bz-status-opt.verified  { background: rgba(167,139,250,.1); color: #a78bfa; border-color: rgba(167,139,250,.2); }
+.bz-status-opt.selected  { opacity: 1; } .bz-status-opt:not(.selected) { opacity: .4; }
 
-/* ── Two-column detail body ── */
-.bz-detail-cols {
-    flex: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    overflow: hidden;
-    min-height: 0;
-}
+.bz-check-list { display: flex; flex-direction: column; gap: 6px; }
+.bz-check-row { display: flex; align-items: flex-start; gap: 8px; }
+.bz-check-row input { width: 14px; height: 14px; margin-top: 2px; accent-color: #4ade80; cursor: pointer; flex-shrink: 0; }
+.bz-check-row label { font-size: 13px; color: #94a3b8; cursor: pointer; line-height: 1.4; flex: 1; }
+.bz-check-row label.done { text-decoration: line-through; color: #334155; }
+.bz-check-add { display: flex; gap: 6px; margin-top: 8px; }
+.bz-check-add input { flex: 1; background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; font-size: 12px; color: #e2e8f0; font-family: inherit; outline: none; }
+.bz-check-add button { background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; color: #4ade80; cursor: pointer; font-size: 13px; }
 
-.bz-col {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
-}
-.bz-col + .bz-col { border-left: 1px solid #1e293b; }
+.bz-comments { display: flex; flex-direction: column; gap: 12px; }
+.bz-comment { display: flex; gap: 8px; align-items: flex-start; }
+.bz-comment-avatar { width: 26px; height: 26px; border-radius: 50%; background: #1e293b; color: #64748b; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bz-comment-body { flex: 1; min-width: 0; }
+.bz-comment-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+.bz-comment-author { font-size: 11px; font-weight: 600; color: #94a3b8; }
+.bz-comment-time   { font-size: 10px; color: #334155; }
+.bz-comment-text   { font-size: 13px; color: #64748b; line-height: 1.5; word-break: break-word; }
 
-.bz-col-head {
-    padding: 10px 16px;
-    font-size: 10px;
-    font-weight: 700;
-    color: #334155;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    border-bottom: 1px solid #1e293b;
-    flex-shrink: 0;
-}
+.bz-comment-input-wrap { padding: 12px 16px; border-top: 1px solid #1e293b; display: flex; gap: 8px; flex-shrink: 0; }
+.bz-comment-input { flex: 1; background: #1e293b; border: 1px solid #273548; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #e2e8f0; font-family: inherit; resize: none; outline: none; transition: border-color .15s; }
+.bz-comment-input::placeholder { color: #334155; }
+.bz-comment-input:focus { border-color: #334155; }
+.bz-comment-send { background: none; border: none; color: #4ade80; font-size: 20px; cursor: pointer; padding: 4px; transition: opacity .15s; display: flex; align-items: center; }
+.bz-comment-send:hover { opacity: .7; }
 
-/* Checklist */
-.bz-col-scroll {
-    flex: 1;
-    overflow-y: auto;
-    padding: 10px 16px;
-    min-height: 0;
-}
-.bz-col-scroll::-webkit-scrollbar { width: 3px; }
-.bz-col-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+/* ══════════════════════════
+   MODAL: New task
+══════════════════════════ */
+.bz-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.bz-overlay.hidden { display: none; }
+.bz-modal { background: #1e293b; border: 1px solid #273548; border-radius: 12px; padding: 24px; width: 440px; max-width: 95vw; }
+.bz-modal h3 { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 16px; }
+.bz-modal-field { margin-bottom: 14px; }
+.bz-modal-field label { display: block; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.bz-modal-field input,
+.bz-modal-field select,
+.bz-modal-field textarea { width: 100%; background: #0f172a; border: 1px solid #273548; border-radius: 7px; padding: 8px 12px; font-size: 13px; color: #e2e8f0; font-family: inherit; outline: none; transition: border-color .15s; }
+.bz-modal-field input:focus,
+.bz-modal-field select:focus,
+.bz-modal-field textarea:focus { border-color: #334155; }
+.bz-modal-field textarea { resize: vertical; min-height: 80px; }
+.bz-modal-field select option { background: #1e293b; }
+.bz-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bz-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.bz-modal-cancel { background: none; border: 1px solid #273548; border-radius: 7px; padding: 8px 16px; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit; }
+.bz-modal-submit { background: #4ade80; border: none; border-radius: 7px; padding: 8px 20px; color: #0f172a; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
 
-.bz-check-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid #1a2438;
-}
-.bz-check-item:last-child { border-bottom: none; }
-.bz-check-item input[type=checkbox] {
-    width: 14px; height: 14px;
-    margin-top: 2px;
-    accent-color: #4ade80;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.bz-check-label {
-    font-size: 13px;
-    color: #94a3b8;
-    cursor: pointer;
-    line-height: 1.4;
-}
-.bz-check-label.done { text-decoration: line-through; color: #334155; }
-
-/* Chat */
-.bz-feed {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    min-height: 0;
-}
-.bz-feed::-webkit-scrollbar { width: 3px; }
-.bz-feed::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-
-.bz-bubble { display: flex; gap: 10px; align-items: flex-start; }
-.bz-avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: #1e293b;
-    color: #64748b;
-    font-size: 10px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    letter-spacing: .02em;
-}
-.bz-bubble-body   { flex: 1; min-width: 0; }
-.bz-bubble-meta   { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
-.bz-bubble-author { font-size: 12px; font-weight: 600; color: #94a3b8; }
-.bz-bubble-time   { font-size: 10px; color: #334155; }
-.bz-bubble-text   { font-size: 13px; color: #64748b; line-height: 1.55; word-break: break-word; }
-.bz-bubble-img    { margin-top: 8px; max-width: 200px; border-radius: 8px; cursor: zoom-in; opacity: .9; }
-
-.bz-chat-bar {
-    padding: 10px 14px;
-    border-top: 1px solid #1e293b;
-    display: flex;
-    gap: 8px;
-    flex-shrink: 0;
-    background: #111827;
-}
-.bz-chat-input {
-    flex: 1;
-    background: #1e293b;
-    border: 1px solid #273548;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
-    color: #e2e8f0;
-    font-family: inherit;
-    resize: none;
-    outline: none;
-    transition: border-color .15s;
-}
-.bz-chat-input::placeholder { color: #334155; }
-.bz-chat-input:focus { border-color: #334155; }
-.bz-chat-send {
-    background: #1e293b;
-    color: #4ade80;
-    border: 1px solid #273548;
-    border-radius: 8px;
-    padding: 0 14px;
-    font-size: 20px;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .15s;
-    display: flex;
-    align-items: center;
-}
-.bz-chat-send:hover { background: #273548; }
-.bz-chat-send:disabled { opacity: .3; cursor: not-allowed; }
-
-/* ══════════════════════════════════════
-   FLOORPLANS tab
-══════════════════════════════════════ */
-.bz-fp-wrap {
-    width: 100%;
-    padding: 24px;
-    overflow-y: auto;
-    background: #111827;
-}
-.bz-fp-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 14px;
-}
-.bz-fp-card {
-    background: #1e293b;
-    border: 1px solid #273548;
-    border-radius: 10px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    transition: border-color .15s;
-}
-.bz-fp-card:hover { border-color: #334155; }
-.bz-fp-icon { font-size: 28px; color: #334155; }
-.bz-fp-name { font-size: 13px; font-weight: 600; color: #e2e8f0; line-height: 1.4; }
-.bz-fp-meta { font-size: 11px; color: #475569; }
-.bz-fp-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #60a5fa;
-    text-decoration: none;
-    margin-top: 4px;
-}
-.bz-fp-link:hover { color: #93c5fd; }
-
-/* ══════════════════════════════════════
-   Not-connected state
-══════════════════════════════════════ */
-.bz-not-connected {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 40px;
-    background: #111827;
-}
-.bz-not-connected i   { font-size: 52px; color: #1e293b; margin-bottom: 16px; }
-.bz-not-connected h2  { font-size: 18px; font-weight: 600; color: #e2e8f0; margin-bottom: 8px; }
-.bz-not-connected p   { font-size: 13px; color: #475569; max-width: 360px; margin-bottom: 24px; }
-
-.bz-enable-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #1e293b;
-    color: #4ade80;
-    border: 1px solid #273548;
-    border-radius: 8px;
-    padding: 10px 24px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .15s;
-}
-.bz-enable-btn:hover { background: #273548; }
-.bz-enable-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-/* ── Spinner ── */
+/* ── Misc ── */
+.bz-empty { padding: 40px; text-align: center; font-size: 13px; color: #334155; width: 100%; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .bz-spin { animation: spin .8s linear infinite; display: inline-block; }
+.pill { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.pill-open { background: rgba(251,191,36,.12); color: #fbbf24; }
+.pill-progress { background: rgba(96,165,250,.12); color: #60a5fa; }
+.pill-done { background: rgba(74,222,128,.12); color: #4ade80; }
+.pill-verified { background: rgba(167,139,250,.12); color: #a78bfa; }
 </style>
 </head>
 <body>
-<div class="bz-app">
+<div class="bz">
 
     {# ── Header ── #}
     <header class="bz-header">
         <a href="/worksites/{{ worksite_id }}" class="bz-back">
-            <i class="ti ti-arrow-left"></i>
-            Cantiere
+            <i class="ti ti-arrow-left"></i> Cantiere
         </a>
-        <div class="bz-divider"></div>
+        <div class="bz-sep"></div>
         <div class="bz-brand">
             <span class="bz-brand-bob">BOB</span>
             <span class="bz-brand-zone">Zone</span>
         </div>
-        <div class="bz-divider"></div>
-        <span class="bz-worksite-name">{{ worksite.name }}</span>
-
+        <div class="bz-sep"></div>
+        <span class="bz-wname">{{ worksite.name }}</span>
         <div class="bz-header-right">
             {% if fieldwire_project_id %}
-                <span class="bz-sync-pill">
-                    <span class="bz-sync-dot"></span>
-                    Fieldwire
-                </span>
+                <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire</span>
             {% elseif fieldwire_enabled %}
-                <button class="bz-connect-btn" id="btn-fw-connect">
-                    <i class="ti ti-link"></i>
-                    Collega Fieldwire
+                <button class="bz-fw-btn" id="btn-fw-connect">
+                    <i class="ti ti-link" style="font-size:14px"></i> Collega Fieldwire
                 </button>
             {% endif %}
         </div>
     </header>
 
-    {# ── Nav ── #}
-    <nav class="bz-nav">
-        <button class="bz-nav-tab active" data-tab="tasks">
-            <i class="ti ti-checkbox"></i>
-            Task
+    {# ── Toolbar ── #}
+    <div class="bz-toolbar">
+        <div class="bz-view-switcher">
+            <button class="bz-view-btn active" data-view="kanban">
+                <i class="ti ti-layout-columns"></i> Kanban
+            </button>
+            <button class="bz-view-btn" data-view="gantt">
+                <i class="ti ti-chart-gantt"></i> Gantt
+            </button>
+            <button class="bz-view-btn" data-view="calendar">
+                <i class="ti ti-calendar"></i> Calendario
+            </button>
+        </div>
+        <button class="bz-new-btn" id="btn-new-task">
+            <i class="ti ti-plus"></i> Nuovo Task
         </button>
-        <button class="bz-nav-tab" data-tab="floorplans">
-            <i class="ti ti-files"></i>
-            Tavole
-        </button>
-    </nav>
+    </div>
 
     {# ── Body ── #}
     <div class="bz-body">
 
-        {# ── Tasks ── #}
-        <div class="bz-panel active" id="panel-tasks">
-            {% if fieldwire_project_id %}
-            <div class="bz-tasks-layout">
-
-                <div class="bz-sidebar">
-                    <div class="bz-sidebar-head">
-                        <span class="bz-sidebar-title">Task</span>
-                        <button class="bz-new-task-btn" id="btn-new-task">
-                            <i class="ti ti-plus" style="font-size:13px"></i>
-                            Nuovo
-                        </button>
-                    </div>
-                    <div class="bz-task-list" id="bz-task-list">
-                        <div class="bz-state-msg">
-                            <i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bz-detail" id="bz-detail">
-                    <div class="bz-detail-empty">
-                        <i class="ti ti-checkbox"></i>
-                        <p>Seleziona un task</p>
-                    </div>
-                </div>
-
+        {# Kanban #}
+        <div class="bz-view active" id="view-kanban">
+            <div class="bz-kanban" id="bz-kanban">
+                <div class="bz-empty"><i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i></div>
             </div>
-            {% else %}
-            <div class="bz-not-connected">
-                <i class="ti ti-link-off"></i>
-                <h2>Fieldwire non collegato</h2>
-                <p>Collega questo cantiere a Fieldwire per gestire task, disegni e messaggi.</p>
-                {% if fieldwire_enabled %}
-                <button class="bz-enable-btn" id="btn-fw-enable">
-                    <i class="ti ti-link"></i>
-                    Collega a Fieldwire
-                </button>
-                {% endif %}
-            </div>
-            {% endif %}
         </div>
 
-        {# ── Floorplans ── #}
-        <div class="bz-panel" id="panel-floorplans">
-            {% if fieldwire_project_id %}
-            <div class="bz-fp-wrap">
-                <div id="bz-fp-content">
-                    <div class="bz-state-msg">
-                        <i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i>
-                    </div>
+        {# Gantt #}
+        <div class="bz-view" id="view-gantt">
+            <div class="bz-gantt">
+                <div class="bz-gantt-wrap" id="bz-gantt-content">
+                    <div class="bz-gantt-empty"><i class="ti ti-loader-2 bz-spin" style="font-size:20px"></i></div>
                 </div>
             </div>
-            {% else %}
-            <div class="bz-not-connected">
-                <i class="ti ti-file-off"></i>
-                <h2>Nessuna tavola</h2>
-                <p>Collega Fieldwire per accedere alle tavole.</p>
+        </div>
+
+        {# Calendar #}
+        <div class="bz-view" id="view-calendar">
+            <div class="bz-calendar">
+                <div class="bz-cal-header">
+                    <div class="bz-cal-title" id="cal-title"></div>
+                    <div class="bz-cal-nav">
+                        <button onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button>
+                        <button onclick="calNav(0)">Oggi</button>
+                        <button onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="bz-cal-grid" id="bz-cal-grid"></div>
             </div>
-            {% endif %}
+        </div>
+
+        {# Detail panel #}
+        <div class="bz-detail-wrap closed" id="bz-detail-wrap">
+            <div class="bz-detail-topbar">
+                <span style="font-size:12px;font-weight:600;color:#475569;">Dettaglio Task</span>
+                <button class="bz-detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
+            </div>
+            <div class="bz-detail-inner" id="bz-detail-inner"></div>
+            <div class="bz-comment-input-wrap">
+                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"
+                          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendComment()}"></textarea>
+                <button class="bz-comment-send" onclick="sendComment()"><i class="ti ti-send"></i></button>
+            </div>
         </div>
 
     </div>
 </div>
 
+{# ── New task modal ── #}
+<div class="bz-overlay hidden" id="task-modal">
+    <div class="bz-modal">
+        <h3>Nuovo Task</h3>
+        <div class="bz-modal-field">
+            <label>Nome *</label>
+            <input type="text" id="task-name" placeholder="Descrivi il task...">
+        </div>
+        <div class="bz-modal-field">
+            <label>Descrizione</label>
+            <textarea id="task-desc" placeholder="Dettagli opzionali..."></textarea>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Status</label>
+                <select id="task-status">
+                    <option value="open">Aperto</option>
+                    <option value="in_progress">In corso</option>
+                    <option value="complete">Completato</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Categoria</label>
+                <input type="text" id="task-cat" placeholder="Es. Elettrico">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Assegnato a</label>
+                <input type="text" id="task-assignee" placeholder="Nome persona">
+            </div>
+            <div class="bz-modal-field">
+                <label>Scadenza</label>
+                <input type="date" id="task-due">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Data inizio</label>
+                <input type="date" id="task-start">
+            </div>
+        </div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" onclick="closeModal()">Annulla</button>
+            <button class="bz-modal-submit" onclick="submitTask()">Crea Task</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const WID = {{ worksite_id }};
-const FWP = {{ fieldwire_project_id ? '"' ~ fieldwire_project_id ~ '"' : 'null' }};
+const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
+const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
 
-const $ = id => document.getElementById(id);
+let allTasks = [];
+let activeTaskId = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
 
-/* ── Tabs ── */
-document.querySelectorAll('.bz-nav-tab').forEach(btn => {
+/* ── API ── */
+async function api(url, opts = {}) {
+    const r = await fetch(url, { ...opts });
+    return r.json();
+}
+
+/* ── Data ── */
+async function loadTasks() {
+    const res = await api(`/worksites/${WID}/zone/tasks`);
+    allTasks = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    renderCurrentView();
+}
+
+function renderCurrentView() {
+    const active = document.querySelector('.bz-view-btn.active')?.dataset.view || 'kanban';
+    if (active === 'kanban')   renderKanban();
+    if (active === 'gantt')    renderGantt();
+    if (active === 'calendar') renderCalendar();
+}
+
+/* ══════════ KANBAN ══════════ */
+const COLS = [
+    { key: 'open',        label: 'Aperto',      dot: 'dot-open' },
+    { key: 'in_progress', label: 'In corso',     dot: 'dot-progress' },
+    { key: 'complete',    label: 'Completato',   dot: 'dot-done' },
+    { key: 'verified',    label: 'Verificato',   dot: 'dot-verified' },
+];
+
+function renderKanban() {
+    const board = document.getElementById('bz-kanban');
+    const grouped = {};
+    COLS.forEach(c => grouped[c.key] = []);
+    allTasks.forEach(t => { if (grouped[t.status] !== undefined) grouped[t.status].push(t); else grouped['open'].push(t); });
+
+    board.innerHTML = COLS.map(col => `
+        <div class="bz-col">
+            <div class="bz-col-head">
+                <span class="bz-col-label">
+                    <span class="bz-col-dot ${col.dot}"></span>
+                    ${col.label}
+                </span>
+                <span class="bz-col-count">${grouped[col.key].length}</span>
+            </div>
+            <div class="bz-cards" id="col-${col.key}">
+                ${grouped[col.key].map(t => cardHtml(t)).join('') || ''}
+            </div>
+            <div class="bz-col-add">
+                <button class="bz-col-add-btn" onclick="quickAdd('${col.key}')">
+                    <i class="ti ti-plus" style="font-size:13px"></i> Aggiungi
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function cardHtml(t) {
+    const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete';
+    return `
+        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" onclick="openTask(${t.id})">
+            <div class="bz-card-name">${t.name}</div>
+            <div class="bz-card-foot">
+                ${t.assignee_name ? `<span class="bz-card-user"><i class="ti ti-user" style="font-size:11px"></i>${t.assignee_name}</span>` : ''}
+                ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="ti ti-calendar" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
+            </div>
+        </div>`;
+}
+
+/* ══════════ GANTT ══════════ */
+function renderGantt() {
+    const el = document.getElementById('bz-gantt-content');
+    const withDates = allTasks.filter(t => t.start_date || t.due_date);
+    if (!withDates.length) {
+        el.innerHTML = '<div class="bz-gantt-empty">Nessun task con date impostate.<br>Aggiungi una data di inizio o scadenza per vederli qui.</div>';
+        return;
+    }
+
+    const dates = withDates.flatMap(t => [t.start_date, t.due_date].filter(Boolean)).map(d => new Date(d));
+    const minD  = new Date(Math.min(...dates)); minD.setDate(1);
+    const maxD  = new Date(Math.max(...dates)); maxD.setDate(maxD.getDate() + 7);
+    const totalDays = Math.max(1, Math.ceil((maxD - minD) / 86400000));
+
+    const months = [];
+    let cur = new Date(minD);
+    while (cur <= maxD) {
+        months.push({ label: cur.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), start: new Date(cur) });
+        cur.setMonth(cur.getMonth() + 1);
+    }
+
+    el.innerHTML = `
+        <table class="bz-gantt-table">
+            <thead>
+                <tr>
+                    <th style="width:200px">Task</th>
+                    <th>Timeline</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${withDates.map(t => {
+                    const start = t.start_date ? new Date(t.start_date) : new Date(t.due_date);
+                    const end   = t.due_date   ? new Date(t.due_date)   : new Date(t.start_date);
+                    const left  = Math.max(0, (start - minD) / 86400000 / totalDays * 100);
+                    const width = Math.max(1, (end - start) / 86400000 / totalDays * 100) + (t.start_date && t.due_date ? 0 : 1);
+                    const color = STATUS_COLORS[t.status] || STATUS_COLORS.open;
+                    return `
+                        <tr onclick="openTask(${t.id})" style="cursor:pointer">
+                            <td><div class="bz-gantt-name" title="${t.name}">${t.name}</div></td>
+                            <td>
+                                <div class="bz-gantt-timeline">
+                                    <div class="bz-gantt-bar"
+                                         style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%;background:${color}">
+                                        ${width > 8 ? t.name : ''}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+}
+
+/* ══════════ CALENDAR ══════════ */
+function renderCalendar() {
+    const months = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    const days   = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+    document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+
+    const grid = document.getElementById('bz-cal-grid');
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Day headers
+    let html = days.map(d => `<div class="bz-cal-day-name">${d}</div>`).join('');
+
+    const first = new Date(calYear, calMonth, 1);
+    let startDow = first.getDay(); // 0=Sun
+    startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
+
+    const tasksByDate = {};
+    allTasks.forEach(t => {
+        const key = t.due_date ? t.due_date.slice(0,10) : null;
+        if (key) { if (!tasksByDate[key]) tasksByDate[key] = []; tasksByDate[key].push(t); }
+    });
+
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const prevDays    = new Date(calYear, calMonth, 0).getDate();
+
+    // Fill prev month
+    for (let i = startDow - 1; i >= 0; i--) {
+        html += `<div class="bz-cal-day other-month"><div class="bz-cal-day-num">${prevDays - i}</div></div>`;
+    }
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dt = new Date(calYear, calMonth, d);
+        const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isToday = dt.getTime() === today.getTime();
+        const events  = (tasksByDate[key] || []).slice(0, 3);
+        html += `
+            <div class="bz-cal-day ${isToday ? 'today' : ''}">
+                <div class="bz-cal-day-num">${d}</div>
+                ${events.map(t => `
+                    <div class="bz-cal-event ${t.status}" onclick="openTask(${t.id})" title="${t.name}">${t.name}</div>
+                `).join('')}
+                ${(tasksByDate[key]||[]).length > 3 ? `<div style="font-size:10px;color:#334155">+${(tasksByDate[key]||[]).length - 3} altri</div>` : ''}
+            </div>`;
+    }
+    // Fill next month
+    const total = startDow + daysInMonth;
+    const rem   = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let d = 1; d <= rem; d++) {
+        html += `<div class="bz-cal-day other-month"><div class="bz-cal-day-num">${d}</div></div>`;
+    }
+
+    grid.innerHTML = html;
+}
+
+function calNav(dir) {
+    if (dir === 0) { calYear = new Date().getFullYear(); calMonth = new Date().getMonth(); }
+    else { calMonth += dir; if (calMonth < 0) { calMonth = 11; calYear--; } if (calMonth > 11) { calMonth = 0; calYear++; } }
+    renderCalendar();
+}
+
+/* ══════════ DETAIL PANEL ══════════ */
+async function openTask(id) {
+    activeTaskId = id;
+    document.querySelectorAll('.bz-card').forEach(c => c.classList.toggle('active', parseInt(c.closest('[onclick]')?.getAttribute('onclick')?.match(/\d+/)?.[0]) === id));
+    document.getElementById('bz-detail-wrap').classList.remove('closed');
+
+    const task = allTasks.find(t => t.id == id);
+    if (!task) return;
+
+    const inner = document.getElementById('bz-detail-inner');
+    inner.innerHTML = `
+        <div class="bz-detail-section">
+            <input class="bz-detail-title-input" value="${task.name}"
+                   onblur="updateTaskName(${id}, this.value)">
+            ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${task.category}</div>` : ''}
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Status</div>
+            <div class="bz-status-row">
+                ${Object.entries(STATUSES).map(([k,v]) => `
+                    <button class="bz-status-opt ${k} ${task.status === k ? 'selected' : ''}"
+                            onclick="setStatus(${id},'${k}')">
+                        ${v}
+                    </button>`).join('')}
+            </div>
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Info</div>
+            ${task.assignee_name ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="ti ti-user" style="font-size:13px;vertical-align:-2px"></i> ${task.assignee_name}</div>` : ''}
+            ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="ti ti-calendar" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
+            ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="ti ti-calendar-due" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
+            ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5">${task.description}</p>` : ''}
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Checklist</div>
+            <div class="bz-check-list" id="bz-checklist-${id}">
+                <div style="font-size:12px;color:#334155">Caricamento...</div>
+            </div>
+            <div class="bz-check-add">
+                <input id="new-check-input" placeholder="Nuovo elemento..." onkeydown="if(event.key==='Enter')addCheck(${id})">
+                <button onclick="addCheck(${id})"><i class="ti ti-plus"></i></button>
+            </div>
+        </div>
+
+        <div class="bz-detail-section" style="border-bottom:none">
+            <div class="bz-detail-section-title">Commenti</div>
+            <div class="bz-comments" id="bz-comments-${id}">
+                <div style="font-size:12px;color:#334155">Caricamento...</div>
+            </div>
+        </div>
+    `;
+
+    loadChecklist(id);
+    loadComments(id);
+}
+
+function closeDetail() {
+    activeTaskId = null;
+    document.getElementById('bz-detail-wrap').classList.add('closed');
+    document.querySelectorAll('.bz-card').forEach(c => c.classList.remove('active'));
+}
+
+async function setStatus(taskId, status) {
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+    });
+    const task = allTasks.find(t => t.id == taskId);
+    if (task) task.status = status;
+    renderCurrentView();
+    // update buttons
+    document.querySelectorAll('.bz-status-opt').forEach(b => {
+        b.classList.toggle('selected', b.classList.contains(status));
+    });
+}
+
+function updateTaskName(taskId, name) {
+    if (!name.trim()) return;
+    const task = allTasks.find(t => t.id == taskId);
+    if (task) task.name = name;
+    api(`/worksites/${WID}/zone/tasks/${taskId}/status`, { // reuse status endpoint (name update not yet needed as separate endpoint)
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: task?.status || 'open' }),
+    });
+}
+
+/* ── Checklist ── */
+async function loadChecklist(taskId) {
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist`);
+    const el  = document.getElementById(`bz-checklist-${taskId}`);
+    if (!el) return;
+    const items = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun elemento.</div>'; return; }
+    el.innerHTML = items.map(c => `
+        <div class="bz-check-row" id="crow-${c.id}">
+            <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
+                   onchange="toggleCheck(${taskId},${c.id},this)">
+            <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}">${c.name}</label>
+        </div>`).join('');
+}
+
+async function toggleCheck(taskId, itemId, cb) {
+    cb.disabled = true;
+    const label = cb.nextElementSibling;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist/${itemId}/complete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: cb.checked }),
+    });
+    label?.classList.toggle('done', cb.checked);
+    cb.disabled = false;
+}
+
+async function addCheck(taskId) {
+    const inp  = document.getElementById('new-check-input');
+    const name = inp.value.trim();
+    if (!name) return;
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+    });
+    if (res.ok) { inp.value = ''; loadChecklist(taskId); }
+}
+
+/* ── Comments ── */
+async function loadComments(taskId) {
+    const res  = await api(`/worksites/${WID}/zone/tasks/${taskId}/comments`);
+    const el   = document.getElementById(`bz-comments-${taskId}`);
+    if (!el) return;
+    const items = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun commento ancora.</div>'; return; }
+    el.innerHTML = items.map(c => `
+        <div class="bz-comment">
+            <div class="bz-comment-avatar">${initials(c.author_name)}</div>
+            <div class="bz-comment-body">
+                <div class="bz-comment-meta">
+                    <span class="bz-comment-author">${c.author_name || '?'}</span>
+                    <span class="bz-comment-time">${ago(c.created_at)}</span>
+                </div>
+                <div class="bz-comment-text">${c.text || ''}</div>
+            </div>
+        </div>`).join('');
+    el.scrollTop = el.scrollHeight;
+}
+
+async function sendComment() {
+    const inp  = document.getElementById('bz-comment-input');
+    const text = inp?.value?.trim();
+    if (!text || !activeTaskId) return;
+    inp.disabled = true;
+    const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/comments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+    if (res.ok) { inp.value = ''; loadComments(activeTaskId); }
+    inp.disabled = false;
+    inp.focus();
+}
+
+/* ══════════ NEW TASK MODAL ══════════ */
+let quickAddStatus = null;
+
+function quickAdd(status) {
+    quickAddStatus = status;
+    document.getElementById('task-status').value = status;
+    openModal();
+}
+
+function openModal() {
+    document.getElementById('task-modal').classList.remove('hidden');
+    document.getElementById('task-name').focus();
+}
+function closeModal() {
+    document.getElementById('task-modal').classList.add('hidden');
+    quickAddStatus = null;
+    ['task-name','task-desc','task-cat','task-assignee','task-due','task-start'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('task-status').value = 'open';
+}
+
+async function submitTask() {
+    const name = document.getElementById('task-name').value.trim();
+    if (!name) { document.getElementById('task-name').focus(); return; }
+
+    const body = {
+        name,
+        description:   document.getElementById('task-desc').value,
+        status:        document.getElementById('task-status').value,
+        category:      document.getElementById('task-cat').value,
+        assignee_name: document.getElementById('task-assignee').value,
+        due_date:      document.getElementById('task-due').value || null,
+        start_date:    document.getElementById('task-start').value || null,
+    };
+
+    const btn = document.querySelector('.bz-modal-submit');
+    btn.textContent = '...'; btn.disabled = true;
+
+    const res = await api(`/worksites/${WID}/zone/tasks`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+
+    btn.textContent = 'Crea Task'; btn.disabled = false;
+
+    if (res.ok) {
+        allTasks.unshift(res.data);
+        closeModal();
+        renderCurrentView();
+        openTask(res.data.id);
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile creare il task'));
+    }
+}
+
+/* ══════════ FIELDWIRE CONNECT ══════════ */
+document.getElementById('btn-fw-connect')?.addEventListener('click', async () => {
+    if (!confirm('Collegare questo cantiere a Fieldwire?')) return;
+    const btn = document.getElementById('btn-fw-connect');
+    btn.disabled = true;
+    const res = await api(`/worksites/${WID}/zone/enable`, { method: 'POST' });
+    if (res.ok) { window.location.reload(); }
+    else { alert('Errore: ' + (res.error || 'sconosciuto')); btn.disabled = false; }
+});
+
+/* ══════════ VIEW SWITCHING ══════════ */
+document.querySelectorAll('.bz-view-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.bz-nav-tab').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.bz-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.bz-view-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.bz-view').forEach(v => v.classList.remove('active'));
         btn.classList.add('active');
-        $('panel-' + btn.dataset.tab)?.classList.add('active');
-        if (btn.dataset.tab === 'floorplans') loadFloorplans();
+        document.getElementById('view-' + btn.dataset.view)?.classList.add('active');
+        renderCurrentView();
     });
 });
 
-/* ── Utils ── */
+document.getElementById('btn-new-task').addEventListener('click', openModal);
+
+// Close modal on backdrop click
+document.getElementById('task-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+});
+
+/* ══════════ UTILS ══════════ */
 function initials(name) {
     return (name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -668,226 +790,18 @@ function ago(str) {
     if (!str) return '';
     const s = Math.floor((Date.now() - new Date(str)) / 1000);
     if (s < 60) return 'adesso';
-    if (s < 3600) return Math.floor(s / 60) + 'm fa';
-    if (s < 86400) return Math.floor(s / 3600) + 'h fa';
-    return new Date(str).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+    if (s < 3600) return Math.floor(s/60) + 'm fa';
+    if (s < 86400) return Math.floor(s/3600) + 'h fa';
+    return new Date(str).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
 }
-function pill(s) {
-    const m = {
-        open:       ['bz-pill-open',     'Aperto'],
-        in_progress:['bz-pill-progress', 'In corso'],
-        complete:   ['bz-pill-done',     'Completato'],
-        completed:  ['bz-pill-done',     'Completato'],
-        verified:   ['bz-pill-verified', 'Verificato'],
-    };
-    const [cls, label] = m[(s||'').toLowerCase()] || ['bz-pill-open', s || 'Aperto'];
-    return `<span class="bz-pill ${cls}">${label}</span>`;
-}
-async function api(url, opts = {}) {
-    const r = await fetch(url, opts);
-    return r.json();
+function fmtDate(str) {
+    if (!str) return '';
+    return new Date(str + 'T00:00:00').toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
 }
 
-/* ════════════ TASKS ════════════ */
-async function loadTasks() {
-    const list = $('bz-task-list');
-    if (!list) return;
-    const res = await api(`/worksites/${WID}/zone/tasks`);
-    if (!res.ok || !res.data?.length) {
-        list.innerHTML = '<div class="bz-state-msg">Nessun task trovato.</div>';
-        return;
-    }
-    list.innerHTML = res.data.map(t => `
-        <div class="bz-task-item" data-id="${t.id}"
-             onclick="openTask(${JSON.stringify(t).replace(/"/g,'&quot;')})">
-            <div class="bz-task-item-name">${t.name || 'Task senza titolo'}</div>
-            <div class="bz-task-item-foot">
-                ${pill(t.status)}
-                ${t.assignee_name
-                    ? `<span class="bz-task-user"><i class="ti ti-user"></i>${t.assignee_name}</span>`
-                    : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-function openTask(task) {
-    document.querySelectorAll('.bz-task-item').forEach(el =>
-        el.classList.toggle('active', el.dataset.id == task.id));
-
-    $('bz-detail').innerHTML = `
-        <div class="bz-detail-head">
-            <div class="bz-detail-title">${task.name || 'Task'}</div>
-            <div class="bz-detail-attrs">
-                ${pill(task.status)}
-                ${task.assignee_name
-                    ? `<span class="bz-detail-attr"><i class="ti ti-user"></i>${task.assignee_name}</span>`
-                    : ''}
-                ${task.category_name
-                    ? `<span class="bz-detail-attr"><i class="ti ti-tag"></i>${task.category_name}</span>`
-                    : ''}
-                ${task.due_date
-                    ? `<span class="bz-detail-attr"><i class="ti ti-calendar"></i>${new Date(task.due_date).toLocaleDateString('it-IT')}</span>`
-                    : ''}
-            </div>
-        </div>
-        <div class="bz-detail-cols">
-            <div class="bz-col">
-                <div class="bz-col-head">Checklist</div>
-                <div class="bz-col-scroll" id="bz-checks-${task.id}">
-                    <div class="bz-state-msg"><i class="ti ti-loader-2 bz-spin"></i></div>
-                </div>
-            </div>
-            <div class="bz-col">
-                <div class="bz-col-head">Messaggi</div>
-                <div class="bz-feed" id="bz-feed-${task.id}">
-                    <div class="bz-state-msg"><i class="ti ti-loader-2 bz-spin"></i></div>
-                </div>
-                <div class="bz-chat-bar">
-                    <textarea class="bz-chat-input" id="bz-msg-${task.id}"
-                              placeholder="Scrivi un messaggio..." rows="2"
-                              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('${task.id}')}"></textarea>
-                    <button class="bz-chat-send" id="bz-send-${task.id}" onclick="sendMsg('${task.id}')">
-                        <i class="ti ti-send"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    loadChecklist(task.id);
-    loadBubbles(task.id);
-}
-
-/* ── Checklist ── */
-async function loadChecklist(taskId) {
-    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/check-items`);
-    const el  = $(`bz-checks-${taskId}`);
-    if (!el) return;
-    if (!res.ok || !res.data?.length) {
-        el.innerHTML = '<div class="bz-state-msg" style="padding:16px 0;">Nessun elemento.</div>';
-        return;
-    }
-    el.innerHTML = res.data.map(c => `
-        <div class="bz-check-item">
-            <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
-                   onchange="toggleCheck('${taskId}','${c.id}',this)">
-            <label for="chk-${c.id}" class="bz-check-label ${c.completed ? 'done' : ''}">${c.name}</label>
-        </div>
-    `).join('');
-}
-
-async function toggleCheck(taskId, checkId, cb) {
-    cb.disabled = true;
-    const label = cb.nextElementSibling;
-    if (cb.checked) {
-        await api(`/worksites/${WID}/zone/tasks/${taskId}/check-items/${checkId}/complete`, { method: 'POST' });
-        label?.classList.add('done');
-    } else {
-        label?.classList.remove('done');
-    }
-    cb.disabled = false;
-}
-
-/* ── Bubbles ── */
-async function loadBubbles(taskId) {
-    const res  = await api(`/worksites/${WID}/zone/tasks/${taskId}/bubbles`);
-    const feed = $(`bz-feed-${taskId}`);
-    if (!feed) return;
-    if (!res.ok || !res.data?.length) {
-        feed.innerHTML = '<div class="bz-state-msg" style="padding:16px 0;">Nessun messaggio.</div>';
-        return;
-    }
-    feed.innerHTML = res.data.map(b => {
-        const name  = b.creator_name || b.creator_email || '?';
-        const photo = b.file_url
-            ? `<img src="${b.file_url}" class="bz-bubble-img"
-                    onclick="window.open('${b.file_url}','_blank')" alt="foto">`
-            : '';
-        return `
-            <div class="bz-bubble">
-                <div class="bz-avatar">${initials(name)}</div>
-                <div class="bz-bubble-body">
-                    <div class="bz-bubble-meta">
-                        <span class="bz-bubble-author">${name}</span>
-                        <span class="bz-bubble-time">${ago(b.fw_created_at || b.created_at)}</span>
-                    </div>
-                    ${b.text ? `<div class="bz-bubble-text">${b.text}</div>` : ''}
-                    ${photo}
-                </div>
-            </div>`;
-    }).join('');
-    feed.scrollTop = feed.scrollHeight;
-}
-
-async function sendMsg(taskId) {
-    const inp  = $(`bz-msg-${taskId}`);
-    const btn  = $(`bz-send-${taskId}`);
-    const text = inp?.value?.trim();
-    if (!text) return;
-    btn.disabled = true;
-    inp.disabled = true;
-    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/bubbles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-    });
-    if (res.ok) {
-        inp.value = '';
-        await loadBubbles(taskId);
-    } else {
-        alert('Errore: ' + (res.error || 'impossibile inviare'));
-    }
-    btn.disabled = false;
-    inp.disabled = false;
-    inp.focus();
-}
-
-/* ════════════ FLOORPLANS ════════════ */
-let fpLoaded = false;
-async function loadFloorplans() {
-    if (fpLoaded) return;
-    fpLoaded = true;
-    const res = await api(`/worksites/${WID}/zone/floorplans`);
-    const el  = $('bz-fp-content');
-    if (!el) return;
-    if (!res.ok || !res.data?.length) {
-        el.innerHTML = '<div class="bz-state-msg">Nessuna tavola trovata.</div>';
-        return;
-    }
-    el.innerHTML = `<div class="bz-fp-grid">${res.data.map(f => `
-        <div class="bz-fp-card">
-            <i class="ti ti-file bz-fp-icon"></i>
-            <div class="bz-fp-name">${f.name || 'Tavola'}</div>
-            ${f.sheets_count ? `<div class="bz-fp-meta">${f.sheets_count} fogli</div>` : ''}
-            <a href="https://app.fieldwire.com" target="_blank" class="bz-fp-link">
-                <i class="ti ti-external-link" style="font-size:12px"></i>
-                Apri in Fieldwire
-            </a>
-        </div>`).join('')}
-    </div>`;
-}
-
-/* ════════════ CONNECT ════════════ */
-['btn-fw-connect','btn-fw-enable'].forEach(id => {
-    const btn = $(id);
-    if (!btn) return;
-    btn.addEventListener('click', async () => {
-        if (!confirm('Creare il progetto Fieldwire per questo cantiere?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="ti ti-loader-2 bz-spin"></i> Collegamento...';
-        const res = await api(`/worksites/${WID}/zone/enable`, { method: 'POST' });
-        if (res.ok) {
-            window.location.reload();
-        } else {
-            alert('Errore: ' + (res.error || 'sconosciuto'));
-            btn.disabled = false;
-        }
-    });
-});
-
-/* ════════════ INIT ════════════ */
-if (FWP) loadTasks();
+/* ══════════ INIT ══════════ */
+loadTasks();
+renderCalendar();
 </script>
 </body>
 </html>
