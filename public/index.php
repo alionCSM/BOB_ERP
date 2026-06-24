@@ -366,7 +366,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/disable',                                  [FieldwireController::class, 'disable'])
            ->get( '/worksites/{id}/zone/tasks',                                    [FieldwireController::class, 'tasks'])
            ->post('/worksites/{id}/zone/tasks',                                    [FieldwireController::class, 'createTask'])
-           ->patch('/worksites/{id}/zone/tasks/{taskId}',                          [FieldwireController::class, 'updateTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/update',                     [FieldwireController::class, 'updateTask'])
            ->get( '/worksites/{id}/zone/tasks/{taskId}/bubbles',                   [FieldwireController::class, 'bubbles'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/bubbles',                   [FieldwireController::class, 'postBubble'])
            ->get( '/worksites/{id}/zone/tasks/{taskId}/check-items',               [FieldwireController::class, 'checkItems'])
