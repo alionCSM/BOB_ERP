@@ -1,117 +1,384 @@
-# Fieldwire Integration — TODO
+# BOB Zone × Fieldwire — Documentazione completa
 
-## Critico (da fare prima del go-live)
+## Cos'è BOB Zone
 
-- [ ] **Run migrations on production**
-  - `vendor/bin/phinx migrate` (migration 001, 002, 003)
+BOB Zone è una feature BOB-nativa per la gestione operativa del cantiere.
+Ogni cantiere BOB ha la sua pagina BOB Zone (`/worksites/{id}/zone`) — accessibile
+dal bottone "BOB Zone" nella pagina cantiere — che si apre in un tab separato con
+design dark standalone (non usa il layout BOB con sidebar/topbar).
 
-- [ ] **Configurare `.env` production**
-  - `FIELDWIRE_API_TOKEN=<refresh_token_da_app.fieldwire.com>`
-  - `FIELDWIRE_REGION=eu`
-
-- [ ] **Passare `fieldwire_project_id` e `fieldwire_enabled` a `view.html.twig`**
-  - `WorksitesController::show()` deve aggiungere queste variabili al render
-  - Attualmente il bottone BOB Zone appare sempre ma non sa se il cantiere è già collegato
-
-- [ ] **Testare il flusso "Collega Fieldwire" end-to-end**
-  - Clicca "Collega Fieldwire" → crea progetto su Fieldwire → sync iniziale → ricarica pagina
-  - Verificare che `fieldwire_project_id` venga salvato in `bb_worksites`
-
-- [ ] **Testare autenticazione Fieldwire**
-  - Verificare che il refresh token → access token funzioni correttamente
-  - Verificare che i rate limit vengano gestiti (HTTP 429)
+**Fieldwire è opzionale.** BOB Zone funziona da sola con i dati BOB.
+Se il cantiere viene collegato a Fieldwire, i dati si sincronizzano bidirezionalmente.
 
 ---
 
-## BOB Zone — Features mancanti
+## Fieldwire API — Come funziona
+
+### Autenticazione (due token)
+
+Fieldwire usa un sistema a **due token**:
+
+1. **Refresh token** (permanente)
+   - Si chiama anche "API key" o "API token" nel gergo Fieldwire
+   - Si ottiene da: `app.fieldwire.com` → Account → API Keys
+   - Va salvato in `.env` come `FIELDWIRE_API_TOKEN`
+   - Non scade (o scade dopo mesi)
+
+2. **Access token** (temporaneo, minuti/ore)
+   - Si genera chiamando: `POST https://client-api.super.fieldwire.com/api_keys/jwt`
+   - Body: `{"api_token": "<refresh_token>"}`
+   - Response: `{"token": "...", "expires_in": 1800}`
+   - Va usato nell'header di ogni chiamata API
+   - `FieldwireClient` lo gestisce automaticamente (cache + rinnovo su 401)
+
+### Headers richiesti
+
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+Fieldwire-Version: 2023-11-30
+```
+
+### Base URL
+
+- EU: `https://client-api.eu.fieldwire.com/api/v3`
+- US: `https://client-api.us.fieldwire.com/api/v3`
+
+Configurare `FIELDWIRE_REGION=eu` in `.env`.
+
+### Struttura generale
+
+Tutte le risorse seguono `/projects/{project_id}/resource`.
+Fieldwire usa `id` come stringa (UUID), non intero.
+
+---
+
+## Fieldwire — Risorse principali e endpoint
+
+### Progetti
+```
+POST   /projects                          → crea progetto
+GET    /projects                          → lista tutti i progetti dell'account
+GET    /projects/{id}                     → dettaglio progetto
+PATCH  /projects/{id}                     → aggiorna progetto
+DELETE /projects/{id}                     → elimina progetto
+```
+Body creazione: `{"project": {"name": "...", "description": "..."}}`
+Response: `{"id": "uuid", "name": "...", ...}`
+
+### Task
+```
+GET    /projects/{id}/tasks               → lista task (con filtri: ?status=open)
+POST   /projects/{id}/tasks               → crea task
+GET    /projects/{id}/tasks/{task_id}     → dettaglio task
+PATCH  /projects/{id}/tasks/{task_id}     → aggiorna task
+DELETE /projects/{id}/tasks/{task_id}     → elimina task
+POST   /projects/{id}/tasks/{task_id}/restore → ripristina task eliminato
+```
+Campi task: `name`, `description`, `status` (open/in_progress/complete/verified),
+`category_name`, `assignee_name`, `due_date`, `start_date`, `priority`
+
+### Check Items (Checklist)
+```
+GET    /projects/{id}/tasks/{task_id}/check_items
+POST   /projects/{id}/tasks/{task_id}/check_items    → {"check_item": {"name": "..."}}
+GET    /projects/{id}/tasks/{task_id}/check_items/{ci_id}
+PATCH  /projects/{id}/tasks/{task_id}/check_items/{ci_id}  → {"check_item": {"completed": true}}
+DELETE /projects/{id}/tasks/{task_id}/check_items/{ci_id}
+GET    /projects/{id}/check_items         → tutti i check items del progetto
+```
+Campi: `name`, `completed` (bool)
+
+### Bubbles (Messaggi/Commenti/Foto su task)
+```
+GET    /projects/{id}/tasks/{task_id}/bubbles
+POST   /projects/{id}/tasks/{task_id}/bubbles   → {"bubble": {"kind": "comment", "text": "..."}}
+GET    /projects/{id}/bubbles/{bubble_id}
+PATCH  /projects/{id}/bubbles/{bubble_id}
+DELETE /projects/{id}/bubbles/{bubble_id}
+POST   /projects/{id}/bubbles/{bubble_id}/flatten  → brucia markup sull'immagine
+```
+Kind possibili: `comment`, `photo`, `video`, `link`, `attachment`
+Campi: `kind`, `text`, `file_url`, `creator_name`, `creator_email`
+
+### Floorplans (Tavole/Disegni)
+```
+GET    /projects/{id}/floorplans
+GET    /projects/{id}/floorplans/{fp_id}
+PATCH  /projects/{id}/floorplans/{fp_id}
+DELETE /projects/{id}/floorplans/{fp_id}
+GET    /projects/{id}/floorplans/{fp_id}/sheets
+```
+Upload disegni — flusso a due step (S3):
+1. `POST /projects/{id}/sheet_uploads` → ottieni URL S3 + credenziali
+2. Upload diretto su S3 con le credenziali
+3. `PATCH /projects/{id}/sheet_uploads/{su_id}` con `{"sheet_upload": {"status": "uploaded"}}`
+
+Export:
+- `POST /projects/{id}/floorplans/{fp_id}/exports` → genera PDF
+- `POST /projects/{id}/floorplans/batch_exports` → export multiplo
+
+### Markups (Annotazioni su tavole)
+```
+GET    /projects/{id}/sheets/{sheet_id}/markups
+POST   /projects/{id}/sheets/{sheet_id}/markups
+PATCH  /projects/{id}/sheets/{sheet_id}/markups/{m_id}
+DELETE /projects/{id}/sheets/{sheet_id}/markups/{m_id}
+POST   /projects/{id}/sheets/{sheet_id}/markups/batch_update
+POST   /projects/{id}/sheets/{sheet_id}/markups/batch_destroy
+```
+Kind: `arrow`, `cloud`, `drawing`, `ellipse`, `highlighter`, `measurement`,
+`polygon`, `rectangle`, `text`
+Geometry: formato GeoJSON (`{"type": "Point", "coordinates": [x, y]}`)
+
+### Webhook
+Endpoint Fieldwire per registrare webhook (senza auth, usa il token dell'account):
+- EU: `https://webhook-api.eu.fieldwire.com`
+
+Registrazione:
+```
+POST https://webhook-api.eu.fieldwire.com/subscriptions
+{
+  "subscription": {
+    "name": "BOB Zone",
+    "url": "https://<dominio>/api/fieldwire/webhook",
+    "active": true,
+    "entity_filters": [{"type": "task"}, {"type": "check_item"}, {"type": "bubble"}, {"type": "floorplan"}]
+  }
+}
+```
+
+Payload webhook:
+```json
+{
+  "event_type": "task.updated",
+  "project_id": "uuid-del-progetto",
+  "data": { ...campi della risorsa modificata... }
+}
+```
+Event types: `task.created`, `task.updated`, `task.deleted`,
+`check_item.created`, `check_item.updated`, `check_item.deleted`,
+`bubble.created`, `bubble.deleted`,
+`floorplan.created`, `floorplan.updated`, `floorplan.deleted`
+
+---
+
+## Architettura BOB Zone
+
+### Database BOB
+
+**Tabelle nuove:**
+
+| Tabella | Scopo |
+|---------|-------|
+| `bb_worksites.fieldwire_project_id` | Link cantiere ↔ progetto Fieldwire |
+| `bb_worksites.fieldwire_enabled_at` | Quando è stato collegato |
+| `bb_worksites.fieldwire_enabled_by` | Chi l'ha collegato |
+| `bb_zone_tasks` | Task BOB-nativi (con `fw_id` opzionale) |
+| `bb_zone_task_comments` | Commenti sui task |
+| `bb_zone_task_checklist` | Elementi checklist |
+| `bb_fw_tasks` | Cache locale dei task Fieldwire (sync) |
+| `bb_fw_check_items` | Cache locale checklist Fieldwire |
+| `bb_fw_bubbles` | Cache locale messaggi Fieldwire |
+| `bb_fw_floorplans` | Cache locale tavole Fieldwire |
+
+**Decisione architetturale:** BOB legge sempre dal suo DB. Fieldwire API viene
+usata solo per: scrittura (crea/aggiorna) e sync iniziale. I webhook tengono
+il DB aggiornato in tempo reale.
+
+### Flusso connessione Fieldwire
+
+```
+Utente clicca "Collega Fieldwire"
+    → POST /worksites/{id}/zone/enable
+    → ProjectsApi::create() → crea progetto su Fieldwire
+    → Salva fieldwire_project_id in bb_worksites
+    → InitialSyncService::run()
+        → pull tutti i task Fieldwire → bb_fw_tasks
+        → pull check items → bb_fw_check_items
+        → pull bubbles → bb_fw_bubbles
+        → pull floorplans → bb_fw_floorplans
+    → Ricarica pagina
+```
+
+**DA FARE:** copiare i dati da `bb_fw_tasks` anche in `bb_zone_tasks` durante
+la sync iniziale, e fare il push dei task BOB già esistenti verso Fieldwire.
+
+### Flusso scrittura (BOB → Fieldwire)
+
+```
+Utente crea task da BOB Zone
+    → Salva in bb_zone_tasks
+    → Se cantiere ha fieldwire_project_id:
+        → TasksApi::create() su Fieldwire
+        → Salva fw_id in bb_zone_tasks.fw_id
+```
+
+### Flusso sync (Fieldwire → BOB)
+
+```
+Qualcuno modifica qualcosa su Fieldwire
+    → Fieldwire chiama POST /api/fieldwire/webhook
+    → WebhookHandler::dispatch()
+    → Aggiorna bb_fw_* tables
+    → (DA FARE) Aggiorna anche bb_zone_* tables
+```
+
+---
+
+## Codice — Struttura file
+
+```
+src/Fieldwire/
+├── FieldwireClient.php           → HTTP client (auth, retry, headers)
+├── Api/
+│   ├── ProjectsApi.php           → CRUD progetti
+│   ├── TasksApi.php              → CRUD task
+│   ├── CheckItemsApi.php         → CRUD checklist
+│   ├── BubblesApi.php            → CRUD messaggi/foto
+│   ├── FloorplansApi.php         → tavole + upload S3
+│   └── MarkupsApi.php            → annotazioni su tavole
+├── Sync/
+│   ├── ProjectSync.php           → collega/scollega cantiere ↔ Fieldwire
+│   └── InitialSyncService.php    → sync iniziale al momento della connessione
+└── Webhook/
+    └── WebhookHandler.php        → riceve eventi Fieldwire, aggiorna DB
+
+src/Repository/Fieldwire/
+├── ZoneTaskRepository.php        → CRUD bb_zone_tasks/comments/checklist
+├── FwTaskRepository.php          → bb_fw_tasks (cache Fieldwire)
+├── FwCheckItemRepository.php     → bb_fw_check_items
+├── FwBubbleRepository.php        → bb_fw_bubbles
+└── FwFloorplanRepository.php     → bb_fw_floorplans
+
+src/Http/Controllers/
+└── FieldwireController.php       → tutte le route /worksites/{id}/zone/*
+
+templates/worksites/
+├── view.html.twig                → pagina cantiere (bottone BOB Zone)
+└── fieldwire.html.twig           → pagina BOB Zone standalone
+
+db/migrations/
+├── 20260624000001_fieldwire_worksite_link.php   → aggiunge campi a bb_worksites
+├── 20260624000002_fieldwire_sync_tables.php     → crea bb_fw_* tables
+└── 20260624000003_create_zone_tasks.php         → crea bb_zone_* tables
+```
+
+### Route `/worksites/{id}/zone/*`
+
+```
+GET  /worksites/{id}/zone                                    → pagina BOB Zone
+POST /worksites/{id}/zone/enable                             → collega Fieldwire
+POST /worksites/{id}/zone/disable                            → scollega Fieldwire
+GET  /worksites/{id}/zone/tasks                              → lista task (JSON)
+POST /worksites/{id}/zone/tasks                              → crea task
+POST /worksites/{id}/zone/tasks/{taskId}/status              → aggiorna status
+POST /worksites/{id}/zone/tasks/{taskId}/delete              → elimina task
+GET  /worksites/{id}/zone/tasks/{taskId}/comments            → lista commenti
+POST /worksites/{id}/zone/tasks/{taskId}/comments            → aggiungi commento
+GET  /worksites/{id}/zone/tasks/{taskId}/checklist           → lista checklist
+POST /worksites/{id}/zone/tasks/{taskId}/checklist           → aggiungi elemento
+POST /worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete → spunta
+GET  /worksites/{id}/zone/floorplans                         → lista tavole (JSON)
+POST /api/fieldwire/webhook                                  → webhook Fieldwire (no auth)
+```
+
+---
+
+## TODO — Ordinato per priorità
+
+### 🔴 Prima di poter usare in produzione
+
+- [ ] Configurare `.env`: `FIELDWIRE_API_TOKEN` e `FIELDWIRE_REGION=eu`
+- [ ] Eseguire `vendor/bin/phinx migrate` su produzione (3 migration)
+- [ ] In `WorksitesController::show()` passare `fieldwire_project_id` e `fieldwire_enabled`
+      alla view `worksites/view.html.twig` (serve per mostrare il badge "collegato" nel bottone)
+- [ ] Testare e verificare che il bottone BOB Zone funzioni su server reale
+- [ ] Verificare che la pagina BOB Zone carichi correttamente (task vuoti = 4 colonne Kanban)
+- [ ] Testare creazione task da BOB Zone
+
+### 🟠 Per avere Fieldwire funzionante
+
+- [ ] Testare "Collega Fieldwire" end-to-end con token reale
+- [ ] Registrare webhook su Fieldwire account:
+      `app.fieldwire.com` → Impostazioni account → Webhooks → aggiungi URL
+- [ ] Verificare che `InitialSyncService` non vada in timeout (se molti task)
+      Soluzione: aggiungere paginazione o eseguire in background
+- [ ] Fare il push dei task `bb_zone_tasks` esistenti → Fieldwire al momento della connessione
+- [ ] `WebhookHandler` aggiornare anche `bb_zone_tasks` oltre a `bb_fw_tasks`
+      quando arrivano eventi da Fieldwire
+
+### 🟡 BOB Zone UX mancante
 
 - [ ] **Modifica task** — form per aggiornare nome, assegnatario, date, categoria
-  - Endpoint `POST /worksites/{id}/zone/tasks/{taskId}/update` da aggiungere
-  - UI: bottone "Modifica" nel pannello dettaglio
+      - Aggiungere endpoint `POST /zone/tasks/{id}/update`
+      - UI: bottone "Modifica" nel pannello dettaglio
+- [ ] **Elimina task** — bottone con conferma nel pannello dettaglio
+- [ ] **Elimina commento** — bottone X su ogni commento
+- [ ] **Elimina elemento checklist** — bottone X su ogni riga
+- [ ] **Drag & drop Kanban** — spostare card tra colonne aggiorna status
+      (attualmente si cambia status solo dai bottoni nel dettaglio)
+- [ ] **Filtri** — per status, assegnatario, data nel Kanban
+- [ ] **Assegnatario** — dropdown utenti BOB invece di testo libero
 
-- [ ] **Elimina task** — bottone elimina con conferma nel pannello dettaglio
-  - Endpoint già presente (`/zone/tasks/{taskId}/delete`)
-  - UI mancante
+### 🟡 Tavole (Floorplans)
 
-- [ ] **Elimina commento** — bottone elimina su ogni commento
+- [ ] Link "Apri in Fieldwire" deve puntare alla tavola specifica:
+      `https://app.fieldwire.com/projects/{fw_project_id}/sheets/{fw_floorplan_id}`
+      (attualmente porta alla homepage Fieldwire)
+- [ ] Upload tavola da BOB → Fieldwire (flusso S3 già implementato, manca UI)
+- [ ] Visualizzare anteprima della tavola in BOB (thumbnail da Fieldwire)
+- [ ] Annotazioni: creare markup da BOB su una tavola Fieldwire
 
-- [ ] **Elimina elemento checklist** — bottone X su ogni riga checklist
+### 🟢 Nice to have / futuro
 
-- [ ] **Upload foto su commento** — allegare immagine a un commento (bubble con foto)
-  - Richiede upload file al server + salvataggio URL
-
-- [ ] **Drag & drop Kanban** — spostare card tra colonne aggiorna lo status
-  - Attualmente il status si cambia solo dal pannello dettaglio
-
-- [ ] **Task assegnatario** — collegare a utenti BOB invece di testo libero
-  - Dropdown utenti del cantiere invece di input text
-
-- [ ] **Filtri task** — filtro per status, assegnatario, data nel Kanban/Gantt/Calendario
-
-- [ ] **Priorità task** — visualizzare e modificare la priorità (già in DB, non visibile in UI)
-
----
-
-## Sync Fieldwire ↔ BOB Zone
-
-- [ ] **Push task BOB → Fieldwire al momento della connessione**
-  - Se il cantiere ha già task in `bb_zone_tasks` prima di collegare Fieldwire,
-    mandarli tutti a Fieldwire durante `enable()`
-
-- [ ] **Pull task Fieldwire → `bb_zone_tasks` durante sync iniziale**
-  - `InitialSyncService` popola `bb_fw_tasks` ma non `bb_zone_tasks`
-  - Decidere: usare `bb_fw_tasks` come sorgente oppure copiare in `bb_zone_tasks`
-
-- [ ] **Webhook — registrare l'endpoint su Fieldwire**
-  - Andare su Fieldwire → Account → Webhooks → aggiungere:
-    `https://<dominio>/api/fieldwire/webhook`
-  - Selezionare eventi: `task.*`, `check_item.*`, `bubble.*`, `floorplan.*`
-
-- [ ] **Webhook — aggiornare `bb_zone_tasks` quando arriva evento da Fieldwire**
-  - Attualmente `WebhookHandler` aggiorna solo `bb_fw_*` tables
-  - Aggiungere sync su `bb_zone_tasks` / `bb_zone_task_comments` / `bb_zone_task_checklist`
-
-- [ ] **Gestire conflitti di sync** — cosa succede se stesso task viene modificato sia su BOB che su Fieldwire contemporaneamente?
+- [ ] Validare autenticità webhook con HMAC (Fieldwire manda un secret header)
+- [ ] Logging errori API Fieldwire con Monolog
+- [ ] Decidere architettura finale: unificare `bb_fw_*` e `bb_zone_*` in un'unica tabella?
+- [ ] Upload foto su commento da BOB Zone
+- [ ] RFI e Submittals (Richieste di Informazione) — Fieldwire ha endpoint dedicati
+- [ ] Form Fieldwire — visualizzare e compilare moduli da BOB Zone
+- [ ] Notifiche BOB push quando arriva evento webhook da Fieldwire
 
 ---
 
-## Tavole (Floorplans)
+## Note importanti
 
-- [ ] **Visualizzare tavole Fieldwire nel tab "Tavole"** — attualmente carica da `bb_fw_floorplans`
-  - Link "Apri in Fieldwire" funziona ma porta alla homepage Fieldwire, non alla tavola specifica
-  - Usare l'URL diretto: `https://app.fieldwire.com/projects/{fw_project_id}/sheets/{fw_floorplan_id}`
+### Il `bb_fw_tasks` vs `bb_zone_tasks` — problema da risolvere
 
-- [ ] **Upload tavola da BOB → Fieldwire**
-  - `FloorplansApi::createUpload()` già implementato (flusso S3)
-  - Manca UI e gestione del flusso di upload a due step
+Attualmente ci sono due tabelle separate:
+- `bb_zone_tasks` — task BOB-nativi, `fw_id` nullable
+- `bb_fw_tasks` — cache dei task Fieldwire, `fw_id` obbligatorio (unique key)
 
----
+La sync iniziale popola `bb_fw_tasks` ma non `bb_zone_tasks`. Questo significa
+che se colleghi Fieldwire, i task Fieldwire esistenti non appaiono in BOB Zone.
 
-## Infrastruttura
+**Soluzione proposta:** durante `InitialSyncService::run()`, per ogni task in
+Fieldwire, creare anche una riga in `bb_zone_tasks` con `fw_id` impostato.
+Poi usare solo `bb_zone_tasks` come sorgente di verità e deprecare `bb_fw_*`.
 
-- [ ] **Webhook autenticità** — validare che le chiamate arrivino davvero da Fieldwire
-  - Aggiungere verifica HMAC o IP allowlist
+### Timeout sync iniziale
 
-- [ ] **Gestione token scaduto** — il client già fa retry su 401, testare in produzione
+`InitialSyncService` fa chiamate API sincrone per ogni task (task → check items → bubbles).
+Su progetti grandi (100+ task) questo può richiedere 30-60 secondi e andare in timeout PHP.
 
-- [ ] **Logging chiamate Fieldwire** — loggare errori API con Monolog (già usato in BOB)
+**Soluzione:** lanciare la sync in background dopo aver salvato `fieldwire_project_id`,
+oppure paginarla (sync parziale + continua al prossimo accesso).
 
-- [ ] **Job asincrono per sync iniziale** — `InitialSyncService::run()` può essere lento
-  - Se il progetto Fieldwire ha molti task, la richiesta HTTP va in timeout
-  - Soluzioni: background job, oppure sync paginata
+### Webhook non registrato su Fieldwire
 
-- [ ] **Rimuovere `bb_fw_*` tables o integrarle con `bb_zone_*`**
-  - `bb_fw_tasks` e `bb_zone_tasks` hanno dati sovrapposti
-  - Decidere architettura finale: una tabella sola o due distinte
+Il codice per ricevere webhook è pronto (`/api/fieldwire/webhook`) ma Fieldwire
+non sa dell'URL. Va registrato manualmente dall'account Fieldwire, oppure via API:
+```
+POST https://webhook-api.eu.fieldwire.com/subscriptions
+Authorization: Bearer <access_token>
+Fieldwire-Version: 2023-11-30
+{"subscription": {"name": "BOB Zone", "url": "https://tuodominio.com/api/fieldwire/webhook", "active": true}}
+```
 
----
+### CSP (Content Security Policy)
 
-## Testing
-
-- [ ] Testare Kanban con task reali
-- [ ] Testare Gantt con task con date
-- [ ] Testare Calendario con task con scadenza
-- [ ] Testare commenti (invia, visualizza)
-- [ ] Testare checklist (aggiungi, spunta)
-- [ ] Testare "Collega Fieldwire" su cantiere reale
-- [ ] Testare ricezione webhook da Fieldwire
+La pagina BOB Zone usa `<script>` inline. Se il server ha CSP con `script-src 'self'`
+senza `unsafe-inline`, il JS non gira. Tutti gli event handler sono già stati
+convertiti da `onclick=""` a `addEventListener` per evitare questo problema.
+Se i bottoni non rispondono, verificare i header CSP nelle DevTools del browser.
