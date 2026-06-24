@@ -1147,7 +1147,7 @@ final class WorksitesController
 
         $originalName = $file['name'];
         $extension    = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['pdf', 'dwg', 'png', 'jpg', 'jpeg'], true)) {
+        if (!in_array($extension, ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'], true)) {
             Response::error('Formato file non consentito', 422);
         }
 
@@ -1159,6 +1159,8 @@ final class WorksitesController
             'image/vnd.dwg', 'application/acad', 'application/x-acad',
             'application/autocad_dwg', 'image/x-dwg', 'application/dwg',
             'application/x-dwg', 'application/octet-stream',
+            // DXF: spesso rilevato come testo
+            'image/vnd.dxf', 'application/dxf', 'text/plain',
         ];
         if (!in_array($mimeType, $allowedMimes, true)) {
             Response::error('Tipo di file non consentito.', 422);
@@ -1202,10 +1204,10 @@ final class WorksitesController
             ]);
         }
 
-        // DWG → conversione in SVG vettoriale per il viewer BOB Zone.
+        // DWG/DXF → conversione in SVG vettoriale per il viewer BOB Zone.
         // Best-effort: se fallisce, il disegno resta caricato (status=error).
         $dwgRender = null;
-        if ($extension === 'dwg' && $savedDocId > 0) {
+        if (in_array($extension, ['dwg', 'dxf'], true) && $savedDocId > 0) {
             try {
                 $dwgRender = (new \App\Service\Fieldwire\DwgConverter($this->conn))->convert($savedDocId);
             } catch (\Throwable $e) {

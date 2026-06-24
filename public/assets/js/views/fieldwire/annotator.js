@@ -142,9 +142,9 @@
         setTool('select');
 
         const ft = (cfg.fileType || '').toLowerCase();
-        if (ft === 'pdf')      await loadPdf();
-        else if (ft === 'dwg') await loadDwg();
-        else                   await loadImage();
+        if (ft === 'pdf')                    await loadPdf();
+        else if (ft === 'dwg' || ft === 'dxf') await loadDwg();
+        else                                 await loadImage();
         await loadAnnotations();
     }
 

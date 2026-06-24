@@ -54,11 +54,13 @@ def dwg_to_dxf(dwg_path, out_dir):
     oda = os.environ.get("BOB_ODA_CONVERTER", "").strip()
     if oda and os.path.isfile(oda):
         # ODA File Converter: <in_dir> <out_dir> <out_ver> <out_type> <recurse> <audit>
+        # E' una GUI Qt: la lanciamo headless con xvfb-run se disponibile.
         in_dir = os.path.dirname(dwg_path) or "."
-        subprocess.run(
-            [oda, in_dir, out_dir, "ACAD2018", "DXF", "0", "1", os.path.basename(dwg_path)],
-            check=True, capture_output=True, timeout=120,
-        )
+        oda_cmd = [oda, in_dir, out_dir, "ACAD2018", "DXF", "0", "1", os.path.basename(dwg_path)]
+        from shutil import which
+        if which("xvfb-run"):
+            oda_cmd = ["xvfb-run", "-a"] + oda_cmd
+        subprocess.run(oda_cmd, check=True, capture_output=True, timeout=180)
         if os.path.isfile(dxf_path):
             return dxf_path
         # ODA a volte nomina diversamente: prendi il primo .dxf nella out_dir

@@ -408,7 +408,7 @@ final class FieldwireController
             $stmt->execute([':wid' => $worksiteId]);
             $bob = array_map(function ($r) use ($worksiteId) {
                 $type = strtolower($r['file_type'] ?? '');
-                $isDwg = $type === 'dwg';
+                $isDwg = in_array($type, ['dwg', 'dxf'], true); // entrambi passano dal render vettoriale
                 return [
                     'id'           => (int)$r['id'],
                     'file_name'    => $r['file_name'],

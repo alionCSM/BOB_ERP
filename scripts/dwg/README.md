@@ -6,19 +6,35 @@ Pipeline di conversione DWG per il viewer vettoriale di BOB Zone.
 
 ## Installazione sul server (collaudo / produzione)
 
+### DXF — funziona subito (nessun convertitore)
 ```bash
-# 1) Python + ezdxf (lettura DXF + estrazione geometria)
 sudo apt install -y python3 python3-pip
 pip3 install ezdxf
+```
+ezdxf legge i DXF direttamente. Carica un .dxf dal tab Disegni e funziona.
+(Da AutoCAD: Salva con nome → DXF.)
 
-# 2) Convertitore DWG → DXF. Opzione A (open source, consigliata per iniziare):
-sudo apt install -y libredwg-tools     # fornisce 'dwg2dxf'
+### DWG — serve un convertitore DWG→DXF
+`libredwg-tools` NON è nei repo Ubuntu 22.04. Due strade:
 
-#    Opzione B (qualità migliore, DWG recenti): ODA File Converter
-#    Scarica da https://www.opendesign.com/guestfiles/oda_file_converter
-#    poi esporta la variabile col path dell'eseguibile:
-#    export BOB_ODA_CONVERTER=/opt/ODAFileConverter/ODAFileConverter
-#    (ODA è GUI: serve xvfb-run per girare headless)
+**A) ODA File Converter (consigliata, gratis, qualità top)**
+```bash
+# scarica il .deb da:
+#   https://www.opendesign.com/guestfiles/oda_file_converter
+sudo apt install -y ./ODAFileConverter_*.deb xvfb
+# trova l'eseguibile (di solito):
+#   /usr/bin/ODAFileConverter
+# poi esporta la variabile per PHP (es. nel .env o nella conf del web server):
+export BOB_ODA_CONVERTER=/usr/bin/ODAFileConverter
+```
+Lo script lancia ODA headless con `xvfb-run` in automatico.
+
+**B) LibreDWG da sorgente (se preferisci open source puro)**
+```bash
+sudo apt install -y build-essential libtool autoconf git
+git clone https://github.com/LibreDWG/libredwg.git
+cd libredwg && sh autogen.sh && ./configure --enable-release && make && sudo make install
+# fornisce dwg2dxf nel PATH
 ```
 
 ## Variabili d'ambiente (opzionali)
