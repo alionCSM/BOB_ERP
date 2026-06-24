@@ -410,6 +410,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 <script nonce="{{ cspNonce }}">
 const WID = {{ worksite_id }};
+const CSRF = '{{ csrfToken }}';
 const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
 const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
 
@@ -421,7 +422,10 @@ let calMonth = new Date().getMonth();
 /* ── API ── */
 async function api(url, opts = {}) {
     try {
-        const r = await fetch(url, { ...opts });
+        // Inietta sempre il CSRF token (il middleware lo richiede sui POST).
+        // Lo mettiamo su tutte le richieste: per i GET viene semplicemente ignorato.
+        opts.headers = { 'X-CSRF-Token': CSRF, ...(opts.headers || {}) };
+        const r = await fetch(url, { credentials: 'same-origin', ...opts });
         const text = await r.text();
         try {
             const json = JSON.parse(text);
