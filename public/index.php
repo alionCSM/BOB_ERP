@@ -359,6 +359,65 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get('/worksites/documents/{id}/open',                              [WorksitesController::class, 'openDocument'])
            ->get('/worksites/documents/{id}/download',                         [WorksitesController::class, 'downloadDocument']);
 
+    // ── BOB Zone ──────────────────────────────────────────────────────────────
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $router->get( '/worksites/{id}/zone',                                                         [FieldwireController::class, 'page'])
+           ->post('/worksites/{id}/zone/enable',                                                  [FieldwireController::class, 'enable'])
+           ->post('/worksites/{id}/zone/disable',                                                 [FieldwireController::class, 'disable'])
+           ->get( '/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'tasks'])
+           ->post('/worksites/{id}/zone/tasks',                                                   [FieldwireController::class, 'createTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/update',                                   [FieldwireController::class, 'updateTask'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/status',                                   [FieldwireController::class, 'updateTaskStatus'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/delete',                                   [FieldwireController::class, 'deleteTask'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'comments'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments',                                 [FieldwireController::class, 'postComment'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/comments/{commentId}/delete',              [FieldwireController::class, 'deleteComment'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/photo',                                    [FieldwireController::class, 'postPhoto'])
+           ->get( '/worksites/{id}/zone/photo',                                                   [FieldwireController::class, 'zonePhoto'])
+           ->get( '/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'checklist'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist',                                [FieldwireController::class, 'addChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
+           ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
+           ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
+           ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
+           ->get( '/worksites/{id}/zone/media',                                                   [FieldwireController::class, 'media'])
+           ->get( '/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'formTemplates'])
+           ->post('/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'saveFormTemplate'])
+           ->get( '/worksites/{id}/zone/forms/submissions',                                       [FieldwireController::class, 'formSubmissions'])
+           ->get( '/worksites/{id}/zone/forms/submission/{subId}',                                [FieldwireController::class, 'formSubmission'])
+           ->get( '/worksites/{id}/zone/forms/{tplId}',                                           [FieldwireController::class, 'formTemplate'])
+           ->post('/worksites/{id}/zone/forms/{tplId}/submit',                                    [FieldwireController::class, 'submitForm'])
+           ->post('/worksites/{id}/zone/forms/{tplId}/delete',                                    [FieldwireController::class, 'deleteFormTemplate'])
+           ->get( '/worksites/{id}/zone/form-file',                                               [FieldwireController::class, 'formFile'])
+           ->get( '/worksites/{id}/zone/files',                                                   [FieldwireController::class, 'files'])
+           ->post('/worksites/{id}/zone/files',                                                   [FieldwireController::class, 'uploadFile'])
+           ->post('/worksites/{id}/zone/files/folder',                                            [FieldwireController::class, 'createFolder'])
+           ->post('/worksites/{id}/zone/files/folder/{folderId}/delete',                          [FieldwireController::class, 'deleteFolder'])
+           ->get( '/worksites/{id}/zone/files/{fileId}/download',                                 [FieldwireController::class, 'downloadFile'])
+           ->post('/worksites/{id}/zone/files/{fileId}/delete',                                   [FieldwireController::class, 'deleteFile'])
+           ->get( '/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'fileComments'])
+           ->post('/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'postFileComment'])
+           ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans'])
+           ->get( '/worksites/{id}/zone/disegni',                                                 [FieldwireController::class, 'disegni'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/push-fieldwire',                          [FieldwireController::class, 'pushDisegno'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'annotations'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/annotations',                             [FieldwireController::class, 'saveAnnotation'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/annotations/{annId}/delete',              [FieldwireController::class, 'deleteAnnotation'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/calibration',                             [FieldwireController::class, 'setCalibration'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/dwg',                                      [FieldwireController::class, 'dwgMeta'])
+           ->post('/worksites/{id}/zone/disegni/{docId}/dwg/convert',                             [FieldwireController::class, 'dwgConvert'])
+           ->get( '/worksites/{id}/zone/disegni/{docId}/dwg-svg',                                  [FieldwireController::class, 'dwgSvg']);
+
+    $router->dispatch($request, $container);
+}
+
+// ── Fieldwire webhook (no auth — called by Fieldwire servers) ─────────────────
+if ($uri === '/api/fieldwire/webhook') {
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+    $request   = new \App\Http\Request();
+    $router    = new \App\Http\Router();
+    $router->post('/api/fieldwire/webhook', [FieldwireController::class, 'webhook']);
     $router->dispatch($request, $container);
 }
 

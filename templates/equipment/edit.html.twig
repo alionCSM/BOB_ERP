@@ -9,7 +9,7 @@
     {% if message is not empty %}
         <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
             <span>{{ message }}</span>
-            <button type="button" onclick="this.parentElement.style.display='none';" class="text-green-800 text-lg font-bold ml-4">&times;</button>
+            <button type="button" data-dismiss-alert class="text-green-800 text-lg font-bold ml-4">&times;</button>
         </div>
     {% endif %}
 
@@ -30,11 +30,19 @@
             </tr>
             </thead>
             <tbody>
+            {# Mostriamo TUTTI i noleggi (Attivo + Completato + Finito).
+               Il template internamente rende readonly quelli completati.
+               Prima un filtro esterno "solo Attivo" nascondeva tutto cio'
+               che era stato terminato via /equipment/rentals/.../complete,
+               lasciando visibili solo le "Una Tantum" (es. Trasporto A/R)
+               che la pagina Termina non gestisce. #}
             {% for row in mezzi %}
-                {% if row.stato == 'Attivo' %}
-                <tr class="hover:bg-slate-100">
+                <tr class="hover:bg-slate-100 {{ row.stato in ['Completato','Finito'] ? 'bg-slate-50 opacity-90' : '' }}">
                     <td>
                         {{ row.mezzo_descrizione }}
+                        {% if row.stato in ['Completato','Finito'] and row.data_fine %}
+                            <div class="text-xs text-slate-500">Terminato il {{ row.data_fine|date('d/m/Y') }}</div>
+                        {% endif %}
                         <input type="hidden" name="id[]" value="{{ row.id }}">
                     </td>
                     <td>
@@ -89,16 +97,15 @@
                         {% endif %}
                     </td>
                     <td>
-                        <button
-                                type="button"
-                                class="btn btn-danger text-xs px-3 py-1"
-                                data-delete-id="{{ row.id }}"
-                        >
-                             Elimina
-                        </button>
+                        {% if row.stato == 'Attivo' %}
+                            <button type="button" class="btn btn-danger text-xs px-3 py-1" data-delete-id="{{ row.id }}">
+                                Elimina
+                            </button>
+                        {% else %}
+                            <span class="text-xs text-slate-400">—</span>
+                        {% endif %}
                     </td>
                 </tr>
-                {% endif %}
             {% endfor %}
             </tbody>
         </table>

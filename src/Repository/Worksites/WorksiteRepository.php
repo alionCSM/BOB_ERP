@@ -34,6 +34,19 @@ final class WorksiteRepository
         return $row ?: null;
     }
 
+    /** Find a worksite by its linked Fieldwire project ID. */
+    public function findByFieldwireProjectId(string $fwProjectId): ?array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT id, name, worksite_code, fieldwire_project_id
+            FROM bb_worksites
+            WHERE fieldwire_project_id = :fwid AND is_draft = 0
+            LIMIT 1
+        ");
+        $stmt->execute([':fwid' => $fwProjectId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
     /** id list of all live (non-draft) worksites. */
     public function getAllIds(): array
     {

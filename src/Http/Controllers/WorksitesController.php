@@ -922,6 +922,15 @@ final class WorksitesController
             );
         }
 
+        // Fieldwire flags per il bottone BOB Zone (badge "collegato" + abilitazione).
+        // $worksite e' un oggetto App\Domain\Worksite (NON array), e la classe
+        // non espone fieldwire_project_id come getter → query diretta su PDO.
+        $fwStmt = $this->conn->prepare("SELECT fieldwire_project_id FROM bb_worksites WHERE id = :id");
+        $fwStmt->execute([':id' => $worksite_id]);
+        $fieldwireProjectId = $fwStmt->fetchColumn() ?: null;
+        $fieldwireEnabled   = (new \App\Infrastructure\Config())->fieldwireEnabled();
+        $fieldwireLinked    = !empty($fieldwireProjectId);
+
         Response::view('worksites/view.html.twig', $request, compact(
             'worksite_id', 'worksite', 'isWorker',
             'offerId', 'presenze', 'presenzeCons', 'allPresenze',
@@ -939,7 +948,8 @@ final class WorksitesController
             'extrasUnbilledCount',
             'totalFatture', 'totalFattureDaEmettere',
             'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
-            'financeNotes', 'financeNotesBillingOpen'
+            'financeNotes', 'financeNotesBillingOpen',
+            'fieldwireProjectId', 'fieldwireEnabled', 'fieldwireLinked'
         ));
     }
 
@@ -1118,11 +1128,16 @@ final class WorksitesController
         }
 
         $worksiteObj = new \Worksite($this->conn, $worksiteId);
-        $targetDir   = \CloudPath::ensureDisegniPath($worksiteObj->toCloudArray(), $category);
+        try {
+            $targetDir = \CloudPath::ensureDisegniPath($worksiteObj->toCloudArray(), $category);
+        } catch (\Throwable $e) {
+            error_log('[uploadDisegno] ensureDisegniPath: ' . $e->getMessage());
+            Response::error('Cartella disegni non disponibile: ' . $e->getMessage(), 500);
+        }
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            Response::error('Errore upload file', 500);
+            Response::error('Errore upload file (codice ' . $file['error'] . ')', 500);
         }
 
         // Validate file size (50 MB max)
@@ -1132,7 +1147,7 @@ final class WorksitesController
 
         $originalName = $file['name'];
         $extension    = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['pdf', 'dwg', 'png', 'jpg', 'jpeg'], true)) {
+        if (!in_array($extension, ['pdf', 'dwg', 'dxf', 'png', 'jpg', 'jpeg'], true)) {
             Response::error('Formato file non consentito', 422);
         }
 
@@ -1144,6 +1159,8 @@ final class WorksitesController
             'image/vnd.dwg', 'application/acad', 'application/x-acad',
             'application/autocad_dwg', 'image/x-dwg', 'application/dwg',
             'application/x-dwg', 'application/octet-stream',
+            // DXF: spesso rilevato come testo
+            'image/vnd.dxf', 'application/dxf', 'text/plain',
         ];
         if (!in_array($mimeType, $allowedMimes, true)) {
             Response::error('Tipo di file non consentito.', 422);
@@ -1154,11 +1171,14 @@ final class WorksitesController
         $target   = $targetDir . DIRECTORY_SEPARATOR . $filename;
 
         if (!move_uploaded_file($file['tmp_name'], $target)) {
-            Response::error('Impossibile salvare il file', 500);
+            $err = error_get_last()['message'] ?? 'motivo sconosciuto';
+            error_log("[uploadDisegno] move_uploaded_file fallito → {$target} ({$err})");
+            Response::error('Impossibile salvare il file in ' . $targetDir . ' (' . $err . ')', 500);
         }
 
         $relativePath = \CloudPath::relativeToRoot($target);
 
+        $savedDocId = $replaceId;
         if ($replaceId > 0) {
             $existing = $this->documentRepo->getById($replaceId);
             if ($existing && (int)$existing['worksite_id'] === $worksiteId) {
@@ -1172,7 +1192,7 @@ final class WorksitesController
                 ]);
             }
         } else {
-            $this->documentRepo->create([
+            $savedDocId = $this->documentRepo->createReturningId([
                 'worksite_id' => $worksiteId,
                 'file_name'   => $filename,
                 'file_path'   => $relativePath,
@@ -1184,7 +1204,35 @@ final class WorksitesController
             ]);
         }
 
+        // DWG/DXF → conversione in SVG vettoriale per il viewer BOB Zone.
+        // Best-effort: se fallisce, il disegno resta caricato (status=error).
+        $dwgRender = null;
+        if (in_array($extension, ['dwg', 'dxf'], true) && $savedDocId > 0) {
+            try {
+                $dwgRender = (new \App\Service\Fieldwire\DwgConverter($this->conn))->convert($savedDocId);
+            } catch (\Throwable $e) {
+                error_log('[uploadDisegno] DWG convert: ' . $e->getMessage());
+            }
+        }
+
+        // Chiamata AJAX da BOB Zone → rispondi JSON, niente redirect.
+        if ($this->wantsJson($request)) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => true, 'data' => [
+                'id' => $savedDocId, 'file_name' => $filename,
+                'dwg_render' => $dwgRender['status'] ?? null,
+            ]]);
+            exit;
+        }
+
         Response::redirect("/worksites/{$worksiteId}?tab=disegni");
+    }
+
+    /** Rileva richieste AJAX (header X-Requested-With o ?ajax=1). */
+    private function wantsJson(Request $request): bool
+    {
+        $xrw = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+        return strtolower($xrw) === 'xmlhttprequest' || !empty($_GET['ajax']) || !empty($_POST['ajax']);
     }
 
     public function viewDisegno(Request $request): never

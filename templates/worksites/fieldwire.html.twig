@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BOB Zone — {{ worksite.name }}</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
+
+/* ── Shell ── */
+.bz { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Header ── */
+.bz-header { height: 52px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 20px; gap: 14px; flex-shrink: 0; }
+.bz-back { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #475569; text-decoration: none; transition: color .15s; }
+.bz-back:hover { color: #94a3b8; }
+.bz-sep { width: 1px; height: 18px; background: #1e293b; flex-shrink: 0; }
+.bz-brand { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; }
+.bz-brand-bob  { font-size: 12px; font-weight: 500; color: #475569; letter-spacing: .04em; }
+.bz-brand-zone { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+.bz-wname { font-size: 13px; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bz-header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.bz-fw-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: #4ade80; background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.15); border-radius: 999px; padding: 4px 12px; }
+.bz-fw-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+.bz-fw-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #64748b; background: #1e293b; border: 1px solid #273548; border-radius: 7px; padding: 5px 12px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-fw-btn:hover { color: #94a3b8; border-color: #334155; }
+
+/* ── Toolbar ── */
+.bz-toolbar { height: 48px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
+.bz-view-switcher { display: flex; background: #1e293b; border-radius: 8px; padding: 3px; gap: 2px; }
+.bz-view-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 6px; border: none; background: none; color: #475569; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
+.bz-view-btn i { font-size: 14px; }
+.bz-view-btn:hover { color: #94a3b8; }
+.bz-view-btn.active { background: #334155; color: #f1f5f9; }
+
+.bz-new-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #4ade80; color: #0f172a; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity .15s; margin-left: auto; }
+.bz-new-btn:hover { opacity: .88; }
+.bz-new-btn i { font-size: 14px; }
+
+/* ── Main + Sidebar ── */
+.bz-main { flex: 1; display: flex; overflow: hidden; }
+.bz-sidebar { width: 190px; flex-shrink: 0; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 12px 10px; }
+.bz-nav { display: flex; flex-direction: column; gap: 2px; }
+.bz-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; border: none; background: none; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; text-align: left; text-decoration: none; width: 100%; }
+.bz-nav-item i { width: 18px; text-align: center; font-size: 15px; }
+.bz-nav-item:hover { background: #1e293b; color: #e2e8f0; }
+.bz-nav-item.active { background: #334155; color: #f1f5f9; }
+.bz-nav-sep { height: 1px; background: #1e293b; margin: 10px 4px; }
+.bz-nav-actions .bz-nav-item { color: #cbd5e1; }
+.bz-nav-spacer { flex: 1; }
+.bz-nav-fw { padding-top: 10px; border-top: 1px solid #1e293b; }
+.bz-nav-fw-btn { color: #4ade80 !important; }
+.bz-fw-off { font-size: 11px; color: #475569; padding: 8px 12px; display: block; line-height: 1.4; }
+
+/* ── Body ── */
+.bz-body { flex: 1; overflow: hidden; display: flex; }
+.bz-view { display: none; flex: 1; overflow: hidden; }
+.bz-view.active { display: flex; }
+/* Attività: contenitore a colonna con sub-switcher in cima */
+#view-attivita.active { flex-direction: column; }
+.bz-subswitch { display: flex; gap: 4px; padding: 10px 16px; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
+.bz-sub-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: none; background: #1e293b; color: #94a3b8; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; font-family: inherit; }
+.bz-sub-btn:hover { color: #e2e8f0; }
+.bz-sub-btn.active { background: #334155; color: #f1f5f9; }
+.bz-act-body { flex: 1; display: flex; overflow: hidden; }
+.bz-subview { display: none; flex: 1; overflow: hidden; }
+.bz-subview.active { display: flex; }
+[data-theme="light"] .bz-subswitch { border-color: #e2e8f0; }
+[data-theme="light"] .bz-sub-btn { background: #f1f5f9; color: #64748b; }
+[data-theme="light"] .bz-sub-btn.active { background: #e0e7ff; color: #1e3a8a; }
+
+/* ══════════════════════════
+   KANBAN
+══════════════════════════ */
+.bz-kanban { display: flex; gap: 12px; padding: 16px 20px; overflow-x: auto; overflow-y: hidden; align-items: flex-start; width: 100%; }
+.bz-kanban::-webkit-scrollbar { height: 4px; } .bz-kanban::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+
+.bz-col { display: flex; flex-direction: column; min-width: 260px; max-width: 300px; flex: 1; background: #111827; border: 1px solid #1e293b; border-radius: 10px; overflow: hidden; max-height: 100%; }
+.bz-col-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
+.bz-col-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .06em; }
+.bz-col-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-open { background: #fbbf24; }
+.dot-progress { background: #60a5fa; }
+.dot-done { background: #4ade80; }
+.dot-verified { background: #a78bfa; }
+.bz-col-count { font-size: 11px; color: #334155; background: #1e293b; padding: 1px 7px; border-radius: 999px; }
+
+.bz-cards { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+.bz-cards::-webkit-scrollbar { width: 3px; } .bz-cards::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+
+.bz-card { background: #1e293b; border: 1px solid #273548; border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color .15s; }
+.bz-card:hover { border-color: #334155; }
+.bz-card.active { border-color: #4ade80; }
+.bz-card-name { font-size: 13px; font-weight: 500; color: #e2e8f0; line-height: 1.4; margin-bottom: 8px; }
+.bz-card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bz-card-user { font-size: 11px; color: #475569; display: flex; align-items: center; gap: 3px; }
+.bz-card-due  { font-size: 11px; color: #475569; display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.bz-card-due.overdue { color: #f87171; }
+.bz-card-progress { display: flex; align-items: center; gap: 5px; width: 100%; margin-top: 6px; }
+.bz-progress-bar { flex: 1; height: 3px; background: #273548; border-radius: 2px; overflow: hidden; }
+.bz-progress-fill { height: 100%; background: #4ade80; border-radius: 2px; transition: width .3s; }
+.bz-progress-text { font-size: 10px; color: #334155; white-space: nowrap; }
+
+.bz-col-add { padding: 8px 10px; border-top: 1px solid #1e293b; flex-shrink: 0; }
+.bz-col-add-btn { width: 100%; display: flex; align-items: center; gap: 6px; background: none; border: 1px dashed #1e293b; border-radius: 6px; padding: 7px 10px; color: #334155; font-size: 12px; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-col-add-btn:hover { border-color: #273548; color: #475569; }
+
+/* ══════════════════════════
+   GANTT
+══════════════════════════ */
+.bz-gantt { display: flex; flex-direction: column; flex: 1; overflow: hidden; background: #111827; }
+.bz-gantt-wrap { flex: 1; overflow: auto; padding: 16px 20px; }
+.bz-gantt-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+.bz-gantt-table th { font-size: 10px; font-weight: 600; color: #334155; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid #1e293b; white-space: nowrap; }
+.bz-gantt-table td { padding: 6px 8px; border-bottom: 1px solid #1a2438; vertical-align: middle; }
+.bz-gantt-name { font-size: 12px; font-weight: 500; color: #94a3b8; min-width: 180px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bz-gantt-timeline { position: relative; height: 28px; }
+.bz-gantt-bar { position: absolute; height: 20px; top: 4px; border-radius: 4px; opacity: .85; display: flex; align-items: center; padding: 0 6px; font-size: 10px; font-weight: 600; color: #0f172a; overflow: hidden; white-space: nowrap; min-width: 6px; }
+.bz-gantt-empty { text-align: center; padding: 40px; font-size: 13px; color: #334155; }
+
+/* ══════════════════════════
+   CALENDAR
+══════════════════════════ */
+.bz-calendar { display: flex; flex-direction: column; flex: 1; overflow: hidden; background: #111827; padding: 16px 20px; }
+.bz-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
+.bz-cal-title { font-size: 15px; font-weight: 600; color: #e2e8f0; }
+.bz-cal-nav { display: flex; gap: 6px; }
+.bz-cal-nav button { background: #1e293b; border: 1px solid #273548; color: #64748b; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-family: inherit; font-size: 13px; transition: all .15s; }
+.bz-cal-nav button:hover { color: #e2e8f0; }
+.bz-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; flex: 1; overflow: hidden; }
+.bz-cal-day-name { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; text-align: center; padding: 4px; letter-spacing: .06em; }
+.bz-cal-day { background: #1a2438; border-radius: 6px; padding: 6px; overflow: hidden; cursor: default; min-height: 80px; }
+.bz-cal-day.today { background: #1e293b; border: 1px solid #273548; }
+.bz-cal-day.other-month { opacity: .35; }
+.bz-cal-day-num { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+.bz-cal-day.today .bz-cal-day-num { color: #4ade80; }
+.bz-cal-event { font-size: 10px; font-weight: 500; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.bz-cal-event.open { background: rgba(251,191,36,.15); color: #fbbf24; }
+.bz-cal-event.in_progress { background: rgba(96,165,250,.15); color: #60a5fa; }
+.bz-cal-event.complete { background: rgba(74,222,128,.15); color: #4ade80; }
+
+/* ══════════════════════════
+   DETAIL PANEL (right side)
+══════════════════════════ */
+.bz-detail-wrap { width: 420px; flex-shrink: 0; background: #111827; border-left: 1px solid #1e293b; display: flex; flex-direction: column; overflow: hidden; transition: width .2s; }
+.bz-detail-wrap.closed { width: 0; border-left: none; overflow: hidden; }
+
+.bz-detail-topbar { padding: 12px 16px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.bz-detail-close { background: none; border: none; color: #475569; cursor: pointer; font-size: 20px; padding: 2px; transition: color .15s; }
+.bz-detail-close:hover { color: #94a3b8; }
+
+.bz-detail-inner { flex: 1; overflow-y: auto; }
+.bz-detail-inner::-webkit-scrollbar { width: 3px; } .bz-detail-inner::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+
+.bz-detail-section { padding: 14px 16px; border-bottom: 1px solid #1a2438; }
+.bz-detail-section-title { font-size: 10px; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+
+.bz-detail-title-input { width: 100%; background: none; border: none; color: #f1f5f9; font-size: 15px; font-weight: 600; font-family: inherit; outline: none; line-height: 1.4; }
+
+.bz-status-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.bz-status-opt { padding: 5px 12px; border-radius: 999px; border: 1px solid transparent; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+.bz-status-opt.open     { background: rgba(251,191,36,.1);  color: #fbbf24; border-color: rgba(251,191,36,.2); }
+.bz-status-opt.in_progress { background: rgba(96,165,250,.1); color: #60a5fa; border-color: rgba(96,165,250,.2); }
+.bz-status-opt.complete  { background: rgba(74,222,128,.1); color: #4ade80; border-color: rgba(74,222,128,.2); }
+.bz-status-opt.verified  { background: rgba(167,139,250,.1); color: #a78bfa; border-color: rgba(167,139,250,.2); }
+.bz-status-opt.selected  { opacity: 1; } .bz-status-opt:not(.selected) { opacity: .4; }
+
+.bz-check-list { display: flex; flex-direction: column; gap: 6px; }
+.bz-check-row { display: flex; align-items: flex-start; gap: 8px; }
+.bz-check-row input { width: 14px; height: 14px; margin-top: 2px; accent-color: #4ade80; cursor: pointer; flex-shrink: 0; }
+.bz-check-row label { font-size: 13px; color: #94a3b8; cursor: pointer; line-height: 1.4; flex: 1; }
+.bz-check-row label.done { text-decoration: line-through; color: #334155; }
+.bz-check-add { display: flex; gap: 6px; margin-top: 8px; }
+.bz-check-add input { flex: 1; background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; font-size: 12px; color: #e2e8f0; font-family: inherit; outline: none; }
+.bz-check-add button { background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; color: #4ade80; cursor: pointer; font-size: 13px; }
+
+.bz-comments { display: flex; flex-direction: column; gap: 12px; }
+.bz-comment { display: flex; gap: 8px; align-items: flex-start; }
+.bz-comment-avatar { width: 26px; height: 26px; border-radius: 50%; background: #1e293b; color: #64748b; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bz-comment-body { flex: 1; min-width: 0; }
+.bz-comment-meta { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+.bz-comment-author { font-size: 11px; font-weight: 600; color: #94a3b8; }
+.bz-comment-time   { font-size: 10px; color: #334155; }
+.bz-comment-text   { font-size: 13px; color: #64748b; line-height: 1.5; word-break: break-word; }
+
+.bz-comment-input-wrap { padding: 12px 16px; border-top: 1px solid #1e293b; display: flex; gap: 8px; flex-shrink: 0; }
+.bz-comment-input { flex: 1; background: #1e293b; border: 1px solid #273548; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #e2e8f0; font-family: inherit; resize: none; outline: none; transition: border-color .15s; }
+.bz-comment-input::placeholder { color: #334155; }
+.bz-comment-input:focus { border-color: #334155; }
+.bz-comment-send { background: none; border: none; color: #4ade80; font-size: 20px; cursor: pointer; padding: 4px; transition: opacity .15s; display: flex; align-items: center; }
+.bz-comment-send:hover { opacity: .7; }
+
+/* ══════════════════════════
+   MODAL: New task
+══════════════════════════ */
+.bz-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.bz-overlay.hidden { display: none; }
+.bz-modal { background: #fff; border-radius: 14px; padding: 28px; width: 460px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.bz-modal h3 { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 20px; }
+.bz-modal-field { margin-bottom: 14px; }
+.bz-modal-field label { display: block; font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
+.bz-modal-field input,
+.bz-modal-field select,
+.bz-modal-field textarea { width: 100%; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #1e293b; font-family: inherit; outline: none; transition: border-color .15s; }
+.bz-modal-field input:focus,
+.bz-modal-field select:focus,
+.bz-modal-field textarea:focus { border-color: #94a3b8; background: #fff; }
+.bz-modal-field textarea { resize: vertical; min-height: 80px; }
+.bz-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bz-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.bz-modal-cancel { background: #f1f5f9; border: none; border-radius: 8px; padding: 9px 18px; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500; }
+.bz-modal-cancel:hover { background: #e2e8f0; }
+.bz-modal-submit { background: #0f172a; border: none; border-radius: 8px; padding: 9px 22px; color: #4ade80; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.bz-modal-submit:hover { background: #1e293b; }
+
+/* ── Misc ── */
+.bz-empty { padding: 40px; text-align: center; font-size: 13px; color: #334155; width: 100%; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.bz-spin { animation: spin .8s linear infinite; display: inline-block; }
+.pill { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.pill-open { background: rgba(251,191,36,.12); color: #fbbf24; }
+.pill-progress { background: rgba(96,165,250,.12); color: #60a5fa; }
+.pill-done { background: rgba(74,222,128,.12); color: #4ade80; }
+.pill-verified { background: rgba(167,139,250,.12); color: #a78bfa; }
+
+/* ══════════════════════════
+   TEMA CHIARO (override: il dark è il default)
+══════════════════════════ */
+[data-theme="light"] body { background: #f1f5f9; color: #1e293b; }
+[data-theme="light"] .bz-header,
+[data-theme="light"] .bz-sidebar { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .bz-header { border-bottom-color: #e2e8f0; }
+[data-theme="light"] .bz-sidebar { border-right-color: #e2e8f0; }
+[data-theme="light"] .bz-sep, [data-theme="light"] .bz-nav-sep,
+[data-theme="light"] .bz-nav-fw { background: #e2e8f0; border-color: #e2e8f0; }
+[data-theme="light"] .bz-brand-zone { color: #0f172a; }
+[data-theme="light"] .bz-brand-bob, [data-theme="light"] .bz-wname,
+[data-theme="light"] .bz-back { color: #64748b; }
+[data-theme="light"] .bz-nav-item { color: #475569; }
+[data-theme="light"] .bz-nav-item:hover { background: #f1f5f9; color: #0f172a; }
+[data-theme="light"] .bz-nav-item.active { background: #e0e7ff; color: #1e3a8a; }
+[data-theme="light"] .bz-nav-actions .bz-nav-item { color: #334155; }
+[data-theme="light"] .bz-info { background: #f8fafc; border-color: #e2e8f0; }
+[data-theme="light"] .bz-info-title { color: #94a3b8; }
+[data-theme="light"] .bz-info-row { color: #475569; }
+[data-theme="light"] .bz-col, [data-theme="light"] .bz-gantt,
+[data-theme="light"] .bz-calendar, [data-theme="light"] .bz-detail-wrap { background: #ffffff; border-color: #e2e8f0; }
+[data-theme="light"] .bz-col-head, [data-theme="light"] .bz-detail-topbar,
+[data-theme="light"] .bz-detail-section, [data-theme="light"] .bz-col-add { border-color: #e2e8f0; }
+[data-theme="light"] .bz-card { background: #f8fafc; border-color: #e2e8f0; }
+[data-theme="light"] .bz-card:hover { border-color: #cbd5e1; }
+[data-theme="light"] .bz-card-name { color: #1e293b; }
+[data-theme="light"] .bz-detail-title-input { color: #0f172a; }
+[data-theme="light"] .bz-check-row label { color: #334155; }
+[data-theme="light"] .bz-cal-day { background: #f1f5f9; }
+[data-theme="light"] .bz-cal-day.today { background: #e0e7ff; border-color: #c7d2fe; }
+[data-theme="light"] .bz-cal-title { color: #1e293b; }
+[data-theme="light"] .bz-kanban-filters { border-color: #e2e8f0; }
+[data-theme="light"] .bz-kanban-filters input,
+[data-theme="light"] .bz-kanban-filters select,
+[data-theme="light"] .bz-check-add input,
+[data-theme="light"] .bz-comment-input { background: #ffffff; border-color: #e2e8f0; color: #1e293b; }
+[data-theme="light"] .bz-comment-photo { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+[data-theme="light"] .bz-col-count { background: #f1f5f9; color: #64748b; }
+[data-theme="light"] .bz-comment-input-wrap { border-color: #e2e8f0; }
+
+/* Theme toggle button */
+.bz-theme-toggle { background: none; border: 1px solid #273548; color: #94a3b8; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.bz-theme-toggle:hover { color: #e2e8f0; }
+[data-theme="light"] .bz-theme-toggle { border-color: #e2e8f0; color: #64748b; }
+
+/* Info cantiere (sidebar) */
+.bz-info { margin-top: 12px; padding: 10px; background: #111827; border: 1px solid #1e293b; border-radius: 8px; }
+.bz-info-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #475569; margin-bottom: 8px; }
+.bz-info-row { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #94a3b8; margin-bottom: 5px; line-height: 1.3; }
+.bz-info-row i { width: 13px; text-align: center; color: #64748b; flex-shrink: 0; }
+.bz-info-counts { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1e293b; font-size: 11px; color: #94a3b8; }
+</style>
+<script nonce="{{ cspNonce }}">
+/* applica il tema PRIMA del render per evitare il flash */
+(function () {
+    var pref = localStorage.getItem('bzTheme') || 'system';
+    var light = pref === 'light' || (pref === 'system' && window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: light)').matches);
+    document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+})();
+</script>
+</head>
+<body>
+<div class="bz">
+
+    {# ── Header (sottile) ── #}
+    <header class="bz-header">
+        <a href="/worksites/{{ worksite_id }}" class="bz-back">
+            <i class="fas fa-arrow-left"></i> Cantiere
+        </a>
+        <div class="bz-sep"></div>
+        <div class="bz-brand">
+            <span class="bz-brand-bob">BOB</span>
+            <span class="bz-brand-zone">Zone</span>
+        </div>
+        <div class="bz-sep"></div>
+        <span class="bz-wname">{{ worksite.worksite_code ? '[' ~ worksite.worksite_code ~ '] ' : '' }}{{ worksite.name }}</span>
+        <div class="bz-header-right">
+            <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
+                <i class="fas fa-circle-half-stroke"></i>
+            </button>
+        </div>
+    </header>
+
+    {# ── Main: sidebar + body ── #}
+    <div class="bz-main">
+
+        {# Side menu #}
+        <aside class="bz-sidebar">
+            <nav class="bz-nav">
+                <button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>
+                <button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
+                <button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>
+                <button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
+                <button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
+            </nav>
+            <div class="bz-nav-sep"></div>
+            <div class="bz-nav-actions">
+                <button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>
+                <a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>
+            </div>
+
+            {# ── Info cantiere ── #}
+            <div class="bz-info">
+                <div class="bz-info-title">Cantiere</div>
+                {% if clientName %}<div class="bz-info-row"><i class="fas fa-user-tie"></i><span>{{ clientName }}</span></div>{% endif %}
+                {% if worksite.location %}<div class="bz-info-row"><i class="fas fa-location-dot"></i><span>{{ worksite.location }}</span></div>{% endif %}
+                {% if worksite.status %}<div class="bz-info-row"><i class="fas fa-circle-info"></i><span>{{ worksite.status }}</span></div>{% endif %}
+                {% if worksite.start_date %}<div class="bz-info-row"><i class="fas fa-calendar-day"></i><span>Inizio {{ worksite.start_date|date('d/m/Y') }}</span></div>{% endif %}
+                {% if worksite.order_number %}<div class="bz-info-row"><i class="fas fa-file-signature"></i><span>Ord. {{ worksite.order_number }}</span></div>{% endif %}
+                <div class="bz-info-counts">
+                    <span title="Aperti"><b style="color:#fbbf24">{{ taskCounts.open }}</b> aperti</span>
+                    <span title="In corso"><b style="color:#60a5fa">{{ taskCounts.in_progress }}</b> in corso</span>
+                    <span title="Completati"><b style="color:#4ade80">{{ taskCounts.complete }}</b> fatti</span>
+                </div>
+            </div>
+
+            <div class="bz-nav-spacer"></div>
+            <div class="bz-nav-fw">
+                {% if fieldwire_project_id %}
+                    <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire collegato</span>
+                {% elseif fieldwire_enabled %}
+                    <button class="bz-nav-item bz-nav-fw-btn" id="btn-fw-connect"><i class="fas fa-link"></i><span>Collega Fieldwire</span></button>
+                {% else %}
+                    <span class="bz-fw-off"><i class="fas fa-info-circle"></i> Fieldwire non configurato (manca il token in .env)</span>
+                {% endif %}
+            </div>
+        </aside>
+
+    {# ── Body ── #}
+    <div class="bz-body">
+
+        {# ── Attività (Kanban / Gantt / Calendario) ── #}
+        <div class="bz-view active" id="view-attivita">
+          <div class="bz-subswitch" id="bz-subswitch">
+            <button class="bz-sub-btn active" data-sub="kanban"><i class="fas fa-columns"></i> Kanban</button>
+            <button class="bz-sub-btn" data-sub="gantt"><i class="fas fa-chart-bar"></i> Gantt</button>
+            <button class="bz-sub-btn" data-sub="calendar"><i class="fas fa-calendar-alt"></i> Calendario</button>
+          </div>
+          <div class="bz-act-body">
+
+        {# Kanban #}
+        <div class="bz-subview active" id="view-kanban">
+            <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                <div class="bz-kanban-filters">
+                    <input type="text" id="bz-filter-search" placeholder="Cerca task...">
+                    <select id="bz-filter-assignee"><option value="">Tutti gli assegnatari</option></select>
+                    <select id="bz-filter-cat"><option value="">Tutte le categorie</option></select>
+                    <button type="button" id="bz-filter-clear" title="Azzera filtri"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="bz-kanban" id="bz-kanban" style="flex:1;">
+                    <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# Gantt #}
+        <div class="bz-subview" id="view-gantt">
+            <div class="bz-gantt">
+                <div class="bz-gantt-wrap" id="bz-gantt-content">
+                    <div class="bz-gantt-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# Calendar #}
+        <div class="bz-subview" id="view-calendar">
+            <div class="bz-calendar">
+                <div class="bz-cal-header">
+                    <div class="bz-cal-title" id="cal-title"></div>
+                    <div class="bz-cal-nav">
+                        <button data-cal="-1"><i class="fas fa-chevron-left"></i></button>
+                        <button data-cal="0">Oggi</button>
+                        <button data-cal="1"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="bz-cal-grid" id="bz-cal-grid"></div>
+            </div>
+        </div>
+
+          </div>{# /bz-act-body #}
+        </div>{# /view-attivita #}
+
+        {# Disegni / Tavole #}
+        <div class="bz-view" id="view-disegni">
+            <div class="bz-disegni">
+                <div class="bz-disegni-bar">
+                    <div class="bz-disegni-title"><i class="fas fa-drafting-compass"></i> Disegni del cantiere</div>
+                    <label class="bz-upload-btn">
+                        <i class="fas fa-upload"></i> Carica disegno
+                        <input type="file" id="dz-file-input" accept=".pdf,.dwg,.png,.jpg,.jpeg" hidden>
+                    </label>
+                </div>
+                <div class="bz-disegni-grid" id="bz-disegni-grid">
+                    <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+
+                <div class="bz-fw-floorplans" id="bz-fw-floorplans" style="display:none;">
+                    <div class="bz-disegni-title" style="margin-top:24px;"><i class="fas fa-layer-group"></i> Tavole su Fieldwire</div>
+                    <div class="bz-disegni-grid" id="bz-fw-floorplans-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        {# Moduli #}
+        <div class="bz-view" id="view-forms">
+            <div id="bz-forms-root"></div>
+        </div>
+
+        {# Galleria (foto dai task) #}
+        <div class="bz-view" id="view-media">
+            <div class="bz-media">
+                <div class="bz-disegni-title"><i class="fas fa-images"></i> Galleria foto del cantiere</div>
+                <div class="bz-media-grid" id="bz-media-grid">
+                    <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# File (repository documenti con cartelle) #}
+        <div class="bz-view" id="view-files">
+            <div class="bz-files">
+                <aside class="bz-folders" id="bz-folders"></aside>
+                <div class="bz-files-main">
+                    <div class="bz-files-bar">
+                        <div class="bz-files-title" id="bz-files-title">Tutti i file</div>
+                        <div style="display:flex;gap:8px;">
+                            <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica file
+                                <input type="file" id="bz-file-input" hidden>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="bz-files-list" id="bz-files-list">
+                        <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Viewer file (immagini + PDF in-app) #}
+        <div class="bz-fileview" id="bz-fileview">
+            <div class="bz-fileview-head">
+                <span id="bz-fileview-name">File</span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <a id="bz-fileview-dl" href="#" class="bz-file-act" target="_blank" rel="noopener"><i class="fas fa-download"></i> Scarica</a>
+                    <button id="bz-fileview-close" class="bz-file-act"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="bz-fileview-body" id="bz-fileview-body"></div>
+        </div>
+
+        {# Modal commenti file #}
+        <div class="bz-file-modal" id="bz-file-modal">
+            <div class="bz-file-modal-box">
+                <div class="bz-file-modal-head">
+                    <span id="bz-file-modal-name">File</span>
+                    <button id="bz-file-modal-close">&times;</button>
+                </div>
+                <div class="bz-file-modal-body" id="bz-file-modal-comments"></div>
+                <div class="bz-file-modal-foot">
+                    <input type="text" id="bz-file-comment-input" placeholder="Aggiungi un commento...">
+                    <button id="bz-file-comment-send"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+
+        {# Lightbox #}
+        <div class="bz-lightbox" id="bz-lightbox">
+            <button class="bz-lb-close" id="bz-lb-close">&times;</button>
+            <img id="bz-lb-img" src="" alt="">
+            <div class="bz-lb-caption" id="bz-lb-caption"></div>
+        </div>
+
+        {# Detail panel #}
+        <div class="bz-detail-wrap closed" id="bz-detail-wrap">
+            <div class="bz-detail-topbar">
+                <span style="font-size:12px;font-weight:600;color:#475569;">Dettaglio Task</span>
+                <button class="bz-detail-close" id="btn-close-detail"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="bz-detail-inner" id="bz-detail-inner"></div>
+            <div class="bz-comment-input-wrap">
+                <label class="bz-comment-photo" title="Allega foto">
+                    <i class="fas fa-camera"></i>
+                    <input type="file" id="bz-photo-input" accept="image/*" capture="environment" hidden>
+                </label>
+                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"></textarea>
+                <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+    </div>{# /bz-body #}
+    </div>{# /bz-main #}
+</div>
+
+{# ── New task modal ── #}
+<div class="bz-overlay hidden" id="task-modal">
+    <div class="bz-modal">
+        <h3>Nuovo Task</h3>
+        <div class="bz-modal-field">
+            <label>Nome *</label>
+            <input type="text" id="task-name" placeholder="Descrivi il task...">
+        </div>
+        <div class="bz-modal-field">
+            <label>Descrizione</label>
+            <textarea id="task-desc" placeholder="Dettagli opzionali..."></textarea>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Status</label>
+                <select id="task-status">
+                    <option value="open">Aperto</option>
+                    <option value="in_progress">In corso</option>
+                    <option value="complete">Completato</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Categoria</label>
+                <input type="text" id="task-cat" placeholder="Es. Elettrico">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Assegnato a</label>
+                <select id="task-assignee">
+                    <option value="">— nessuno —</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Scadenza</label>
+                <input type="date" id="task-due">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Data inizio</label>
+                <input type="date" id="task-start">
+            </div>
+        </div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="btn-modal-cancel">Annulla</button>
+            <button class="bz-modal-submit" id="btn-modal-submit">Crea Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════ EDIT TASK MODAL ════════ -->
+<div class="bz-overlay hidden" id="task-edit-modal">
+    <div class="bz-modal">
+        <h3>Modifica Task</h3>
+        <input type="hidden" id="edit-task-id">
+        <div class="bz-modal-field">
+            <label>Nome *</label>
+            <input type="text" id="edit-task-name">
+        </div>
+        <div class="bz-modal-field">
+            <label>Descrizione</label>
+            <textarea id="edit-task-desc"></textarea>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Status</label>
+                <select id="edit-task-status">
+                    <option value="open">Aperto</option>
+                    <option value="in_progress">In corso</option>
+                    <option value="complete">Completato</option>
+                    <option value="verified">Verificato</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Categoria</label>
+                <input type="text" id="edit-task-cat">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Assegnato a</label>
+                <select id="edit-task-assignee">
+                    <option value="">— nessuno —</option>
+                </select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Scadenza</label>
+                <input type="date" id="edit-task-due">
+            </div>
+        </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Data inizio</label>
+                <input type="date" id="edit-task-start">
+            </div>
+            <div class="bz-modal-field">
+                <label>Priorità</label>
+                <select id="edit-task-priority">
+                    <option value="0">Normale</option>
+                    <option value="1">Alta</option>
+                    <option value="2">Urgente</option>
+                </select>
+            </div>
+        </div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="btn-edit-cancel">Annulla</button>
+            <button class="bz-modal-submit" id="btn-edit-submit">Salva modifiche</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ cspNonce }}">
+const WID = {{ worksite_id }};
+const CSRF = '{{ csrfToken }}';
+const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
+const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
+
+let allTasks = [];
+let activeTaskId = null;
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+/* ── API ── */
+async function api(url, opts = {}) {
+    try {
+        // Inietta sempre il CSRF token (il middleware lo richiede sui POST).
+        // Lo mettiamo su tutte le richieste: per i GET viene semplicemente ignorato.
+        opts.headers = { 'X-CSRF-Token': CSRF, ...(opts.headers || {}) };
+        const r = await fetch(url, { credentials: 'same-origin', ...opts });
+        const text = await r.text();
+        try {
+            const json = JSON.parse(text);
+            if (!json.ok && json.where) {
+                console.warn('[API error]', url, json.type, json.error, '@', json.where);
+            }
+            return json;
+        } catch {
+            console.error('[Non-JSON response]', url, 'HTTP', r.status, '\n--- body ---\n', text.slice(0, 1500));
+            return { ok: false, error: 'Risposta non valida dal server (HTTP ' + r.status + ') — vedi DevTools Console' };
+        }
+    } catch (e) {
+        console.error('Fetch error', url, e);
+        return { ok: false, error: e.message };
+    }
+}
+
+/* ── Data ── */
+async function loadTasks() {
+    const res = await api(`/worksites/${WID}/zone/tasks`);
+    allTasks = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    renderCurrentView();
+}
+
+let currentTop = 'attivita';   // attivita | disegni | media | files | forms
+let activeSub  = 'kanban';     // kanban | gantt | calendar
+
+function switchTop(v) {
+    currentTop = v;
+    document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
+    document.getElementById('view-' + v)?.classList.add('active');
+    document.querySelectorAll('.bz-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    if (v === 'attivita')      renderSub();
+    else if (v === 'disegni')  loadDisegni();
+    else if (v === 'media')    loadMedia();
+    else if (v === 'files')    loadFiles();
+    else if (v === 'forms')    openForms();
+}
+
+function switchSub(s) {
+    activeSub = s;
+    document.querySelectorAll('.bz-subview').forEach(x => x.classList.remove('active'));
+    document.getElementById('view-' + s)?.classList.add('active');
+    document.querySelectorAll('.bz-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === s));
+    renderSub();
+}
+
+function renderSub() {
+    if (activeSub === 'kanban')   renderKanban();
+    if (activeSub === 'gantt')    renderGantt();
+    if (activeSub === 'calendar') renderCalendar();
+}
+
+function openForms() {
+    if (!window.BZForms) return;
+    if (!window._bzFormsInited) {
+        BZForms.init({
+            worksiteId: WID, csrf: CSRF,
+            wsName: {{ worksite.name|json_encode|raw }},
+            wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
+            clientName: {{ (clientName ?? '')|json_encode|raw }}
+        });
+        window._bzFormsInited = true;
+    }
+    BZForms.show();
+}
+
+/* compat: chiamato dopo modifiche ai task → ridisegna la vista attività corrente */
+function renderCurrentView() {
+    if (currentTop === 'attivita') renderSub();
+}
+
+/* ══════════ KANBAN ══════════ */
+const COLS = [
+    { key: 'open',        label: 'Aperto',      dot: 'dot-open' },
+    { key: 'in_progress', label: 'In corso',     dot: 'dot-progress' },
+    { key: 'complete',    label: 'Completato',   dot: 'dot-done' },
+    { key: 'verified',    label: 'Verificato',   dot: 'dot-verified' },
+];
+
+let kFilter = { q: '', assignee: '', cat: '' };
+
+function filteredTasks() {
+    const q = kFilter.q.toLowerCase();
+    return allTasks.filter(t => {
+        if (kFilter.assignee && (t.assignee_name || '') !== kFilter.assignee) return false;
+        if (kFilter.cat && (t.category || '') !== kFilter.cat) return false;
+        if (q) {
+            const blob = `${t.name||''} ${t.assignee_name||''} ${t.category||''} ${t.description||''}`.toLowerCase();
+            if (!blob.includes(q)) return false;
+        }
+        return true;
+    });
+}
+
+function refreshKanbanFilterOptions() {
+    const aSel = document.getElementById('bz-filter-assignee');
+    const cSel = document.getElementById('bz-filter-cat');
+    if (!aSel || !cSel) return;
+    const assignees = [...new Set(allTasks.map(t => t.assignee_name).filter(Boolean))].sort();
+    const cats      = [...new Set(allTasks.map(t => t.category).filter(Boolean))].sort();
+    aSel.innerHTML = '<option value="">Tutti gli assegnatari</option>' + assignees.map(a=>`<option ${a===kFilter.assignee?'selected':''}>${escHtml(a)}</option>`).join('');
+    cSel.innerHTML = '<option value="">Tutte le categorie</option>' + cats.map(c=>`<option ${c===kFilter.cat?'selected':''}>${escHtml(c)}</option>`).join('');
+}
+
+function renderKanban() {
+    refreshKanbanFilterOptions();
+    const board = document.getElementById('bz-kanban');
+    const grouped = {};
+    COLS.forEach(c => grouped[c.key] = []);
+    filteredTasks().forEach(t => { if (grouped[t.status] !== undefined) grouped[t.status].push(t); else grouped['open'].push(t); });
+
+    board.innerHTML = COLS.map(col => `
+        <div class="bz-col">
+            <div class="bz-col-head">
+                <span class="bz-col-label">
+                    <span class="bz-col-dot ${col.dot}"></span>
+                    ${col.label}
+                </span>
+                <span class="bz-col-count">${grouped[col.key].length}</span>
+            </div>
+            <div class="bz-cards" id="col-${col.key}">
+                ${grouped[col.key].map(t => cardHtml(t)).join('') || ''}
+            </div>
+            <div class="bz-col-add">
+                <button class="bz-col-add-btn" data-quick-add="${col.key}">
+                    <i class="fas fa-plus" style="font-size:13px"></i> Aggiungi
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function cardHtml(t) {
+    const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete';
+    return `
+        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
+            <div class="bz-card-name">${escHtml(t.name)}</div>
+            <div class="bz-card-foot">
+                ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
+                ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
+            </div>
+        </div>`;
+}
+
+/* ══════════ GANTT ══════════ */
+function renderGantt() {
+    const el = document.getElementById('bz-gantt-content');
+    const withDates = allTasks.filter(t => t.start_date || t.due_date);
+    if (!withDates.length) {
+        el.innerHTML = '<div class="bz-gantt-empty">Nessun task con date impostate.<br>Aggiungi una data di inizio o scadenza per vederli qui.</div>';
+        return;
+    }
+
+    const dates = withDates.flatMap(t => [t.start_date, t.due_date].filter(Boolean)).map(d => new Date(d));
+    const minD  = new Date(Math.min(...dates)); minD.setDate(1);
+    const maxD  = new Date(Math.max(...dates)); maxD.setDate(maxD.getDate() + 7);
+    const totalDays = Math.max(1, Math.ceil((maxD - minD) / 86400000));
+
+    const months = [];
+    let cur = new Date(minD);
+    while (cur <= maxD) {
+        months.push({ label: cur.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), start: new Date(cur) });
+        cur.setMonth(cur.getMonth() + 1);
+    }
+
+    el.innerHTML = `
+        <table class="bz-gantt-table">
+            <thead>
+                <tr>
+                    <th style="width:200px">Task</th>
+                    <th>Timeline</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${withDates.map(t => {
+                    const start = t.start_date ? new Date(t.start_date) : new Date(t.due_date);
+                    const end   = t.due_date   ? new Date(t.due_date)   : new Date(t.start_date);
+                    const left  = Math.max(0, (start - minD) / 86400000 / totalDays * 100);
+                    const width = Math.max(1, (end - start) / 86400000 / totalDays * 100) + (t.start_date && t.due_date ? 0 : 1);
+                    const color = STATUS_COLORS[t.status] || STATUS_COLORS.open;
+                    return `
+                        <tr data-task-id="${t.id}" style="cursor:pointer">
+                            <td><div class="bz-gantt-name" title="${t.name}">${t.name}</div></td>
+                            <td>
+                                <div class="bz-gantt-timeline">
+                                    <div class="bz-gantt-bar"
+                                         style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%;background:${color}">
+                                        ${width > 8 ? t.name : ''}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+}
+
+/* ══════════ CALENDAR ══════════ */
+function renderCalendar() {
+    const months = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    const days   = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+    document.getElementById('cal-title').textContent = `${months[calMonth]} ${calYear}`;
+
+    const grid = document.getElementById('bz-cal-grid');
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // Day headers
+    let html = days.map(d => `<div class="bz-cal-day-name">${d}</div>`).join('');
+
+    const first = new Date(calYear, calMonth, 1);
+    let startDow = first.getDay(); // 0=Sun
+    startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
+
+    const tasksByDate = {};
+    allTasks.forEach(t => {
+        const key = t.due_date ? t.due_date.slice(0,10) : null;
+        if (key) { if (!tasksByDate[key]) tasksByDate[key] = []; tasksByDate[key].push(t); }
+    });
+
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    const prevDays    = new Date(calYear, calMonth, 0).getDate();
+
+    // Fill prev month
+    for (let i = startDow - 1; i >= 0; i--) {
+        html += `<div class="bz-cal-day other-month"><div class="bz-cal-day-num">${prevDays - i}</div></div>`;
+    }
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dt = new Date(calYear, calMonth, d);
+        const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const isToday = dt.getTime() === today.getTime();
+        const events  = (tasksByDate[key] || []).slice(0, 3);
+        html += `
+            <div class="bz-cal-day ${isToday ? 'today' : ''}">
+                <div class="bz-cal-day-num">${d}</div>
+                ${events.map(t => `
+                    <div class="bz-cal-event ${t.status}" data-task-id="${t.id}" title="${t.name}" style="cursor:pointer">${t.name}</div>
+                `).join('')}
+                ${(tasksByDate[key]||[]).length > 3 ? `<div style="font-size:10px;color:#334155">+${(tasksByDate[key]||[]).length - 3} altri</div>` : ''}
+            </div>`;
+    }
+    // Fill next month
+    const total = startDow + daysInMonth;
+    const rem   = total % 7 === 0 ? 0 : 7 - (total % 7);
+    for (let d = 1; d <= rem; d++) {
+        html += `<div class="bz-cal-day other-month"><div class="bz-cal-day-num">${d}</div></div>`;
+    }
+
+    grid.innerHTML = html;
+}
+
+function calNav(dir) {
+    if (dir === 0) { calYear = new Date().getFullYear(); calMonth = new Date().getMonth(); }
+    else { calMonth += dir; if (calMonth < 0) { calMonth = 11; calYear--; } if (calMonth > 11) { calMonth = 0; calYear++; } }
+    renderCalendar();
+}
+
+/* ══════════ DETAIL PANEL ══════════ */
+async function openTask(id) {
+    activeTaskId = id;
+    document.querySelectorAll('.bz-card').forEach(c => c.classList.toggle('active', parseInt(c.dataset.taskId) === id));
+    document.getElementById('bz-detail-wrap').classList.remove('closed');
+
+    const task = allTasks.find(t => t.id == id);
+    if (!task) return;
+
+    const inner = document.getElementById('bz-detail-inner');
+    inner.innerHTML = `
+        <div class="bz-detail-section">
+            <input class="bz-detail-title-input" value="${escHtml(task.name)}"
+                   data-task-name-id="${id}">
+            ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${escHtml(task.category)}</div>` : ''}
+            <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="bz-task-action-btn" data-edit-task="${id}" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-pen" style="font-size:11px"></i> Modifica
+                </button>
+                <button class="bz-task-action-btn" data-delete-task="${id}" style="background:#1e293b;color:#fca5a5;border:1px solid #471515;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                    <i class="fas fa-trash" style="font-size:11px"></i> Elimina
+                </button>
+            </div>
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Status</div>
+            <div class="bz-status-row">
+                ${Object.entries(STATUSES).map(([k,v]) => `
+                    <button class="bz-status-opt ${k} ${task.status === k ? 'selected' : ''}"
+                            data-set-status="${k}" data-task-id="${id}">
+                        ${v}
+                    </button>`).join('')}
+            </div>
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Info</div>
+            ${task.assignee_name ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i> ${task.assignee_name}</div>` : ''}
+            ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-calendar-alt" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
+            ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="fas fa-calendar-check" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
+            ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5">${task.description}</p>` : ''}
+        </div>
+
+        <div class="bz-detail-section">
+            <div class="bz-detail-section-title">Checklist</div>
+            <div class="bz-check-list" id="bz-checklist-${id}">
+                <div style="font-size:12px;color:#334155">Caricamento...</div>
+            </div>
+            <div class="bz-check-add">
+                <input id="new-check-input" placeholder="Nuovo elemento..." data-check-enter="${id}">
+                <button data-add-check="${id}"><i class="fas fa-plus"></i></button>
+            </div>
+        </div>
+
+        <div class="bz-detail-section" style="border-bottom:none">
+            <div class="bz-detail-section-title">Commenti</div>
+            <div class="bz-comments" id="bz-comments-${id}">
+                <div style="font-size:12px;color:#334155">Caricamento...</div>
+            </div>
+        </div>
+    `;
+
+    loadChecklist(id);
+    loadComments(id);
+}
+
+function closeDetail() {
+    activeTaskId = null;
+    document.getElementById('bz-detail-wrap').classList.add('closed');
+    document.querySelectorAll('.bz-card').forEach(c => c.classList.remove('active'));
+}
+
+async function setStatus(taskId, status) {
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+    });
+    const task = allTasks.find(t => t.id == taskId);
+    if (task) task.status = status;
+    renderCurrentView();
+    // update buttons
+    document.querySelectorAll('.bz-status-opt').forEach(b => {
+        b.classList.toggle('selected', b.classList.contains(status));
+    });
+}
+
+/* updateTaskName moved below, ora usa /update con il payload completo */
+
+/* ── Checklist ── */
+async function loadChecklist(taskId) {
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist`);
+    const el  = document.getElementById(`bz-checklist-${taskId}`);
+    if (!el) return;
+    const items = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun elemento.</div>'; return; }
+    el.innerHTML = items.map(c => `
+        <div class="bz-check-row" id="crow-${c.id}" style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
+                   data-toggle-check="${taskId}:${c.id}">
+            <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}" style="flex:1;">${escHtml(c.name)}</label>
+            <button class="bz-x-btn" data-delete-check="${taskId}:${c.id}"
+                    title="Elimina elemento"
+                    style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:2px 6px;line-height:1;">×</button>
+        </div>`).join('');
+}
+
+async function toggleCheck(taskId, itemId, cb) {
+    cb.disabled = true;
+    const label = cb.nextElementSibling;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist/${itemId}/complete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: cb.checked }),
+    });
+    label?.classList.toggle('done', cb.checked);
+    cb.disabled = false;
+}
+
+async function addCheck(taskId) {
+    const inp  = document.getElementById('new-check-input');
+    const name = inp.value.trim();
+    if (!name) return;
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+    });
+    if (res.ok) { inp.value = ''; loadChecklist(taskId); }
+}
+
+async function deleteCheck(taskId, itemId) {
+    if (!confirm('Eliminare questo elemento della checklist?')) return;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/checklist/${itemId}/delete`, { method: 'POST' });
+    loadChecklist(taskId);
+}
+
+async function deleteComment(taskId, commentId) {
+    if (!confirm('Eliminare questo commento?')) return;
+    await api(`/worksites/${WID}/zone/tasks/${taskId}/comments/${commentId}/delete`, { method: 'POST' });
+    loadComments(taskId);
+}
+
+async function deleteTask(taskId) {
+    if (!confirm('Eliminare definitivamente questo task? Tutti i commenti e checklist saranno persi.')) return;
+    const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/delete`, { method: 'POST' });
+    if (res.ok) {
+        allTasks = allTasks.filter(t => t.id != taskId);
+        closeDetail();
+        renderCurrentView();
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile eliminare'));
+    }
+}
+
+/* ══════════ EDIT TASK MODAL ══════════ */
+function openEditModal(taskId) {
+    const t = allTasks.find(x => x.id == taskId);
+    if (!t) return;
+    document.getElementById('edit-task-id').value       = t.id;
+    document.getElementById('edit-task-name').value     = t.name || '';
+    document.getElementById('edit-task-desc').value     = t.description || '';
+    document.getElementById('edit-task-status').value   = t.status || 'open';
+    document.getElementById('edit-task-cat').value      = t.category || '';
+    document.getElementById('edit-task-due').value      = t.due_date   || '';
+    document.getElementById('edit-task-start').value    = t.start_date || '';
+    document.getElementById('edit-task-priority').value = String(t.priority ?? 0);
+    // assignee select per user_id; se il task ha un nome FW senza id, lo
+    // aggiungo come opzione "custom" (value vuoto, solo display) cosi' si vede.
+    const sel = document.getElementById('edit-task-assignee');
+    if (t.assignee_user_id) {
+        sel.value = String(t.assignee_user_id);
+    } else if (t.assignee_name) {
+        sel.value = '';
+    } else {
+        sel.value = '';
+    }
+    document.getElementById('task-edit-modal').classList.remove('hidden');
+    document.getElementById('edit-task-name').focus();
+}
+function closeEditModal() {
+    document.getElementById('task-edit-modal').classList.add('hidden');
+}
+
+async function submitEdit() {
+    const id = parseInt(document.getElementById('edit-task-id').value);
+    const eSel = document.getElementById('edit-task-assignee');
+    const body = {
+        name:            document.getElementById('edit-task-name').value.trim(),
+        description:     document.getElementById('edit-task-desc').value,
+        status:          document.getElementById('edit-task-status').value,
+        category:        document.getElementById('edit-task-cat').value || null,
+        assignee_user_id: eSel.value || null,
+        assignee_name:   eSel.value ? (eSel.options[eSel.selectedIndex]?.text || null) : null,
+        due_date:        document.getElementById('edit-task-due').value   || null,
+        start_date:      document.getElementById('edit-task-start').value || null,
+        priority:        parseInt(document.getElementById('edit-task-priority').value || '0'),
+    };
+    if (!body.name) { document.getElementById('edit-task-name').focus(); return; }
+
+    const btn = document.getElementById('btn-edit-submit');
+    btn.disabled = true; btn.textContent = '...';
+    const res = await api(`/worksites/${WID}/zone/tasks/${id}/update`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    btn.disabled = false; btn.textContent = 'Salva modifiche';
+
+    if (res.ok) {
+        // sostituisci il task locale
+        const idx = allTasks.findIndex(t => t.id == id);
+        if (idx >= 0) allTasks[idx] = res.data;
+        closeEditModal();
+        renderCurrentView();
+        openTask(id);
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile aggiornare'));
+    }
+}
+
+/* Override updateTaskName per usare l'endpoint giusto (era bacato — chiamava /status) */
+function updateTaskName(taskId, name) {
+    if (!name.trim()) return;
+    const task = allTasks.find(t => t.id == taskId);
+    if (!task) return;
+    task.name = name;
+    api(`/worksites/${WID}/zone/tasks/${taskId}/update`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, name }),
+    });
+}
+
+/* ══════════ BOB USERS DROPDOWN ══════════ */
+async function loadBobUsers() {
+    const res = await api(`/worksites/${WID}/zone/users`);
+    if (!res.ok || !Array.isArray(res.data)) return;
+    const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label)}</option>`).join('');
+    document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
+        // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
+        sel.innerHTML = '<option value="">— nessuno —</option>' + html;
+    });
+}
+
+/* ── Comments ── */
+async function loadComments(taskId) {
+    const res  = await api(`/worksites/${WID}/zone/tasks/${taskId}/comments`);
+    const el   = document.getElementById(`bz-comments-${taskId}`);
+    if (!el) return;
+    const items = res.ok && Array.isArray(res.data) ? res.data : [];
+    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun commento ancora.</div>'; return; }
+    el.innerHTML = items.map(c => `
+        <div class="bz-comment">
+            <div class="bz-comment-avatar">${initials(c.author_name)}</div>
+            <div class="bz-comment-body">
+                <div class="bz-comment-meta">
+                    <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
+                    <span class="bz-comment-time">${ago(c.created_at)}</span>
+                    <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
+                            title="Elimina commento"
+                            style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
+                </div>
+                ${c.text ? `<div class="bz-comment-text">${escHtml(c.text)}</div>` : ''}
+                ${c.file_url ? `<a href="${escAttr(c.file_url)}" target="_blank" rel="noopener"><img class="bz-comment-photo-thumb" src="${escAttr(c.file_url)}" alt="foto" loading="lazy"></a>` : ''}
+            </div>
+        </div>`).join('');
+    el.scrollTop = el.scrollHeight;
+}
+
+async function sendComment() {
+    const inp  = document.getElementById('bz-comment-input');
+    const text = inp?.value?.trim();
+    if (!text || !activeTaskId) return;
+    inp.disabled = true;
+    const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/comments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+    });
+    if (res.ok) { inp.value = ''; loadComments(activeTaskId); }
+    inp.disabled = false;
+    inp.focus();
+}
+
+/* ══════════ DISEGNI / TAVOLE ══════════ */
+let disegniLoaded = false;
+
+async function loadDisegni() {
+    const grid = document.getElementById('bz-disegni-grid');
+    if (!disegniLoaded) grid.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
+
+    const res = await api(`/worksites/${WID}/zone/disegni`);
+    disegniLoaded = true;
+    if (!res.ok) { grid.innerHTML = '<div class="bz-dz-empty">Errore caricamento disegni.</div>'; return; }
+
+    const { bob = [], fieldwire = [], fieldwire_ready = false } = res.data || {};
+    renderDisegni(bob, fieldwire_ready);
+    renderFwFloorplans(fieldwire);
+}
+
+function dzIconClass(type) {
+    const t = (type || '').toLowerCase();
+    if (t === 'pdf') return 'pdf';
+    if (t === 'dwg') return 'dwg';
+    if (['png','jpg','jpeg'].includes(t)) return 'img';
+    return '';
+}
+function dzIconGlyph(type) {
+    const t = (type || '').toLowerCase();
+    if (t === 'pdf') return 'fa-file-pdf';
+    if (t === 'dwg') return 'fa-drafting-compass';
+    if (['png','jpg','jpeg'].includes(t)) return 'fa-file-image';
+    return 'fa-file';
+}
+
+function renderDisegni(items, fwReady) {
+    const grid = document.getElementById('bz-disegni-grid');
+    if (!items.length) {
+        grid.innerHTML = '<div class="bz-dz-empty">Nessun disegno. Carica la prima tavola.</div>';
+        return;
+    }
+    grid.innerHTML = items.map(d => `
+        <div class="bz-dz-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                <i class="fas ${dzIconGlyph(d.file_type)} bz-dz-icon ${dzIconClass(d.file_type)}"></i>
+                <span class="bz-dz-folder">${escHtml(d.folder)}</span>
+            </div>
+            <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
+            <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
+            ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
+            <div class="bz-dz-actions">
+                ${d.annotatable
+                    ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
+                    : (d.is_dwg
+                        ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
+                        : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)}
+                <a class="bz-dz-btn" href="${d.view_url}" download><i class="fas fa-download"></i></a>
+                ${fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
+                <button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`).join('');
+}
+
+function renderFwFloorplans(items) {
+    const wrap = document.getElementById('bz-fw-floorplans');
+    const grid = document.getElementById('bz-fw-floorplans-grid');
+    if (!items.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    grid.innerHTML = items.map(f => `
+        <div class="bz-dz-card">
+            <i class="fas fa-layer-group bz-dz-icon"></i>
+            <div class="bz-dz-name">${escHtml(f.name)}</div>
+            <div class="bz-dz-meta">${f.sheets_count != null ? f.sheets_count + ' fogli' : ''}</div>
+            <div class="bz-dz-actions">
+                ${f.open_url ? `<a class="bz-dz-btn fw" href="${f.open_url}" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> Apri in Fieldwire</a>` : ''}
+            </div>
+        </div>`).join('');
+}
+
+async function uploadDisegno(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'altri');
+    fd.append('ajax', '1');
+
+    const grid = document.getElementById('bz-disegni-grid');
+    const prev = grid.innerHTML;
+    grid.insertAdjacentHTML('afterbegin', '<div class="bz-dz-empty" id="dz-uploading"><i class="fas fa-spinner bz-spin"></i> Caricamento...</div>');
+
+    // upload usa l'endpoint BOB esistente (AJAX-aware). FormData → niente Content-Type manuale.
+    const res = await api(`/worksites/${WID}/disegni/upload`, { method: 'POST', body: fd });
+    if (!res.ok) {
+        document.getElementById('dz-uploading')?.remove();
+        alert('Errore upload: ' + (res.error || 'sconosciuto'));
+        return;
+    }
+    disegniLoaded = false;
+    loadDisegni();
+}
+
+async function deleteDisegno(docId) {
+    if (!confirm('Eliminare questo disegno?')) return;
+    // l'endpoint delete BOB e' GET e ritorna 204 (no JSON) → fetch diretto
+    await fetch(`/worksites/${WID}/disegni/${docId}/delete`, {
+        headers: { 'X-CSRF-Token': CSRF }, credentials: 'same-origin'
+    });
+    disegniLoaded = false;
+    loadDisegni();
+}
+
+async function pushDisegnoFw(docId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner bz-spin"></i>'; }
+    const res = await api(`/worksites/${WID}/zone/disegni/${docId}/push-fieldwire`, { method: 'POST' });
+    if (res.ok) {
+        disegniLoaded = false;
+        loadDisegni();
+    } else {
+        alert('Errore sync Fieldwire: ' + (res.error || 'sconosciuto'));
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> FW'; }
+    }
+}
+
+function fmtDateTime(str) {
+    if (!str) return '';
+    const d = new Date(str.replace(' ', 'T'));
+    if (isNaN(d)) return str;
+    return d.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'2-digit' });
+}
+
+/* ══════════ GALLERIA ══════════ */
+let mediaLoaded = false;
+async function loadMedia() {
+    const grid = document.getElementById('bz-media-grid');
+    if (!mediaLoaded) grid.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
+    const res = await api(`/worksites/${WID}/zone/media`);
+    mediaLoaded = true;
+    const items = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    if (!items.length) { grid.innerHTML = '<div class="bz-dz-empty">Nessuna foto caricata. Allega foto ai task per vederle qui.</div>'; return; }
+    grid.innerHTML = items.map(m => `
+        <div class="bz-media-card" data-lb="${escAttr(m.file_url)}"
+             data-cap="${escAttr((m.task_name||'') + ' · ' + (m.author_name||'') + ' · ' + fmtDateTime(m.created_at))}"
+             data-task="${m.task_id}">
+            <img src="${escAttr(m.file_url)}" loading="lazy" alt="">
+            <div class="bz-media-meta">
+                <div class="bz-media-task">${escHtml(m.task_name || '—')}</div>
+                <div class="bz-media-sub">${escHtml(m.author_name || '')} · ${fmtDateTime(m.created_at)}</div>
+            </div>
+        </div>`).join('');
+}
+
+function openLightbox(src, caption, taskId) {
+    document.getElementById('bz-lb-img').src = src;
+    const cap = document.getElementById('bz-lb-caption');
+    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">apri task →</a>` : '');
+    document.getElementById('bz-lightbox').classList.add('open');
+}
+function closeLightbox() { document.getElementById('bz-lightbox').classList.remove('open'); }
+
+document.getElementById('bz-lb-close')?.addEventListener('click', closeLightbox);
+document.getElementById('bz-lightbox')?.addEventListener('click', e => {
+    if (e.target.id === 'bz-lightbox') closeLightbox();
+    const tl = e.target.closest('[data-lb-task]');
+    if (tl) {
+        e.preventDefault();
+        const tid = parseInt(tl.dataset.lbTask);
+        closeLightbox();
+        switchTop('attivita'); switchSub('kanban');
+        setTimeout(() => openTask(tid), 50);
+    }
+});
+document.addEventListener('click', e => {
+    const card = e.target.closest('[data-lb]');
+    if (card) openLightbox(card.dataset.lb, card.dataset.cap, card.dataset.task);
+});
+
+/* ══════════ FILE (repository documenti) ══════════ */
+let curFolder = null;        // null = root
+let fileActiveId = null;
+
+function fileIcon(type) {
+    const t = (type || '').toLowerCase();
+    if (['jpg','jpeg','png','webp','gif'].includes(t)) return 'fa-file-image';
+    if (t === 'pdf') return 'fa-file-pdf';
+    if (['doc','docx'].includes(t)) return 'fa-file-word';
+    if (['xls','xlsx','csv'].includes(t)) return 'fa-file-excel';
+    if (['ppt','pptx'].includes(t)) return 'fa-file-powerpoint';
+    if (['zip','rar','7z'].includes(t)) return 'fa-file-zipper';
+    if (['dwg','dxf'].includes(t)) return 'fa-drafting-compass';
+    return 'fa-file';
+}
+function humanSize(b) {
+    b = +b || 0;
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(0) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+}
+
+async function loadFiles() {
+    const list = document.getElementById('bz-files-list');
+    list.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
+    const res = await api(`/worksites/${WID}/zone/files${curFolder ? '?folder=' + curFolder : ''}`);
+    if (!res.ok) { list.innerHTML = '<div class="bz-dz-empty">Errore caricamento file.</div>'; return; }
+    renderFolders(res.data.folders || []);
+    renderFiles(res.data.files || []);
+}
+
+function renderFolders(folders) {
+    const el = document.getElementById('bz-folders');
+    el.innerHTML = `
+        <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
+        ${folders.map(f => `
+            <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
+                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>
+                <em>${f.file_count}</em>
+                <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
+            </button>`).join('')}
+        <button class="bz-folder-new" id="bz-new-folder"><i class="fas fa-plus"></i> Nuova cartella</button>
+    `;
+}
+
+function renderFiles(files) {
+    const list = document.getElementById('bz-files-list');
+    const title = document.getElementById('bz-files-title');
+    title.textContent = 'File' + (curFolder ? '' : ' — tutti');
+    if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file qui. Carica il primo.</div>'; return; }
+    const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
+    list.innerHTML = files.map(f => {
+        const viewable = canView(f.file_type);
+        return `
+        <div class="bz-file-row">
+            <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
+            <div class="bz-file-info ${viewable?'bz-file-clickable':''}"
+                 ${viewable?`data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}"`:''}>
+                <div class="bz-file-name">${escHtml(f.file_name)}</div>
+                <div class="bz-file-sub">${escHtml(f.uploader||'—')} · ${fmtDateTime(f.created_at)} · ${humanSize(f.size_bytes)}</div>
+            </div>
+            ${viewable?`<button class="bz-file-act" data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}" title="Anteprima"><i class="fas fa-eye"></i></button>`:''}
+            <button class="bz-file-act" data-file-comments="${f.id}" data-file-name="${escAttr(f.file_name)}" title="Commenti"><i class="fas fa-comment"></i> ${f.comment_count>0?f.comment_count:''}</button>
+            <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
+            <button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>
+        </div>`;
+    }).join('');
+}
+
+async function createFolder() {
+    const name = prompt('Nome cartella:');
+    if (!name || !name.trim()) return;
+    await api(`/worksites/${WID}/zone/files/folder`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim()}) });
+    loadFiles();
+}
+async function deleteFolder(id) {
+    if (!confirm('Eliminare la cartella? I file dentro tornano in "Tutti i file".')) return;
+    await api(`/worksites/${WID}/zone/files/folder/${id}/delete`, { method:'POST' });
+    if (curFolder == id) curFolder = null;
+    loadFiles();
+}
+async function uploadFile(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    if (curFolder) fd.append('folder_id', curFolder);
+    const res = await api(`/worksites/${WID}/zone/files`, { method:'POST', body: fd });
+    if (res.ok) loadFiles();
+    else alert('Errore upload: ' + (res.error || 'sconosciuto'));
+}
+async function deleteFile(id) {
+    if (!confirm('Eliminare questo file?')) return;
+    await api(`/worksites/${WID}/zone/files/${id}/delete`, { method:'POST' });
+    loadFiles();
+}
+
+/* viewer file in-app (immagini + PDF) */
+function openFileView(name, type, url) {
+    const t = (type || '').toLowerCase();
+    const body = document.getElementById('bz-fileview-body');
+    document.getElementById('bz-fileview-name').textContent = name;
+    document.getElementById('bz-fileview-dl').href = url;
+    if (['jpg','jpeg','png','webp','gif'].includes(t)) {
+        body.innerHTML = `<img src="${escAttr(url)}" alt="">`;
+    } else if (t === 'pdf') {
+        body.innerHTML = `<iframe src="${escAttr(url)}" title="PDF"></iframe>`;
+    } else {
+        body.innerHTML = `<div class="bz-fileview-msg">Anteprima non disponibile per questo tipo di file.<br>Usa "Scarica" per aprirlo.</div>`;
+    }
+    document.getElementById('bz-fileview').classList.add('open');
+}
+function closeFileView() {
+    document.getElementById('bz-fileview').classList.remove('open');
+    document.getElementById('bz-fileview-body').innerHTML = ''; // stop iframe/video
+}
+document.getElementById('bz-fileview-close')?.addEventListener('click', closeFileView);
+document.getElementById('bz-fileview')?.addEventListener('click', e => { if (e.target.id==='bz-fileview') closeFileView(); });
+
+/* commenti file (modal) */
+async function openFileComments(fileId, fileName) {
+    fileActiveId = fileId;
+    document.getElementById('bz-file-modal-name').textContent = fileName;
+    document.getElementById('bz-file-modal').classList.add('open');
+    loadFileComments();
+}
+async function loadFileComments() {
+    const box = document.getElementById('bz-file-modal-comments');
+    box.innerHTML = '<div class="bz-empty">Caricamento...</div>';
+    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`);
+    const items = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    box.innerHTML = items.length ? items.map(c => `
+        <div class="bz-comment">
+            <div class="bz-comment-avatar">${initials(c.author_name)}</div>
+            <div class="bz-comment-body">
+                <div class="bz-comment-meta"><span class="bz-comment-author">${escHtml(c.author_name||'?')}</span><span class="bz-comment-time">${ago(c.created_at)}</span></div>
+                <div class="bz-comment-text">${escHtml(c.text||'')}</div>
+            </div>
+        </div>`).join('') : '<div style="font-size:12px;color:#64748b;">Nessun commento.</div>';
+    box.scrollTop = box.scrollHeight;
+}
+async function sendFileComment() {
+    const inp = document.getElementById('bz-file-comment-input');
+    const text = inp.value.trim();
+    if (!text || !fileActiveId) return;
+    inp.disabled = true;
+    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+    inp.disabled = false;
+    if (res.ok) { inp.value=''; loadFileComments(); loadFiles(); }
+    inp.focus();
+}
+
+// listener delegati per la sezione file
+document.addEventListener('click', e => {
+    const folBtn = e.target.closest('[data-folder]');
+    if (folBtn && !e.target.closest('[data-del-folder]')) { curFolder = folBtn.dataset.folder ? parseInt(folBtn.dataset.folder) : null; loadFiles(); return; }
+    const delFol = e.target.closest('[data-del-folder]');
+    if (delFol) { e.stopPropagation(); deleteFolder(parseInt(delFol.dataset.delFolder)); return; }
+    if (e.target.closest('#bz-new-folder')) { createFolder(); return; }
+    const vf = e.target.closest('[data-view-file]');
+    if (vf) { openFileView(vf.dataset.vfName, vf.dataset.vfType, vf.dataset.vfUrl); return; }
+    const fc = e.target.closest('[data-file-comments]');
+    if (fc) { openFileComments(parseInt(fc.dataset.fileComments), fc.dataset.fileName); return; }
+    const df = e.target.closest('[data-del-file]');
+    if (df) { deleteFile(parseInt(df.dataset.delFile)); return; }
+});
+document.getElementById('bz-file-input')?.addEventListener('change', e => { const f=e.target.files?.[0]; e.target.value=''; if (f) uploadFile(f); });
+document.getElementById('bz-file-modal-close')?.addEventListener('click', () => document.getElementById('bz-file-modal').classList.remove('open'));
+document.getElementById('bz-file-modal')?.addEventListener('click', e => { if (e.target.id==='bz-file-modal') document.getElementById('bz-file-modal').classList.remove('open'); });
+document.getElementById('bz-file-comment-send')?.addEventListener('click', sendFileComment);
+document.getElementById('bz-file-comment-input')?.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); sendFileComment(); } });
+
+/* ══════════ NEW TASK MODAL ══════════ */
+let quickAddStatus = null;
+
+function quickAdd(status) {
+    quickAddStatus = status;
+    document.getElementById('task-status').value = status;
+    openModal();
+}
+
+function openModal() {
+    document.getElementById('task-modal').classList.remove('hidden');
+    document.getElementById('task-name').focus();
+}
+function closeModal() {
+    document.getElementById('task-modal').classList.add('hidden');
+    quickAddStatus = null;
+    ['task-name','task-desc','task-cat','task-assignee','task-due','task-start'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('task-status').value = 'open';
+}
+
+async function submitTask() {
+    const name = document.getElementById('task-name').value.trim();
+    if (!name) { document.getElementById('task-name').focus(); return; }
+
+    const aSel = document.getElementById('task-assignee');
+    const body = {
+        name,
+        description:      document.getElementById('task-desc').value,
+        status:          document.getElementById('task-status').value,
+        category:        document.getElementById('task-cat').value,
+        assignee_user_id: aSel.value || null,
+        assignee_name:   aSel.value ? (aSel.options[aSel.selectedIndex]?.text || null) : null,
+        due_date:        document.getElementById('task-due').value || null,
+        start_date:      document.getElementById('task-start').value || null,
+    };
+
+    const btn = document.querySelector('.bz-modal-submit');
+    btn.textContent = '...'; btn.disabled = true;
+
+    const res = await api(`/worksites/${WID}/zone/tasks`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+
+    btn.textContent = 'Crea Task'; btn.disabled = false;
+
+    if (res.ok) {
+        allTasks.unshift(res.data);
+        closeModal();
+        renderCurrentView();
+        openTask(res.data.id);
+    } else {
+        alert('Errore: ' + (res.error || 'impossibile creare il task'));
+    }
+}
+
+/* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
+
+// Sidebar: voci di primo livello (Attività / Disegni / Foto / File / Moduli)
+document.querySelectorAll('.bz-nav-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchTop(btn.dataset.view));
+});
+// Sub-switcher dentro Attività (Kanban / Gantt / Calendario)
+document.querySelectorAll('.bz-sub-btn[data-sub]').forEach(btn => {
+    btn.addEventListener('click', () => switchSub(btn.dataset.sub));
+});
+
+// New task button
+document.getElementById('btn-new-task')?.addEventListener('click', () => openModal());
+
+// Theme toggle (system → light → dark)
+(function () {
+    const order = ['system', 'light', 'dark'];
+    const icons = { system: 'fa-circle-half-stroke', light: 'fa-sun', dark: 'fa-moon' };
+    const pref = () => localStorage.getItem('bzTheme') || 'system';
+    const resolve = p => p === 'system'
+        ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : p;
+    const apply = () => {
+        document.documentElement.setAttribute('data-theme', resolve(pref()));
+        const btn = document.getElementById('bz-theme-toggle');
+        if (btn) { btn.querySelector('i').className = 'fas ' + icons[pref()]; btn.title = 'Tema: ' + pref(); }
+    };
+    apply();
+    document.getElementById('bz-theme-toggle')?.addEventListener('click', () => {
+        const next = order[(order.indexOf(pref()) + 1) % order.length];
+        localStorage.setItem('bzTheme', next);
+        apply();
+    });
+    if (window.matchMedia) {
+        matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (pref() === 'system') apply(); });
+    }
+})();
+
+// Filtri Kanban
+document.getElementById('bz-filter-search')?.addEventListener('input', e => { kFilter.q = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-assignee')?.addEventListener('change', e => { kFilter.assignee = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-cat')?.addEventListener('change', e => { kFilter.cat = e.target.value; renderKanban(); });
+document.getElementById('bz-filter-clear')?.addEventListener('click', () => {
+    kFilter = { q: '', assignee: '', cat: '' };
+    const s = document.getElementById('bz-filter-search'); if (s) s.value = '';
+    renderKanban();
+});
+
+// Modal cancel / submit
+document.getElementById('btn-modal-cancel')?.addEventListener('click', () => closeModal());
+document.getElementById('btn-modal-submit')?.addEventListener('click', () => submitTask());
+
+// Modal backdrop close
+document.getElementById('task-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+});
+
+// Close detail
+document.getElementById('btn-close-detail')?.addEventListener('click', () => closeDetail());
+
+// Send comment button + enter key
+document.getElementById('btn-send-comment')?.addEventListener('click', () => sendComment());
+document.getElementById('bz-comment-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendComment(); }
+});
+
+// Foto sul task (allegato sul commento)
+document.getElementById('bz-photo-input')?.addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !activeTaskId) return;
+    const fd = new FormData();
+    fd.append('photo', file);
+    fd.append('text', document.getElementById('bz-comment-input')?.value?.trim() || '');
+    const lbl = document.querySelector('.bz-comment-photo');
+    if (lbl) lbl.classList.add('uploading');
+    const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/photo`, { method: 'POST', body: fd });
+    if (lbl) lbl.classList.remove('uploading');
+    if (res.ok) {
+        const inp = document.getElementById('bz-comment-input');
+        if (inp) inp.value = '';
+        loadComments(activeTaskId);
+        mediaLoaded = false; // la galleria si ricaricherà alla prossima apertura
+    } else {
+        alert('Errore caricamento foto: ' + (res.error || 'sconosciuto'));
+    }
+});
+
+// Calendar nav
+document.querySelectorAll('[data-cal]').forEach(btn => {
+    btn.addEventListener('click', () => calNav(parseInt(btn.dataset.cal)));
+});
+
+// Fieldwire connect
+document.getElementById('btn-fw-connect')?.addEventListener('click', async () => {
+    if (!confirm('Collegare questo cantiere a Fieldwire?')) return;
+    const btn = document.getElementById('btn-fw-connect');
+    if (btn) { btn.disabled = true; btn.textContent = 'Collegamento...'; }
+    const res = await api(`/worksites/${WID}/zone/enable`, { method: 'POST' });
+    if (res.ok) { window.location.reload(); }
+    else { alert('Errore: ' + (res.error || 'sconosciuto')); if (btn) btn.disabled = false; }
+});
+
+// Edit modal buttons
+document.getElementById('btn-edit-cancel')?.addEventListener('click', () => closeEditModal());
+document.getElementById('btn-edit-submit')?.addEventListener('click', () => submitEdit());
+document.getElementById('task-edit-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeEditModal();
+});
+
+// Event delegation for dynamically generated elements
+document.addEventListener('click', e => {
+    const t = e.target;
+
+    // X buttons FIRST (otherwise the card/task-id wrapper catches the click)
+    const delCheck = t.closest('[data-delete-check]');
+    if (delCheck) {
+        e.stopPropagation();
+        const [tid, iid] = delCheck.dataset.deleteCheck.split(':').map(Number);
+        deleteCheck(tid, iid); return;
+    }
+    const delComment = t.closest('[data-delete-comment]');
+    if (delComment) {
+        e.stopPropagation();
+        const [tid, cid] = delComment.dataset.deleteComment.split(':').map(Number);
+        deleteComment(tid, cid); return;
+    }
+    const editTask = t.closest('[data-edit-task]');
+    if (editTask) { e.stopPropagation(); openEditModal(parseInt(editTask.dataset.editTask)); return; }
+    const delTask = t.closest('[data-delete-task]');
+    if (delTask)  { e.stopPropagation(); deleteTask(parseInt(delTask.dataset.deleteTask)); return; }
+
+    // Open task from card / gantt / calendar
+    const taskEl = t.closest('[data-task-id]');
+    if (taskEl) { openTask(parseInt(taskEl.dataset.taskId)); return; }
+
+    // Quick add from kanban column
+    const qaEl = t.closest('[data-quick-add]');
+    if (qaEl) { quickAdd(qaEl.dataset.quickAdd); return; }
+
+    // Status buttons in detail panel
+    const stEl = t.closest('[data-set-status]');
+    if (stEl) { setStatus(parseInt(stEl.dataset.taskId), stEl.dataset.setStatus); return; }
+
+    // Add checklist item button
+    const acEl = t.closest('[data-add-check]');
+    if (acEl) { addCheck(parseInt(acEl.dataset.addCheck)); return; }
+
+    // Disegni: push to Fieldwire / delete
+    const pushFw = t.closest('[data-push-fw]');
+    if (pushFw) { pushDisegnoFw(parseInt(pushFw.dataset.pushFw), pushFw); return; }
+    const delDz = t.closest('[data-del-disegno]');
+    if (delDz) { deleteDisegno(parseInt(delDz.dataset.delDisegno)); return; }
+    const annBtn = t.closest('[data-annot]');
+    if (annBtn && window.BZAnnotator) {
+        window.BZAnnotator.open({
+            worksiteId: WID,
+            csrf: CSRF,
+            docId: parseInt(annBtn.dataset.annot),
+            fileType: annBtn.dataset.annotType,
+            fileName: annBtn.dataset.annotName,
+            viewUrl: `/worksites/${WID}/disegni/${annBtn.dataset.annot}/view`,
+        });
+        return;
+    }
+    const dwgConv = t.closest('[data-dwg-convert]');
+    if (dwgConv) { convertDwg(parseInt(dwgConv.dataset.dwgConvert), dwgConv); return; }
+});
+
+async function convertDwg(docId, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner bz-spin"></i> Converto...'; }
+    const res = await api(`/worksites/${WID}/zone/disegni/${docId}/dwg/convert`, { method: 'POST' });
+    if (res.ok && res.data?.status === 'ok') {
+        disegniLoaded = false; loadDisegni();
+    } else {
+        alert('Conversione DWG fallita: ' + (res.data?.error || res.error || 'errore'));
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> Converti'; }
+    }
+}
+
+// Disegni: file input change → upload
+document.getElementById('dz-file-input')?.addEventListener('change', e => {
+    const f = e.target.files?.[0];
+    if (f) uploadDisegno(f);
+    e.target.value = ''; // reset per ri-caricare lo stesso file
+});
+
+/* ══════════ DRAG & DROP KANBAN ══════════ */
+let dragTaskId = null;
+
+document.addEventListener('dragstart', e => {
+    const card = e.target.closest && e.target.closest('.bz-card');
+    if (!card) return;
+    dragTaskId = parseInt(card.dataset.taskId);
+    card.style.opacity = '0.4';
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+});
+document.addEventListener('dragend', e => {
+    const card = e.target.closest && e.target.closest('.bz-card');
+    if (card) card.style.opacity = '';
+    dragTaskId = null;
+    document.querySelectorAll('.bz-cards.dnd-over').forEach(el => el.classList.remove('dnd-over'));
+});
+document.addEventListener('dragover', e => {
+    const col = e.target.closest && e.target.closest('.bz-cards');
+    if (!col || dragTaskId === null) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.bz-cards.dnd-over').forEach(el => el.classList.remove('dnd-over'));
+    col.classList.add('dnd-over');
+});
+document.addEventListener('drop', e => {
+    const col = e.target.closest && e.target.closest('.bz-cards');
+    if (!col || dragTaskId === null) return;
+    e.preventDefault();
+    col.classList.remove('dnd-over');
+
+    // ricava lo status dalla colonna (id="col-<status>")
+    const status = (col.id || '').replace('col-', '');
+    if (!status) return;
+    const taskId = dragTaskId;
+    dragTaskId = null;
+
+    // ottimistico: muovi il task in memoria + ridisegna
+    const task = allTasks.find(t => t.id == taskId);
+    if (task && task.status !== status) {
+        task.status = status;
+        renderCurrentView();
+        // poi server
+        setStatus(taskId, status);
+    }
+});
+
+document.addEventListener('change', e => {
+    const cb = e.target;
+    if (cb.dataset.toggleCheck) {
+        const [taskId, itemId] = cb.dataset.toggleCheck.split(':').map(Number);
+        toggleCheck(taskId, itemId, cb);
+    }
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.dataset.checkEnter) {
+        addCheck(parseInt(e.target.dataset.checkEnter));
+    }
+});
+
+document.addEventListener('blur', e => {
+    if (e.target.dataset.taskNameId) {
+        updateTaskName(parseInt(e.target.dataset.taskNameId), e.target.value);
+    }
+}, true);
+
+/* ══════════ UTILS ══════════ */
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escAttr(s) { return escHtml(s); }
+
+function initials(name) {
+    return (name || '?').split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+function ago(str) {
+    if (!str) return '';
+    const s = Math.floor((Date.now() - new Date(str)) / 1000);
+    if (s < 60) return 'adesso';
+    if (s < 3600) return Math.floor(s/60) + 'm fa';
+    if (s < 86400) return Math.floor(s/3600) + 'h fa';
+    return new Date(str).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
+}
+function fmtDate(str) {
+    if (!str) return '';
+    return new Date(str + 'T00:00:00').toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
+}
+
+/* ══════════ INIT ══════════ */
+loadTasks();
+renderCalendar();
+loadBobUsers();
+/* BZForms init avviene lazy alla prima apertura della vista Moduli
+   (forms.js è incluso a fine pagina, dopo questo script). */
+</script>
+
+<style>
+/* Drag & drop highlight per le colonne Kanban (style inline per non dover
+   toccare il CSS principale; safe perche' usato solo in BOB Zone). */
+.bz-cards.dnd-over { background: rgba(96, 165, 250, 0.10); outline: 2px dashed rgba(96, 165, 250, 0.45); outline-offset: -4px; border-radius: 8px; }
+.bz-card[draggable="true"] { cursor: grab; }
+.bz-card[draggable="true"]:active { cursor: grabbing; }
+
+/* ── Disegni view ── */
+.bz-disegni { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.bz-disegni-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+.bz-disegni-title { font-size: 14px; font-weight: 600; color: #cbd5e1; display: flex; align-items: center; gap: 8px; }
+.bz-disegni-title i { color: #64748b; }
+.bz-upload-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; background: #4ade80; color: #0f172a; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
+.bz-upload-btn:hover { opacity: .88; }
+.bz-disegni-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.bz-dz-card { background: #1e293b; border: 1px solid #273548; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+.bz-dz-card:hover { border-color: #334155; }
+.bz-dz-icon { font-size: 22px; color: #60a5fa; }
+.bz-dz-icon.pdf { color: #f87171; } .bz-dz-icon.dwg { color: #fbbf24; } .bz-dz-icon.img { color: #4ade80; }
+.bz-dz-name { font-size: 13px; font-weight: 600; color: #e2e8f0; word-break: break-word; line-height: 1.3; }
+.bz-dz-meta { font-size: 11px; color: #64748b; }
+.bz-dz-folder { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; background: #273548; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
+.bz-dz-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.bz-dz-btn { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border-radius: 6px; border: 1px solid #273548; background: #0f172a; color: #94a3b8; font-size: 11px; cursor: pointer; text-decoration: none; transition: all .12s; }
+.bz-dz-btn:hover { color: #e2e8f0; border-color: #334155; }
+.bz-dz-btn.danger:hover { color: #fca5a5; border-color: #471515; }
+.bz-dz-btn.fw { color: #93c5fd; }
+.bz-dz-fw-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #4ade80; font-weight: 600; }
+.bz-dz-empty { grid-column: 1/-1; text-align: center; color: #475569; font-size: 13px; padding: 40px 0; }
+
+/* Filtri Kanban */
+.bz-kanban-filters { display:flex; gap:8px; padding:10px 20px; flex-shrink:0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #1e293b; }
+.bz-kanban-filters input, .bz-kanban-filters select { background:#1e293b; border:1px solid #273548; border-radius:7px; padding:6px 10px; color:#e2e8f0; font-size:12px; font-family:inherit; }
+.bz-kanban-filters input { min-width:180px; }
+.bz-kanban-filters button { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:7px; width:32px; height:32px; cursor:pointer; }
+.bz-kanban-filters button:hover { color:#e2e8f0; }
+
+/* File viewer (immagini + PDF in-app) */
+.bz-fileview { position:fixed; inset:0; z-index:10002; background:rgba(8,12,22,.96); display:none; flex-direction:column; }
+.bz-fileview.open { display:flex; }
+.bz-fileview-head { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid #1e293b; color:#e2e8f0; font-size:13px; font-weight:600; flex-shrink:0; }
+.bz-fileview-body { flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:16px; }
+.bz-fileview-body img { max-width:95%; max-height:100%; border-radius:6px; }
+.bz-fileview-body iframe { width:100%; height:100%; border:none; background:#fff; border-radius:6px; }
+.bz-fileview-msg { color:#94a3b8; font-size:14px; text-align:center; line-height:1.6; }
+.bz-file-clickable { cursor:pointer; }
+.bz-file-clickable:hover .bz-file-name { color:#60a5fa; }
+
+/* File (repository) */
+.bz-files { flex:1; display:flex; overflow:hidden; }
+.bz-folders { width:220px; flex-shrink:0; border-right:1px solid #1e293b; padding:14px 10px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.bz-folder { display:flex; align-items:center; gap:8px; padding:8px 10px; border:none; background:none; color:#94a3b8; font-size:13px; cursor:pointer; border-radius:7px; font-family:inherit; text-align:left; width:100%; }
+.bz-folder span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bz-folder em { font-size:10px; color:#64748b; font-style:normal; }
+.bz-folder .bz-folder-del { opacity:0; color:#f87171; font-size:11px; }
+.bz-folder:hover { background:#1e293b; color:#e2e8f0; }
+.bz-folder:hover .bz-folder-del { opacity:.7; }
+.bz-folder.active { background:#334155; color:#f1f5f9; }
+.bz-folder-new { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px dashed #273548; background:none; color:#64748b; font-size:12px; cursor:pointer; border-radius:7px; font-family:inherit; margin-top:8px; }
+.bz-folder-new:hover { color:#94a3b8; border-color:#475569; }
+.bz-files-main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.bz-files-bar { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid #1e293b; flex-shrink:0; }
+.bz-files-title { font-size:14px; font-weight:600; color:#cbd5e1; }
+.bz-files-list { flex:1; overflow-y:auto; padding:12px 20px; }
+.bz-file-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid #1e293b; border-radius:8px; margin-bottom:6px; }
+.bz-file-row:hover { border-color:#334155; }
+.bz-file-icon { font-size:20px; color:#60a5fa; width:24px; text-align:center; }
+.bz-file-info { flex:1; min-width:0; }
+.bz-file-name { font-size:13px; font-weight:600; color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bz-file-sub { font-size:11px; color:#64748b; margin-top:2px; }
+.bz-file-act { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; text-decoration:none; }
+.bz-file-act:hover { color:#e2e8f0; }
+.bz-file-act.danger:hover { color:#fca5a5; border-color:#471515; }
+.bz-file-modal { position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
+.bz-file-modal.open { display:flex; }
+.bz-file-modal-box { width:95%; max-width:520px; max-height:80vh; background:#0f172a; border:1px solid #1e293b; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+.bz-file-modal-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #1e293b; font-size:13px; font-weight:600; color:#e2e8f0; }
+.bz-file-modal-head button { background:none; border:none; color:#64748b; font-size:22px; cursor:pointer; }
+.bz-file-modal-body { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+.bz-file-modal-foot { display:flex; gap:8px; padding:12px 16px; border-top:1px solid #1e293b; }
+.bz-file-modal-foot input { flex:1; background:#1e293b; border:1px solid #273548; border-radius:7px; padding:8px 10px; color:#e2e8f0; font-size:13px; font-family:inherit; }
+.bz-file-modal-foot button { background:#3b82f6; border:none; color:#fff; border-radius:7px; padding:8px 14px; cursor:pointer; }
+[data-theme="light"] .bz-folders { border-color:#e2e8f0; }
+[data-theme="light"] .bz-files-bar { border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-row { border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-name, [data-theme="light"] .bz-files-title { color:#1e293b; }
+[data-theme="light"] .bz-file-modal-box { background:#fff; border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-modal-head { color:#1e293b; border-color:#e2e8f0; }
+
+/* Galleria */
+.bz-media { flex:1; overflow-y:auto; padding:20px 24px; }
+.bz-media-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; }
+.bz-media-card { background:#1e293b; border:1px solid #273548; border-radius:10px; overflow:hidden; cursor:pointer; transition:border-color .12s; }
+.bz-media-card:hover { border-color:#475569; }
+.bz-media-card img { width:100%; height:140px; object-fit:cover; display:block; background:#0f172a; }
+.bz-media-meta { padding:8px 10px; }
+.bz-media-task { font-size:12px; font-weight:600; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bz-media-sub { font-size:10px; color:#64748b; margin-top:2px; }
+[data-theme="light"] .bz-media-card { background:#fff; border-color:#e2e8f0; }
+[data-theme="light"] .bz-media-task { color:#1e293b; }
+/* Lightbox */
+.bz-lightbox { position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,.88); display:none; flex-direction:column; align-items:center; justify-content:center; padding:40px; }
+.bz-lightbox.open { display:flex; }
+.bz-lightbox img { max-width:92vw; max-height:82vh; border-radius:8px; box-shadow:0 10px 50px rgba(0,0,0,.6); }
+.bz-lb-caption { color:#e2e8f0; font-size:13px; margin-top:14px; text-align:center; }
+.bz-lb-close { position:absolute; top:16px; right:20px; background:none; border:none; color:#fff; font-size:34px; cursor:pointer; line-height:1; }
+
+/* Foto su commenti */
+.bz-comment-photo { display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; flex-shrink:0; border-radius:8px; background:#1e293b; border:1px solid #273548; color:#94a3b8; cursor:pointer; transition:all .12s; }
+.bz-comment-photo:hover { color:#e2e8f0; border-color:#334155; }
+.bz-comment-photo.uploading { opacity:.5; pointer-events:none; }
+.bz-comment-photo-thumb { margin-top:6px; max-width:100%; max-height:180px; border-radius:8px; border:1px solid #273548; display:block; }
+
+/* ── Mobile / tablet ── */
+@media (max-width: 820px) {
+    .bz-header { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px; }
+    .bz-wname { display: none; }
+    /* sidebar → barra orizzontale scrollabile sopra il body */
+    .bz-main { flex-direction: column; }
+    .bz-sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 6px 8px; gap: 4px; border-right: none; border-bottom: 1px solid #1e293b; align-items: center; }
+    .bz-nav { flex-direction: row; gap: 4px; }
+    .bz-nav-item { white-space: nowrap; padding: 7px 10px; }
+    .bz-nav-item span { display: none; }      /* solo icone su mobile */
+    .bz-nav-actions { display: flex; flex-direction: row; gap: 4px; }
+    .bz-nav-sep, .bz-nav-spacer { display: none; }
+    .bz-nav-fw { padding: 0; border: none; }
+    .bz-nav-fw .bz-fw-off { display: none; }
+    .bz-info { display: none; }
+    .bz-nav-fw-btn span { display: inline; }   /* il connect FW mostra il testo */
+    /* pannello dettaglio task: overlay a tutto schermo */
+    .bz-detail-wrap { position: fixed; inset: 0; width: 100% !important; z-index: 50; border-left: none; }
+    .bz-detail-wrap.closed { width: 0 !important; display: none; }
+    /* file: cartelle in orizzontale sopra la lista */
+    .bz-files { flex-direction: column; }
+    .bz-folders { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #1e293b; padding: 8px; }
+    .bz-folder { white-space: nowrap; width: auto; }
+    .bz-folder-new { margin-top: 0; }
+    /* kanban: colonne piu' strette, scroll orizzontale */
+    .bz-col { min-width: 78vw; }
+    .bz-kanban-filters input { min-width: 0; flex: 1; }
+    /* annotator: toolbar e pannello adattati */
+    .bza-top { flex-wrap: wrap; height: auto; padding: 8px; gap: 6px; }
+    .bza-side { position: fixed; inset: 0; width: 100% !important; z-index: 60; }
+    .bza-tools { order: 3; width: 100%; justify-content: center; }
+}
+</style>
+
+<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
+<script src="/assets/js/views/fieldwire/forms.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script nonce="{{ cspNonce }}">
+  // configura il worker di PDF.js (stesso CDN)
+  if (window.pdfjsLib) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+</script>
+<script src="/assets/js/views/fieldwire/annotator.js"></script>
+</body>
+</html>

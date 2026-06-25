@@ -17,4 +17,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // dismiss toast (era onclick inline → bloccato da CSP)
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('[data-dismiss-alert]');
+        if (btn && btn.parentElement) btn.parentElement.style.display = 'none';
+    });
+
 });

@@ -1,0 +1,71 @@
+/* BOB Zone — Annotator (viewer disegni con pin/misure/markup) */
+.bza-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: #0b1220;
+    display: none; flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+.bza-overlay.open { display: flex; }
+
+/* Topbar */
+.bza-top {
+    height: 50px; flex-shrink: 0;
+    background: #0f172a; border-bottom: 1px solid #1e293b;
+    display: flex; align-items: center; gap: 12px; padding: 0 16px;
+}
+.bza-title { font-size: 13px; color: #cbd5e1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bza-top-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.bza-close { background: #1e293b; border: 1px solid #273548; color: #94a3b8; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 16px; }
+.bza-close:hover { color: #e2e8f0; }
+
+/* Toolbar */
+.bza-tools { display: flex; gap: 4px; background: #1e293b; padding: 4px; border-radius: 9px; flex-wrap: wrap; }
+.bza-tool {
+    width: 34px; height: 34px; border-radius: 6px; border: none; background: none;
+    color: #94a3b8; cursor: pointer; font-size: 14px; display: inline-flex;
+    align-items: center; justify-content: center; transition: all .12s;
+}
+.bza-tool:hover { background: #273548; color: #e2e8f0; }
+.bza-tool.active { background: #3b82f6; color: #fff; }
+
+/* Body: stage + side panel */
+.bza-body { flex: 1; display: flex; overflow: hidden; }
+.bza-stage-wrap { flex: 1; overflow: auto; position: relative; display: flex; align-items: flex-start; justify-content: center; padding: 24px; }
+.bza-stage { position: relative; line-height: 0; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.bza-stage canvas, .bza-stage img { display: block; }
+.bza-svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+.bza-svg.tool-select { cursor: default; }
+
+/* Pins */
+.bza-pin { cursor: pointer; }
+.bza-pin-label { font-size: 11px; font-weight: 700; fill: #fff; pointer-events: none; }
+
+/* Side panel */
+.bza-side { width: 320px; flex-shrink: 0; background: #0f172a; border-left: 1px solid #1e293b; overflow-y: auto; padding: 16px; display: none; }
+.bza-side.open { display: block; }
+.bza-side h4 { font-size: 13px; color: #e2e8f0; margin: 0 0 10px; }
+.bza-field { margin-bottom: 12px; }
+.bza-field label { display: block; font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
+.bza-field input, .bza-field select, .bza-field textarea {
+    width: 100%; background: #1e293b; border: 1px solid #273548; border-radius: 7px;
+    padding: 8px 10px; color: #e2e8f0; font-size: 13px; font-family: inherit;
+}
+.bza-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 7px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; }
+.bza-btn-primary { background: #3b82f6; color: #fff; }
+.bza-btn-ghost { background: #1e293b; color: #94a3b8; border: 1px solid #273548; }
+.bza-btn-danger { background: #1e293b; color: #fca5a5; border: 1px solid #471515; }
+.bza-row { display: flex; gap: 8px; }
+
+/* Footer status */
+.bza-status { font-size: 12px; color: #64748b; }
+.bza-page-nav { display: flex; align-items: center; gap: 6px; color: #94a3b8; font-size: 12px; }
+.bza-page-nav button { background: #1e293b; border: 1px solid #273548; color: #94a3b8; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; }
+.bza-zoom { display: flex; align-items: center; gap: 4px; }
+.bza-zoom button { background: #1e293b; border: 1px solid #273548; color: #94a3b8; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+
+.bza-color-swatches { display: flex; gap: 6px; }
+.bza-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.bza-swatch.active { border-color: #fff; }
+
+.bza-hint { font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4; }
+.bza-loading { color: #94a3b8; font-size: 14px; padding: 40px; text-align: center; }
