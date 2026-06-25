@@ -21,6 +21,7 @@
         { t: 'select',     label: 'Menu a tendina', opts: true },
         { t: 'radio',      label: 'Scelta singola',  opts: true },
         { t: 'checkboxes', label: 'Scelta multipla', opts: true },
+        { t: 'checklist',  label: 'Checklist',       opts: true },
         { t: 'yesno',      label: 'Sì / No' },
         { t: 'heading',    label: 'Titolo / sezione' },
         { t: 'signature',  label: 'Firma' },
@@ -149,80 +150,110 @@
         root.innerHTML = `
             <div class="bzf-bar">
                 <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button>
-                <div style="display:flex;gap:8px;">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <select id="bzf-dest" class="bzf-dest">
+                        <option value="cantiere" ${!builder.universal ? 'selected' : ''}>Salva per: questo cantiere</option>
+                        <option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>
+                    </select>
                     <button class="bzf-btn-ghost" id="bzf-preview"><i class="fas fa-eye"></i> Anteprima</button>
-                    <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva modulo</button>
+                    <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva</button>
                 </div>
             </div>
-            <div class="bzf-builder">
-                <div class="bzf-field">
-                    <label>Nome modulo *</label>
-                    <input id="bzf-name" value="${esc(builder.name)}" placeholder="Es. Verbale di consegna">
+            <div class="bzf-paper-wrap">
+              <div class="bzf-paper bzf-paper-build">
+                <div class="bzf-doc-head">
+                    <div class="bzf-doc-brand">BOB Zone${META.wsCode ? ' · ' + esc(META.wsCode) : ''} · Costruzione modulo</div>
+                    <input class="bzf-title-edit" id="bzf-name" value="${esc(builder.name)}" placeholder="Titolo del modulo">
+                    <input class="bzf-desc-edit" id="bzf-desc" value="${esc(builder.description)}" placeholder="Descrizione (opzionale)">
                 </div>
-                <div class="bzf-field">
-                    <label>Descrizione</label>
-                    <input id="bzf-desc" value="${esc(builder.description)}" placeholder="Opzionale">
-                </div>
-                <label class="bzf-check"><input type="checkbox" id="bzf-univ" ${builder.universal ? 'checked' : ''}> Template universale (riusabile su ogni cantiere)</label>
-
                 <div class="bzf-fields" id="bzf-fields"></div>
-
                 <div class="bzf-addfield">
                     <select id="bzf-addtype">${TYPES.map(t => `<option value="${t.t}">${t.label}</option>`).join('')}</select>
                     <button class="bzf-btn-ghost" id="bzf-add"><i class="fas fa-plus"></i> Aggiungi campo</button>
                 </div>
+              </div>
             </div>
         `;
         root.querySelector('#bzf-back').addEventListener('click', loadTemplates);
         root.querySelector('#bzf-save').addEventListener('click', saveBuilder);
-        root.querySelector('#bzf-preview').addEventListener('click', () => {
-            // sincronizza nome/desc dai campi prima dell'anteprima
-            builder.name = root.querySelector('#bzf-name').value.trim() || '(senza nome)';
-            builder.description = root.querySelector('#bzf-desc').value.trim();
-            openPreview();
-        });
+        root.querySelector('#bzf-name').addEventListener('input', e => builder.name = e.target.value);
+        root.querySelector('#bzf-desc').addEventListener('input', e => builder.description = e.target.value);
+        root.querySelector('#bzf-dest').addEventListener('change', e => builder.universal = (e.target.value === 'all'));
+        root.querySelector('#bzf-preview').addEventListener('click', openPreview);
         root.querySelector('#bzf-add').addEventListener('click', () => {
             const type = root.querySelector('#bzf-addtype').value;
             const f = { id: uid(), type, label: '', required: false };
-            if (TYPES.find(x => x.t === type)?.opts) f.options = ['Opzione 1'];
+            if (TYPES.find(x => x.t === type)?.opts) f.options = ['Opzione 1', 'Opzione 2'];
             builder.fields.push(f);
             renderFieldsEditor();
         });
         renderFieldsEditor();
     }
 
+    /* anteprima (disabilitato) del controllo risposta nel builder */
+    function previewControl(f) {
+        switch (f.type) {
+            case 'text':       return `<input disabled placeholder="Risposta testo">`;
+            case 'number':     return `<input type="number" disabled placeholder="0">`;
+            case 'date':       return `<input type="date" disabled>`;
+            case 'textarea':   return `<textarea rows="2" disabled placeholder="Risposta lunga"></textarea>`;
+            case 'select':     return `<select disabled><option>— scegli —</option>${(f.options||[]).map(o=>`<option>${esc(o)}</option>`).join('')}</select>`;
+            case 'yesno':      return `<select disabled><option>Sì</option><option>No</option></select>`;
+            case 'radio':      return `<div class="bzf-opts">${(f.options||[]).map(o=>`<label><input type="radio" disabled> ${esc(o)}</label>`).join('')}</div>`;
+            case 'checkboxes':
+            case 'checklist':  return `<div class="bzf-opts">${(f.options||[]).map(o=>`<label><input type="checkbox" disabled> ${esc(o)}</label>`).join('')}</div>`;
+            case 'signature':  return `<div class="bzf-sign-box">✍ Firma</div>`;
+            case 'photo':      return `<div class="bzf-photo-box">📷 Foto</div>`;
+            default:           return '';
+        }
+    }
+
     function renderFieldsEditor() {
         const el = root.querySelector('#bzf-fields');
-        if (!builder.fields.length) { el.innerHTML = '<div class="bzf-empty">Nessun campo. Aggiungine sotto.</div>'; return; }
+        if (!builder.fields.length) { el.innerHTML = '<div class="bzf-empty">Nessun campo. Aggiungilo qui sotto.</div>'; return; }
+        const hasOpts = t => !!TYPES.find(x => x.t === t)?.opts;
         el.innerHTML = builder.fields.map((f, i) => `
-            <div class="bzf-fedit" data-i="${i}">
-                <div class="bzf-fedit-head">
+            <div class="bzf-bfield ${f.type==='heading'?'is-heading':''}" data-i="${i}">
+                <div class="bzf-bfield-bar">
                     <span class="bzf-ftype">${typeLabel(f.type)}</span>
-                    <div class="bzf-fedit-ord">
-                        <button data-up="${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
-                        <button data-down="${i}" ${i === builder.fields.length - 1 ? 'disabled' : ''}>↓</button>
-                        <button data-rm="${i}" class="danger">✕</button>
+                    <div class="bzf-bfield-ord">
+                        ${f.type !== 'heading' ? `<label class="bzf-req"><input type="checkbox" data-req="${i}" ${f.required?'checked':''}> obblig.</label>` : ''}
+                        <button data-up="${i}" ${i===0?'disabled':''} title="Su">↑</button>
+                        <button data-down="${i}" ${i===builder.fields.length-1?'disabled':''} title="Giù">↓</button>
+                        <button data-rm="${i}" class="danger" title="Elimina">✕</button>
                     </div>
                 </div>
-                <input class="bzf-flabel" data-lbl="${i}" value="${esc(f.label)}" placeholder="${f.type === 'heading' ? 'Testo del titolo' : 'Etichetta campo'}">
-                ${TYPES.find(x => x.t === f.type)?.opts ? `
-                    <textarea class="bzf-fopts" data-opts="${i}" rows="2" placeholder="Una opzione per riga">${(f.options || []).join('\n')}</textarea>` : ''}
-                ${f.type !== 'heading' ? `<label class="bzf-check small"><input type="checkbox" data-req="${i}" ${f.required ? 'checked' : ''}> Obbligatorio</label>` : ''}
+                <input class="bzf-bfield-title" data-lbl="${i}" value="${esc(f.label)}"
+                       placeholder="${f.type==='heading' ? 'Titolo della sezione' : 'Titolo del campo / domanda'}">
+                ${f.type !== 'heading' ? `<div class="bzf-bfield-resp">${previewControl(f)}</div>` : ''}
+                ${hasOpts(f.type) ? `<div class="bzf-optedit" data-oi="${i}">
+                    ${(f.options||[]).map((o,oi)=>`<div class="bzf-optrow"><input data-opt="${i}:${oi}" value="${esc(o)}" placeholder="Opzione ${oi+1}"><button data-optrm="${i}:${oi}" title="Rimuovi">✕</button></div>`).join('')}
+                    <button class="bzf-optadd" data-optadd="${i}"><i class="fas fa-plus"></i> Aggiungi opzione</button>
+                </div>` : ''}
             </div>`).join('');
-        // bind
+
         el.querySelectorAll('[data-lbl]').forEach(inp => inp.addEventListener('input', e => { builder.fields[+e.target.dataset.lbl].label = e.target.value; }));
-        el.querySelectorAll('[data-opts]').forEach(inp => inp.addEventListener('input', e => { builder.fields[+e.target.dataset.opts].options = e.target.value.split('\n').map(s => s.trim()).filter(Boolean); }));
         el.querySelectorAll('[data-req]').forEach(inp => inp.addEventListener('change', e => { builder.fields[+e.target.dataset.req].required = e.target.checked; }));
-        el.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.up; [builder.fields[i-1], builder.fields[i]] = [builder.fields[i], builder.fields[i-1]]; renderFieldsEditor(); }));
-        el.querySelectorAll('[data-down]').forEach(b => b.addEventListener('click', () => { const i = +b.dataset.down; [builder.fields[i+1], builder.fields[i]] = [builder.fields[i], builder.fields[i+1]]; renderFieldsEditor(); }));
-        el.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { builder.fields.splice(+b.dataset.rm, 1); renderFieldsEditor(); }));
+        el.querySelectorAll('[data-opt]').forEach(inp => inp.addEventListener('input', e => {
+            const [i, oi] = e.target.dataset.opt.split(':').map(Number);
+            builder.fields[i].options[oi] = e.target.value;
+        }));
+        el.querySelectorAll('[data-optadd]').forEach(b => b.addEventListener('click', () => {
+            const i = +b.dataset.optadd; builder.fields[i].options = builder.fields[i].options || []; builder.fields[i].options.push(''); renderFieldsEditor();
+        }));
+        el.querySelectorAll('[data-optrm]').forEach(b => b.addEventListener('click', () => {
+            const [i, oi] = b.dataset.optrm.split(':').map(Number);
+            builder.fields[i].options.splice(oi, 1); renderFieldsEditor();
+        }));
+        el.querySelectorAll('[data-up]').forEach(b => b.addEventListener('click', () => { const i=+b.dataset.up; [builder.fields[i-1],builder.fields[i]]=[builder.fields[i],builder.fields[i-1]]; renderFieldsEditor(); }));
+        el.querySelectorAll('[data-down]').forEach(b => b.addEventListener('click', () => { const i=+b.dataset.down; [builder.fields[i+1],builder.fields[i]]=[builder.fields[i],builder.fields[i+1]]; renderFieldsEditor(); }));
+        el.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => { builder.fields.splice(+b.dataset.rm,1); renderFieldsEditor(); }));
     }
 
     async function saveBuilder() {
-        builder.name = root.querySelector('#bzf-name').value.trim();
-        builder.description = root.querySelector('#bzf-desc').value.trim();
-        builder.universal = root.querySelector('#bzf-univ').checked;
-        if (!builder.name) { alert('Inserisci il nome del modulo'); return; }
+        builder.name = (builder.name || '').trim();
+        builder.description = (builder.description || '').trim();
+        if (!builder.name) { alert('Inserisci il titolo del modulo'); return; }
         if (!builder.fields.length) { alert('Aggiungi almeno un campo'); return; }
         const res = await api(base(), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -292,6 +323,7 @@
             case 'yesno':     return `<div class="bzf-field">${L}<select data-fid="${f.id}"><option value="">—</option><option>Sì</option><option>No</option></select></div>`;
             case 'radio':     return `<div class="bzf-field">${L}<div class="bzf-opts">${(f.options||[]).map((o,i) => `<label><input type="radio" name="${f.id}" data-fid="${f.id}" value="${esc(o)}"> ${esc(o)}</label>`).join('')}</div></div>`;
             case 'checkboxes':return `<div class="bzf-field">${L}<div class="bzf-opts">${(f.options||[]).map(o => `<label><input type="checkbox" data-cb="${f.id}" value="${esc(o)}"> ${esc(o)}</label>`).join('')}</div></div>`;
+            case 'checklist': return `<div class="bzf-field">${L}<div class="bzf-checklist">${(f.options||[]).map(o => `<label class="bzf-checkrow"><input type="checkbox" data-cb="${f.id}" value="${esc(o)}"> <span>${esc(o)}</span></label>`).join('')}</div></div>`;
             case 'signature': return `<div class="bzf-field">${L}<div class="bzf-sign"><canvas id="sig-${f.id}" width="600" height="180"></canvas><button type="button" class="bzf-btn-ghost" data-sigclear="${f.id}">Cancella</button></div></div>`;
             case 'photo':     return `<div class="bzf-field">${L}<input type="file" accept="image/*" capture="environment" data-photo="${f.id}"><img class="bzf-photo-prev" id="pp-${f.id}" style="display:none;"></div>`;
             default:          return '';
@@ -330,7 +362,7 @@
         for (const f of tpl.fields) {
             if (f.type === 'heading') continue;
             let v = null;
-            if (f.type === 'checkboxes') {
+            if (f.type === 'checkboxes' || f.type === 'checklist') {
                 v = [...root.querySelectorAll(`[data-cb="${f.id}"]:checked`)].map(x => x.value);
             } else if (f.type === 'radio') {
                 v = root.querySelector(`[data-fid="${f.id}"]:checked`)?.value || '';
