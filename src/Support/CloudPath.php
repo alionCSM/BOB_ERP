@@ -132,6 +132,20 @@ class CloudPath
         return $path;
     }
 
+    /** Cartella file BOB Zone: <root>/BOBZone/<worksiteId>/files */
+    public static function ensureZoneFilesDir(int $worksiteId): string
+    {
+        $path = implode(DIRECTORY_SEPARATOR, [self::root(), 'BOBZone', (string)$worksiteId, 'files']);
+        if (!is_dir($path) && !@mkdir($path, 0775, true) && !is_dir($path)) {
+            $err = error_get_last()['message'] ?? '?';
+            throw new RuntimeException("Impossibile creare la cartella file: {$path} ({$err})");
+        }
+        if (!is_writable($path)) {
+            throw new RuntimeException("Cartella file non scrivibile: {$path}");
+        }
+        return $path;
+    }
+
     public static function relativeToRoot(string $absolutePath): string
     {
         $root = rtrim(self::root(), DIRECTORY_SEPARATOR);

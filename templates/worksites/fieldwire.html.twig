@@ -312,6 +312,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <button class="bz-nav-item bz-view-btn" data-view="calendar"><i class="fas fa-calendar-alt"></i><span>Calendario</span></button>
                 <button class="bz-nav-item bz-view-btn" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
                 <button class="bz-nav-item bz-view-btn" data-view="media"><i class="fas fa-images"></i><span>Galleria</span></button>
+                <button class="bz-nav-item bz-view-btn" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
@@ -415,6 +416,41 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-disegni-title"><i class="fas fa-images"></i> Galleria foto del cantiere</div>
                 <div class="bz-media-grid" id="bz-media-grid">
                     <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+            </div>
+        </div>
+
+        {# File (repository documenti con cartelle) #}
+        <div class="bz-view" id="view-files">
+            <div class="bz-files">
+                <aside class="bz-folders" id="bz-folders"></aside>
+                <div class="bz-files-main">
+                    <div class="bz-files-bar">
+                        <div class="bz-files-title" id="bz-files-title">Tutti i file</div>
+                        <div style="display:flex;gap:8px;">
+                            <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica file
+                                <input type="file" id="bz-file-input" hidden>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="bz-files-list" id="bz-files-list">
+                        <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Modal commenti file #}
+        <div class="bz-file-modal" id="bz-file-modal">
+            <div class="bz-file-modal-box">
+                <div class="bz-file-modal-head">
+                    <span id="bz-file-modal-name">File</span>
+                    <button id="bz-file-modal-close">&times;</button>
+                </div>
+                <div class="bz-file-modal-body" id="bz-file-modal-comments"></div>
+                <div class="bz-file-modal-foot">
+                    <input type="text" id="bz-file-comment-input" placeholder="Aggiungi un commento...">
+                    <button id="bz-file-comment-send"><i class="fas fa-paper-plane"></i></button>
                 </div>
             </div>
         </div>
@@ -608,6 +644,7 @@ function renderCurrentView() {
     if (active === 'calendar') renderCalendar();
     if (active === 'disegni')  loadDisegni();
     if (active === 'media')    loadMedia();
+    if (active === 'files')    loadFiles();
 }
 
 /* ══════════ KANBAN ══════════ */
@@ -1251,6 +1288,147 @@ document.addEventListener('click', e => {
     if (card) openLightbox(card.dataset.lb, card.dataset.cap, card.dataset.task);
 });
 
+/* ══════════ FILE (repository documenti) ══════════ */
+let curFolder = null;        // null = root
+let fileActiveId = null;
+
+function fileIcon(type) {
+    const t = (type || '').toLowerCase();
+    if (['jpg','jpeg','png','webp','gif'].includes(t)) return 'fa-file-image';
+    if (t === 'pdf') return 'fa-file-pdf';
+    if (['doc','docx'].includes(t)) return 'fa-file-word';
+    if (['xls','xlsx','csv'].includes(t)) return 'fa-file-excel';
+    if (['ppt','pptx'].includes(t)) return 'fa-file-powerpoint';
+    if (['zip','rar','7z'].includes(t)) return 'fa-file-zipper';
+    if (['dwg','dxf'].includes(t)) return 'fa-drafting-compass';
+    return 'fa-file';
+}
+function humanSize(b) {
+    b = +b || 0;
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(0) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+}
+
+async function loadFiles() {
+    const list = document.getElementById('bz-files-list');
+    list.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
+    const res = await api(`/worksites/${WID}/zone/files${curFolder ? '?folder=' + curFolder : ''}`);
+    if (!res.ok) { list.innerHTML = '<div class="bz-dz-empty">Errore caricamento file.</div>'; return; }
+    renderFolders(res.data.folders || []);
+    renderFiles(res.data.files || []);
+}
+
+function renderFolders(folders) {
+    const el = document.getElementById('bz-folders');
+    el.innerHTML = `
+        <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
+        ${folders.map(f => `
+            <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
+                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>
+                <em>${f.file_count}</em>
+                <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
+            </button>`).join('')}
+        <button class="bz-folder-new" id="bz-new-folder"><i class="fas fa-plus"></i> Nuova cartella</button>
+    `;
+}
+
+function renderFiles(files) {
+    const list = document.getElementById('bz-files-list');
+    const title = document.getElementById('bz-files-title');
+    title.textContent = 'File' + (curFolder ? '' : ' — tutti');
+    if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file qui. Carica il primo.</div>'; return; }
+    list.innerHTML = files.map(f => `
+        <div class="bz-file-row">
+            <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
+            <div class="bz-file-info">
+                <div class="bz-file-name">${escHtml(f.file_name)}</div>
+                <div class="bz-file-sub">${escHtml(f.uploader||'—')} · ${fmtDateTime(f.created_at)} · ${humanSize(f.size_bytes)}</div>
+            </div>
+            <button class="bz-file-act" data-file-comments="${f.id}" data-file-name="${escAttr(f.file_name)}" title="Commenti"><i class="fas fa-comment"></i> ${f.comment_count>0?f.comment_count:''}</button>
+            <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Apri/Scarica"><i class="fas fa-download"></i></a>
+            <button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>
+        </div>`).join('');
+}
+
+async function createFolder() {
+    const name = prompt('Nome cartella:');
+    if (!name || !name.trim()) return;
+    await api(`/worksites/${WID}/zone/files/folder`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim()}) });
+    loadFiles();
+}
+async function deleteFolder(id) {
+    if (!confirm('Eliminare la cartella? I file dentro tornano in "Tutti i file".')) return;
+    await api(`/worksites/${WID}/zone/files/folder/${id}/delete`, { method:'POST' });
+    if (curFolder == id) curFolder = null;
+    loadFiles();
+}
+async function uploadFile(file) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    if (curFolder) fd.append('folder_id', curFolder);
+    const res = await api(`/worksites/${WID}/zone/files`, { method:'POST', body: fd });
+    if (res.ok) loadFiles();
+    else alert('Errore upload: ' + (res.error || 'sconosciuto'));
+}
+async function deleteFile(id) {
+    if (!confirm('Eliminare questo file?')) return;
+    await api(`/worksites/${WID}/zone/files/${id}/delete`, { method:'POST' });
+    loadFiles();
+}
+
+/* commenti file (modal) */
+async function openFileComments(fileId, fileName) {
+    fileActiveId = fileId;
+    document.getElementById('bz-file-modal-name').textContent = fileName;
+    document.getElementById('bz-file-modal').classList.add('open');
+    loadFileComments();
+}
+async function loadFileComments() {
+    const box = document.getElementById('bz-file-modal-comments');
+    box.innerHTML = '<div class="bz-empty">Caricamento...</div>';
+    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`);
+    const items = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    box.innerHTML = items.length ? items.map(c => `
+        <div class="bz-comment">
+            <div class="bz-comment-avatar">${initials(c.author_name)}</div>
+            <div class="bz-comment-body">
+                <div class="bz-comment-meta"><span class="bz-comment-author">${escHtml(c.author_name||'?')}</span><span class="bz-comment-time">${ago(c.created_at)}</span></div>
+                <div class="bz-comment-text">${escHtml(c.text||'')}</div>
+            </div>
+        </div>`).join('') : '<div style="font-size:12px;color:#64748b;">Nessun commento.</div>';
+    box.scrollTop = box.scrollHeight;
+}
+async function sendFileComment() {
+    const inp = document.getElementById('bz-file-comment-input');
+    const text = inp.value.trim();
+    if (!text || !fileActiveId) return;
+    inp.disabled = true;
+    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+    inp.disabled = false;
+    if (res.ok) { inp.value=''; loadFileComments(); loadFiles(); }
+    inp.focus();
+}
+
+// listener delegati per la sezione file
+document.addEventListener('click', e => {
+    const folBtn = e.target.closest('[data-folder]');
+    if (folBtn && !e.target.closest('[data-del-folder]')) { curFolder = folBtn.dataset.folder ? parseInt(folBtn.dataset.folder) : null; loadFiles(); return; }
+    const delFol = e.target.closest('[data-del-folder]');
+    if (delFol) { e.stopPropagation(); deleteFolder(parseInt(delFol.dataset.delFolder)); return; }
+    if (e.target.closest('#bz-new-folder')) { createFolder(); return; }
+    const fc = e.target.closest('[data-file-comments]');
+    if (fc) { openFileComments(parseInt(fc.dataset.fileComments), fc.dataset.fileName); return; }
+    const df = e.target.closest('[data-del-file]');
+    if (df) { deleteFile(parseInt(df.dataset.delFile)); return; }
+});
+document.getElementById('bz-file-input')?.addEventListener('change', e => { const f=e.target.files?.[0]; e.target.value=''; if (f) uploadFile(f); });
+document.getElementById('bz-file-modal-close')?.addEventListener('click', () => document.getElementById('bz-file-modal').classList.remove('open'));
+document.getElementById('bz-file-modal')?.addEventListener('click', e => { if (e.target.id==='bz-file-modal') document.getElementById('bz-file-modal').classList.remove('open'); });
+document.getElementById('bz-file-comment-send')?.addEventListener('click', sendFileComment);
+document.getElementById('bz-file-comment-input')?.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); sendFileComment(); } });
+
 /* ══════════ NEW TASK MODAL ══════════ */
 let quickAddStatus = null;
 
@@ -1629,6 +1807,47 @@ loadBobUsers();
 .bz-kanban-filters button { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:7px; width:32px; height:32px; cursor:pointer; }
 .bz-kanban-filters button:hover { color:#e2e8f0; }
 
+/* File (repository) */
+.bz-files { flex:1; display:flex; overflow:hidden; }
+.bz-folders { width:220px; flex-shrink:0; border-right:1px solid #1e293b; padding:14px 10px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.bz-folder { display:flex; align-items:center; gap:8px; padding:8px 10px; border:none; background:none; color:#94a3b8; font-size:13px; cursor:pointer; border-radius:7px; font-family:inherit; text-align:left; width:100%; }
+.bz-folder span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bz-folder em { font-size:10px; color:#64748b; font-style:normal; }
+.bz-folder .bz-folder-del { opacity:0; color:#f87171; font-size:11px; }
+.bz-folder:hover { background:#1e293b; color:#e2e8f0; }
+.bz-folder:hover .bz-folder-del { opacity:.7; }
+.bz-folder.active { background:#334155; color:#f1f5f9; }
+.bz-folder-new { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px dashed #273548; background:none; color:#64748b; font-size:12px; cursor:pointer; border-radius:7px; font-family:inherit; margin-top:8px; }
+.bz-folder-new:hover { color:#94a3b8; border-color:#475569; }
+.bz-files-main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.bz-files-bar { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid #1e293b; flex-shrink:0; }
+.bz-files-title { font-size:14px; font-weight:600; color:#cbd5e1; }
+.bz-files-list { flex:1; overflow-y:auto; padding:12px 20px; }
+.bz-file-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid #1e293b; border-radius:8px; margin-bottom:6px; }
+.bz-file-row:hover { border-color:#334155; }
+.bz-file-icon { font-size:20px; color:#60a5fa; width:24px; text-align:center; }
+.bz-file-info { flex:1; min-width:0; }
+.bz-file-name { font-size:13px; font-weight:600; color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bz-file-sub { font-size:11px; color:#64748b; margin-top:2px; }
+.bz-file-act { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; text-decoration:none; }
+.bz-file-act:hover { color:#e2e8f0; }
+.bz-file-act.danger:hover { color:#fca5a5; border-color:#471515; }
+.bz-file-modal { position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; }
+.bz-file-modal.open { display:flex; }
+.bz-file-modal-box { width:95%; max-width:520px; max-height:80vh; background:#0f172a; border:1px solid #1e293b; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; }
+.bz-file-modal-head { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid #1e293b; font-size:13px; font-weight:600; color:#e2e8f0; }
+.bz-file-modal-head button { background:none; border:none; color:#64748b; font-size:22px; cursor:pointer; }
+.bz-file-modal-body { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
+.bz-file-modal-foot { display:flex; gap:8px; padding:12px 16px; border-top:1px solid #1e293b; }
+.bz-file-modal-foot input { flex:1; background:#1e293b; border:1px solid #273548; border-radius:7px; padding:8px 10px; color:#e2e8f0; font-size:13px; font-family:inherit; }
+.bz-file-modal-foot button { background:#3b82f6; border:none; color:#fff; border-radius:7px; padding:8px 14px; cursor:pointer; }
+[data-theme="light"] .bz-folders { border-color:#e2e8f0; }
+[data-theme="light"] .bz-files-bar { border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-row { border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-name, [data-theme="light"] .bz-files-title { color:#1e293b; }
+[data-theme="light"] .bz-file-modal-box { background:#fff; border-color:#e2e8f0; }
+[data-theme="light"] .bz-file-modal-head { color:#1e293b; border-color:#e2e8f0; }
+
 /* Galleria */
 .bz-media { flex:1; overflow-y:auto; padding:20px 24px; }
 .bz-media-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; }
@@ -1672,6 +1891,11 @@ loadBobUsers();
     /* pannello dettaglio task: overlay a tutto schermo */
     .bz-detail-wrap { position: fixed; inset: 0; width: 100% !important; z-index: 50; border-left: none; }
     .bz-detail-wrap.closed { width: 0 !important; display: none; }
+    /* file: cartelle in orizzontale sopra la lista */
+    .bz-files { flex-direction: column; }
+    .bz-folders { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #1e293b; padding: 8px; }
+    .bz-folder { white-space: nowrap; width: auto; }
+    .bz-folder-new { margin-top: 0; }
     /* kanban: colonne piu' strette, scroll orizzontale */
     .bz-col { min-width: 78vw; }
     .bz-kanban-filters input { min-width: 0; flex: 1; }

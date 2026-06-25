@@ -17,6 +17,7 @@ use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Repository\Fieldwire\FwFloorplanRepository;
 use App\Repository\Fieldwire\ZoneAnnotationRepository;
+use App\Repository\Fieldwire\ZoneFileRepository;
 use App\Repository\Fieldwire\ZoneTaskRepository;
 use App\Repository\Worksites\WorksiteRepository;
 
@@ -36,6 +37,7 @@ final class FieldwireController
     private ZoneTaskRepository       $zoneRepo;
     private FwFloorplanRepository    $fwFloorplanRepo;
     private ZoneAnnotationRepository $annRepo;
+    private ZoneFileRepository       $fileRepo;
 
     public function __construct(
         private Config             $config,
@@ -45,6 +47,7 @@ final class FieldwireController
         $this->zoneRepo        = new ZoneTaskRepository($conn);
         $this->fwFloorplanRepo = new FwFloorplanRepository($conn);
         $this->annRepo         = new ZoneAnnotationRepository($conn);
+        $this->fileRepo        = new ZoneFileRepository($conn);
     }
 
     // ─── Pagina BOB Zone ──────────────────────────────────────────────────────
@@ -479,6 +482,156 @@ final class FieldwireController
         header('Content-Length: ' . strlen($pdf));
         echo $pdf;
         exit;
+    }
+
+    // ─── Sezione File (repository documenti con cartelle) ─────────────────────
+
+    public function files(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $folderId   = isset($_GET['folder']) && $_GET['folder'] !== '' ? (int)$_GET['folder'] : null;
+            $files = $this->fileRepo->files($worksiteId, $folderId);
+            // arricchisci con url download/preview
+            foreach ($files as &$f) {
+                $f['download_url'] = "/worksites/{$worksiteId}/zone/files/{$f['id']}/download";
+                $f['is_image'] = in_array(strtolower($f['file_type'] ?? ''), ['jpg','jpeg','png','webp','gif'], true);
+            }
+            return [
+                'folders'        => $this->fileRepo->folders($worksiteId),
+                'files'          => $files,
+                'current_folder' => $folderId,
+            ];
+        });
+    }
+
+    public function createFolder(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $body = $this->jsonBody();
+            $name = trim($body['name'] ?? '');
+            if ($name === '') throw new \RuntimeException('Nome cartella obbligatorio');
+            $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0));
+            return ['id' => $id, 'name' => $name];
+        });
+    }
+
+    public function deleteFolder(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $folderId   = (int) $request->param('folderId');
+            $this->fileRepo->deleteFolder($worksiteId, $folderId);
+            return ['deleted' => true];
+        });
+    }
+
+    public function uploadFile(Request $request): void
+    {
+        header('Content-Type: application/json');
+        try {
+            $worksiteId = (int) $request->param('id');
+            $user       = $request->user();
+            $folderId   = !empty($_POST['folder_id']) ? (int)$_POST['folder_id'] : null;
+
+            if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new \RuntimeException('Nessun file ricevuto');
+            }
+            $f = $_FILES['file'];
+            if (($f['size'] ?? 0) > 50 * 1024 * 1024) throw new \RuntimeException('File troppo grande (max 50 MB)');
+
+            $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+            // blocca eseguibili/script
+            $blocked = ['php','phtml','exe','sh','bat','cmd','js','jar','com','msi','dll','app','scr'];
+            if ($ext === '' || in_array($ext, $blocked, true)) {
+                throw new \RuntimeException('Tipo di file non consentito');
+            }
+
+            $dir  = \CloudPath::ensureZoneFilesDir($worksiteId);
+            $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo($f['name'], PATHINFO_FILENAME));
+            $stored = $safe . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
+            $dest = $dir . DIRECTORY_SEPARATOR . $stored;
+            if (!move_uploaded_file($f['tmp_name'], $dest)) throw new \RuntimeException('Salvataggio fallito');
+
+            $id = $this->fileRepo->create([
+                'worksite_id' => $worksiteId,
+                'folder_id'   => $folderId,
+                'file_name'   => mb_substr($f['name'], 0, 255),
+                'file_path'   => \CloudPath::relativeToRoot($dest),
+                'file_type'   => $ext,
+                'size_bytes'  => (int)($f['size'] ?? 0),
+                'uploaded_by' => (int)($user?->id ?? 0),
+            ]);
+            echo json_encode(['ok' => true, 'data' => ['id' => $id]]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function deleteFile(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $fileId     = (int) $request->param('fileId');
+            $row = $this->fileRepo->delete($worksiteId, $fileId);
+            // rimuovi anche il file fisico
+            if ($row && !empty($row['file_path'])) {
+                $abs = \CloudPath::getRoot() . DIRECTORY_SEPARATOR . $row['file_path'];
+                if (is_file($abs)) @unlink($abs);
+            }
+            return ['deleted' => true];
+        });
+    }
+
+    public function downloadFile(Request $request): void
+    {
+        $worksiteId = (int) $request->param('id');
+        $fileId     = (int) $request->param('fileId');
+        $file = $this->fileRepo->find($fileId);
+        if (!$file || (int)$file['worksite_id'] !== $worksiteId) { http_response_code(404); exit('File non trovato'); }
+
+        $abs = \CloudPath::getRoot() . DIRECTORY_SEPARATOR . $file['file_path'];
+        $real = realpath($abs); $rootReal = realpath(\CloudPath::getRoot());
+        if ($real === false || $rootReal === false || strpos($real, $rootReal) !== 0 || !is_file($real)) {
+            http_response_code(404); exit('File non trovato su disco');
+        }
+        $ext = strtolower($file['file_type'] ?? '');
+        $inlineTypes = ['pdf'=>'application/pdf','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','png'=>'image/png','webp'=>'image/webp','gif'=>'image/gif'];
+        if (isset($inlineTypes[$ext])) {
+            header('Content-Type: ' . $inlineTypes[$ext]);
+            header('Content-Disposition: inline; filename="' . basename($file['file_name']) . '"');
+        } else {
+            header('Content-Type: application/octet-stream');
+            header('Content-Disposition: attachment; filename="' . basename($file['file_name']) . '"');
+        }
+        header('Content-Length: ' . filesize($real));
+        header('X-Frame-Options: SAMEORIGIN');
+        readfile($real);
+        exit;
+    }
+
+    public function fileComments(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            return $this->fileRepo->comments((int)$request->param('fileId'));
+        });
+    }
+
+    public function postFileComment(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $fileId = (int) $request->param('fileId');
+            $user   = $request->user();
+            $body   = $this->jsonBody();
+            $text   = trim($body['text'] ?? '');
+            if ($text === '') throw new \RuntimeException('Commento vuoto');
+            $author = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? 'Utente');
+            $id = $this->fileRepo->addComment($fileId, $text, $author, (int)($user?->id ?? 0));
+            return ['id' => $id, 'text' => $text, 'author_name' => $author, 'created_at' => date('Y-m-d H:i:s')];
+        });
     }
 
     /** Galleria: tutte le foto caricate sui task del cantiere. */
