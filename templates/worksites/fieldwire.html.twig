@@ -61,6 +61,18 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-body { flex: 1; overflow: hidden; display: flex; }
 .bz-view { display: none; flex: 1; overflow: hidden; }
 .bz-view.active { display: flex; }
+/* Attività: contenitore a colonna con sub-switcher in cima */
+#view-attivita.active { flex-direction: column; }
+.bz-subswitch { display: flex; gap: 4px; padding: 10px 16px; border-bottom: 1px solid #1e293b; flex-shrink: 0; }
+.bz-sub-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: none; background: #1e293b; color: #94a3b8; font-size: 12px; font-weight: 500; border-radius: 7px; cursor: pointer; font-family: inherit; }
+.bz-sub-btn:hover { color: #e2e8f0; }
+.bz-sub-btn.active { background: #334155; color: #f1f5f9; }
+.bz-act-body { flex: 1; display: flex; overflow: hidden; }
+.bz-subview { display: none; flex: 1; overflow: hidden; }
+.bz-subview.active { display: flex; }
+[data-theme="light"] .bz-subswitch { border-color: #e2e8f0; }
+[data-theme="light"] .bz-sub-btn { background: #f1f5f9; color: #64748b; }
+[data-theme="light"] .bz-sub-btn.active { background: #e0e7ff; color: #1e3a8a; }
 
 /* ══════════════════════════
    KANBAN
@@ -307,13 +319,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Side menu #}
         <aside class="bz-sidebar">
             <nav class="bz-nav">
-                <button class="bz-nav-item bz-view-btn active" data-view="kanban"><i class="fas fa-columns"></i><span>Kanban</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="gantt"><i class="fas fa-chart-bar"></i><span>Gantt</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="calendar"><i class="fas fa-calendar-alt"></i><span>Calendario</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="media"><i class="fas fa-images"></i><span>Galleria</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
-                <button class="bz-nav-item bz-view-btn" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
+                <button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>
+                <button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
+                <button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>
+                <button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
+                <button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
@@ -351,8 +361,17 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     {# ── Body ── #}
     <div class="bz-body">
 
+        {# ── Attività (Kanban / Gantt / Calendario) ── #}
+        <div class="bz-view active" id="view-attivita">
+          <div class="bz-subswitch" id="bz-subswitch">
+            <button class="bz-sub-btn active" data-sub="kanban"><i class="fas fa-columns"></i> Kanban</button>
+            <button class="bz-sub-btn" data-sub="gantt"><i class="fas fa-chart-bar"></i> Gantt</button>
+            <button class="bz-sub-btn" data-sub="calendar"><i class="fas fa-calendar-alt"></i> Calendario</button>
+          </div>
+          <div class="bz-act-body">
+
         {# Kanban #}
-        <div class="bz-view active" id="view-kanban">
+        <div class="bz-subview active" id="view-kanban">
             <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
                 <div class="bz-kanban-filters">
                     <input type="text" id="bz-filter-search" placeholder="Cerca task...">
@@ -367,7 +386,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
 
         {# Gantt #}
-        <div class="bz-view" id="view-gantt">
+        <div class="bz-subview" id="view-gantt">
             <div class="bz-gantt">
                 <div class="bz-gantt-wrap" id="bz-gantt-content">
                     <div class="bz-gantt-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
@@ -376,7 +395,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
 
         {# Calendar #}
-        <div class="bz-view" id="view-calendar">
+        <div class="bz-subview" id="view-calendar">
             <div class="bz-calendar">
                 <div class="bz-cal-header">
                     <div class="bz-cal-title" id="cal-title"></div>
@@ -389,6 +408,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-cal-grid" id="bz-cal-grid"></div>
             </div>
         </div>
+
+          </div>{# /bz-act-body #}
+        </div>{# /view-attivita #}
 
         {# Disegni / Tavole #}
         <div class="bz-view" id="view-disegni">
@@ -655,26 +677,52 @@ async function loadTasks() {
     renderCurrentView();
 }
 
-function renderCurrentView() {
-    const active = document.querySelector('.bz-view-btn.active')?.dataset.view || 'kanban';
-    if (active === 'kanban')   renderKanban();
-    if (active === 'gantt')    renderGantt();
-    if (active === 'calendar') renderCalendar();
-    if (active === 'disegni')  loadDisegni();
-    if (active === 'media')    loadMedia();
-    if (active === 'files')    loadFiles();
-    if (active === 'forms' && window.BZForms) {
-        if (!window._bzFormsInited) {
-            BZForms.init({
-                worksiteId: WID, csrf: CSRF,
-                wsName: {{ worksite.name|json_encode|raw }},
-                wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
-                clientName: {{ (clientName ?? '')|json_encode|raw }}
-            });
-            window._bzFormsInited = true;
-        }
-        BZForms.show();
+let currentTop = 'attivita';   // attivita | disegni | media | files | forms
+let activeSub  = 'kanban';     // kanban | gantt | calendar
+
+function switchTop(v) {
+    currentTop = v;
+    document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
+    document.getElementById('view-' + v)?.classList.add('active');
+    document.querySelectorAll('.bz-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    if (v === 'attivita')      renderSub();
+    else if (v === 'disegni')  loadDisegni();
+    else if (v === 'media')    loadMedia();
+    else if (v === 'files')    loadFiles();
+    else if (v === 'forms')    openForms();
+}
+
+function switchSub(s) {
+    activeSub = s;
+    document.querySelectorAll('.bz-subview').forEach(x => x.classList.remove('active'));
+    document.getElementById('view-' + s)?.classList.add('active');
+    document.querySelectorAll('.bz-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === s));
+    renderSub();
+}
+
+function renderSub() {
+    if (activeSub === 'kanban')   renderKanban();
+    if (activeSub === 'gantt')    renderGantt();
+    if (activeSub === 'calendar') renderCalendar();
+}
+
+function openForms() {
+    if (!window.BZForms) return;
+    if (!window._bzFormsInited) {
+        BZForms.init({
+            worksiteId: WID, csrf: CSRF,
+            wsName: {{ worksite.name|json_encode|raw }},
+            wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
+            clientName: {{ (clientName ?? '')|json_encode|raw }}
+        });
+        window._bzFormsInited = true;
     }
+    BZForms.show();
+}
+
+/* compat: chiamato dopo modifiche ai task → ridisegna la vista attività corrente */
+function renderCurrentView() {
+    if (currentTop === 'attivita') renderSub();
 }
 
 /* ══════════ KANBAN ══════════ */
@@ -1309,7 +1357,7 @@ document.getElementById('bz-lightbox')?.addEventListener('click', e => {
         e.preventDefault();
         const tid = parseInt(tl.dataset.lbTask);
         closeLightbox();
-        document.querySelector('.bz-view-btn[data-view="kanban"]')?.click();
+        switchTop('attivita'); switchSub('kanban');
         setTimeout(() => openTask(tid), 50);
     }
 });
@@ -1550,15 +1598,13 @@ async function submitTask() {
 
 /* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
 
-// View switcher
-document.querySelectorAll('.bz-view-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.bz-view-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.bz-view').forEach(v => v.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('view-' + btn.dataset.view)?.classList.add('active');
-        renderCurrentView();
-    });
+// Sidebar: voci di primo livello (Attività / Disegni / Foto / File / Moduli)
+document.querySelectorAll('.bz-nav-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => switchTop(btn.dataset.view));
+});
+// Sub-switcher dentro Attività (Kanban / Gantt / Calendario)
+document.querySelectorAll('.bz-sub-btn[data-sub]').forEach(btn => {
+    btn.addEventListener('click', () => switchSub(btn.dataset.sub));
 });
 
 // New task button
