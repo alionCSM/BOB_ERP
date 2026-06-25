@@ -663,7 +663,10 @@ function renderCurrentView() {
     if (active === 'disegni')  loadDisegni();
     if (active === 'media')    loadMedia();
     if (active === 'files')    loadFiles();
-    if (active === 'forms' && window.BZForms) BZForms.show();
+    if (active === 'forms' && window.BZForms) {
+        if (!window._bzFormsInited) { BZForms.init({ worksiteId: WID, csrf: CSRF }); window._bzFormsInited = true; }
+        BZForms.show();
+    }
 }
 
 /* ══════════ KANBAN ══════════ */
@@ -1817,7 +1820,8 @@ function fmtDate(str) {
 loadTasks();
 renderCalendar();
 loadBobUsers();
-if (window.BZForms) BZForms.init({ worksiteId: WID, csrf: CSRF });
+/* BZForms init avviene lazy alla prima apertura della vista Moduli
+   (forms.js è incluso a fine pagina, dopo questo script). */
 </script>
 
 <style>
