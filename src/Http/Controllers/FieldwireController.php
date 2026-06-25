@@ -481,6 +481,25 @@ final class FieldwireController
         exit;
     }
 
+    /** Galleria: tutte le foto caricate sui task del cantiere. */
+    public function media(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $stmt = $this->conn->prepare("
+                SELECT c.id, c.task_id, c.file_url, c.text, c.author_name, c.created_at,
+                       t.name AS task_name, t.status AS task_status
+                FROM bb_zone_task_comments c
+                JOIN bb_zone_tasks t ON t.id = c.task_id
+                WHERE t.worksite_id = :w
+                  AND c.file_url IS NOT NULL AND c.file_url <> ''
+                ORDER BY c.created_at DESC
+            ");
+            $stmt->execute([':w' => $worksiteId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        });
+    }
+
     // ─── Lookup utenti BOB (per dropdown assignee) ────────────────────────────
 
     public function bobUsers(Request $request): void
