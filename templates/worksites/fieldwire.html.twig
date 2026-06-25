@@ -440,6 +440,18 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
 
+        {# Viewer file (immagini + PDF in-app) #}
+        <div class="bz-fileview" id="bz-fileview">
+            <div class="bz-fileview-head">
+                <span id="bz-fileview-name">File</span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <a id="bz-fileview-dl" href="#" class="bz-file-act" target="_blank" rel="noopener"><i class="fas fa-download"></i> Scarica</a>
+                    <button id="bz-fileview-close" class="bz-file-act"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            <div class="bz-fileview-body" id="bz-fileview-body"></div>
+        </div>
+
         {# Modal commenti file #}
         <div class="bz-file-modal" id="bz-file-modal">
             <div class="bz-file-modal-box">
@@ -1338,17 +1350,23 @@ function renderFiles(files) {
     const title = document.getElementById('bz-files-title');
     title.textContent = 'File' + (curFolder ? '' : ' — tutti');
     if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file qui. Carica il primo.</div>'; return; }
-    list.innerHTML = files.map(f => `
+    const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
+    list.innerHTML = files.map(f => {
+        const viewable = canView(f.file_type);
+        return `
         <div class="bz-file-row">
             <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
-            <div class="bz-file-info">
+            <div class="bz-file-info ${viewable?'bz-file-clickable':''}"
+                 ${viewable?`data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}"`:''}>
                 <div class="bz-file-name">${escHtml(f.file_name)}</div>
                 <div class="bz-file-sub">${escHtml(f.uploader||'—')} · ${fmtDateTime(f.created_at)} · ${humanSize(f.size_bytes)}</div>
             </div>
+            ${viewable?`<button class="bz-file-act" data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}" title="Anteprima"><i class="fas fa-eye"></i></button>`:''}
             <button class="bz-file-act" data-file-comments="${f.id}" data-file-name="${escAttr(f.file_name)}" title="Commenti"><i class="fas fa-comment"></i> ${f.comment_count>0?f.comment_count:''}</button>
-            <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Apri/Scarica"><i class="fas fa-download"></i></a>
+            <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
             <button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 async function createFolder() {
@@ -1377,6 +1395,28 @@ async function deleteFile(id) {
     await api(`/worksites/${WID}/zone/files/${id}/delete`, { method:'POST' });
     loadFiles();
 }
+
+/* viewer file in-app (immagini + PDF) */
+function openFileView(name, type, url) {
+    const t = (type || '').toLowerCase();
+    const body = document.getElementById('bz-fileview-body');
+    document.getElementById('bz-fileview-name').textContent = name;
+    document.getElementById('bz-fileview-dl').href = url;
+    if (['jpg','jpeg','png','webp','gif'].includes(t)) {
+        body.innerHTML = `<img src="${escAttr(url)}" alt="">`;
+    } else if (t === 'pdf') {
+        body.innerHTML = `<iframe src="${escAttr(url)}" title="PDF"></iframe>`;
+    } else {
+        body.innerHTML = `<div class="bz-fileview-msg">Anteprima non disponibile per questo tipo di file.<br>Usa "Scarica" per aprirlo.</div>`;
+    }
+    document.getElementById('bz-fileview').classList.add('open');
+}
+function closeFileView() {
+    document.getElementById('bz-fileview').classList.remove('open');
+    document.getElementById('bz-fileview-body').innerHTML = ''; // stop iframe/video
+}
+document.getElementById('bz-fileview-close')?.addEventListener('click', closeFileView);
+document.getElementById('bz-fileview')?.addEventListener('click', e => { if (e.target.id==='bz-fileview') closeFileView(); });
 
 /* commenti file (modal) */
 async function openFileComments(fileId, fileName) {
@@ -1418,6 +1458,8 @@ document.addEventListener('click', e => {
     const delFol = e.target.closest('[data-del-folder]');
     if (delFol) { e.stopPropagation(); deleteFolder(parseInt(delFol.dataset.delFolder)); return; }
     if (e.target.closest('#bz-new-folder')) { createFolder(); return; }
+    const vf = e.target.closest('[data-view-file]');
+    if (vf) { openFileView(vf.dataset.vfName, vf.dataset.vfType, vf.dataset.vfUrl); return; }
     const fc = e.target.closest('[data-file-comments]');
     if (fc) { openFileComments(parseInt(fc.dataset.fileComments), fc.dataset.fileName); return; }
     const df = e.target.closest('[data-del-file]');
@@ -1806,6 +1848,17 @@ loadBobUsers();
 .bz-kanban-filters input { min-width:180px; }
 .bz-kanban-filters button { background:#1e293b; border:1px solid #273548; color:#94a3b8; border-radius:7px; width:32px; height:32px; cursor:pointer; }
 .bz-kanban-filters button:hover { color:#e2e8f0; }
+
+/* File viewer (immagini + PDF in-app) */
+.bz-fileview { position:fixed; inset:0; z-index:10002; background:rgba(8,12,22,.96); display:none; flex-direction:column; }
+.bz-fileview.open { display:flex; }
+.bz-fileview-head { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid #1e293b; color:#e2e8f0; font-size:13px; font-weight:600; flex-shrink:0; }
+.bz-fileview-body { flex:1; overflow:auto; display:flex; align-items:center; justify-content:center; padding:16px; }
+.bz-fileview-body img { max-width:95%; max-height:100%; border-radius:6px; }
+.bz-fileview-body iframe { width:100%; height:100%; border:none; background:#fff; border-radius:6px; }
+.bz-fileview-msg { color:#94a3b8; font-size:14px; text-align:center; line-height:1.6; }
+.bz-file-clickable { cursor:pointer; }
+.bz-file-clickable:hover .bz-file-name { color:#60a5fa; }
 
 /* File (repository) */
 .bz-files { flex:1; display:flex; overflow:hidden; }
