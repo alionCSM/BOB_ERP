@@ -313,6 +313,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <button class="bz-nav-item bz-view-btn" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
                 <button class="bz-nav-item bz-view-btn" data-view="media"><i class="fas fa-images"></i><span>Galleria</span></button>
                 <button class="bz-nav-item bz-view-btn" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
+                <button class="bz-nav-item bz-view-btn" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
@@ -408,6 +409,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     <div class="bz-disegni-grid" id="bz-fw-floorplans-grid"></div>
                 </div>
             </div>
+        </div>
+
+        {# Moduli #}
+        <div class="bz-view" id="view-forms">
+            <div id="bz-forms-root"></div>
         </div>
 
         {# Galleria (foto dai task) #}
@@ -657,6 +663,7 @@ function renderCurrentView() {
     if (active === 'disegni')  loadDisegni();
     if (active === 'media')    loadMedia();
     if (active === 'files')    loadFiles();
+    if (active === 'forms' && window.BZForms) BZForms.show();
 }
 
 /* ══════════ KANBAN ══════════ */
@@ -1810,6 +1817,7 @@ function fmtDate(str) {
 loadTasks();
 renderCalendar();
 loadBobUsers();
+if (window.BZForms) BZForms.init({ worksiteId: WID, csrf: CSRF });
 </script>
 
 <style>
@@ -1960,6 +1968,8 @@ loadBobUsers();
 </style>
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
+<script src="/assets/js/views/fieldwire/forms.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)

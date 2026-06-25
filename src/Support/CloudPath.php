@@ -132,6 +132,20 @@ class CloudPath
         return $path;
     }
 
+    /** Cartella moduli BOB Zone (firme/foto compilazioni): <root>/BOBZone/<id>/forms */
+    public static function ensureZoneFormsDir(int $worksiteId): string
+    {
+        $path = implode(DIRECTORY_SEPARATOR, [self::root(), 'BOBZone', (string)$worksiteId, 'forms']);
+        if (!is_dir($path) && !@mkdir($path, 0775, true) && !is_dir($path)) {
+            $err = error_get_last()['message'] ?? '?';
+            throw new RuntimeException("Impossibile creare la cartella moduli: {$path} ({$err})");
+        }
+        if (!is_writable($path)) {
+            throw new RuntimeException("Cartella moduli non scrivibile: {$path}");
+        }
+        return $path;
+    }
+
     /** Cartella file BOB Zone: <root>/BOBZone/<worksiteId>/files */
     public static function ensureZoneFilesDir(int $worksiteId): string
     {

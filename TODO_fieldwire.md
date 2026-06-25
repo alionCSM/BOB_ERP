@@ -324,6 +324,16 @@ POST /api/fieldwire/webhook                                  → webhook Fieldwi
       con foto incorporate (dompdf + GD downscale)
 - [ ] Notifica anche su nuovo commento (oltre assegnazione)
 
+### 🟢 Moduli / Form builder
+- [x] Builder template con campi (testo/area/numero/data/select/radio/checkbox/
+      sì-no/titolo/firma/foto), riordino, obbligatori, opzioni
+- [x] Template per-cantiere o universali
+- [x] Compilazione (self) con firma su canvas + foto, validazione obbligatori
+- [x] Archivio compilazioni + vista compilato (con firma/foto)
+- [ ] Invio a utenti BOB (assegnazione + notifica) — DA FARE
+- [ ] Link esterno pubblico per compilazione senza login — DA FARE
+- [ ] Export PDF del compilato (con firma) — DA FARE
+
 ### 🟡 Tavole (Floorplans) / Disegni
 
 - [x] Vista "Disegni" in BOB Zone (riusa i disegni del cantiere, BOB-native)

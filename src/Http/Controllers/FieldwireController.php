@@ -18,6 +18,7 @@ use App\Infrastructure\Config;
 use App\Repository\Fieldwire\FwFloorplanRepository;
 use App\Repository\Fieldwire\ZoneAnnotationRepository;
 use App\Repository\Fieldwire\ZoneFileRepository;
+use App\Repository\Fieldwire\ZoneFormRepository;
 use App\Repository\Fieldwire\ZoneTaskRepository;
 use App\Repository\Worksites\WorksiteRepository;
 
@@ -38,6 +39,7 @@ final class FieldwireController
     private FwFloorplanRepository    $fwFloorplanRepo;
     private ZoneAnnotationRepository $annRepo;
     private ZoneFileRepository       $fileRepo;
+    private ZoneFormRepository       $formRepo;
 
     public function __construct(
         private Config             $config,
@@ -48,6 +50,7 @@ final class FieldwireController
         $this->fwFloorplanRepo = new FwFloorplanRepository($conn);
         $this->annRepo         = new ZoneAnnotationRepository($conn);
         $this->fileRepo        = new ZoneFileRepository($conn);
+        $this->formRepo        = new ZoneFormRepository($conn);
     }
 
     // ─── Pagina BOB Zone ──────────────────────────────────────────────────────
@@ -482,6 +485,161 @@ final class FieldwireController
         header('Content-Length: ' . strlen($pdf));
         echo $pdf;
         exit;
+    }
+
+    // ─── Moduli / Form builder ────────────────────────────────────────────────
+
+    public function formTemplates(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            return $this->formRepo->templatesFor((int)$request->param('id'));
+        });
+    }
+
+    public function formTemplate(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $t = $this->formRepo->find((int)$request->param('tplId'));
+            if (!$t) throw new \RuntimeException('Modulo non trovato');
+            return $t;
+        });
+    }
+
+    public function saveFormTemplate(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $user = $request->user();
+            $body = $this->jsonBody();
+            $name = trim($body['name'] ?? '');
+            if ($name === '') throw new \RuntimeException('Nome modulo obbligatorio');
+            $fields = $body['fields'] ?? [];
+            if (!is_array($fields) || !count($fields)) throw new \RuntimeException('Aggiungi almeno un campo');
+
+            // universale (worksite_id null) o di questo cantiere
+            $wsId = !empty($body['universal']) ? null : $worksiteId;
+
+            $data = [
+                'worksite_id' => $wsId,
+                'name'        => mb_substr($name, 0, 200),
+                'description' => trim($body['description'] ?? '') ?: null,
+                'fields'      => $fields,
+                'created_by'  => (int)($user?->id ?? 0),
+            ];
+            if (!empty($body['id'])) {
+                $this->formRepo->update((int)$body['id'], $data);
+                return ['id' => (int)$body['id']];
+            }
+            return ['id' => $this->formRepo->create($data)];
+        });
+    }
+
+    public function deleteFormTemplate(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $this->formRepo->delete((int)$request->param('tplId'));
+            return ['deleted' => true];
+        });
+    }
+
+    public function submitForm(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $tplId      = (int) $request->param('tplId');
+            $user       = $request->user();
+            $body       = $this->jsonBody();
+
+            $tpl = $this->formRepo->find($tplId);
+            if (!$tpl) throw new \RuntimeException('Modulo non trovato');
+
+            $values = is_array($body['values'] ?? null) ? $body['values'] : [];
+
+            // converti firme/foto (data URI) in file salvati su disco
+            foreach ($tpl['fields'] as $f) {
+                $fid  = $f['id'] ?? '';
+                $type = $f['type'] ?? '';
+                if (!in_array($type, ['signature', 'photo'], true)) continue;
+                if (empty($values[$fid]) || !is_string($values[$fid])) continue;
+                if (str_starts_with($values[$fid], 'data:')) {
+                    $values[$fid] = $this->saveFormDataUri($worksiteId, $values[$fid], $type . '_' . $fid);
+                }
+            }
+
+            $submitterName = trim($body['submitter_name'] ?? '');
+            if ($submitterName === '' && $user) {
+                $submitterName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? '');
+            }
+
+            $id = $this->formRepo->createSubmission([
+                'template_id'    => $tplId,
+                'worksite_id'    => $worksiteId,
+                'template_name'  => $tpl['name'],
+                'values'         => $values,
+                'submitter_name' => $submitterName ?: null,
+                'submitted_by'   => (int)($user?->id ?? 0) ?: null,
+                'source'         => 'internal',
+            ]);
+            return ['id' => $id];
+        });
+    }
+
+    public function formSubmissions(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $worksiteId = (int) $request->param('id');
+            $tplId = isset($_GET['template']) && $_GET['template'] !== '' ? (int)$_GET['template'] : null;
+            return $this->formRepo->submissions($worksiteId, $tplId);
+        });
+    }
+
+    public function formSubmission(Request $request): void
+    {
+        $this->jsonResponse(function () use ($request) {
+            $sub = $this->formRepo->findSubmission((int)$request->param('subId'));
+            if (!$sub) throw new \RuntimeException('Compilazione non trovata');
+            $tpl = $this->formRepo->find((int)$sub['template_id']);
+            $sub['fields'] = $tpl['fields'] ?? [];
+            return $sub;
+        });
+    }
+
+    /** Stream firma/foto modulo (?f=). */
+    public function formFile(Request $request): void
+    {
+        $worksiteId = (int) $request->param('id');
+        $rel = (string)($_GET['f'] ?? '');
+        $prefix = 'BOBZone/' . $worksiteId . '/forms/';
+        $relNorm = str_replace('\\', '/', $rel);
+        if ($rel === '' || strpos($relNorm, '..') !== false || strpos($relNorm, $prefix) !== 0) {
+            http_response_code(403); exit('Accesso negato');
+        }
+        $real = realpath(\CloudPath::getRoot() . DIRECTORY_SEPARATOR . $rel);
+        $rootReal = realpath(\CloudPath::getRoot());
+        if ($real === false || strpos($real, $rootReal) !== 0 || !is_file($real)) { http_response_code(404); exit('Non trovato'); }
+        $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+        $mm = ['png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','webp'=>'image/webp'];
+        header('Content-Type: ' . ($mm[$ext] ?? 'application/octet-stream'));
+        header('Content-Length: ' . filesize($real));
+        readfile($real); exit;
+    }
+
+    /** Salva un data URI (firma/foto modulo) su disco, ritorna l'URL servito. */
+    private function saveFormDataUri(int $worksiteId, string $dataUri, string $prefix): string
+    {
+        if (!preg_match('/^data:(image\/[a-z]+);base64,(.+)$/s', $dataUri, $m)) {
+            throw new \RuntimeException('Dato immagine non valido');
+        }
+        $ext = ['image/png'=>'png','image/jpeg'=>'jpg','image/webp'=>'webp'][$m[1]] ?? 'png';
+        $bin = base64_decode($m[2], true);
+        if ($bin === false) throw new \RuntimeException('Decodifica immagine fallita');
+        if (strlen($bin) > 15 * 1024 * 1024) throw new \RuntimeException('Immagine troppo grande');
+
+        $dir  = \CloudPath::ensureZoneFormsDir($worksiteId);
+        $name = preg_replace('/[^a-z0-9_]/i', '', $prefix) . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
+        $dest = $dir . DIRECTORY_SEPARATOR . $name;
+        file_put_contents($dest, $bin);
+        return "/worksites/{$worksiteId}/zone/form-file?f=" . rawurlencode(\CloudPath::relativeToRoot($dest));
     }
 
     // ─── Sezione File (repository documenti con cartelle) ─────────────────────
