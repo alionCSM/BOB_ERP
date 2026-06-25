@@ -42,16 +42,54 @@
 .bzf-addfield { display: flex; gap: 8px; align-items: center; }
 .bzf-addfield #bzf-addtype { max-width: 220px; }
 
-/* filler */
-.bzf-fill { max-width: 680px; }
-.bzf-fill-title { font-size: 20px; font-weight: 800; color: #f1f5f9; margin-bottom: 4px; }
-.bzf-fill-desc { font-size: 13px; color: #94a3b8; margin-bottom: 16px; }
-.bzf-heading { font-size: 15px; font-weight: 700; color: #cbd5e1; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #1e293b; }
-.bzf-opts { display: flex; flex-direction: column; gap: 6px; }
-.bzf-opts label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cbd5e1; }
-.bzf-sign { }
-.bzf-sign canvas { width: 100%; max-width: 600px; height: 180px; background: #fff; border: 1px solid #273548; border-radius: 8px; touch-action: none; display: block; margin-bottom: 6px; }
-.bzf-photo-prev { max-width: 220px; max-height: 220px; border-radius: 8px; margin-top: 8px; border: 1px solid #273548; }
+/* ── FOGLIO / DOCUMENTO (compilazione, anteprima, vista) ── */
+.bzf-paper-wrap { display: flex; justify-content: center; padding: 8px 0 40px; }
+.bzf-paper {
+    width: 100%; max-width: 800px; background: #fff; color: #1f2937;
+    border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.25);
+    padding: 48px 56px; font-size: 13px;
+}
+.bzf-preview-tag { font-size: 12px; color: #94a3b8; }
+
+.bzf-doc-head { border-bottom: 2px solid #1f2937; padding-bottom: 14px; margin-bottom: 22px; }
+.bzf-doc-brand { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.bzf-doc-title { font-size: 24px; font-weight: 800; color: #111827; margin: 6px 0 4px; line-height: 1.2; }
+.bzf-doc-desc { font-size: 13px; color: #4b5563; margin-bottom: 8px; }
+.bzf-doc-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12px; color: #374151; margin-top: 6px; }
+.bzf-doc-meta b { font-weight: 700; color: #111827; }
+
+/* campi dentro al foglio: stile modulo */
+.bzf-paper .bzf-field { margin-bottom: 16px; }
+.bzf-paper .bzf-field > label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #374151; margin-bottom: 5px; }
+.bzf-paper .bzf-field input,
+.bzf-paper .bzf-field textarea,
+.bzf-paper .bzf-field select {
+    width: 100%; background: #fff; border: 1px solid #cbd5e1; border-radius: 5px;
+    padding: 9px 11px; color: #111827; font-size: 13px; font-family: inherit;
+}
+.bzf-paper .bzf-field input:focus,
+.bzf-paper .bzf-field textarea:focus,
+.bzf-paper .bzf-field select:focus { outline: none; border-color: #3b82f6; }
+.bzf-paper .bzf-opts { display: flex; flex-direction: column; gap: 6px; }
+.bzf-paper .bzf-opts label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+.bzf-heading { font-size: 16px; font-weight: 800; color: #111827; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #d1d5db; }
+.bzf-sign canvas { width: 100%; max-width: 560px; height: 170px; background: #fff; border: 1px solid #9ca3af; border-radius: 5px; touch-action: none; display: block; margin-bottom: 6px; }
+.bzf-photo-prev { max-width: 260px; max-height: 260px; border-radius: 6px; margin-top: 8px; border: 1px solid #cbd5e1; }
+
+/* vista compilato dentro al foglio */
+.bzf-paper .bzf-sub-field { margin-bottom: 14px; border-bottom: 1px dotted #e5e7eb; padding-bottom: 10px; }
+.bzf-paper .bzf-sub-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; margin-bottom: 3px; font-weight: 700; }
+.bzf-paper .bzf-sub-val { font-size: 14px; color: #111827; }
+.bzf-paper .bzf-sub-img { max-width: 320px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; }
+.bzf-paper .bzf-muted { color: #9ca3af; }
+
+/* stampa: solo il foglio */
+@media print {
+    body * { visibility: hidden !important; }
+    .bzf-paper-wrap, .bzf-paper-wrap * { visibility: visible !important; }
+    .bzf-paper-wrap { position: absolute; inset: 0; padding: 0; }
+    .bzf-paper { box-shadow: none; max-width: none; padding: 24px; }
+}
 
 /* compilazioni list */
 .bzf-sub-list { display: flex; flex-direction: column; gap: 6px; }

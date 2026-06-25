@@ -664,7 +664,15 @@ function renderCurrentView() {
     if (active === 'media')    loadMedia();
     if (active === 'files')    loadFiles();
     if (active === 'forms' && window.BZForms) {
-        if (!window._bzFormsInited) { BZForms.init({ worksiteId: WID, csrf: CSRF }); window._bzFormsInited = true; }
+        if (!window._bzFormsInited) {
+            BZForms.init({
+                worksiteId: WID, csrf: CSRF,
+                wsName: {{ worksite.name|json_encode|raw }},
+                wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
+                clientName: {{ (clientName ?? '')|json_encode|raw }}
+            });
+            window._bzFormsInited = true;
+        }
         BZForms.show();
     }
 }

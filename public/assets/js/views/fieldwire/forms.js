@@ -7,6 +7,7 @@
     'use strict';
 
     let WID = 0, CSRF = '';
+    let META = { wsName: '', wsCode: '', clientName: '' };
     let root = null;
     let view = 'list';          // list | builder | fill | submission | submissions
     let builder = null;         // stato builder corrente
@@ -29,7 +30,23 @@
 
     function init(cfg) {
         WID = cfg.worksiteId; CSRF = cfg.csrf;
+        META = { wsName: cfg.wsName || '', wsCode: cfg.wsCode || '', clientName: cfg.clientName || '' };
         root = document.getElementById('bz-forms-root');
+    }
+
+    /** Intestazione documento (foglio) comune a compilazione/anteprima/vista. */
+    function docHeader(title, desc, metaLine) {
+        return `
+            <div class="bzf-doc-head">
+                <div class="bzf-doc-brand">BOB Zone${META.wsCode ? ' · ' + esc(META.wsCode) : ''}</div>
+                <div class="bzf-doc-title">${esc(title)}</div>
+                ${desc ? `<div class="bzf-doc-desc">${esc(desc)}</div>` : ''}
+                <div class="bzf-doc-meta">
+                    ${META.clientName ? '<span><b>Cliente:</b> ' + esc(META.clientName) + '</span>' : ''}
+                    ${META.wsName ? '<span><b>Cantiere:</b> ' + esc(META.wsName) + '</span>' : ''}
+                    ${metaLine || ''}
+                </div>
+            </div>`;
     }
 
     async function api(url, opts = {}) {
@@ -132,7 +149,10 @@
         root.innerHTML = `
             <div class="bzf-bar">
                 <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button>
-                <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva modulo</button>
+                <div style="display:flex;gap:8px;">
+                    <button class="bzf-btn-ghost" id="bzf-preview"><i class="fas fa-eye"></i> Anteprima</button>
+                    <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva modulo</button>
+                </div>
             </div>
             <div class="bzf-builder">
                 <div class="bzf-field">
@@ -155,6 +175,12 @@
         `;
         root.querySelector('#bzf-back').addEventListener('click', loadTemplates);
         root.querySelector('#bzf-save').addEventListener('click', saveBuilder);
+        root.querySelector('#bzf-preview').addEventListener('click', () => {
+            // sincronizza nome/desc dai campi prima dell'anteprima
+            builder.name = root.querySelector('#bzf-name').value.trim() || '(senza nome)';
+            builder.description = root.querySelector('#bzf-desc').value.trim();
+            openPreview();
+        });
         root.querySelector('#bzf-add').addEventListener('click', () => {
             const type = root.querySelector('#bzf-addtype').value;
             const f = { id: uid(), type, label: '', required: false };
@@ -206,6 +232,23 @@
         else alert('Errore: ' + (res.error || 'salvataggio'));
     }
 
+    function openPreview() {
+        root.innerHTML = `
+            <div class="bzf-bar">
+                <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Torna al builder</button>
+                <span class="bzf-preview-tag">Anteprima — i campi non si salvano</span>
+            </div>
+            <div class="bzf-paper-wrap">
+              <div class="bzf-paper">
+                ${docHeader(builder.name, builder.description, '<span><b>Data:</b> ' + new Date().toLocaleDateString('it-IT') + '</span>')}
+                <div class="bzf-field"><label>Compilato da</label><input disabled placeholder="Nome di chi compila"></div>
+                ${builder.fields.map(renderFillField).join('')}
+              </div>
+            </div>
+        `;
+        root.querySelector('#bzf-back').addEventListener('click', renderBuilder);
+    }
+
     // ── FILLER ──────────────────────────────────────────────────────────────
     async function openFill(tplId) {
         const res = await api(`${base()}/${tplId}`);
@@ -213,16 +256,18 @@
         const tpl = res.data;
         view = 'fill';
         signaturePads = {};
+        const today = new Date().toLocaleDateString('it-IT');
         root.innerHTML = `
             <div class="bzf-bar">
                 <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button>
                 <button class="bzf-btn-primary" id="bzf-submit"><i class="fas fa-paper-plane"></i> Invia</button>
             </div>
-            <div class="bzf-fill">
-                <h2 class="bzf-fill-title">${esc(tpl.name)}</h2>
-                ${tpl.description ? `<p class="bzf-fill-desc">${esc(tpl.description)}</p>` : ''}
+            <div class="bzf-paper-wrap">
+              <div class="bzf-paper">
+                ${docHeader(tpl.name, tpl.description, '<span><b>Data:</b> ' + today + '</span>')}
                 <div class="bzf-field"><label>Compilato da</label><input id="bzf-submitter" placeholder="Nome di chi compila"></div>
                 <div id="bzf-fillfields">${tpl.fields.map(renderFillField).join('')}</div>
+              </div>
             </div>
         `;
         root.querySelector('#bzf-back').addEventListener('click', loadTemplates);
@@ -318,14 +363,19 @@
         if (!res.ok) { alert('Errore'); return; }
         const s = res.data;
         root.innerHTML = `
-            <div class="bzf-bar"><button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button></div>
-            <div class="bzf-fill">
-                <h2 class="bzf-fill-title">${esc(s.template_name || '')}</h2>
-                <div class="bzf-sub-meta" style="margin-bottom:16px;">Compilato da ${esc(s.submitter_name || '—')} · ${fmtDate(s.created_at)}</div>
+            <div class="bzf-bar">
+                <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button>
+                <button class="bzf-btn-primary" id="bzf-print"><i class="fas fa-print"></i> Stampa / PDF</button>
+            </div>
+            <div class="bzf-paper-wrap">
+              <div class="bzf-paper" id="bzf-print-area">
+                ${docHeader(s.template_name || '', '', '<span><b>Compilato da:</b> ' + esc(s.submitter_name || '—') + '</span><span><b>Data:</b> ' + fmtDate(s.created_at) + '</span>')}
                 ${(s.fields || []).map(f => renderSubmissionField(f, s.values[f.id])).join('')}
+              </div>
             </div>
         `;
         root.querySelector('#bzf-back').addEventListener('click', () => { loadTemplates().then(() => root.querySelector('[data-tab="submissions"]')?.click()); });
+        root.querySelector('#bzf-print').addEventListener('click', () => window.print());
     }
 
     function renderSubmissionField(f, val) {
