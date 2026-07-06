@@ -2,14 +2,66 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<style>
+  .rn-hero {
+      position: relative; overflow: hidden;
+      border-radius: 18px;
+      padding: 26px 30px 22px;
+      background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+      color: #fff; margin: 16px 0 18px;
+  }
+  .rn-hero::before {
+      content: ''; position: absolute; top: -80px; right: -40px;
+      width: 220px; height: 220px; border-radius: 50%;
+      background: rgba(245,158,11,.14); pointer-events: none;
+  }
+  .rn-hero-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
+  .rn-hero-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: center;
+  }
+  .rn-hero-icon svg { width: 22px; height: 22px; stroke: #fff; stroke-width: 1.5; fill: none; }
+  .rn-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 2px; }
+  .rn-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+
+  .rn-picker {
+      background: #fff; border-radius: 14px; border: 1.5px solid #e8edf3;
+      padding: 16px 20px; margin-bottom: 16px;
+  }
+
+  /* Righe mezzo in stile card */
+  #mezzi-container .row-item {
+      background: #fff !important;
+      border: 1.5px solid #e8edf3;
+      border-radius: 14px;
+      padding: 16px 18px !important;
+      position: relative;
+  }
+  #mezzi-container .row-item::before {
+      content: ''; position: absolute; top: 0; left: 0; bottom: 0;
+      width: 4px; background: #2563eb; border-radius: 14px 0 0 14px;
+  }
+  #mezzi-container .cal-wrap {
+      background: #fffbeb; border-radius: 8px; padding: 6px 8px;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="intro-y mt-8">
-    <h2 class="text-lg font-medium">Assegna Mezzi - Noleggio</h2>
+<div class="rn-hero">
+    <div class="rn-hero-content">
+        <div class="rn-hero-icon">
+            <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
+        </div>
+        <div>
+            <h1 class="rn-hero-title">Assegna Mezzi — Noleggio</h1>
+            <p class="rn-hero-sub">Aggiungi mezzi di sollevamento a un cantiere</p>
+        </div>
+    </div>
 </div>
 
-<div class="mt-6 mb-6">
+<div class="rn-picker">
     <label class="form-label">Seleziona Cantiere</label>
     <select id="worksiteSelect" class="tomselect" placeholder="Cerca cantiere..."
             data-mezzi="{{ mezzi|json_encode }}"
