@@ -1,65 +1,75 @@
 {% extends 'layout/base.html.twig' %}
 
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/equipment/noleggio.css">
+{% endblock %}
+
 {% block content %}
-<div class="grid grid-cols-12 gap-6 mt-5">
-    <!-- Bottone per aprire modale aggiunta -->
-    <div class="intro-y col-span-12 flex items-center mt-2">
-        <button class="btn btn-primary shadow-md mr-2" data-tw-toggle="modal" data-tw-target="#add-lifting-modal">
-            <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Aggiungi Nuovo Mezzo
-        </button>
+<div class="rn-page">
+
+    <div class="rn-hero">
+        <div class="rn-hero-content">
+            <div class="rn-hero-left">
+                <div class="rn-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
+                </div>
+                <div>
+                    <h1 class="rn-hero-title">Catalogo Mezzi Sollevamento</h1>
+                    <p class="rn-hero-sub">{{ listaMezzi|length }} mezzi a listino</p>
+                </div>
+            </div>
+            <div class="rn-hero-actions">
+                <button class="rn-btn-hero is-primary" data-tw-toggle="modal" data-tw-target="#add-lifting-modal">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Aggiungi nuovo mezzo
+                </button>
+            </div>
+        </div>
     </div>
 
-<!-- Campo ricerca -->
-    <div class="intro-y col-span-12 flex flex-wrap xl:flex-nowrap items-center mt-2">
-        <input
-                type="text"
-                id="search-mezzo"
-                placeholder="Cerca mezzo..."
-                class="form-control w-64 shadow-md mr-2 mt-2 xl:mt-0"
-        />
+    <div class="rn-toolbar">
+        <div class="rn-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-mezzo" placeholder="Cerca mezzo...">
+        </div>
     </div>
 
-    <!-- Tabella elenco mezzi -->
-    <div class="intro-y col-span-12 overflow-auto 2xl:overflow-visible mt-4">
-        <table class="table table-report -mt-2" id="mezziTable">
+    <div class="rn-table-wrap">
+        <table class="rn-table" id="mezziTable">
             <thead>
             <tr>
-                <th class="whitespace-nowrap">Descrizione</th>
-                <th class="whitespace-nowrap">Costo Giornaliero (€)</th>
-                <th class="whitespace-nowrap">Azioni</th>
+                <th>Descrizione</th>
+                <th style="text-align:center">Costo giornaliero</th>
+                <th style="text-align:right">Azioni</th>
             </tr>
             </thead>
             <tbody>
             {% if listaMezzi is empty %}
                 <tr>
-                    <td colspan="3" class="text-center text-slate-500 py-4">
+                    <td colspan="3" style="text-align:center; color:#94a3b8; padding:32px;">
                         Nessun mezzo presente
                     </td>
                 </tr>
             {% else %}
                 {% for mezzo in listaMezzi %}
-                    <tr class="intro-x">
-                        <td class="font-medium whitespace-nowrap">
-                            {{ mezzo.descrizione }}
-                        </td>
-                        <td class="whitespace-nowrap">
-                            {{ mezzo.costo_giornaliero|number_format(2, ',', '.') }} €
-                        </td>
-                        <td class="table-report__action w-56">
-                            <div class="flex justify-center items-center">
-                                <button
-                                        class="btn btn-outline-primary py-1 px-2 mr-2"
+                    <tr>
+                        <td style="font-weight:600">{{ mezzo.descrizione }}</td>
+                        <td style="text-align:center">{{ mezzo.costo_giornaliero|number_format(2, ',', '.') }} €</td>
+                        <td>
+                            <div class="rn-actions-cell" style="justify-content:flex-end">
+                                <button class="rn-btn rn-btn-edit"
                                         data-tw-toggle="modal"
-                                        data-tw-target="#edit-lifting-modal-{{ mezzo.id }}"
-                                >
-                                    <i data-lucide="edit" class="w-4 h-4 mr-1"></i> Modifica
+                                        data-tw-target="#edit-lifting-modal-{{ mezzo.id }}">
+                                    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Modifica
                                 </button>
                                 <form method="POST" class="inline-block" data-confirm="Sei sicuro di voler eliminare questo mezzo?">
                                     <input type="hidden" name="_token" value="{{ csrfToken }}">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="{{ mezzo.id }}">
-                                    <button type="submit" class="btn btn-danger py-1 px-2">
-                                        <i data-lucide="trash" class="w-4 h-4 mr-1"></i> Elimina
+                                    <button type="submit" class="rn-btn rn-btn-delete">
+                                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        Elimina
                                     </button>
                                 </form>
                             </div>

@@ -52,7 +52,7 @@
         });
 
         const div = document.createElement('div');
-        div.classList.add("row-item", "grid", "grid-cols-12", "gap-2", "items-end", "bg-gray-50", "p-2", "rounded", "mt-2");
+        div.classList.add("row-item", "grid", "grid-cols-12", "gap-3", "items-end", "p-2", "rounded", "mt-2");
         div.innerHTML = `
         <div class="col-span-3">
             <label class="form-label">Mezzo</label>
@@ -84,8 +84,10 @@
             <input type="date" name="data_inizio[]" class="form-control" required>
         </div>
 
-        <div class="col-span-1 flex">
-            <button type="button" class="btn btn-danger remove-row">Elimina Riga</button>
+        <div class="col-span-1">
+            <button type="button" class="rn-btn rn-btn-delete remove-row" title="Elimina riga">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
         </div>
 
         <div class="col-span-4 cal-wrap">
@@ -96,8 +98,8 @@
                 <button type="button" class="rn-day on" data-day="3">Mer</button>
                 <button type="button" class="rn-day on" data-day="4">Gio</button>
                 <button type="button" class="rn-day on" data-day="5">Ven</button>
-                <button type="button" class="rn-day" data-day="6">Sab</button>
-                <button type="button" class="rn-day" data-day="7">Dom</button>
+                <button type="button" class="rn-day is-weekend" data-day="6">Sab</button>
+                <button type="button" class="rn-day is-weekend" data-day="7">Dom</button>
             </div>
             <input type="hidden" name="calendario[]" class="cal-value" value="1,2,3,4,5">
         </div>
