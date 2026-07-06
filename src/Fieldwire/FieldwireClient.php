@@ -9,12 +9,16 @@ class FieldwireClient
 {
     private const TOKEN_ENDPOINT = 'https://client-api.super.fieldwire.com/api_keys/jwt';
     private const VERSION_HEADER = 'Fieldwire-Version: 2023-11-30';
+    private const PER_PAGE       = 1000; // max consentito (default API: 50)
 
     private string $refreshToken;
     private string $baseUrl;
 
     private ?string $accessToken  = null;
     private int     $accessExpiry = 0; // unix timestamp
+
+    /** Response headers dell'ultima richiesta (lowercase name => value). */
+    private array $lastHeaders = [];
 
     public function __construct(string $refreshToken, string $region = 'eu')
     {
@@ -36,6 +40,32 @@ class FieldwireClient
         return $this->request('GET', $url);
     }
 
+    /**
+     * GET con paginazione completa: Fieldwire pagina tramite gli header
+     * X-Has-More / X-Last-Synced-At e il query param last_synced_at.
+     * Senza questo loop una lista restituirebbe al massimo una pagina.
+     */
+    public function getAll(string $path, array $query = []): array
+    {
+        $all = [];
+        $guard = 0;
+        do {
+            $page = $this->get($path, $query);
+            if (!is_array($page)) break;
+            $all = array_merge($all, $page);
+
+            $hasMore = strtolower((string)($this->lastHeaders['x-has-more'] ?? 'false')) === 'true';
+            $cursor  = $this->lastHeaders['x-last-synced-at'] ?? null;
+            if ($hasMore && $cursor) {
+                $query['last_synced_at'] = $cursor;
+            } else {
+                $hasMore = false;
+            }
+        } while ($hasMore && ++$guard < 100); // guardia anti-loop
+
+        return $all;
+    }
+
     public function post(string $path, array $body = []): array
     {
         return $this->request('POST', $this->baseUrl . $path, $body);
@@ -49,6 +79,23 @@ class FieldwireClient
     public function delete(string $path): array
     {
         return $this->request('DELETE', $this->baseUrl . $path);
+    }
+
+    // ── Helpers per i payload v3 ────────────────────────────────────────────────
+    // L'API v3 richiede che il client generi l'id (UUID) delle nuove entita'
+    // e i timestamp device_created_at / device_updated_at.
+
+    public static function uuid(): string
+    {
+        $b = random_bytes(16);
+        $b[6] = chr((ord($b[6]) & 0x0f) | 0x40); // version 4
+        $b[8] = chr((ord($b[8]) & 0x3f) | 0x80); // variant
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($b), 4));
+    }
+
+    public static function nowIso(): string
+    {
+        return gmdate('Y-m-d\TH:i:s.v\Z');
     }
 
     // ── Token management ───────────────────────────────────────────────────────
@@ -67,7 +114,7 @@ class FieldwireClient
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
             CURLOPT_POSTFIELDS     => json_encode(['api_token' => $this->refreshToken]),
             CURLOPT_TIMEOUT        => 10,
         ]);
@@ -86,12 +133,16 @@ class FieldwireClient
 
         $data = json_decode($raw, true) ?? [];
 
-        if (empty($data['token'])) {
+        // La doc ufficiale documenta "access_token"; accettiamo anche "token"
+        // per robustezza verso versioni precedenti dell'endpoint.
+        $token = $data['access_token'] ?? $data['token'] ?? null;
+        if (empty($token)) {
             throw new RuntimeException('Fieldwire did not return an access token');
         }
 
-        $this->accessToken  = $data['token'];
-        // expires_in may be provided in seconds; fall back to 30 minutes
+        $this->accessToken  = $token;
+        // TTL non documentato ("da pochi minuti a poche ore"): teniamo 30 minuti
+        // e in ogni caso il retry su 401 rigenera il token.
         $ttl = (int) ($data['expires_in'] ?? 1800);
         $this->accessExpiry = time() + $ttl;
 
@@ -109,13 +160,23 @@ class FieldwireClient
             'Content-Type: application/json',
             'Accept: application/json',
             self::VERSION_HEADER,
+            'Fieldwire-Per-Page: ' . self::PER_PAGE,
         ];
+
+        $this->lastHeaders = [];
 
         $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CUSTOMREQUEST  => $method,
+            CURLOPT_HEADERFUNCTION => function ($ch, string $line): int {
+                $parts = explode(':', $line, 2);
+                if (count($parts) === 2) {
+                    $this->lastHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($line);
+            },
         ];
 
         if ($body !== null) {
@@ -143,7 +204,7 @@ class FieldwireClient
         $data = json_decode($raw, true) ?? [];
 
         if ($http < 200 || $http >= 300) {
-            $message = $data['message'] ?? $data['error'] ?? "HTTP $http";
+            $message = $data['message'] ?? $data['error'] ?? (is_string($raw) ? substr($raw, 0, 300) : "HTTP $http");
             throw new RuntimeException("Fieldwire API error ($http): $message");
         }
 

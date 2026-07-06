@@ -105,6 +105,27 @@ final class ZoneTaskRepository
         ]);
     }
 
+    /**
+     * Update parziale: aggiorna SOLO le colonne presenti in $data.
+     * Usato dalla sync Fieldwire, dove gli eventi possono portare un subset
+     * dei campi e update() (che sovrascrive tutto) farebbe danni.
+     */
+    private function updateFields(int $id, array $data): void
+    {
+        $allowed = ['name', 'description', 'status', 'category', 'assignee_name', 'start_date', 'due_date', 'priority'];
+        $set = [];
+        $par = [':id' => $id];
+        foreach ($allowed as $col) {
+            if (array_key_exists($col, $data)) {
+                $set[] = "{$col} = :{$col}";
+                $par[":{$col}"] = $data[$col];
+            }
+        }
+        if (empty($set)) return;
+        $this->db->prepare("UPDATE bb_zone_tasks SET " . implode(', ', $set) . " WHERE id = :id")
+                 ->execute($par);
+    }
+
     public function setFwId(int $id, string $fwId): void
     {
         $this->db->prepare("UPDATE bb_zone_tasks SET fw_id = :fw WHERE id = :id")
@@ -138,21 +159,33 @@ final class ZoneTaskRepository
 
         $existing = $this->findByFwId($fwId);
 
-        $data = [
-            'name'          => (string)($fw['name'] ?? ''),
-            'description'   => $fw['description']   ?? null,
-            'status'        => $this->normalizeStatus($fw['status'] ?? 'open'),
-            'category'      => $fw['category_name'] ?? null,
-            'assignee_name' => $fw['assignee_name'] ?? null,
-            'start_date'    => !empty($fw['start_date']) ? substr($fw['start_date'], 0, 10) : null,
-            'due_date'      => !empty($fw['due_date'])   ? substr($fw['due_date'],   0, 10) : null,
-            'priority'      => (int)($fw['priority']     ?? 0),
-        ];
+        // I task Fieldwire v3 usano start_at/due_at (ISO) e status_id/team_id/
+        // owner_user_id. I caller (InitialSync/Webhook) traducono id → nomi
+        // quando possibile e passano status/category_name/assignee_name gia'
+        // risolti. Qui mappiamo SOLO i campi presenti, cosi' un evento parziale
+        // non azzera i campi non inclusi.
+        $startRaw = $fw['start_date'] ?? $fw['start_at'] ?? null;
+        $dueRaw   = $fw['due_date']   ?? $fw['due_at']   ?? null;
+
+        $data = [];
+        if (isset($fw['name']))          $data['name']          = (string)$fw['name'];
+        if (isset($fw['description']))   $data['description']   = $fw['description'];
+        if (isset($fw['status']))        $data['status']        = $this->normalizeStatus((string)$fw['status']);
+        if (isset($fw['category_name'])) $data['category']      = $fw['category_name'];
+        if (isset($fw['assignee_name'])) $data['assignee_name'] = $fw['assignee_name'];
+        if (!empty($startRaw))           $data['start_date']    = substr((string)$startRaw, 0, 10);
+        if (!empty($dueRaw))             $data['due_date']      = substr((string)$dueRaw,   0, 10);
+        if (isset($fw['priority']))      $data['priority']      = (int)$fw['priority'];
 
         if ($existing) {
-            $this->update((int)$existing['id'], $data);
+            if (!empty($data)) {
+                $this->updateFields((int)$existing['id'], $data);
+            }
             return (int)$existing['id'];
         }
+
+        // per il create servono i default
+        $data += ['name' => '', 'status' => 'open', 'priority' => 0];
         $id = $this->create($worksiteId, $data, 0);
         $this->setFwId($id, $fwId);
         return $id;
@@ -244,7 +277,9 @@ final class ZoneTaskRepository
             // niente da aggiornare: i commenti sono immutabili lato BOB
             return (int)$existing['id'];
         }
-        $text       = (string)($fw['text']         ?? '');
+        // Le bubble v3 usano "content" per il testo; "text"/"creator_name"
+        // sono i nomi gia' risolti dai caller (InitialSync con FwLookup).
+        $text       = (string)($fw['text'] ?? $fw['content'] ?? '');
         $author     = (string)($fw['creator_name'] ?? 'Fieldwire');
         $fileUrl    = $fw['file_url']              ?? null;
 
@@ -318,8 +353,12 @@ final class ZoneTaskRepository
         if ($fwId === '') throw new \RuntimeException('Fieldwire check_item senza id');
 
         $existing = $this->findChecklistItemByFwId($fwId);
-        $name      = (string)($fw['name']      ?? '');
-        $completed = !empty($fw['completed']);
+        $name      = (string)($fw['name'] ?? '');
+        // v3: lo stato e' "state" (empty|yes|no|not_applicable);
+        // "checked"/"completed" sono legacy/BOB.
+        $completed = isset($fw['state'])
+            ? ($fw['state'] === 'yes')
+            : (!empty($fw['completed']) || !empty($fw['checked']));
 
         if ($existing) {
             $this->db->prepare("

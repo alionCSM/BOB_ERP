@@ -21,10 +21,17 @@ class ProjectsApi
 
     public function create(string $name, string $code = ''): array
     {
+        // NB: a differenza delle altre risorse v3, il create dei progetti E'
+        // wrappato in "project". Lo schema non ha un campo description:
+        // il codice cantiere BOB viene incluso nel nome.
+        $now = \App\Fieldwire\FieldwireClient::nowIso();
         return $this->client->post('/projects', [
             'project' => [
-                'name'        => $name,
-                'description' => $code ? "BOB: {$code}" : '',
+                'name'              => $code ? "{$code} - {$name}" : $name,
+                'measurement_units' => 'metric',
+                'currency'          => 'EUR',
+                'device_created_at' => $now,
+                'device_updated_at' => $now,
             ],
         ]);
     }

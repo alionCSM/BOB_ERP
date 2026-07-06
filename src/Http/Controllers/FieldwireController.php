@@ -1127,7 +1127,8 @@ final class FieldwireController
             $initial = new InitialSyncService(
                 new TasksApi($client), new CheckItemsApi($client),
                 new BubblesApi($client), new FloorplansApi($client),
-                $this->zoneRepo, $this->fwFloorplanRepo
+                $this->zoneRepo, $this->fwFloorplanRepo,
+                new \App\Fieldwire\FwLookup($client)
             );
             $pullStats = $initial->run($worksiteId, $fwId);
 
