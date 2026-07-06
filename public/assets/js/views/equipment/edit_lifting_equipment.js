@@ -23,4 +23,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btn && btn.parentElement) btn.parentElement.style.display = 'none';
     });
 
+    // Calendario/festivi valgono solo per il Giornaliero: per gli altri tipi
+    // la cella resta invisibile (ma i campi vengono comunque inviati, per
+    // mantenere allineati gli array del form).
+    document.querySelectorAll('select.tipo-select').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+            var wrap = sel.closest('tr')?.querySelector('.cal-wrap');
+            if (wrap) wrap.classList.toggle('invisible', sel.value !== 'Giornaliero');
+        });
+    });
+
 });

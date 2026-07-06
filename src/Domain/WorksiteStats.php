@@ -337,6 +337,9 @@ class WorksiteStats
 
     private function calcMezziSollevamento(): float
     {
+        // Il costo NON dipende piu' dalle presenze: ogni noleggio matura sul
+        // proprio calendario (giornaliero/settimanale/mensile) da data_inizio
+        // a data_fine, o a oggi se ancora attivo. Vedi RentalCostCalculator.
         $stmt = $this->conn->prepare("
         SELECT *
         FROM bb_worksite_lifting
@@ -345,41 +348,8 @@ class WorksiteStats
         $stmt->execute(['wid' => $this->worksiteId]);
 
         $tot = 0.0;
-
         while ($m = $stmt->fetch(PDO::FETCH_ASSOC)) {
-
-            if ($m['tipo_noleggio'] === 'Una Tantum') {
-                $tot += $m['costo_giornaliero'] * $m['quantita'];
-                continue;
-            }
-
-            // 🔹 Count presence days AFTER mezzo start date
-            $giorniStmt = $this->conn->prepare("
-            SELECT COUNT(DISTINCT d) FROM (
-                SELECT data AS d 
-                FROM bb_presenze
-                WHERE worksite_id = :wid
-                  AND data >= :start
-
-                UNION
-
-                SELECT data_presenza AS d
-                FROM bb_presenze_consorziate
-                WHERE worksite_id = :wid2
-                  AND data_presenza >= :start2
-            ) x
-        ");
-
-            $giorniStmt->execute([
-                'wid'    => $this->worksiteId,
-                'wid2'   => $this->worksiteId,
-                'start'  => $m['data_inizio'],
-                'start2' => $m['data_inizio']
-            ]);
-
-            $giorni = (int)$giorniStmt->fetchColumn();
-
-            $tot += $m['costo_giornaliero'] * $giorni * $m['quantita'];
+            $tot += \App\Service\RentalCostCalculator::cost($m);
         }
 
         return $tot;

@@ -22,8 +22,9 @@
             <tr>
                 <th>Mezzo</th>
                 <th>Tipo</th>
+                <th>Calendario</th>
                 <th>Quantità</th>
-                <th>Costo €/gg</th>
+                <th>Costo € / periodo</th>
                 <th>Data Inizio</th>
                 <th>Stato</th>
                 <th>Azioni</th>
@@ -47,16 +48,52 @@
                     </td>
                     <td>
                         {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            <select name="tipo_noleggio[]" class="form-select w-full" disabled>
-                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
-                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
+                            <select class="form-select w-full" disabled>
+                                <option selected>{{ row.tipo_noleggio }}</option>
                             </select>
                             <input type="hidden" name="tipo_noleggio[]" value="{{ row.tipo_noleggio }}">
                         {% else %}
-                            <select name="tipo_noleggio[]" class="form-select w-full">
-                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
-                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
+                            <select name="tipo_noleggio[]" class="form-select w-full tipo-select">
+                                <option value="Giornaliero"  {{ row.tipo_noleggio == 'Giornaliero'  ? 'selected' : '' }}>Giornaliero</option>
+                                <option value="Settimanale"  {{ row.tipo_noleggio == 'Settimanale'  ? 'selected' : '' }}>Settimanale</option>
+                                <option value="Mensile"      {{ row.tipo_noleggio == 'Mensile'      ? 'selected' : '' }}>Mensile</option>
+                                <option value="Una Tantum"   {{ row.tipo_noleggio == 'Una Tantum'   ? 'selected' : '' }}>Una Tantum</option>
                             </select>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
+                            {% if row.tipo_noleggio == 'Giornaliero' %}
+                                <span class="text-xs text-slate-500">
+                                    {{ {'lun_ven':'Lun–Ven','lun_sab':'Lun–Sab','lun_dom':'Lun–Dom','sab_dom':'Sab–Dom'}[row.calendario ?? 'lun_ven'] }}
+                                    {{ row.festivi_inclusi ? '+ festivi' : '' }}
+                                    {{ (row.giorni_extra ?? 0) > 0 ? '· +' ~ row.giorni_extra ~ ' gg extra' : '' }}
+                                </span>
+                            {% else %}
+                                <span class="text-xs text-slate-400">—</span>
+                            {% endif %}
+                            <input type="hidden" name="calendario[]" value="{{ row.calendario ?? 'lun_ven' }}">
+                            <input type="hidden" name="festivi_inclusi[]" value="{{ row.festivi_inclusi ? '1' : '' }}">
+                            <input type="hidden" name="giorni_extra[]" value="{{ row.giorni_extra ?? 0 }}">
+                        {% else %}
+                            <div class="cal-wrap {{ row.tipo_noleggio != 'Giornaliero' ? 'invisible' : '' }}">
+                                <select name="calendario[]" class="form-select w-full mb-1">
+                                    <option value="lun_ven" {{ (row.calendario ?? 'lun_ven') == 'lun_ven' ? 'selected' : '' }}>Lun – Ven</option>
+                                    <option value="lun_sab" {{ (row.calendario ?? '') == 'lun_sab' ? 'selected' : '' }}>Lun – Sab</option>
+                                    <option value="lun_dom" {{ (row.calendario ?? '') == 'lun_dom' ? 'selected' : '' }}>Lun – Dom</option>
+                                    <option value="sab_dom" {{ (row.calendario ?? '') == 'sab_dom' ? 'selected' : '' }}>Solo Sab – Dom</option>
+                                </select>
+                                <select name="festivi_inclusi[]" class="form-select w-full mb-1">
+                                    <option value=""  {{ not row.festivi_inclusi ? 'selected' : '' }}>Festivi esclusi</option>
+                                    <option value="1" {{ row.festivi_inclusi ? 'selected' : '' }}>Festivi inclusi</option>
+                                </select>
+                                {# Giorni fuori calendario aggiunti a mano (vedi email alert) #}
+                                <div class="flex items-center gap-1">
+                                    <span class="text-xs text-slate-500 whitespace-nowrap">Giorni extra</span>
+                                    <input type="number" name="giorni_extra[]" min="0" class="form-input w-16 text-center"
+                                           value="{{ row.giorni_extra ?? 0 }}" title="Giorni fuori calendario conteggiati comunque (es. uso di sabato con noleggio Lun–Ven)">
+                                </div>
+                            </div>
                         {% endif %}
                     </td>
                     <td>

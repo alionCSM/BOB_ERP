@@ -83,8 +83,8 @@ final class EquipmentRepository
                 wl.worksite_id,
                 w.worksite_code,
                 w.name AS cantiere_nome,
-                SUM(CASE WHEN wl.tipo_noleggio = 'Giornaliero' THEN wl.quantita ELSE 0 END) AS total_mezzi,
-                SUM(CASE WHEN wl.tipo_noleggio = 'Giornaliero' AND wl.stato = 'Attivo' THEN wl.quantita ELSE 0 END) AS mezzi_attivi,
+                SUM(CASE WHEN wl.tipo_noleggio <> 'Una Tantum' THEN wl.quantita ELSE 0 END) AS total_mezzi,
+                SUM(CASE WHEN wl.tipo_noleggio <> 'Una Tantum' AND wl.stato = 'Attivo' THEN wl.quantita ELSE 0 END) AS mezzi_attivi,
                 MIN(wl.data_inizio) AS prima_data_inizio,
                 MAX(wl.data_fine)   AS ultima_data_fine
             FROM bb_worksite_lifting wl
@@ -127,18 +127,28 @@ final class EquipmentRepository
         string $tipoNoleggio,
         float  $costo,
         int    $quantita,
-        string $dataInizio
+        string $dataInizio,
+        string $calendario = 'lun_ven',
+        bool   $festiviInclusi = false
     ): bool {
+        // calendario/festivi hanno senso solo per il Giornaliero
+        if ($tipoNoleggio !== 'Giornaliero') {
+            $calendario     = 'lun_ven';
+            $festiviInclusi = false;
+        }
         $stmt = $this->conn->prepare("
             INSERT INTO bb_worksite_lifting
-                (worksite_id, lifting_equipment_id, tipo_noleggio, stato, data_inizio, costo_giornaliero, quantita)
+                (worksite_id, lifting_equipment_id, tipo_noleggio, calendario, festivi_inclusi,
+                 stato, data_inizio, costo_giornaliero, quantita)
             VALUES
-                (:ws, :mezzo, :tipo, 'Attivo', :inizio, :costo, :quantita)
+                (:ws, :mezzo, :tipo, :cal, :fest, 'Attivo', :inizio, :costo, :quantita)
         ");
         return $stmt->execute([
             ':ws'       => $worksiteId,
             ':mezzo'    => $mezzoId,
             ':tipo'     => $tipoNoleggio,
+            ':cal'      => $calendario,
+            ':fest'     => (int)$festiviInclusi,
             ':inizio'   => $dataInizio,
             ':costo'    => $costo,
             ':quantita' => $quantita,
@@ -158,7 +168,10 @@ final class EquipmentRepository
         string $stato,
         int    $quantita,
         string $oldStato,
-        int    $userId
+        int    $userId,
+        string $calendario = 'lun_ven',
+        bool   $festiviInclusi = false,
+        int    $giorniExtra = 0
     ): bool {
         $current = $this->getRentalById($id);
         if (!$current) {
@@ -169,12 +182,22 @@ final class EquipmentRepository
             return false;
         }
 
+        if ($tipoNoleggio !== 'Giornaliero') {
+            $calendario     = 'lun_ven';
+            $festiviInclusi = false;
+            $giorniExtra    = 0;
+        }
+        $giorniExtra = max(0, $giorniExtra);
+
         $dataFine = ($stato === 'Attivo') ? null : $current['data_fine'];
 
         $stmt = $this->conn->prepare("
             UPDATE bb_worksite_lifting
             SET costo_giornaliero = :costo,
                 tipo_noleggio     = :tipo,
+                calendario        = :cal,
+                festivi_inclusi   = :fest,
+                giorni_extra      = :extra,
                 data_inizio       = :di,
                 stato             = :st,
                 quantita          = :qt,
@@ -184,6 +207,9 @@ final class EquipmentRepository
         $stmt->execute([
             ':costo' => $costo,
             ':tipo'  => $tipoNoleggio,
+            ':cal'   => $calendario,
+            ':fest'  => (int)$festiviInclusi,
+            ':extra' => $giorniExtra,
             ':di'    => $dataInizio,
             ':st'    => $stato,
             ':qt'    => $quantita,
@@ -195,6 +221,9 @@ final class EquipmentRepository
         $fields = [
             'costo_giornaliero' => $costo,
             'tipo_noleggio'     => $tipoNoleggio,
+            'calendario'        => $calendario,
+            'festivi_inclusi'   => (int)$festiviInclusi,
+            'giorni_extra'      => $giorniExtra,
             'data_inizio'       => $dataInizio,
             'stato'             => $stato,
             'quantita'          => $quantita,
@@ -238,6 +267,9 @@ final class EquipmentRepository
         $dateInizio = $data['data_inizio']  ?? [];
         $stati      = $data['stato']        ?? [];
         $quantita   = $data['quantita']     ?? [];
+        $calendari  = $data['calendario']   ?? [];
+        $festivi    = $data['festivi_inclusi'] ?? [];
+        $extra      = $data['giorni_extra'] ?? [];
 
         for ($i = 0, $n = count($ids); $i < $n; $i++) {
             $rentalId = (int)$ids[$i];
@@ -254,7 +286,10 @@ final class EquipmentRepository
                 $stati[$i],
                 (int)$quantita[$i],
                 $current['stato'],
-                $userId
+                $userId,
+                (string)($calendari[$i] ?? 'lun_ven'),
+                !empty($festivi[$i]),
+                (int)($extra[$i] ?? 0)
             );
         }
     }
@@ -302,9 +337,9 @@ final class EquipmentRepository
             $stmt = $this->conn->prepare("
                 INSERT INTO bb_worksite_lifting
                     (lifting_equipment_id, worksite_id, quantita, costo_giornaliero,
-                     tipo_noleggio, data_inizio, data_fine, stato)
+                     tipo_noleggio, calendario, festivi_inclusi, data_inizio, data_fine, stato)
                 VALUES
-                    (:le_id, :ws, :qt, :costo, :tipo, :di, :df, 'Completato')
+                    (:le_id, :ws, :qt, :costo, :tipo, :cal, :fest, :di, :df, 'Completato')
             ");
             $stmt->execute([
                 ':le_id' => $mezzo['lifting_equipment_id'],
@@ -312,6 +347,8 @@ final class EquipmentRepository
                 ':qt'    => $qt,
                 ':costo' => $mezzo['costo_giornaliero'],
                 ':tipo'  => $mezzo['tipo_noleggio'],
+                ':cal'   => $mezzo['calendario'] ?? 'lun_ven',
+                ':fest'  => (int)($mezzo['festivi_inclusi'] ?? 0),
                 ':di'    => $mezzo['data_inizio'],
                 ':df'    => $dataFine,
             ]);

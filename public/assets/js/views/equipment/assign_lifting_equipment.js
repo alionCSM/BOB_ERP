@@ -61,8 +61,10 @@
 
         <div class="col-span-2">
             <label class="form-label">Tipo</label>
-            <select name="tipo_noleggio[]" class="form-select">
+            <select name="tipo_noleggio[]" class="form-select tipo-select">
                 <option value="Giornaliero">Giornaliero</option>
+                <option value="Settimanale">Settimanale</option>
+                <option value="Mensile">Mensile</option>
                 <option value="Una Tantum">Una Tantum</option>
             </select>
         </div>
@@ -73,7 +75,7 @@
         </div>
 
         <div class="col-span-2">
-            <label class="form-label">Costo (€)</label>
+            <label class="form-label costo-label">Costo (€/giorno)</label>
             <input type="number" step="0.01" name="costo[]" class="form-control" required>
         </div>
 
@@ -84,6 +86,23 @@
 
         <div class="col-span-1 flex">
             <button type="button" class="btn btn-danger remove-row">Elimina Riga</button>
+        </div>
+
+        <div class="col-span-3 cal-wrap">
+            <label class="form-label">Calendario conteggio</label>
+            <select name="calendario[]" class="form-select">
+                <option value="lun_ven">Lun – Ven</option>
+                <option value="lun_sab">Lun – Sab</option>
+                <option value="lun_dom">Lun – Dom</option>
+                <option value="sab_dom">Solo Sab – Dom</option>
+            </select>
+        </div>
+        <div class="col-span-2 cal-wrap">
+            <label class="form-label">Festivi</label>
+            <select name="festivi_inclusi[]" class="form-select">
+                <option value="">Esclusi</option>
+                <option value="1">Inclusi</option>
+            </select>
         </div>
     `;
 
@@ -129,7 +148,28 @@
                 alert('Per il mezzo Trasporto A/R il tipo deve essere "Una Tantum".');
                 this.value = 'Una Tantum';
             }
+            syncTipoUI(row);
         });
+
+        syncTipoUI(row);
+    }
+
+    // Calendario/festivi valgono solo per il Giornaliero; la label del costo
+    // segue la periodicità scelta.
+    const COSTO_LABELS = {
+        'Giornaliero': 'Costo (€/giorno)',
+        'Settimanale': 'Costo (€/settimana)',
+        'Mensile':     'Costo (€/mese)',
+        'Una Tantum':  'Costo (€)'
+    };
+
+    function syncTipoUI(row) {
+        const tipo = row.querySelector('select[name="tipo_noleggio[]"]')?.value || 'Giornaliero';
+        row.querySelectorAll('.cal-wrap').forEach(el => {
+            el.classList.toggle('hidden', tipo !== 'Giornaliero');
+        });
+        const label = row.querySelector('.costo-label');
+        if (label) label.textContent = COSTO_LABELS[tipo] || 'Costo (€)';
     }
 
     function attachRemoveListeners() {

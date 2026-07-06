@@ -674,9 +674,22 @@
                         {% for m in mezzi %}
                             <tr>
                                 <td>{{ m.mezzo_descrizione }}</td>
-                                <td>{{ m.tipo_noleggio }}</td>
+                                <td>
+                                    {{ m.tipo_noleggio }}
+                                    {% if m.tipo_noleggio == 'Giornaliero' %}
+                                        <div class="text-xs text-slate-500">
+                                            {{ {'lun_ven':'Lun–Ven','lun_sab':'Lun–Sab','lun_dom':'Lun–Dom','sab_dom':'Sab–Dom'}[m.calendario ?? 'lun_ven'] }}{{ m.festivi_inclusi ? ' + festivi' : '' }}
+                                        </div>
+                                    {% endif %}
+                                </td>
                                 <td>{{ m.quantita|round(0) }}</td>
-                                <td>{{ m.costo_giornaliero|number_format(2, ',', '.') }} €</td>
+                                <td>
+                                    {{ m.costo_giornaliero|number_format(2, ',', '.') }} €
+                                    {%- if m.tipo_noleggio == 'Giornaliero' %}<span class="text-xs text-slate-500">/gg</span>
+                                    {%- elseif m.tipo_noleggio == 'Settimanale' %}<span class="text-xs text-slate-500">/sett</span>
+                                    {%- elseif m.tipo_noleggio == 'Mensile' %}<span class="text-xs text-slate-500">/mese</span>
+                                    {%- endif %}
+                                </td>
                                 <td>{{ m.data_inizio|date('d/m/Y') }}</td>
                                 <td>{{ m.data_fine ? m.data_fine|date('d/m/Y') : '-' }}</td>
                                 <td>

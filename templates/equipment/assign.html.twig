@@ -54,8 +54,10 @@
 
                 <div class="col-span-2">
                     <label class="form-label">Tipo</label>
-                    <select name="tipo_noleggio[]" class="form-select">
+                    <select name="tipo_noleggio[]" class="form-select tipo-select">
                         <option value="Giornaliero">Giornaliero</option>
+                        <option value="Settimanale">Settimanale</option>
+                        <option value="Mensile">Mensile</option>
                         <option value="Una Tantum">Una Tantum</option>
                     </select>
                 </div>
@@ -66,7 +68,7 @@
                 </div>
 
                 <div class="col-span-2">
-                    <label class="form-label">Costo (€)</label>
+                    <label class="form-label costo-label">Costo (€/giorno)</label>
                     <input type="number" step="0.01" name="costo[]" class="form-control" required>
                 </div>
 
@@ -77,6 +79,24 @@
 
                 <div class="col-span-1">
                     <button type="button" class="btn btn-danger remove-row hidden">Elimina Riga</button>
+                </div>
+
+                {# Solo per Giornaliero: quali giorni si contano #}
+                <div class="col-span-3 cal-wrap">
+                    <label class="form-label">Calendario conteggio</label>
+                    <select name="calendario[]" class="form-select">
+                        <option value="lun_ven">Lun – Ven</option>
+                        <option value="lun_sab">Lun – Sab</option>
+                        <option value="lun_dom">Lun – Dom</option>
+                        <option value="sab_dom">Solo Sab – Dom</option>
+                    </select>
+                </div>
+                <div class="col-span-2 cal-wrap">
+                    <label class="form-label">Festivi</label>
+                    <select name="festivi_inclusi[]" class="form-select">
+                        <option value="">Esclusi</option>
+                        <option value="1">Inclusi</option>
+                    </select>
                 </div>
             </div>
         </div>
