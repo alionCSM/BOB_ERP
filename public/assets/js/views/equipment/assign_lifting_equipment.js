@@ -88,26 +88,33 @@
             <button type="button" class="btn btn-danger remove-row">Elimina Riga</button>
         </div>
 
-        <div class="col-span-3 cal-wrap">
-            <label class="form-label">Calendario conteggio</label>
-            <select name="calendario[]" class="form-select">
-                <option value="lun_ven">Lun – Ven</option>
-                <option value="lun_sab">Lun – Sab</option>
-                <option value="lun_dom">Lun – Dom</option>
-                <option value="sab_dom">Solo Sab – Dom</option>
-            </select>
+        <div class="col-span-4 cal-wrap">
+            <label class="form-label">Giorni conteggiati</label>
+            <div class="rn-days">
+                <button type="button" class="rn-day on" data-day="1">Lun</button>
+                <button type="button" class="rn-day on" data-day="2">Mar</button>
+                <button type="button" class="rn-day on" data-day="3">Mer</button>
+                <button type="button" class="rn-day on" data-day="4">Gio</button>
+                <button type="button" class="rn-day on" data-day="5">Ven</button>
+                <button type="button" class="rn-day" data-day="6">Sab</button>
+                <button type="button" class="rn-day" data-day="7">Dom</button>
+            </div>
+            <input type="hidden" name="calendario[]" class="cal-value" value="1,2,3,4,5">
         </div>
-        <div class="col-span-2 cal-wrap">
-            <label class="form-label">Festivi</label>
-            <select name="festivi_inclusi[]" class="form-select">
-                <option value="">Esclusi</option>
-                <option value="1">Inclusi</option>
-            </select>
+        <div class="col-span-3 cal-wrap">
+            <label class="form-label">Festivi nazionali</label>
+            <label class="rn-fest">
+                <input type="checkbox" class="fest-check">
+                <span class="rn-fest-track"></span>
+                <span class="rn-fest-label">Conta anche i festivi</span>
+            </label>
+            <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="">
         </div>
     `;
 
         container.appendChild(div);
         handleMezzoLogic(div);
+        initCalendarUI(div);
         attachRemoveListeners();
     });
 
@@ -172,6 +179,34 @@
         if (label) label.textContent = COSTO_LABELS[tipo] || 'Costo (€)';
     }
 
+    // Chips giorni settimana → hidden CSV; switch festivi → hidden
+    function initCalendarUI(row) {
+        const daysWrap = row.querySelector('.rn-days');
+        const calValue = row.querySelector('input.cal-value');
+        if (daysWrap && calValue && !daysWrap.dataset.bound) {
+            daysWrap.dataset.bound = '1';
+            daysWrap.querySelectorAll('.rn-day').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const active = daysWrap.querySelectorAll('.rn-day.on');
+                    if (chip.classList.contains('on') && active.length === 1) return; // almeno 1 giorno
+                    chip.classList.toggle('on');
+                    const days = [...daysWrap.querySelectorAll('.rn-day.on')]
+                        .map(c => parseInt(c.dataset.day, 10))
+                        .sort((a, b) => a - b);
+                    calValue.value = days.join(',');
+                });
+            });
+        }
+        const festCheck = row.querySelector('.fest-check');
+        const festValue = row.querySelector('input.fest-value');
+        if (festCheck && festValue && !festCheck.dataset.bound) {
+            festCheck.dataset.bound = '1';
+            festCheck.addEventListener('change', () => {
+                festValue.value = festCheck.checked ? '1' : '';
+            });
+        }
+    }
+
     function attachRemoveListeners() {
         document.querySelectorAll('.remove-row').forEach(button => {
             button.classList.remove("hidden");
@@ -183,6 +218,7 @@
 
     document.querySelectorAll('.row-item').forEach(row => {
         handleMezzoLogic(row);
+        initCalendarUI(row);
     });
 
     attachRemoveListeners();

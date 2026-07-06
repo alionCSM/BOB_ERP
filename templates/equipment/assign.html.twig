@@ -42,9 +42,40 @@
       content: ''; position: absolute; top: 0; left: 0; bottom: 0;
       width: 4px; background: #2563eb; border-radius: 14px 0 0 14px;
   }
-  #mezzi-container .cal-wrap {
-      background: #fffbeb; border-radius: 8px; padding: 6px 8px;
+  /* chips giorni settimana */
+  .rn-days { display: flex; gap: 5px; flex-wrap: wrap; }
+  .rn-day {
+      min-width: 40px; padding: 7px 0; text-align: center;
+      border-radius: 9px; border: 1.5px solid #dbe3ec;
+      background: #fff; color: #94a3b8;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: all .12s; user-select: none;
   }
+  .rn-day:hover { border-color: #93c5fd; color: #3b82f6; }
+  .rn-day.on {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-color: #2563eb; color: #fff;
+      box-shadow: 0 2px 6px rgba(37,99,235,.25);
+  }
+
+  /* switch festivi */
+  .rn-fest { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; padding-top: 8px; user-select: none; }
+  .rn-fest input { position: absolute; opacity: 0; }
+  .rn-fest-track {
+      width: 38px; height: 21px; border-radius: 999px;
+      background: #cbd5e1; position: relative; transition: background .15s; flex: none;
+  }
+  .rn-fest-track::after {
+      content: ''; position: absolute; top: 2.5px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      transition: transform .15s;
+  }
+  .rn-fest input:checked + .rn-fest-track { background: #16a34a; }
+  .rn-fest input:checked + .rn-fest-track::after { transform: translateX(16px); }
+  .rn-fest-label { font-size: 12.5px; font-weight: 600; color: #334155; }
+
+  .cal-wrap.hidden { display: none; }
 </style>
 {% endblock %}
 
@@ -134,21 +165,27 @@
                 </div>
 
                 {# Solo per Giornaliero: quali giorni si contano #}
-                <div class="col-span-3 cal-wrap">
-                    <label class="form-label">Calendario conteggio</label>
-                    <select name="calendario[]" class="form-select">
-                        <option value="lun_ven">Lun – Ven</option>
-                        <option value="lun_sab">Lun – Sab</option>
-                        <option value="lun_dom">Lun – Dom</option>
-                        <option value="sab_dom">Solo Sab – Dom</option>
-                    </select>
+                <div class="col-span-4 cal-wrap">
+                    <label class="form-label">Giorni conteggiati</label>
+                    <div class="rn-days">
+                        <button type="button" class="rn-day on" data-day="1">Lun</button>
+                        <button type="button" class="rn-day on" data-day="2">Mar</button>
+                        <button type="button" class="rn-day on" data-day="3">Mer</button>
+                        <button type="button" class="rn-day on" data-day="4">Gio</button>
+                        <button type="button" class="rn-day on" data-day="5">Ven</button>
+                        <button type="button" class="rn-day" data-day="6">Sab</button>
+                        <button type="button" class="rn-day" data-day="7">Dom</button>
+                    </div>
+                    <input type="hidden" name="calendario[]" class="cal-value" value="1,2,3,4,5">
                 </div>
-                <div class="col-span-2 cal-wrap">
-                    <label class="form-label">Festivi</label>
-                    <select name="festivi_inclusi[]" class="form-select">
-                        <option value="">Esclusi</option>
-                        <option value="1">Inclusi</option>
-                    </select>
+                <div class="col-span-3 cal-wrap">
+                    <label class="form-label">Festivi nazionali</label>
+                    <label class="rn-fest">
+                        <input type="checkbox" class="fest-check">
+                        <span class="rn-fest-track"></span>
+                        <span class="rn-fest-label">Conta anche i festivi</span>
+                    </label>
+                    <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="">
                 </div>
             </div>
         </div>

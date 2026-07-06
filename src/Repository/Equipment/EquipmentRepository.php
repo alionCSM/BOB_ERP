@@ -102,7 +102,8 @@ final class EquipmentRepository
     public function getByWorksite(int $worksiteId): array
     {
         $stmt = $this->conn->prepare("
-            SELECT wl.*, le.descrizione AS mezzo_descrizione
+            SELECT wl.*, le.descrizione AS mezzo_descrizione,
+                   (SELECT COUNT(*) FROM bb_lifting_extra_days e WHERE e.rental_id = wl.id) AS extra_days_count
             FROM bb_worksite_lifting wl
             JOIN bb_lifting_equipment le ON wl.lifting_equipment_id = le.id
             WHERE wl.worksite_id = :ws
@@ -128,12 +129,12 @@ final class EquipmentRepository
         float  $costo,
         int    $quantita,
         string $dataInizio,
-        string $calendario = 'lun_ven',
+        string $calendario = '1,2,3,4,5',
         bool   $festiviInclusi = false
     ): bool {
         // calendario/festivi hanno senso solo per il Giornaliero
         if ($tipoNoleggio !== 'Giornaliero') {
-            $calendario     = 'lun_ven';
+            $calendario     = '1,2,3,4,5';
             $festiviInclusi = false;
         }
         $stmt = $this->conn->prepare("
@@ -169,9 +170,8 @@ final class EquipmentRepository
         int    $quantita,
         string $oldStato,
         int    $userId,
-        string $calendario = 'lun_ven',
-        bool   $festiviInclusi = false,
-        int    $giorniExtra = 0
+        string $calendario = '1,2,3,4,5',
+        bool   $festiviInclusi = false
     ): bool {
         $current = $this->getRentalById($id);
         if (!$current) {
@@ -183,11 +183,9 @@ final class EquipmentRepository
         }
 
         if ($tipoNoleggio !== 'Giornaliero') {
-            $calendario     = 'lun_ven';
+            $calendario     = '1,2,3,4,5';
             $festiviInclusi = false;
-            $giorniExtra    = 0;
         }
-        $giorniExtra = max(0, $giorniExtra);
 
         $dataFine = ($stato === 'Attivo') ? null : $current['data_fine'];
 
@@ -197,7 +195,6 @@ final class EquipmentRepository
                 tipo_noleggio     = :tipo,
                 calendario        = :cal,
                 festivi_inclusi   = :fest,
-                giorni_extra      = :extra,
                 data_inizio       = :di,
                 stato             = :st,
                 quantita          = :qt,
@@ -209,7 +206,6 @@ final class EquipmentRepository
             ':tipo'  => $tipoNoleggio,
             ':cal'   => $calendario,
             ':fest'  => (int)$festiviInclusi,
-            ':extra' => $giorniExtra,
             ':di'    => $dataInizio,
             ':st'    => $stato,
             ':qt'    => $quantita,
@@ -223,7 +219,6 @@ final class EquipmentRepository
             'tipo_noleggio'     => $tipoNoleggio,
             'calendario'        => $calendario,
             'festivi_inclusi'   => (int)$festiviInclusi,
-            'giorni_extra'      => $giorniExtra,
             'data_inizio'       => $dataInizio,
             'stato'             => $stato,
             'quantita'          => $quantita,
@@ -269,7 +264,7 @@ final class EquipmentRepository
         $quantita   = $data['quantita']     ?? [];
         $calendari  = $data['calendario']   ?? [];
         $festivi    = $data['festivi_inclusi'] ?? [];
-        $extra      = $data['giorni_extra'] ?? [];
+        $extraDays  = $data['extra_days']   ?? []; // [rental_id => [date, ...]]
 
         for ($i = 0, $n = count($ids); $i < $n; $i++) {
             $rentalId = (int)$ids[$i];
@@ -287,10 +282,68 @@ final class EquipmentRepository
                 (int)$quantita[$i],
                 $current['stato'],
                 $userId,
-                (string)($calendari[$i] ?? 'lun_ven'),
-                !empty($festivi[$i]),
-                (int)($extra[$i] ?? 0)
+                (string)($calendari[$i] ?? '1,2,3,4,5'),
+                !empty($festivi[$i])
             );
+
+            // Giorni extra: il form invia la lista completa per rental → sync
+            $this->syncExtraDays($rentalId, (array)($extraDays[$rentalId] ?? []), $userId);
+        }
+    }
+
+    // ── Giorni extra (date fuori calendario conteggiate comunque) ────────────
+
+    /** @return array<int, string[]> rental_id => elenco date Y-m-d */
+    public function extraDaysByWorksite(int $worksiteId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT e.rental_id, e.data
+            FROM bb_lifting_extra_days e
+            JOIN bb_worksite_lifting wl ON wl.id = e.rental_id
+            WHERE wl.worksite_id = :ws
+            ORDER BY e.data ASC
+        ");
+        $stmt->execute([':ws' => $worksiteId]);
+
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $out[(int)$row['rental_id']][] = substr((string)$row['data'], 0, 10);
+        }
+        return $out;
+    }
+
+    /** Allinea le date extra del rental alla lista inviata dal form. */
+    public function syncExtraDays(int $rentalId, array $dates, int $userId): void
+    {
+        // normalizza e dedup
+        $clean = [];
+        foreach ($dates as $d) {
+            $d = substr(trim((string)$d), 0, 10);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) $clean[$d] = true;
+        }
+        $clean = array_keys($clean);
+
+        $stmt = $this->conn->prepare("SELECT data FROM bb_lifting_extra_days WHERE rental_id = :r");
+        $stmt->execute([':r' => $rentalId]);
+        $existing = array_map(fn($v) => substr((string)$v, 0, 10), $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $toAdd    = array_diff($clean, $existing);
+        $toRemove = array_diff($existing, $clean);
+
+        if (!empty($toAdd)) {
+            $ins = $this->conn->prepare("
+                INSERT IGNORE INTO bb_lifting_extra_days (rental_id, data, created_by)
+                VALUES (:r, :d, :u)
+            ");
+            foreach ($toAdd as $d) {
+                $ins->execute([':r' => $rentalId, ':d' => $d, ':u' => $userId ?: null]);
+            }
+        }
+        if (!empty($toRemove)) {
+            $del = $this->conn->prepare("DELETE FROM bb_lifting_extra_days WHERE rental_id = :r AND data = :d");
+            foreach ($toRemove as $d) {
+                $del->execute([':r' => $rentalId, ':d' => $d]);
+            }
         }
     }
 

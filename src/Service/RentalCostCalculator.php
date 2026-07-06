@@ -15,9 +15,12 @@ use DateTimeImmutable;
  * tipo_noleggio:
  *   - 'Una Tantum'  → costo × quantita (servizio, es. Trasporto A/R)
  *   - 'Giornaliero' → costo × giorni conteggiati × quantita
- *                     I giorni si contano secondo `calendario`:
- *                       lun_ven | lun_sab | lun_dom | sab_dom
- *                     e `festivi_inclusi` (festivita' nazionali italiane).
+ *                     `calendario` = set libero di giorni della settimana in
+ *                     CSV ISO (1=lun ... 7=dom, es. "1,2,3,4,5"); i festivi
+ *                     nazionali contano solo se `festivi_inclusi`.
+ *                     Ai giorni calcolati si sommano i giorni extra (date
+ *                     specifiche in bb_lifting_extra_days, passate come
+ *                     `extra_days_count` nella riga).
  *   - 'Settimanale' → costo × settimane COMPLETE (floor giorni/7) × quantita
  *   - 'Mensile'     → costo × mesi COMPLETI × quantita
  *
@@ -51,9 +54,9 @@ final class RentalCostCalculator
             default       => self::countDays(
                 $start,
                 $end,
-                (string)($rental['calendario'] ?? 'lun_ven'),
+                (string)($rental['calendario'] ?? '1,2,3,4,5'),
                 !empty($rental['festivi_inclusi'])
-            ) + max(0, (int)($rental['giorni_extra'] ?? 0)), // aggiunti a mano dal gestore mezzi
+            ) + max(0, (int)($rental['extra_days_count'] ?? 0)), // date aggiunte a mano
         };
 
         return $costo * $units * $quantita;
@@ -76,9 +79,9 @@ final class RentalCostCalculator
             default       => self::countDays(
                 $start,
                 $end,
-                (string)($rental['calendario'] ?? 'lun_ven'),
+                (string)($rental['calendario'] ?? '1,2,3,4,5'),
                 !empty($rental['festivi_inclusi'])
-            ) + max(0, (int)($rental['giorni_extra'] ?? 0)),
+            ) + max(0, (int)($rental['extra_days_count'] ?? 0)),
         };
     }
 
@@ -120,13 +123,45 @@ final class RentalCostCalculator
     {
         $d   = is_string($day) ? new DateTimeImmutable(substr($day, 0, 10)) : $day;
         $dow = (int)$d->format('N'); // 1=lun ... 7=dom
-        $inCal = match ($calendario) {
-            'lun_sab' => $dow <= 6,
-            'lun_dom' => true,
-            'sab_dom' => $dow >= 6,
-            default   => $dow <= 5, // lun_ven
-        };
+        $inCal = in_array($dow, self::weekdaySet($calendario), true);
         return $inCal && ($festiviInclusi || !self::isItalianHoliday($d));
+    }
+
+    /**
+     * Calendario → set di giorni ISO. Formato nativo: CSV "1,2,3,4,5".
+     * Accetta anche i preset legacy della prima versione (lun_ven, ...).
+     * @return int[]
+     */
+    public static function weekdaySet(string $calendario): array
+    {
+        $legacy = [
+            'lun_ven' => [1, 2, 3, 4, 5],
+            'lun_sab' => [1, 2, 3, 4, 5, 6],
+            'lun_dom' => [1, 2, 3, 4, 5, 6, 7],
+            'sab_dom' => [6, 7],
+        ];
+        if (isset($legacy[$calendario])) return $legacy[$calendario];
+
+        $days = array_values(array_filter(array_map(
+            'intval',
+            explode(',', $calendario)
+        ), fn($n) => $n >= 1 && $n <= 7));
+
+        return !empty($days) ? array_values(array_unique($days)) : [1, 2, 3, 4, 5];
+    }
+
+    /** Etichetta leggibile del calendario ("Lun, Mar, Mer, Gio, Ven"). */
+    public static function weekdayLabel(string $calendario): string
+    {
+        $names = [1 => 'Lun', 2 => 'Mar', 3 => 'Mer', 4 => 'Gio', 5 => 'Ven', 6 => 'Sab', 7 => 'Dom'];
+        $set   = self::weekdaySet($calendario);
+        sort($set);
+        // compatta i range comuni
+        if ($set === [1,2,3,4,5])       return 'Lun–Ven';
+        if ($set === [1,2,3,4,5,6])     return 'Lun–Sab';
+        if ($set === [1,2,3,4,5,6,7])   return 'Tutti i giorni';
+        if ($set === [6,7])             return 'Sab–Dom';
+        return implode(', ', array_map(fn($n) => $names[$n], $set));
     }
 
     /** Festivita' nazionali italiane (incluso Lunedi' dell'Angelo). */

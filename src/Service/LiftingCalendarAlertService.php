@@ -26,13 +26,6 @@ use PDO;
  */
 class LiftingCalendarAlertService
 {
-    private const CAL_LABELS = [
-        'lun_ven' => 'Lun–Ven',
-        'lun_sab' => 'Lun–Sab',
-        'lun_dom' => 'Lun–Dom',
-        'sab_dom' => 'Solo Sab–Dom',
-    ];
-
     public function __construct(private PDO $conn) {}
 
     /**
@@ -94,6 +87,8 @@ class LiftingCalendarAlertService
             $rFrom = max($r['data_inizio'], $from);
             $rTo   = min($r['data_fine'] ?: $to, $to);
 
+            $extraDays = $this->extraDaysForRental((int)$r['id']);
+
             foreach ($presCache[$wid] as $day => $qta) {
                 if ($day < $rFrom || $day > $rTo) continue;
 
@@ -101,6 +96,8 @@ class LiftingCalendarAlertService
                 if (RentalCostCalculator::dayCounts($day, (string)$r['calendario'], !empty($r['festivi_inclusi']))) {
                     continue;
                 }
+                // gia' aggiunto a mano come giorno extra? gestito, niente alert
+                if (isset($extraDays[$day])) continue;
                 // gia' segnalato in passato?
                 if ($this->alreadyNotified((int)$r['id'], $day)) continue;
 
@@ -136,6 +133,18 @@ class LiftingCalendarAlertService
         ]);
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $out[substr((string)$row['d'], 0, 10)] = (int)$row['n'];
+        }
+        return $out;
+    }
+
+    /** @return array<string,bool> date extra gia' registrate per il rental */
+    private function extraDaysForRental(int $rentalId): array
+    {
+        $stmt = $this->conn->prepare("SELECT data FROM bb_lifting_extra_days WHERE rental_id = :r");
+        $stmt->execute([':r' => $rentalId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $d) {
+            $out[substr((string)$d, 0, 10)] = true;
         }
         return $out;
     }
@@ -237,7 +246,7 @@ class LiftingCalendarAlertService
             $h .= "<tr style='background:#f1f5f9'><th align='left'>Mezzo</th><th align='left'>Calendario</th><th align='left'>Giorno</th><th align='left'>Presenze</th></tr>";
             foreach ($items as $f) {
                 $r    = $f['rental'];
-                $cal  = self::CAL_LABELS[$r['calendario']] ?? $r['calendario'];
+                $cal  = RentalCostCalculator::weekdayLabel((string)$r['calendario']);
                 $cal .= !empty($r['festivi_inclusi']) ? ' (festivi inclusi)' : ' (festivi esclusi)';
                 $dow  = $giorni[date('D', strtotime($f['data']))] ?? '';
                 $isHol = RentalCostCalculator::isItalianHoliday(new \DateTimeImmutable($f['data'])) ? ' 🎌 festivo' : '';
@@ -250,7 +259,7 @@ class LiftingCalendarAlertService
             }
             $h .= "</table>";
             if ($appUrl !== '') {
-                $h .= "<p style='margin-top:6px'><a href='{$appUrl}/equipment/rentals/{$wid}/edit' style='color:#2563eb'>→ Modifica noleggi di questo cantiere (campo \"Giorni extra\")</a></p>";
+                $h .= "<p style='margin-top:6px'><a href='{$appUrl}/equipment/rentals/{$wid}/edit' style='color:#2563eb'>→ Modifica noleggi: aggiungi le date come \"Giorni extra\" se il mezzo e' stato usato</a></p>";
             }
         }
 

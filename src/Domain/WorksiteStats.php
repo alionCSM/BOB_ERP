@@ -341,9 +341,10 @@ class WorksiteStats
         // proprio calendario (giornaliero/settimanale/mensile) da data_inizio
         // a data_fine, o a oggi se ancora attivo. Vedi RentalCostCalculator.
         $stmt = $this->conn->prepare("
-        SELECT *
-        FROM bb_worksite_lifting
-        WHERE worksite_id = :wid
+        SELECT wl.*,
+               (SELECT COUNT(*) FROM bb_lifting_extra_days e WHERE e.rental_id = wl.id) AS extra_days_count
+        FROM bb_worksite_lifting wl
+        WHERE wl.worksite_id = :wid
     ");
         $stmt->execute(['wid' => $this->worksiteId]);
 

@@ -2,9 +2,9 @@
 
 {% block head %}
 <style>
-  .rn-page { margin-top: 16px; }
+  .rn-page { margin-top: 16px; max-width: 1100px; }
 
-  /* Hero (allineato a wd-/fl-/bc-) */
+  /* ── Hero (allineato a wd-/fl-/bc-) ─────────────────────────── */
   .rn-hero {
       position: relative; overflow: hidden;
       border-radius: 18px;
@@ -17,6 +17,11 @@
       width: 220px; height: 220px; border-radius: 50%;
       background: rgba(245,158,11,.14); pointer-events: none;
   }
+  .rn-hero::after {
+      content: ''; position: absolute; bottom: -100px; left: 30%;
+      width: 260px; height: 260px; border-radius: 50%;
+      background: rgba(37,99,235,.15); pointer-events: none;
+  }
   .rn-hero-content {
       position: relative; z-index: 1;
       display: flex; align-items: center; justify-content: space-between;
@@ -24,13 +29,14 @@
   }
   .rn-hero-left { display: flex; align-items: center; gap: 14px; }
   .rn-hero-icon {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: rgba(255,255,255,.1);
+      width: 46px; height: 46px; border-radius: 13px;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12);
       display: flex; align-items: center; justify-content: center;
   }
-  .rn-hero-icon svg { width: 22px; height: 22px; stroke: #fff; stroke-width: 1.5; fill: none; }
-  .rn-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 2px; }
-  .rn-hero-sub { font-size: 13px; opacity: .55; margin: 0; }
+  .rn-hero-icon svg { width: 23px; height: 23px; stroke: #fbbf24; stroke-width: 1.6; fill: none; }
+  .rn-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 3px; letter-spacing: -.2px; }
+  .rn-hero-sub { font-size: 13px; opacity: .6; margin: 0; display: flex; gap: 14px; flex-wrap: wrap; }
+  .rn-hero-sub b { opacity: 1; }
 
   .rn-btn-back {
       display: inline-flex; align-items: center; gap: 6px;
@@ -42,7 +48,7 @@
   }
   .rn-btn-back:hover { background: rgba(255,255,255,.2); color: #fff; }
 
-  /* Toast successo */
+  /* ── Toast ──────────────────────────────────────────────────── */
   .rn-toast {
       display: flex; justify-content: space-between; align-items: center;
       background: #dcfce7; border: 1.5px solid #86efac; color: #166534;
@@ -51,100 +57,189 @@
   }
   .rn-toast button { color: #166534; font-size: 18px; font-weight: 800; background: none; border: 0; cursor: pointer; }
 
-  /* Card noleggio */
+  /* ── Card noleggio ──────────────────────────────────────────── */
   .rn-card {
-      background: #fff; border-radius: 14px;
-      border: 1.5px solid #e8edf3;
-      padding: 18px 22px; margin-bottom: 12px;
-      position: relative;
+      background: #fff; border-radius: 16px;
+      border: 1px solid #e6ecf2;
+      box-shadow: 0 1px 3px rgba(15,23,42,.05);
+      margin-bottom: 14px; position: relative; overflow: hidden;
   }
   .rn-card::before {
       content: ''; position: absolute; top: 0; left: 0; bottom: 0;
-      width: 4px; background: #2563eb; border-radius: 14px 0 0 14px;
+      width: 4px; background: linear-gradient(180deg, #3b82f6, #2563eb);
   }
   .rn-card.is-done { background: #f8fafc; }
-  .rn-card.is-done::before { background: #94a3b8; }
+  .rn-card.is-done::before { background: #cbd5e1; }
 
   .rn-card-head {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+      gap: 12px; flex-wrap: wrap;
+      padding: 16px 22px 14px;
+      border-bottom: 1px solid #f1f5f9;
   }
-  .rn-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px; }
-  .rn-card-title svg { width: 18px; height: 18px; stroke: #64748b; fill: none; stroke-width: 1.6; }
+  .rn-card-title { font-size: 15.5px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 10px; }
+  .rn-card-title .rn-qty {
+      background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  }
+  .rn-card-body { padding: 16px 22px 18px; }
 
   .rn-badge {
       display: inline-flex; align-items: center; gap: 5px;
-      padding: 3px 10px; border-radius: 999px;
+      padding: 4px 12px; border-radius: 999px;
       font-size: 11px; font-weight: 700; letter-spacing: .3px;
   }
   .rn-badge-attivo     { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
   .rn-badge-completato { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
   .rn-badge-servizio   { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-  /* Griglia campi */
+  /* ── Campi ──────────────────────────────────────────────────── */
   .rn-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 12px;
+      gap: 14px;
   }
   .rn-field-label {
-      color: #94a3b8; font-weight: 600; text-transform: uppercase;
-      letter-spacing: .3px; font-size: 10px; margin-bottom: 4px; display: block;
+      color: #8ea0b5; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; font-size: 10px; margin-bottom: 5px; display: block;
   }
-  .rn-field-value { color: #0f172a; font-weight: 600; font-size: 13px; padding-top: 6px; }
+  .rn-field-value { color: #0f172a; font-weight: 600; font-size: 13px; padding-top: 5px; }
   .rn-input, .rn-select {
-      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 8px;
-      padding: 7px 10px; font-size: 13px; color: #0f172a; background: #fff;
-      transition: border-color .12s;
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 9px;
+      padding: 8px 11px; font-size: 13px; color: #0f172a; background: #fff;
+      transition: border-color .12s, box-shadow .12s;
   }
-  .rn-input:focus, .rn-select:focus { outline: none; border-color: #2563eb; }
+  .rn-input:focus, .rn-select:focus {
+      outline: none; border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+  }
 
-  /* Blocco calendario (solo Giornaliero) */
-  .rn-cal-fields { display: contents; }
-  .rn-cal-fields.rn-hidden > div { display: none; }
+  /* ── Pannello conteggio (solo Giornaliero) ──────────────────── */
+  .rn-count-panel {
+      margin-top: 14px;
+      background: #f8fafc; border: 1px solid #e8eef4; border-radius: 12px;
+      padding: 14px 16px;
+      display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start;
+  }
+  .rn-count-panel.rn-hidden { display: none; }
 
-  /* Giorni extra evidenziati */
-  .rn-extra-wrap { position: relative; }
-  .rn-extra-wrap .rn-input { border-color: #fde68a; background: #fffbeb; }
-  .rn-extra-wrap .rn-input:focus { border-color: #f59e0b; }
-  .rn-hint { font-size: 10.5px; color: #b45309; margin-top: 4px; line-height: 1.35; }
+  /* chips giorni settimana */
+  .rn-days { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rn-day {
+      min-width: 42px; padding: 7px 0; text-align: center;
+      border-radius: 9px; border: 1.5px solid #dbe3ec;
+      background: #fff; color: #94a3b8;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: all .12s; user-select: none;
+  }
+  .rn-day:hover { border-color: #93c5fd; color: #3b82f6; }
+  .rn-day.on {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-color: #2563eb; color: #fff;
+      box-shadow: 0 2px 6px rgba(37,99,235,.25);
+  }
+  .rn-day.is-weekend:not(.on) { background: #fafafa; }
 
+  /* switch festivi */
+  .rn-fest {
+      display: inline-flex; align-items: center; gap: 9px;
+      cursor: pointer; padding-top: 4px; user-select: none;
+  }
+  .rn-fest input { position: absolute; opacity: 0; }
+  .rn-fest-track {
+      width: 38px; height: 21px; border-radius: 999px;
+      background: #cbd5e1; position: relative; transition: background .15s; flex: none;
+  }
+  .rn-fest-track::after {
+      content: ''; position: absolute; top: 2.5px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+      transition: transform .15s;
+  }
+  .rn-fest input:checked + .rn-fest-track { background: #16a34a; }
+  .rn-fest input:checked + .rn-fest-track::after { transform: translateX(16px); }
+  .rn-fest-label { font-size: 12.5px; font-weight: 600; color: #334155; }
+
+  /* ── Giorni extra ───────────────────────────────────────────── */
+  .rn-extra {
+      margin-top: 12px;
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+      padding: 13px 16px;
+  }
+  .rn-extra.rn-hidden { display: none; }
+  .rn-extra-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .rn-extra-head svg { width: 15px; height: 15px; stroke: #b45309; fill: none; stroke-width: 2; flex: none; }
+  .rn-extra-title { font-size: 12px; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: .4px; }
+  .rn-extra-desc { font-size: 12px; color: #a16207; margin: 0 0 10px; }
+
+  .rn-extra-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+  .rn-extra-chips:empty { display: none; }
+  .rn-chip {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: #fff; border: 1.5px solid #fbbf24; color: #92400e;
+      border-radius: 999px; padding: 5px 7px 5px 12px;
+      font-size: 12px; font-weight: 700;
+  }
+  .rn-chip .rn-chip-x {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fef3c7; color: #b45309; border: 0; cursor: pointer;
+      font-size: 12px; font-weight: 800; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .12s;
+  }
+  .rn-chip .rn-chip-x:hover { background: #dc2626; color: #fff; }
+
+  .rn-extra-add { display: flex; gap: 8px; align-items: center; }
+  .rn-extra-add input[type=date] {
+      border: 1.5px solid #fde68a; border-radius: 9px;
+      padding: 7px 10px; font-size: 13px; background: #fff; color: #0f172a;
+  }
+  .rn-extra-add input[type=date]:focus { outline: none; border-color: #f59e0b; }
+  .rn-btn-add-day {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #f59e0b; color: #fff; border: 0; cursor: pointer;
+      border-radius: 9px; padding: 8px 14px; font-size: 12.5px; font-weight: 700;
+      transition: all .12s;
+  }
+  .rn-btn-add-day:hover { background: #d97706; }
+
+  /* ── Footer card / azioni ───────────────────────────────────── */
   .rn-card-foot {
       display: flex; justify-content: space-between; align-items: center;
-      margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9;
+      margin-top: 16px; padding-top: 13px; border-top: 1px solid #f1f5f9;
       flex-wrap: wrap; gap: 8px;
   }
   .rn-done-note { font-size: 12px; color: #64748b; }
 
   .rn-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 14px; border-radius: 8px;
+      padding: 8px 14px; border-radius: 9px;
       font-size: 13px; font-weight: 600;
       border: 1.5px solid; cursor: pointer;
-      text-decoration: none; transition: all .12s;
+      text-decoration: none; transition: all .12s; background: #fff;
   }
   .rn-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
-  .rn-btn-delete { background: #fff; color: #dc2626; border-color: #fca5a5; }
+  .rn-btn-delete { color: #dc2626; border-color: #fca5a5; }
   .rn-btn-delete:hover { background: #fee2e2; }
 
-  /* Barra salvataggio */
   .rn-savebar {
-      display: flex; justify-content: flex-end; gap: 10px;
-      margin-top: 16px;
+      position: sticky; bottom: 14px; z-index: 5;
+      display: flex; justify-content: flex-end;
+      margin-top: 18px;
   }
   .rn-btn-save {
       display: inline-flex; align-items: center; gap: 8px;
-      padding: 11px 26px; border-radius: 10px;
+      padding: 12px 30px; border-radius: 12px;
       background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       color: #fff; font-size: 14px; font-weight: 700;
       border: 0; cursor: pointer; transition: all .15s;
+      box-shadow: 0 8px 24px rgba(29,78,216,.35);
   }
-  .rn-btn-save:hover { box-shadow: 0 6px 16px rgba(37,99,235,.3); }
+  .rn-btn-save:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(29,78,216,.45); }
   .rn-btn-save svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
 
-  /* Empty */
   .rn-empty {
-      background: #fff; border-radius: 14px; border: 1.5px solid #e8edf3;
+      background: #fff; border-radius: 16px; border: 1px solid #e6ecf2;
       padding: 60px 20px; text-align: center;
   }
   .rn-empty svg { width: 40px; height: 40px; stroke: #cbd5e1; fill: none; opacity: .5; margin: 0 auto 12px; display: block; }
@@ -152,7 +247,7 @@
 </style>
 {% endblock %}
 
-{% set calLabels = {'lun_ven':'Lun – Ven','lun_sab':'Lun – Sab','lun_dom':'Lun – Dom','sab_dom':'Solo Sab – Dom'} %}
+{% set dowNames = {'1':'Lun','2':'Mar','3':'Mer','4':'Gio','5':'Ven','6':'Sab','7':'Dom'} %}
 {% set costoLabels = {'Giornaliero':'Costo € / giorno','Settimanale':'Costo € / settimana','Mensile':'Costo € / mese','Una Tantum':'Costo €'} %}
 
 {% block content %}
@@ -162,12 +257,14 @@
         <div class="rn-hero-content">
             <div class="rn-hero-left">
                 <div class="rn-hero-icon">
-                    {# gru / sollevamento #}
                     <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
                 </div>
                 <div>
                     <h1 class="rn-hero-title">Noleggio Mezzi Sollevamento</h1>
-                    <p class="rn-hero-sub">{{ worksite.worksite_code }} — {{ worksite.name }} · {{ mezzi|filter(m => m.stato == 'Attivo')|length }} noleggi attivi</p>
+                    <p class="rn-hero-sub">
+                        <span><b>{{ worksite.worksite_code }}</b> — {{ worksite.name }}</span>
+                        <span>{{ mezzi|filter(m => m.stato == 'Attivo')|length }} attivi · {{ mezzi|length }} totali</span>
+                    </p>
                 </div>
             </div>
             <a href="/worksites/{{ worksiteId }}" class="rn-btn-back">
@@ -194,17 +291,17 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="save_changes" value="1">
 
-        {# Mostriamo TUTTI i noleggi (Attivo + Completato + Finito): quelli
-           terminati sono readonly ma riattivabili via select Stato. #}
         {% for row in mezzi %}
-            {% set done = row.stato in ['Completato', 'Finito'] %}
+            {% set done   = row.stato in ['Completato', 'Finito'] %}
+            {% set cal    = (row.calendario ?? '1,2,3,4,5')|split(',') %}
+            {% set extras = extraDays[row.id] ?? [] %}
             <div class="rn-card {{ done ? 'is-done' : '' }}">
                 <input type="hidden" name="id[]" value="{{ row.id }}">
 
                 <div class="rn-card-head">
                     <h3 class="rn-card-title">
-                        <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
                         {{ row.mezzo_descrizione }}
+                        <span class="rn-qty">× {{ row.quantita }}</span>
                     </h3>
                     <div>
                         {% if row.tipo_noleggio == 'Una Tantum' %}
@@ -217,8 +314,9 @@
                     </div>
                 </div>
 
+                <div class="rn-card-body">
                 {% if done %}
-                    {# ── Readonly: valori mostrati, campi inviati come hidden ── #}
+                    {# ── Terminato: sola lettura, campi inviati come hidden ── #}
                     <div class="rn-grid">
                         <div>
                             <span class="rn-field-label">Tipo</span>
@@ -226,17 +324,14 @@
                         </div>
                         {% if row.tipo_noleggio == 'Giornaliero' %}
                         <div>
-                            <span class="rn-field-label">Calendario</span>
+                            <span class="rn-field-label">Giorni conteggiati</span>
                             <div class="rn-field-value">
-                                {{ calLabels[row.calendario ?? 'lun_ven'] }}{{ row.festivi_inclusi ? ' + festivi' : '' }}
-                                {{ (row.giorni_extra ?? 0) > 0 ? ' · +' ~ row.giorni_extra ~ ' gg extra' : '' }}
+                                {% for n in cal %}{{ dowNames[n] ?? n }}{{ not loop.last ? ' · ' }}{% endfor %}
+                                {{ row.festivi_inclusi ? ' + festivi' : '' }}
+                                {% if extras|length > 0 %} · {{ extras|length }} gg extra{% endif %}
                             </div>
                         </div>
                         {% endif %}
-                        <div>
-                            <span class="rn-field-label">Quantità</span>
-                            <div class="rn-field-value">{{ row.quantita }}</div>
-                        </div>
                         <div>
                             <span class="rn-field-label">{{ costoLabels[row.tipo_noleggio] ?? 'Costo €' }}</span>
                             <div class="rn-field-value">{{ row.costo_giornaliero|number_format(2, ',', '.') }} €</div>
@@ -254,12 +349,14 @@
                         </div>
                     </div>
                     <input type="hidden" name="tipo_noleggio[]"   value="{{ row.tipo_noleggio }}">
-                    <input type="hidden" name="calendario[]"      value="{{ row.calendario ?? 'lun_ven' }}">
+                    <input type="hidden" name="calendario[]"      value="{{ row.calendario ?? '1,2,3,4,5' }}">
                     <input type="hidden" name="festivi_inclusi[]" value="{{ row.festivi_inclusi ? '1' : '' }}">
-                    <input type="hidden" name="giorni_extra[]"    value="{{ row.giorni_extra ?? 0 }}">
                     <input type="hidden" name="quantita[]"        value="{{ row.quantita }}">
                     <input type="hidden" name="costo[]"           value="{{ row.costo_giornaliero }}">
                     <input type="hidden" name="data_inizio[]"     value="{{ row.data_inizio }}">
+                    {% for d in extras %}
+                        <input type="hidden" name="extra_days[{{ row.id }}][]" value="{{ d }}">
+                    {% endfor %}
                     <div class="rn-card-foot">
                         <span class="rn-done-note">Noleggio terminato: seleziona "Riattiva" e salva per riaprirlo.</span>
                     </div>
@@ -275,32 +372,6 @@
                                 <option value="Una Tantum"   {{ row.tipo_noleggio == 'Una Tantum'   ? 'selected' : '' }}>Una Tantum</option>
                             </select>
                         </div>
-
-                        <div class="rn-cal-fields {{ row.tipo_noleggio != 'Giornaliero' ? 'rn-hidden' : '' }}">
-                            <div>
-                                <span class="rn-field-label">Calendario conteggio</span>
-                                <select name="calendario[]" class="rn-select">
-                                    <option value="lun_ven" {{ (row.calendario ?? 'lun_ven') == 'lun_ven' ? 'selected' : '' }}>Lun – Ven</option>
-                                    <option value="lun_sab" {{ (row.calendario ?? '') == 'lun_sab' ? 'selected' : '' }}>Lun – Sab</option>
-                                    <option value="lun_dom" {{ (row.calendario ?? '') == 'lun_dom' ? 'selected' : '' }}>Lun – Dom</option>
-                                    <option value="sab_dom" {{ (row.calendario ?? '') == 'sab_dom' ? 'selected' : '' }}>Solo Sab – Dom</option>
-                                </select>
-                            </div>
-                            <div>
-                                <span class="rn-field-label">Festivi</span>
-                                <select name="festivi_inclusi[]" class="rn-select">
-                                    <option value=""  {{ not row.festivi_inclusi ? 'selected' : '' }}>Esclusi</option>
-                                    <option value="1" {{ row.festivi_inclusi ? 'selected' : '' }}>Inclusi</option>
-                                </select>
-                            </div>
-                            <div class="rn-extra-wrap">
-                                <span class="rn-field-label">Giorni extra</span>
-                                <input type="number" name="giorni_extra[]" min="0" class="rn-input"
-                                       value="{{ row.giorni_extra ?? 0 }}">
-                                <div class="rn-hint">Giorni fuori calendario da contare comunque (es. sabato lavorato con noleggio Lun–Ven)</div>
-                            </div>
-                        </div>
-
                         <div>
                             <span class="rn-field-label">Quantità</span>
                             <input type="number" name="quantita[]" min="1" class="rn-input" value="{{ row.quantita }}">
@@ -316,6 +387,52 @@
                     </div>
                     <input type="hidden" name="stato[]" value="Attivo">
 
+                    {# ── Conteggio giorni: solo Giornaliero ── #}
+                    <div class="rn-count-panel {{ row.tipo_noleggio != 'Giornaliero' ? 'rn-hidden' : '' }}">
+                        <div>
+                            <span class="rn-field-label">Giorni conteggiati</span>
+                            <div class="rn-days">
+                                {% for n, label in dowNames %}
+                                    <button type="button"
+                                            class="rn-day {{ n in cal ? 'on' : '' }} {{ n in ['6','7'] ? 'is-weekend' : '' }}"
+                                            data-day="{{ n }}">{{ label }}</button>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="calendario[]" class="cal-value" value="{{ row.calendario ?? '1,2,3,4,5' }}">
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Festivi nazionali</span>
+                            <label class="rn-fest">
+                                <input type="checkbox" class="fest-check" {{ row.festivi_inclusi ? 'checked' : '' }}>
+                                <span class="rn-fest-track"></span>
+                                <span class="rn-fest-label">Conta anche i festivi</span>
+                            </label>
+                            <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="{{ row.festivi_inclusi ? '1' : '' }}">
+                        </div>
+                    </div>
+
+                    {# ── Giorni extra (date specifiche fuori calendario) ── #}
+                    <div class="rn-extra {{ row.tipo_noleggio != 'Giornaliero' ? 'rn-hidden' : '' }}" data-rental="{{ row.id }}">
+                        <div class="rn-extra-head">
+                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="rn-extra-title">Giorni extra</span>
+                        </div>
+                        <p class="rn-extra-desc">Date fuori dal calendario in cui il mezzo è stato usato comunque (es. un sabato lavorato): vengono aggiunte al conteggio.</p>
+                        <div class="rn-extra-chips">
+                            {% for d in extras %}
+                                <span class="rn-chip">
+                                    {{ dowNames[d|date('N')] }} {{ d|date('d/m/Y') }}
+                                    <input type="hidden" name="extra_days[{{ row.id }}][]" value="{{ d }}">
+                                    <button type="button" class="rn-chip-x" title="Rimuovi">&times;</button>
+                                </span>
+                            {% endfor %}
+                        </div>
+                        <div class="rn-extra-add">
+                            <input type="date" class="rn-extra-date">
+                            <button type="button" class="rn-btn-add-day">+ Aggiungi giorno</button>
+                        </div>
+                    </div>
+
                     <div class="rn-card-foot">
                         <span></span>
                         <button type="button" class="rn-btn rn-btn-delete" data-delete-id="{{ row.id }}">
@@ -324,6 +441,7 @@
                         </button>
                     </div>
                 {% endif %}
+                </div>
             </div>
         {% endfor %}
 

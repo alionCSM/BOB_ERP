@@ -677,8 +677,14 @@
                                 <td>
                                     {{ m.tipo_noleggio }}
                                     {% if m.tipo_noleggio == 'Giornaliero' %}
+                                        {% set dowNames = {'1':'Lun','2':'Mar','3':'Mer','4':'Gio','5':'Ven','6':'Sab','7':'Dom'} %}
+                                        {% set calSet = (m.calendario ?? '1,2,3,4,5')|split(',') %}
                                         <div class="text-xs text-slate-500">
-                                            {{ {'lun_ven':'Lun–Ven','lun_sab':'Lun–Sab','lun_dom':'Lun–Dom','sab_dom':'Sab–Dom'}[m.calendario ?? 'lun_ven'] }}{{ m.festivi_inclusi ? ' + festivi' : '' }}
+                                            {% if calSet == ['1','2','3','4','5'] %}Lun–Ven
+                                            {%- elseif calSet == ['1','2','3','4','5','6'] %}Lun–Sab
+                                            {%- elseif calSet == ['1','2','3','4','5','6','7'] %}Tutti i giorni
+                                            {%- else %}{% for n in calSet %}{{ dowNames[n] ?? n }}{{ not loop.last ? ', ' }}{% endfor %}
+                                            {%- endif %}{{ m.festivi_inclusi ? ' + festivi' : '' }}{{ (m.extra_days_count ?? 0) > 0 ? ' · +' ~ m.extra_days_count ~ ' gg extra' : '' }}
                                         </div>
                                     {% endif %}
                                 </td>

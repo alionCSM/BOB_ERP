@@ -160,9 +160,10 @@ final class EquipmentController
             $message = 'Modifiche salvate con successo!';
         }
 
-        $mezzi = $this->equipmentRepo->getByWorksite($worksiteId);
+        $mezzi     = $this->equipmentRepo->getByWorksite($worksiteId);
+        $extraDays = $this->equipmentRepo->extraDaysByWorksite($worksiteId);
 
-        Response::view('equipment/edit.html.twig', $request, compact('worksiteId', 'worksite', 'message', 'mezzi'));
+        Response::view('equipment/edit.html.twig', $request, compact('worksiteId', 'worksite', 'message', 'mezzi', 'extraDays'));
     }
 
     // ── Mark rentals complete ──────────────────────────────────────────────────
