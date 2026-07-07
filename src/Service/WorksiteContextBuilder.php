@@ -299,13 +299,33 @@ class WorksiteContextBuilder
            BILLING
         ============================================================ */
 
+        // Aggregati con stato emissione: "emessa" e' il flag sincronizzato da
+        // Yard (refresh alle aperture di /billing + cron notturno). Senza
+        // questo dettaglio l'AI non puo' rispondere a domande tipo
+        // "quali fatture non sono ancora state emesse?".
         $stmt = $this->conn->prepare("
-            SELECT COUNT(*) AS documenti, COALESCE(SUM(totale),0) AS totale
+            SELECT COUNT(*)                                              AS documenti,
+                   COALESCE(SUM(totale), 0)                              AS totale,
+                   COALESCE(SUM(emessa = 1), 0)                          AS emesse_count,
+                   COALESCE(SUM(CASE WHEN emessa = 1 THEN totale END),0) AS emesse_euro,
+                   COALESCE(SUM(emessa = 0), 0)                          AS da_emettere_count,
+                   COALESCE(SUM(CASE WHEN emessa = 0 THEN totale END),0) AS da_emettere_euro
             FROM bb_billing
             WHERE worksite_id = :wid
         ");
         $stmt->execute([':wid' => $worksiteId]);
         $billing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // dettaglio delle righe NON ancora emesse (le piu' richieste)
+        $stmt = $this->conn->prepare("
+            SELECT data, descrizione, totale
+            FROM bb_billing
+            WHERE worksite_id = :wid AND emessa = 0
+            ORDER BY data DESC
+            LIMIT 20
+        ");
+        $stmt->execute([':wid' => $worksiteId]);
+        $billingDaEmettere = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         /* ============================================================
            YARD HISTORY
@@ -396,10 +416,20 @@ class WorksiteContextBuilder
                 'dettaglio' => $extraDetail,
             ];
 
-            // Billing
+            // Billing (con stato emissione da Yard)
             $context['billing'] = [
-                'documenti' => (int)($billing['documenti'] ?? 0),
-                'totale'    => (float)($billing['totale'] ?? 0),
+                'documenti'           => (int)($billing['documenti'] ?? 0),
+                'totale'              => (float)($billing['totale'] ?? 0),
+                'fatture_emesse'      => [
+                    'count' => (int)($billing['emesse_count'] ?? 0),
+                    'euro'  => (float)($billing['emesse_euro'] ?? 0),
+                ],
+                'fatture_da_emettere' => [
+                    'count'  => (int)($billing['da_emettere_count'] ?? 0),
+                    'euro'   => (float)($billing['da_emettere_euro'] ?? 0),
+                    'righe'  => $billingDaEmettere,
+                ],
+                'nota' => "Lo stato 'emessa' proviene da Yard (sincronizzato periodicamente).",
             ];
 
             // Cost breakdown

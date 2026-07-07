@@ -332,6 +332,8 @@ Esempi presenti in `includes/cron/` e `includes/services/`:
 */15 * * * *  www-data  php /var/www/bob.csmontaggi.it/includes/services/recalculate_worksite_stats.php
 # Alert noleggi mezzi: presenze fuori dal calendario di conteggio (email a chi ha il permesso equipment_alerts)
 0    7 * * *  www-data  php /var/www/bob.csmontaggi.it/includes/cron/lifting_calendar_check.php
+# Sync flag "emessa" fatture da Yard (tiene aggiornati BOB AI e dashboard)
+30   5 * * *  www-data  php /var/www/bob.csmontaggi.it/includes/cron/sync_emessa_yard.php
 ```
 
 ---

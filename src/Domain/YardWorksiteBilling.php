@@ -108,6 +108,31 @@ class YardWorksiteBilling
     }
 
     /**
+     * Stato emessa per un insieme di righe Yard in un colpo solo
+     * (per il sync massivo del cron: evita una query per riga).
+     *
+     * @param  int[] $yardIds
+     * @return array<int,bool> yard_id => emessa
+     */
+    public function getEmessaMap(array $yardIds): array
+    {
+        $map = [];
+        foreach (array_chunk(array_values(array_unique(array_map('intval', $yardIds))), 500) as $chunk) {
+            $ph   = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = $this->conn->prepare("
+                SELECT id, emessa
+                FROM dbo.CNT_cantieri_brogliacci
+                WHERE id IN ({$ph})
+            ");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $map[(int)$r['id']] = ((int)$r['emessa'] === 1);
+            }
+        }
+        return $map;
+    }
+
+    /**
      * Righe "emesse reale" (Yard) per un mese.
      * Filtra su emessa=1 e obsoleto=0, ordinate per data DESC.
      *
