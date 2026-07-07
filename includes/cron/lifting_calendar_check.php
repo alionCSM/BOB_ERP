@@ -37,7 +37,13 @@ try {
     echo "Segnalazioni trovate: {$result['findings']}\n";
     echo "Email inviate:        {$result['emails_sent']}\n";
 } catch (\Throwable $e) {
-    LoggerFactory::app()->error('[LiftingCalendarCheck] ' . $e->getMessage());
+    // il log su file puo' fallire (permessi: cron lanciato con utente diverso
+    // da www-data) — non deve mascherare l'errore vero
+    try {
+        LoggerFactory::app()->error('[LiftingCalendarCheck] ' . $e->getMessage());
+    } catch (\Throwable $logErr) {
+        error_log('[LiftingCalendarCheck] log fallito: ' . $logErr->getMessage());
+    }
     echo "ERRORE: " . $e->getMessage() . "\n";
     exit(1);
 }

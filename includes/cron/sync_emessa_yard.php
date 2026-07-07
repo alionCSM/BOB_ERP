@@ -42,7 +42,13 @@ try {
     echo "Righe controllate: {$result['checked']}\n";
     echo "Righe aggiornate:  {$result['updated']}\n";
 } catch (\Throwable $e) {
-    LoggerFactory::app()->error('[SyncEmessaYard] ' . $e->getMessage());
+    // il log su file puo' fallire (permessi: cron lanciato con utente diverso
+    // da www-data) — non deve mascherare l'errore vero
+    try {
+        LoggerFactory::app()->error('[SyncEmessaYard] ' . $e->getMessage());
+    } catch (\Throwable $logErr) {
+        error_log('[SyncEmessaYard] log fallito: ' . $logErr->getMessage());
+    }
     echo "ERRORE: " . $e->getMessage() . "\n";
     exit(1);
 }
