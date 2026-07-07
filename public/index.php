@@ -432,6 +432,7 @@ if ($uri === '/fatturazione/consorziate' || str_starts_with($uri, '/fatturazione
            ->get( '/fatturazione/consorziate/{id}',                                 [ConsorziataFatturazioneController::class, 'show'])
            ->get( '/fatturazione/consorziate/{id}/export',                          [ConsorziataFatturazioneController::class, 'export'])
            ->post('/fatturazione/consorziate/{id}/pay',                             [ConsorziataFatturazioneController::class, 'storePayments'])
+           ->post('/fatturazione/consorziate/{id}/gia-pagato',                      [ConsorziataFatturazioneController::class, 'setGiaPagato'])
            ->post('/fatturazione/consorziate/{id}/payment/{pid}/delete',            [ConsorziataFatturazioneController::class, 'deletePayment']);
 
     $router->dispatch($request, $container);

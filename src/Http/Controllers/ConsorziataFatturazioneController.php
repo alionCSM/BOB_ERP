@@ -160,6 +160,69 @@ final class ConsorziataFatturazioneController
         Response::redirect("/fatturazione/consorziate/{$id}?from={$from}&to={$to}");
     }
 
+    // ── POST /fatturazione/consorziate/{id}/gia-pagato ────────────────────────
+
+    /**
+     * Impostazione manuale del "Gia' pagato" (saldo iniziale / rettifica).
+     *
+     * L'utente scrive il NUOVO TOTALE gia' pagato per il cantiere (o per il
+     * singolo ordine): BOB registra in bb_pagamenti_consorziate una riga di
+     * rettifica pari alla differenza rispetto al totale attuale, cosi' lo
+     * storico resta coerente e il residuo torna giusto. Serve per partire
+     * ora con il modulo senza dover ricostruire i pagamenti storici.
+     */
+    public function setGiaPagato(Request $request): never
+    {
+        $id = $request->intParam('id');
+
+        $consorziata = $this->repo->findConsorziata($id);
+        if (!$consorziata) {
+            Response::error('Consorziata non trovata.', 404);
+        }
+
+        $auth   = $GLOBALS['authenticated_user'];
+        $userId = (int)($auth['user_id'] ?? 0);
+
+        $from       = $_POST['from'] ?? date('Y-m-01');
+        $to         = $_POST['to']   ?? date('Y-m-t');
+        $worksiteId = (int)($_POST['worksite_id'] ?? 0);
+        $ordineId   = (int)($_POST['ordine_id'] ?? 0) ?: null;
+
+        // accetta formati it (1.234,56) e standard (1234.56)
+        $raw = trim((string)($_POST['nuovo_totale'] ?? ''));
+        if (str_contains($raw, ',')) {
+            $raw = str_replace(['.', ','], ['', '.'], $raw);
+        }
+        $nuovoTotale = (float)$raw;
+
+        if ($worksiteId <= 0 || $raw === '' || $nuovoTotale < 0) {
+            $_SESSION['error'] = 'Valore "già pagato" non valido.';
+            Response::redirect("/fatturazione/consorziate/{$id}?from={$from}&to={$to}");
+        }
+
+        $attuale = $this->repo->sumPaid($id, $worksiteId, $ordineId);
+        $diff    = round($nuovoTotale - $attuale, 2);
+
+        if (abs($diff) < 0.01) {
+            $_SESSION['success'] = 'Il "già pagato" era già a questo valore: nessuna modifica.';
+            Response::redirect("/fatturazione/consorziate/{$id}?from={$from}&to={$to}");
+        }
+
+        $this->repo->insertPayment(
+            $id,
+            $worksiteId,
+            $diff, // puo' essere negativa: rettifica in diminuzione
+            date('Y-m-d'),
+            'Impostazione manuale "già pagato" (saldo iniziale/rettifica): totale portato a € ' . number_format($nuovoTotale, 2, ',', '.'),
+            $userId,
+            $ordineId
+        );
+
+        $_SESSION['success'] = '"Già pagato" impostato a € ' . number_format($nuovoTotale, 2, ',', '.')
+            . ' (rettifica di € ' . number_format($diff, 2, ',', '.') . ' registrata nello storico).';
+        Response::redirect("/fatturazione/consorziate/{$id}?from={$from}&to={$to}");
+    }
+
     // ── POST /fatturazione/consorziate/{id}/payment/{pid}/delete ─────────────
 
     public function deletePayment(Request $request): never

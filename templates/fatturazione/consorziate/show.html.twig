@@ -207,7 +207,15 @@
                                             <td class="right"><span class="fp-dash">—</span></td>
                                             <td class="right"><span class="fp-dash">—</span></td>
                                             <td class="right">
-                                                {% if r.gia_pagato > 0 %}<span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                <span class="fc-pagato-wrap">
+                                                    {% if r.gia_pagato > 0 %}<span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    <button type="button" class="fc-edit-pagato" title="Imposta manualmente il già pagato (saldo iniziale)"
+                                                            data-set-pagato data-ws="{{ r.worksite_id }}" data-ordine=""
+                                                            data-current="{{ r.gia_pagato }}"
+                                                            data-label="{{ r.worksite_name|e('html_attr') }}">
+                                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                    </button>
+                                                </span>
                                             </td>
                                             <td class="right">
                                                 {% if r.spese_consorziata > 0 %}<span class="fp-danger">€ {{ r.spese_consorziata|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
@@ -255,7 +263,15 @@
                                                     {% if o.order_date %}{{ o.order_date|date('d/m/Y') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                                 </td>
                                                 <td class="right">
-                                                    {% if o.gia_pagato_ordine > 0 %}<span class="fp-success">€ {{ o.gia_pagato_ordine|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    <span class="fc-pagato-wrap">
+                                                        {% if o.gia_pagato_ordine > 0 %}<span class="fp-success">€ {{ o.gia_pagato_ordine|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                        <button type="button" class="fc-edit-pagato" title="Imposta manualmente il già pagato di questo ordine (saldo iniziale)"
+                                                                data-set-pagato data-ws="{{ r.worksite_id }}" data-ordine="{{ o.id }}"
+                                                                data-current="{{ o.gia_pagato_ordine }}"
+                                                                data-label="{{ r.worksite_name|e('html_attr') }} — ordine {{ (o.order_number ?: '#' ~ o.id)|e('html_attr') }}">
+                                                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                        </button>
+                                                    </span>
                                                 </td>
                                                 {% if loop.first %}
                                                     <td rowspan="{{ rowCount }}" class="right">
@@ -315,6 +331,17 @@
                 </div>
             {% endif %}
         </div>
+    </form>
+
+    {# ── Form nascosto: impostazione manuale "Già pagato" (saldo iniziale).
+         Il click sulla matita apre un prompt; la differenza rispetto al
+         totale attuale viene registrata come rettifica nello storico. #}
+    <form id="gia-pagato-form" method="POST" action="/fatturazione/consorziate/{{ consorziata.id }}/gia-pagato" style="display:none;">
+        <input type="hidden" name="from" value="{{ from }}">
+        <input type="hidden" name="to"   value="{{ to }}">
+        <input type="hidden" name="worksite_id"  id="gp-worksite">
+        <input type="hidden" name="ordine_id"    id="gp-ordine">
+        <input type="hidden" name="nuovo_totale" id="gp-totale">
     </form>
 
     {# ── Storico pagamenti ── #}

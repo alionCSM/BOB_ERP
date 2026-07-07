@@ -316,6 +316,29 @@ final class ConsorziataFatturazioneRepository
 
     // ── Write ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Totale gia' pagato per azienda+cantiere (+ordine se indicato).
+     * Usato dall'impostazione manuale del "Gia' pagato" per calcolare la
+     * rettifica da registrare.
+     */
+    public function sumPaid(int $aziendaId, int $worksiteId, ?int $ordineId = null): float
+    {
+        $sql = "
+            SELECT COALESCE(SUM(importo), 0)
+            FROM   bb_pagamenti_consorziate
+            WHERE  azienda_id  = :aid
+              AND  worksite_id = :wid
+        ";
+        $params = [':aid' => $aziendaId, ':wid' => $worksiteId];
+        if ($ordineId !== null) {
+            $sql .= " AND ordine_id = :oid";
+            $params[':oid'] = $ordineId;
+        }
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return (float)$stmt->fetchColumn();
+    }
+
     public function insertPayment(
         int     $aziendaId,
         int     $worksiteId,

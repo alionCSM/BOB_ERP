@@ -15,6 +15,35 @@ document.addEventListener('click', function (e) {
     if (e.target.closest('[data-action="toggle-storico"]')) {
         toggleStorico();
     }
+
+    // Impostazione manuale "Già pagato" (saldo iniziale / rettifica)
+    var editBtn = e.target.closest('[data-set-pagato]');
+    if (editBtn) {
+        var current = parseFloat(editBtn.dataset.current || '0') || 0;
+        var label   = editBtn.dataset.label || '';
+        var raw = prompt(
+            'Imposta il TOTALE "già pagato" per:\n' + label +
+            '\n\nValore attuale: € ' + current.toLocaleString('it-IT', { minimumFractionDigits: 2 }) +
+            '\nLa differenza verrà registrata nello storico come rettifica.',
+            current ? String(current).replace('.', ',') : ''
+        );
+        if (raw === null) return; // annullato
+        raw = raw.trim();
+        if (raw === '') return;
+
+        // valida: numero it (1.234,56) o standard (1234.56)
+        var norm = raw.indexOf(',') !== -1 ? raw.replace(/\./g, '').replace(',', '.') : raw;
+        var val  = parseFloat(norm);
+        if (isNaN(val) || val < 0) {
+            alert('Importo non valido.');
+            return;
+        }
+
+        document.getElementById('gp-worksite').value = editBtn.dataset.ws || '';
+        document.getElementById('gp-ordine').value   = editBtn.dataset.ordine || '';
+        document.getElementById('gp-totale').value   = raw;
+        document.getElementById('gia-pagato-form').submit();
+    }
 });
 
 // ── Index page: live search filter ────────────────────────────────────────────
