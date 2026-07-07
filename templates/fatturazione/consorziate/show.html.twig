@@ -5,13 +5,17 @@
 {% endblock %}
 
 {# ── Macro: render the "Nostra fattura" cell content ────────────────────
-   Period-scoped only: shows the orange total + the righe whose data
-   is inside [from, to]. Righe fuori periodo are esclusi. #}
-{% macro nostra_fattura_cell(nostraFatturaTotal, righe) %}
+   Period-scoped only: totals + righe whose data is inside [from, to].
+   VERDE  = riga passata per una bozza APPLICATA (status fatturata)
+   ARANCIO = riga in una bozza ancora in lavorazione (non applicata) #}
+{% macro nostra_fattura_cell(nostraFatturaTotal, nostraBozzaTotal, righe) %}
     {% set righeInPeriod = righe|filter(rf => rf.in_period) %}
-    {% if nostraFatturaTotal > 0 or righeInPeriod|length > 0 %}
+    {% if nostraFatturaTotal > 0 or nostraBozzaTotal > 0 or righeInPeriod|length > 0 %}
         {% if nostraFatturaTotal > 0 %}
-            <div class="fc-nostra-tot">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
+            <div class="fc-nostra-tot is-applied" title="Bozza applicata (fatturata)">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
+        {% endif %}
+        {% if nostraBozzaTotal > 0 %}
+            <div class="fc-nostra-tot is-pending" title="Bozza in lavorazione, non ancora applicata">€ {{ nostraBozzaTotal|number_format(2, ',', '.') }} <span class="fc-nostra-tag">in bozza</span></div>
         {% endif %}
         {% if righeInPeriod|length > 0 %}
             <ul class="fc-righe-list fc-righe-list-in">
@@ -19,7 +23,8 @@
                 <li>
                     <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
                     <span class="fc-righe-descr">{{ rf.descrizione }}</span>
-                    <span class="fc-righe-amt">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
+                    <span class="fc-righe-amt {{ rf.applied ? 'is-applied' : 'is-pending' }}"
+                          title="{{ rf.applied ? 'Bozza applicata' : 'Bozza in lavorazione' }}">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
                 </li>
             {% endfor %}
             </ul>
@@ -89,7 +94,7 @@
             <div>
                 <div class="fp-stat-value">€ {{ totalNostraFattura|number_format(0, ',', '.') }}</div>
                 <div class="fp-stat-label">Nostra fattura</div>
-                <div class="fp-stat-sub">da bozze fatturate</div>
+                <div class="fp-stat-sub">da bozze applicate{% if totalNostraBozza > 0 %} · <span style="color:#b45309;font-weight:600;">€ {{ totalNostraBozza|number_format(0, ',', '.') }} in bozza</span>{% endif %}</div>
             </div>
         </div>
         <div class="fp-stat">
@@ -197,12 +202,20 @@
                                             <td class="right">
                                                 {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                             </td>
-                                            <td>{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                            <td>{{ nf.nostra_fattura_cell(r.nostra_fattura, r.nostra_fattura_bozza, wsRighe) }}</td>
                                             <td><span class="fp-dash">—</span></td>
                                             <td class="right"><span class="fp-dash">—</span></td>
                                             <td class="right"><span class="fp-dash">—</span></td>
                                             <td class="right">
-                                                {% if r.gia_pagato > 0 %}<span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                <span class="fc-pagato-wrap">
+                                                    {% if r.gia_pagato > 0 %}<span class="fp-success">€ {{ r.gia_pagato|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    <button type="button" class="fc-edit-pagato" title="Imposta manualmente il già pagato (saldo iniziale)"
+                                                            data-set-pagato data-ws="{{ r.worksite_id }}" data-ordine=""
+                                                            data-current="{{ r.gia_pagato }}"
+                                                            data-label="{{ r.worksite_name|e('html_attr') }}">
+                                                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                    </button>
+                                                </span>
                                             </td>
                                             <td class="right">
                                                 {% if r.spese_consorziata > 0 %}<span class="fp-danger">€ {{ r.spese_consorziata|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
@@ -234,7 +247,7 @@
                                                     <td rowspan="{{ rowCount }}" class="right">
                                                         {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                                     </td>
-                                                    <td rowspan="{{ rowCount }}">{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                                    <td rowspan="{{ rowCount }}">{{ nf.nostra_fattura_cell(r.nostra_fattura, r.nostra_fattura_bozza, wsRighe) }}</td>
                                                 {% endif %}
                                                 {# Per-ordine cells #}
                                                 <td>
@@ -250,7 +263,15 @@
                                                     {% if o.order_date %}{{ o.order_date|date('d/m/Y') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                                 </td>
                                                 <td class="right">
-                                                    {% if o.gia_pagato_ordine > 0 %}<span class="fp-success">€ {{ o.gia_pagato_ordine|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                    <span class="fc-pagato-wrap">
+                                                        {% if o.gia_pagato_ordine > 0 %}<span class="fp-success">€ {{ o.gia_pagato_ordine|number_format(2, ',', '.') }}</span>{% else %}<span class="fp-dash">—</span>{% endif %}
+                                                        <button type="button" class="fc-edit-pagato" title="Imposta manualmente il già pagato di questo ordine (saldo iniziale)"
+                                                                data-set-pagato data-ws="{{ r.worksite_id }}" data-ordine="{{ o.id }}"
+                                                                data-current="{{ o.gia_pagato_ordine }}"
+                                                                data-label="{{ r.worksite_name|e('html_attr') }} — ordine {{ (o.order_number ?: '#' ~ o.id)|e('html_attr') }}">
+                                                            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                        </button>
+                                                    </span>
                                                 </td>
                                                 {% if loop.first %}
                                                     <td rowspan="{{ rowCount }}" class="right">
@@ -310,6 +331,17 @@
                 </div>
             {% endif %}
         </div>
+    </form>
+
+    {# ── Form nascosto: impostazione manuale "Già pagato" (saldo iniziale).
+         Il click sulla matita apre un prompt; la differenza rispetto al
+         totale attuale viene registrata come rettifica nello storico. #}
+    <form id="gia-pagato-form" method="POST" action="/fatturazione/consorziate/{{ consorziata.id }}/gia-pagato" style="display:none;">
+        <input type="hidden" name="from" value="{{ from }}">
+        <input type="hidden" name="to"   value="{{ to }}">
+        <input type="hidden" name="worksite_id"  id="gp-worksite">
+        <input type="hidden" name="ordine_id"    id="gp-ordine">
+        <input type="hidden" name="nuovo_totale" id="gp-totale">
     </form>
 
     {# ── Storico pagamenti ── #}

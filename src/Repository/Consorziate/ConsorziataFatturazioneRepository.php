@@ -81,11 +81,10 @@ final class ConsorziataFatturazioneRepository
                         SELECT SUM(e.totale) FROM bb_extra e WHERE e.worksite_id = w.id
                     ), 0)
                 )                                                                 AS totale_contratto,
-                /* nostra fattura: somma delle righe bb_billing del cantiere
-                   che sono state toccate da una bozza APPLICATA (status =
-                   'fatturata') con riga non esclusa, e con data nel periodo
-                   selezionato. Se la bozza esiste ma non è ancora stata
-                   applicata ai cantieri, il valore rimane 0. */
+                /* nostra fattura (APPLICATA, verde): somma delle righe
+                   bb_billing del cantiere toccate da una bozza APPLICATA
+                   (status = 'fatturata') con riga non esclusa, e con data
+                   nel periodo selezionato. */
                 COALESCE((
                     SELECT SUM(b.totale_imponibile)
                     FROM   bb_billing b
@@ -98,6 +97,28 @@ final class ConsorziataFatturazioneRepository
                           WHERE  d.status = 'fatturata' AND l.excluded = 0
                       )
                 ), 0)                                                             AS nostra_fattura,
+                /* nostra fattura IN BOZZA (arancione): righe toccate da una
+                   bozza ancora in lavorazione (non applicata, non annullata)
+                   e NON gia' coperte da una bozza applicata. */
+                COALESCE((
+                    SELECT SUM(b.totale_imponibile)
+                    FROM   bb_billing b
+                    WHERE  b.worksite_id = w.id
+                      AND  b.data BETWEEN :from_nb AND :to_nb
+                      AND  b.id IN (
+                          SELECT DISTINCT l.bb_billing_id
+                          FROM   bb_billing_draft_lines l
+                          JOIN   bb_billing_drafts      d ON d.id = l.draft_id
+                          WHERE  d.status IN ('bozza','inviata_cliente','da_modificare','approvata')
+                            AND  l.excluded = 0
+                      )
+                      AND  b.id NOT IN (
+                          SELECT DISTINCT l2.bb_billing_id
+                          FROM   bb_billing_draft_lines l2
+                          JOIN   bb_billing_drafts      d2 ON d2.id = l2.draft_id
+                          WHERE  d2.status = 'fatturata' AND l2.excluded = 0
+                      )
+                ), 0)                                                             AS nostra_fattura_bozza,
                 COALESCE((
                     SELECT SUM(o.total)
                     FROM   bb_ordini o
@@ -151,6 +172,8 @@ final class ConsorziataFatturazioneRepository
             ':to'      => $to,
             ':from_nf' => $from,
             ':to_nf'   => $to,
+            ':from_nb' => $from,
+            ':to_nb'   => $to,
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -223,6 +246,8 @@ final class ConsorziataFatturazioneRepository
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($worksiteIds), '?'));
+        // Righe da bozza APPLICATA (applied=1, verde) e da bozza ancora in
+        // lavorazione (applied=0, arancione). Le bozze annullate non contano.
         $sql = "
             SELECT
                 b.id,
@@ -230,14 +255,22 @@ final class ConsorziataFatturazioneRepository
                 b.data,
                 b.descrizione,
                 b.totale_imponibile,
-                (b.data BETWEEN ? AND ?) AS in_period
+                (b.data BETWEEN ? AND ?) AS in_period,
+                EXISTS(
+                    SELECT 1
+                    FROM   bb_billing_draft_lines la
+                    JOIN   bb_billing_drafts      da ON da.id = la.draft_id
+                    WHERE  la.bb_billing_id = b.id
+                      AND  da.status = 'fatturata' AND la.excluded = 0
+                ) AS applied
             FROM   bb_billing b
             WHERE  b.worksite_id IN ({$placeholders})
               AND  b.id IN (
                   SELECT DISTINCT l.bb_billing_id
                   FROM   bb_billing_draft_lines l
                   JOIN   bb_billing_drafts      d ON d.id = l.draft_id
-                  WHERE  d.status = 'fatturata' AND l.excluded = 0
+                  WHERE  d.status IN ('fatturata','bozza','inviata_cliente','da_modificare','approvata')
+                    AND  l.excluded = 0
               )
             ORDER BY b.worksite_id ASC, in_period DESC, b.data DESC, b.id DESC
         ";
@@ -282,6 +315,29 @@ final class ConsorziataFatturazioneRepository
     }
 
     // ── Write ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Totale gia' pagato per azienda+cantiere (+ordine se indicato).
+     * Usato dall'impostazione manuale del "Gia' pagato" per calcolare la
+     * rettifica da registrare.
+     */
+    public function sumPaid(int $aziendaId, int $worksiteId, ?int $ordineId = null): float
+    {
+        $sql = "
+            SELECT COALESCE(SUM(importo), 0)
+            FROM   bb_pagamenti_consorziate
+            WHERE  azienda_id  = :aid
+              AND  worksite_id = :wid
+        ";
+        $params = [':aid' => $aziendaId, ':wid' => $worksiteId];
+        if ($ordineId !== null) {
+            $sql .= " AND ordine_id = :oid";
+            $params[':oid'] = $ordineId;
+        }
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return (float)$stmt->fetchColumn();
+    }
 
     public function insertPayment(
         int     $aziendaId,

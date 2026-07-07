@@ -234,11 +234,23 @@
     border-top: 1px dashed #e2e8f0;      /* lighter divider for sub-rows */
 }
 
-/* "Nostra fattura" cell — header line + righe list */
+/* "Nostra fattura" cell — header line + righe list.
+   Verde = bozza applicata (fatturata), arancio = bozza in lavorazione. */
 .fc-nostra-tot {
     font-weight: 600;
     color: #b45309;
     font-size: 13px;
+}
+.fc-nostra-tot.is-applied { color: #15803d; }
+.fc-nostra-tot.is-pending { color: #b45309; }
+.fc-nostra-tag {
+    display: inline-block;
+    background: #fef3c7; color: #b45309;
+    border: 1px solid #fde68a; border-radius: 999px;
+    font-size: 10px; font-weight: 700;
+    padding: 1px 7px; margin-left: 4px;
+    text-transform: uppercase; letter-spacing: .3px;
+    vertical-align: 1px;
 }
 .fc-righe-list {
     list-style: none;
@@ -259,6 +271,26 @@
 .fc-righe-date  { color: #94a3b8; font-variant-numeric: tabular-nums; }
 .fc-righe-descr { color: #475569; }
 .fc-righe-amt   { color: #b45309; font-weight: 500; white-space: nowrap; }
+.fc-righe-amt.is-applied { color: #15803d; }
+.fc-righe-amt.is-pending { color: #b45309; }
+
+/* "Già pagato" — matita per impostazione manuale (saldo iniziale) */
+.fc-pagato-wrap {
+    display: inline-flex; align-items: center; gap: 6px;
+    justify-content: flex-end;
+}
+.fc-edit-pagato {
+    width: 22px; height: 22px; border-radius: 6px;
+    border: 1px solid #e2e8f0; background: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .12s;
+    opacity: 0; /* visibile solo su hover della riga */
+    flex: none;
+}
+.fc-edit-pagato svg { width: 11px; height: 11px; stroke: #64748b; fill: none; stroke-width: 2; }
+tr:hover .fc-edit-pagato { opacity: 1; }
+.fc-edit-pagato:hover { border-color: #93c5fd; background: #eff6ff; }
+.fc-edit-pagato:hover svg { stroke: #2563eb; }
 
 /* Ordine cell — number + oggetto */
 .fc-ord-oggetto {
