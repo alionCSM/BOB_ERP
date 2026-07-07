@@ -54,7 +54,11 @@ class SqlServerConnection
 
         } catch (PDOException $e) {
             if ($this->config->isProduction()) {
-                \App\Infrastructure\LoggerFactory::database()->error('SQL Server connection error');
+                // all'utente il messaggio generico, ma nel log (privato,
+                // server-side) serve la causa VERA per poter diagnosticare
+                \App\Infrastructure\LoggerFactory::database()->error(
+                    'SQL Server connection error: ' . $e->getMessage()
+                );
                 throw new Exception('Errore di connessione al sistema Yard');
             }
             throw new Exception('SQL Server error: ' . $e->getMessage());
