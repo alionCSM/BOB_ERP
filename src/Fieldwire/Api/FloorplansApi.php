@@ -11,7 +11,7 @@ class FloorplansApi
 
     public function all(string $projectId): array
     {
-        return $this->client->get("/projects/{$projectId}/floorplans");
+        return $this->client->getAll("/projects/{$projectId}/floorplans");
     }
 
     public function find(string $projectId, string $floorplanId): array

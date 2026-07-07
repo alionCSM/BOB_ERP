@@ -674,9 +674,28 @@
                         {% for m in mezzi %}
                             <tr>
                                 <td>{{ m.mezzo_descrizione }}</td>
-                                <td>{{ m.tipo_noleggio }}</td>
+                                <td>
+                                    {{ m.tipo_noleggio }}
+                                    {% if m.tipo_noleggio == 'Giornaliero' %}
+                                        {% set dowNames = {'1':'Lun','2':'Mar','3':'Mer','4':'Gio','5':'Ven','6':'Sab','7':'Dom'} %}
+                                        {% set calSet = (m.calendario ?? '1,2,3,4,5')|split(',') %}
+                                        <div class="text-xs text-slate-500">
+                                            {% if calSet == ['1','2','3','4','5'] %}Lun–Ven
+                                            {%- elseif calSet == ['1','2','3','4','5','6'] %}Lun–Sab
+                                            {%- elseif calSet == ['1','2','3','4','5','6','7'] %}Tutti i giorni
+                                            {%- else %}{% for n in calSet %}{{ dowNames[n] ?? n }}{{ not loop.last ? ', ' }}{% endfor %}
+                                            {%- endif %}{{ m.festivi_inclusi ? ' + festivi' : '' }}{{ (m.extra_days_count ?? 0) > 0 ? ' · +' ~ m.extra_days_count ~ ' gg extra' : '' }}
+                                        </div>
+                                    {% endif %}
+                                </td>
                                 <td>{{ m.quantita|round(0) }}</td>
-                                <td>{{ m.costo_giornaliero|number_format(2, ',', '.') }} €</td>
+                                <td>
+                                    {{ m.costo_giornaliero|number_format(2, ',', '.') }} €
+                                    {%- if m.tipo_noleggio == 'Giornaliero' %}<span class="text-xs text-slate-500">/gg</span>
+                                    {%- elseif m.tipo_noleggio == 'Settimanale' %}<span class="text-xs text-slate-500">/sett</span>
+                                    {%- elseif m.tipo_noleggio == 'Mensile' %}<span class="text-xs text-slate-500">/mese</span>
+                                    {%- endif %}
+                                </td>
                                 <td>{{ m.data_inizio|date('d/m/Y') }}</td>
                                 <td>{{ m.data_fine ? m.data_fine|date('d/m/Y') : '-' }}</td>
                                 <td>

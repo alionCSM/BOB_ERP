@@ -2,94 +2,144 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/equipment/noleggio.css">
 {% endblock %}
 
 {% block content %}
-<div class="intro-y mt-8">
-    <h2 class="text-lg font-medium">Assegna Mezzi - Noleggio</h2>
-</div>
+<div class="rn-page">
 
-<div class="mt-6 mb-6">
-    <label class="form-label">Seleziona Cantiere</label>
-    <select id="worksiteSelect" class="tomselect" placeholder="Cerca cantiere..."
-            data-mezzi="{{ mezzi|json_encode }}"
-            data-selected-value="{{ selectedOption.value ?? '' }}"
-            data-selected-text="{{ selectedOption.text ?? '' }}"
-    ></select>
-</div>
+    <div class="rn-hero">
+        <div class="rn-hero-content">
+            <div class="rn-hero-left">
+                <div class="rn-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
+                </div>
+                <div>
+                    <h1 class="rn-hero-title">Assegna Mezzi — Noleggio</h1>
+                    <p class="rn-hero-sub">Aggiungi mezzi di sollevamento a un cantiere</p>
+                </div>
+            </div>
+            <a href="/equipment/rentals" class="rn-btn-back">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Tutti i noleggi
+            </a>
+        </div>
+    </div>
 
-{# TODO: 'selectedWorksite' comes from $_GET['worksite_id'] — passed from controller as `selectedWorksite` variable #}
-{% if selectedWorksite %}
-    <form method="POST">
-        <input type="hidden" name="_token" value="{{ csrfToken }}">
-        <input type="hidden" name="worksite_id" value="{{ selectedWorksite }}">
-        <input type="hidden" name="save_all" value="1">
+    <div class="rn-picker">
+        <label class="form-label">Seleziona Cantiere</label>
+        <select id="worksiteSelect" class="tomselect" placeholder="Cerca cantiere..."
+                data-mezzi="{{ mezzi|json_encode }}"
+                data-selected-value="{{ selectedOption.value ?? '' }}"
+                data-selected-text="{{ selectedOption.text ?? '' }}"
+        ></select>
+    </div>
 
-        <div id="mezzi-container" class="mt-12 space-y-2">
-            <div class="mt-2">
-                <button
-                        type="button"
-                        id="copy-start-date"
-                        class="btn btn-success"
-                >
-                    Copia Prima Data Inizio
+    {# TODO: 'selectedWorksite' comes from $_GET['worksite_id'] — passed from controller as `selectedWorksite` variable #}
+    {% if selectedWorksite %}
+        <form method="POST">
+            <input type="hidden" name="_token" value="{{ csrfToken }}">
+            <input type="hidden" name="worksite_id" value="{{ selectedWorksite }}">
+            <input type="hidden" name="save_all" value="1">
+
+            <div id="mezzi-container" class="mt-6 space-y-3">
+                <div class="rn-toolbar" style="margin-bottom:4px">
+                    <button type="button" id="copy-start-date" class="rn-btn-filter">
+                        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copia prima data inizio su tutte le righe
+                    </button>
+                </div>
+                <!-- Prima riga -->
+                <div class="row-item grid grid-cols-12 gap-3 items-end p-2 rounded">
+                    <div class="col-span-3">
+                        <label class="form-label">Mezzo</label>
+                        <select name="mezzo_id[]" class="form-select mezzo-select" required>
+                            <option value="">-- Scegli mezzo --</option>
+                            {% for m in mezzi %}
+                                <option
+                                        value="{{ m.id }}"
+                                        data-special="{{ m.descrizione == 'Trasporto A/R' ? '1' : '0' }}"
+                                >
+                                    {{ m.descrizione }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="form-label">Tipo</label>
+                        <select name="tipo_noleggio[]" class="form-select tipo-select">
+                            <option value="Giornaliero">Giornaliero</option>
+                            <option value="Settimanale">Settimanale</option>
+                            <option value="Mensile">Mensile</option>
+                            <option value="Una Tantum">Una Tantum</option>
+                        </select>
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="form-label">Quantità</label>
+                        <input type="number" name="quantita[]" min="1" value="1" class="form-control" required>
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="form-label costo-label">Costo (€/giorno)</label>
+                        <input type="number" step="0.01" name="costo[]" class="form-control" required>
+                    </div>
+
+                    <div class="col-span-2">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" name="data_inizio[]" class="form-control" required>
+                    </div>
+
+                    <div class="col-span-1">
+                        <button type="button" class="rn-btn rn-btn-delete remove-row hidden" title="Elimina riga">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+
+                    {# Solo per Giornaliero: quali giorni si contano #}
+                    <div class="col-span-4 cal-wrap">
+                        <label class="form-label">Giorni conteggiati</label>
+                        <div class="rn-days">
+                            <button type="button" class="rn-day on" data-day="1">Lun</button>
+                            <button type="button" class="rn-day on" data-day="2">Mar</button>
+                            <button type="button" class="rn-day on" data-day="3">Mer</button>
+                            <button type="button" class="rn-day on" data-day="4">Gio</button>
+                            <button type="button" class="rn-day on" data-day="5">Ven</button>
+                            <button type="button" class="rn-day is-weekend" data-day="6">Sab</button>
+                            <button type="button" class="rn-day is-weekend" data-day="7">Dom</button>
+                        </div>
+                        <input type="hidden" name="calendario[]" class="cal-value" value="1,2,3,4,5">
+                    </div>
+                    <div class="col-span-3 cal-wrap">
+                        <label class="form-label">Festivi nazionali</label>
+                        <div>
+                            <button type="button" class="rn-fest-chip fest-chip">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                <span class="fest-chip-text">Festivi esclusi</span>
+                            </button>
+                        </div>
+                        <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button id="add-row" type="button" class="rn-btn rn-btn-edit">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Aggiungi mezzo
                 </button>
             </div>
-            <!-- Prima riga -->
-            <div class="row-item grid grid-cols-12 gap-2 items-end bg-gray-50 p-2 rounded">
-                <div class="col-span-3">
-                    <label class="form-label">Mezzo</label>
-                    <select name="mezzo_id[]" class="form-select mezzo-select" required>
-                        <option value="">-- Scegli mezzo --</option>
-                        {% for m in mezzi %}
-                            <option
-                                    value="{{ m.id }}"
-                                    data-special="{{ m.descrizione == 'Trasporto A/R' ? '1' : '0' }}"
-                            >
-                                {{ m.descrizione }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
 
-                <div class="col-span-2">
-                    <label class="form-label">Tipo</label>
-                    <select name="tipo_noleggio[]" class="form-select">
-                        <option value="Giornaliero">Giornaliero</option>
-                        <option value="Una Tantum">Una Tantum</option>
-                    </select>
-                </div>
-
-                <div class="col-span-2">
-                    <label class="form-label">Quantità</label>
-                    <input type="number" name="quantita[]" min="1" value="1" class="form-control" required>
-                </div>
-
-                <div class="col-span-2">
-                    <label class="form-label">Costo (€)</label>
-                    <input type="number" step="0.01" name="costo[]" class="form-control" required>
-                </div>
-
-                <div class="col-span-2">
-                    <label class="form-label">Data Inizio</label>
-                    <input type="date" name="data_inizio[]" class="form-control" required>
-                </div>
-
-                <div class="col-span-1">
-                    <button type="button" class="btn btn-danger remove-row hidden">Elimina Riga</button>
-                </div>
+            <div class="rn-savebar">
+                <button type="submit" class="rn-btn-save">
+                    <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Salva noleggi
+                </button>
             </div>
-        </div>
-
-        <div class="mt-4">
-            <button id="add-row" type="button" class="btn btn-primary">+ Aggiungi Mezzo</button>
-        </div>
-
-        <div class="flex justify-end mt-6">
-            <button type="submit" class="btn btn-primary">Salva</button>
-        </div>
-    </form>
-{% endif %}
+        </form>
+    {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}

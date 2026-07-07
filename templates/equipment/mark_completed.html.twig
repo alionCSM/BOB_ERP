@@ -1,95 +1,100 @@
 {% extends 'layout/base.html.twig' %}
 
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/equipment/noleggio.css">
+{% endblock %}
+
 {% block content %}
-<div class="intro-y box p-5 mt-5">
-    <h2 class="text-lg font-medium mb-4">
-        Marca Mezzi Completati - {{ worksiteId }}
-    </h2>
+<div class="rn-page">
+
+    <div class="rn-hero">
+        <div class="rn-hero-content">
+            <div class="rn-hero-left">
+                <div class="rn-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <div>
+                    <h1 class="rn-hero-title">Termina noleggio</h1>
+                    <p class="rn-hero-sub">Seleziona i mezzi da ritirare e indica quantità e data fine</p>
+                </div>
+            </div>
+            <a href="/equipment/rentals" class="rn-btn-back">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Torna ai noleggi
+            </a>
+        </div>
+    </div>
 
     {% if message %}
-        <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
-            <span>{{ message }}</span>
-            <button type="button" data-dismiss-alert class="text-green-800 font-bold ml-4">&times;</button>
+        <div class="rn-toast">
+            <span>✓ {{ message }}</span>
+            <button type="button" data-dismiss-alert>&times;</button>
         </div>
     {% endif %}
 
+    {% if attivi is empty %}
+        <div class="rn-empty">
+            <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <p class="rn-empty-text">Nessun mezzo attivo da terminare per questo cantiere.</p>
+        </div>
+    {% else %}
     <form method="POST">
         <input type="hidden" name="_token" value="{{ csrfToken }}">
         <input type="hidden" name="mark_completed" value="1">
 
-        <table class="table w-full text-sm">
-            <thead class="bg-sky-100 text-slate-700">
-            <tr>
-                <th>Seleziona</th>
-                <th>Mezzo</th>
-                <th>Prezzo Unitario</th>
-                <th>Quantità Totale</th>
-                <th>Q.ta da Completare</th>
-                <th>Data Fine</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for i, r in attivi %}
-                <tr class="hover:bg-slate-100">
-                    <td class="px-2">
-                        <input
-                                type="checkbox"
-                                name="selected[]"
-                                value="{{ i }}"
-                                data-toggle-row="{{ i }}"
-                        >
-                        <input
-                                type="hidden"
-                                name="id[{{ i }}]"
-                                value="{{ r.id }}"
-                        >
-                    </td>
-                    <td>{{ r.mezzo_descrizione }}</td>
-                    <td>{{ r.costo_giornaliero|number_format(2, ',', '') }} €</td>
-                    <td>
-                        {{ r.quantita }}
-                        <input
-                                type="hidden"
-                                name="quantita[{{ i }}]"
-                                value="{{ r.quantita }}"
-                        >
-                    </td>
-                    <td>
-                        <input
-                                id="quantita_{{ i }}"
-                                type="number"
-                                name="quantita_finire[{{ i }}]"
-                                class="form-input w-20 text-center"
-                                min="1"
-                                max="{{ r.quantita }}"
-                                value="1"
-                                disabled
-                                required
-                        >
-                    </td>
-                    <td>
-                        <input
-                                id="datafine_{{ i }}"
-                                type="date"
-                                name="data_fine[{{ i }}]"
-                                class="form-input w-full"
-                                disabled
-                                required
-                        >
-                    </td>
-                </tr>
-            {% else %}
-                <tr><td colspan="5" class="text-center py-4">Nessun mezzo Attivo da completare.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        {% for i, r in attivi %}
+            <div class="rn-card">
+                <div class="rn-card-body" style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
 
-        <div class="text-right mt-5">
-            <button type="submit" class="btn btn-primary">
-                Marca come Completati
+                    <label class="rn-check">
+                        <input type="checkbox" name="selected[]" value="{{ i }}" data-toggle-row="{{ i }}">
+                        <span class="rn-check-box">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        </span>
+                    </label>
+                    <input type="hidden" name="id[{{ i }}]" value="{{ r.id }}">
+
+                    <div style="flex:1; min-width:180px;">
+                        <div style="font-size:14.5px; font-weight:700; color:#0f172a;">{{ r.mezzo_descrizione }}</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                            {{ r.costo_giornaliero|number_format(2, ',', '.') }} € · dal {{ r.data_inizio|date('d/m/Y') }}
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="rn-field-label">Q.tà attiva</span>
+                        <div class="rn-field-value" style="text-align:center">
+                            <span class="rn-badge rn-badge-attivo">{{ r.quantita }}</span>
+                        </div>
+                        <input type="hidden" name="quantita[{{ i }}]" value="{{ r.quantita }}">
+                    </div>
+
+                    <div style="width:110px;">
+                        <span class="rn-field-label">Q.tà da terminare</span>
+                        <input id="quantita_{{ i }}" type="number" name="quantita_finire[{{ i }}]"
+                               class="rn-input" style="text-align:center"
+                               min="1" max="{{ r.quantita }}" value="1" disabled required>
+                    </div>
+
+                    <div style="width:160px;">
+                        <span class="rn-field-label">Data fine</span>
+                        <input id="datafine_{{ i }}" type="date" name="data_fine[{{ i }}]"
+                               class="rn-input" disabled required>
+                    </div>
+
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="rn-savebar">
+            <button type="submit" class="rn-btn-save">
+                <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                Termina selezionati
             </button>
         </div>
     </form>
+    {% endif %}
+
 </div>
 {% endblock %}
 

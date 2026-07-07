@@ -89,6 +89,8 @@ final class EquipmentController
             $costi       = $_POST['costo']          ?? [];
             $quantita    = $_POST['quantita']       ?? [];
             $dataInizio  = $_POST['data_inizio']    ?? [];
+            $calendari   = $_POST['calendario']     ?? [];
+            $festivi     = $_POST['festivi_inclusi'] ?? [];
 
             for ($i = 0; $i < count($mezziIds); $i++) {
                 $this->equipmentRepo->assignToWorksite(
@@ -97,7 +99,9 @@ final class EquipmentController
                     $tipi[$i]       ?? 'Giornaliero',
                     (float)($costi[$i] ?? 0),
                     (int)($quantita[$i] ?? 1),
-                    $dataInizio[$i] ?? date('Y-m-d')
+                    $dataInizio[$i] ?? date('Y-m-d'),
+                    (string)($calendari[$i] ?? 'lun_ven'),
+                    !empty($festivi[$i])
                 );
             }
 
@@ -156,9 +160,10 @@ final class EquipmentController
             $message = 'Modifiche salvate con successo!';
         }
 
-        $mezzi = $this->equipmentRepo->getByWorksite($worksiteId);
+        $mezzi     = $this->equipmentRepo->getByWorksite($worksiteId);
+        $extraDays = $this->equipmentRepo->extraDaysByWorksite($worksiteId);
 
-        Response::view('equipment/edit.html.twig', $request, compact('worksiteId', 'worksite', 'message', 'mezzi'));
+        Response::view('equipment/edit.html.twig', $request, compact('worksiteId', 'worksite', 'message', 'mezzi', 'extraDays'));
     }
 
     // ── Mark rentals complete ──────────────────────────────────────────────────
@@ -212,8 +217,10 @@ final class EquipmentController
         }
 
         $mezzi  = $this->equipmentRepo->getByWorksite($worksiteId);
+        // Terminabile tutto cio' che matura nel tempo (Giornaliero/Settimanale/
+        // Mensile); le Una Tantum sono servizi senza durata.
         $attivi = array_values(array_filter($mezzi, fn($m) =>
-            ($m['stato'] ?? '') === 'Attivo' && ($m['tipo_noleggio'] ?? '') === 'Giornaliero'
+            ($m['stato'] ?? '') === 'Attivo' && ($m['tipo_noleggio'] ?? '') !== 'Una Tantum'
         ));
 
         Response::view('equipment/mark_completed.html.twig', $request, compact('worksiteId', 'message', 'mezzi', 'attivi'));

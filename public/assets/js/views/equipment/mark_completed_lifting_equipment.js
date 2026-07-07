@@ -18,6 +18,9 @@
         df.disabled = !on;
         qf.required = on;
         df.required = on;
+        // evidenzia la card selezionata
+        var card = chk.closest('.rn-card');
+        if (card) card.classList.toggle('is-selected', on);
         // se ho appena abilitato la data e e' vuota, preimposta oggi
         if (on && !df.value) {
             var t = new Date();

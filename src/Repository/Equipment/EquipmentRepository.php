@@ -83,8 +83,8 @@ final class EquipmentRepository
                 wl.worksite_id,
                 w.worksite_code,
                 w.name AS cantiere_nome,
-                SUM(CASE WHEN wl.tipo_noleggio = 'Giornaliero' THEN wl.quantita ELSE 0 END) AS total_mezzi,
-                SUM(CASE WHEN wl.tipo_noleggio = 'Giornaliero' AND wl.stato = 'Attivo' THEN wl.quantita ELSE 0 END) AS mezzi_attivi,
+                SUM(CASE WHEN wl.tipo_noleggio <> 'Una Tantum' THEN wl.quantita ELSE 0 END) AS total_mezzi,
+                SUM(CASE WHEN wl.tipo_noleggio <> 'Una Tantum' AND wl.stato = 'Attivo' THEN wl.quantita ELSE 0 END) AS mezzi_attivi,
                 MIN(wl.data_inizio) AS prima_data_inizio,
                 MAX(wl.data_fine)   AS ultima_data_fine
             FROM bb_worksite_lifting wl
@@ -102,7 +102,8 @@ final class EquipmentRepository
     public function getByWorksite(int $worksiteId): array
     {
         $stmt = $this->conn->prepare("
-            SELECT wl.*, le.descrizione AS mezzo_descrizione
+            SELECT wl.*, le.descrizione AS mezzo_descrizione,
+                   (SELECT COUNT(*) FROM bb_lifting_extra_days e WHERE e.rental_id = wl.id) AS extra_days_count
             FROM bb_worksite_lifting wl
             JOIN bb_lifting_equipment le ON wl.lifting_equipment_id = le.id
             WHERE wl.worksite_id = :ws
@@ -127,18 +128,28 @@ final class EquipmentRepository
         string $tipoNoleggio,
         float  $costo,
         int    $quantita,
-        string $dataInizio
+        string $dataInizio,
+        string $calendario = '1,2,3,4,5',
+        bool   $festiviInclusi = false
     ): bool {
+        // calendario/festivi hanno senso solo per il Giornaliero
+        if ($tipoNoleggio !== 'Giornaliero') {
+            $calendario     = '1,2,3,4,5';
+            $festiviInclusi = false;
+        }
         $stmt = $this->conn->prepare("
             INSERT INTO bb_worksite_lifting
-                (worksite_id, lifting_equipment_id, tipo_noleggio, stato, data_inizio, costo_giornaliero, quantita)
+                (worksite_id, lifting_equipment_id, tipo_noleggio, calendario, festivi_inclusi,
+                 stato, data_inizio, costo_giornaliero, quantita)
             VALUES
-                (:ws, :mezzo, :tipo, 'Attivo', :inizio, :costo, :quantita)
+                (:ws, :mezzo, :tipo, :cal, :fest, 'Attivo', :inizio, :costo, :quantita)
         ");
         return $stmt->execute([
             ':ws'       => $worksiteId,
             ':mezzo'    => $mezzoId,
             ':tipo'     => $tipoNoleggio,
+            ':cal'      => $calendario,
+            ':fest'     => (int)$festiviInclusi,
             ':inizio'   => $dataInizio,
             ':costo'    => $costo,
             ':quantita' => $quantita,
@@ -158,7 +169,9 @@ final class EquipmentRepository
         string $stato,
         int    $quantita,
         string $oldStato,
-        int    $userId
+        int    $userId,
+        string $calendario = '1,2,3,4,5',
+        bool   $festiviInclusi = false
     ): bool {
         $current = $this->getRentalById($id);
         if (!$current) {
@@ -169,12 +182,19 @@ final class EquipmentRepository
             return false;
         }
 
+        if ($tipoNoleggio !== 'Giornaliero') {
+            $calendario     = '1,2,3,4,5';
+            $festiviInclusi = false;
+        }
+
         $dataFine = ($stato === 'Attivo') ? null : $current['data_fine'];
 
         $stmt = $this->conn->prepare("
             UPDATE bb_worksite_lifting
             SET costo_giornaliero = :costo,
                 tipo_noleggio     = :tipo,
+                calendario        = :cal,
+                festivi_inclusi   = :fest,
                 data_inizio       = :di,
                 stato             = :st,
                 quantita          = :qt,
@@ -184,6 +204,8 @@ final class EquipmentRepository
         $stmt->execute([
             ':costo' => $costo,
             ':tipo'  => $tipoNoleggio,
+            ':cal'   => $calendario,
+            ':fest'  => (int)$festiviInclusi,
             ':di'    => $dataInizio,
             ':st'    => $stato,
             ':qt'    => $quantita,
@@ -195,6 +217,8 @@ final class EquipmentRepository
         $fields = [
             'costo_giornaliero' => $costo,
             'tipo_noleggio'     => $tipoNoleggio,
+            'calendario'        => $calendario,
+            'festivi_inclusi'   => (int)$festiviInclusi,
             'data_inizio'       => $dataInizio,
             'stato'             => $stato,
             'quantita'          => $quantita,
@@ -238,6 +262,9 @@ final class EquipmentRepository
         $dateInizio = $data['data_inizio']  ?? [];
         $stati      = $data['stato']        ?? [];
         $quantita   = $data['quantita']     ?? [];
+        $calendari  = $data['calendario']   ?? [];
+        $festivi    = $data['festivi_inclusi'] ?? [];
+        $extraDays  = $data['extra_days']   ?? []; // [rental_id => [date, ...]]
 
         for ($i = 0, $n = count($ids); $i < $n; $i++) {
             $rentalId = (int)$ids[$i];
@@ -254,8 +281,69 @@ final class EquipmentRepository
                 $stati[$i],
                 (int)$quantita[$i],
                 $current['stato'],
-                $userId
+                $userId,
+                (string)($calendari[$i] ?? '1,2,3,4,5'),
+                !empty($festivi[$i])
             );
+
+            // Giorni extra: il form invia la lista completa per rental → sync
+            $this->syncExtraDays($rentalId, (array)($extraDays[$rentalId] ?? []), $userId);
+        }
+    }
+
+    // ── Giorni extra (date fuori calendario conteggiate comunque) ────────────
+
+    /** @return array<int, string[]> rental_id => elenco date Y-m-d */
+    public function extraDaysByWorksite(int $worksiteId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT e.rental_id, e.data
+            FROM bb_lifting_extra_days e
+            JOIN bb_worksite_lifting wl ON wl.id = e.rental_id
+            WHERE wl.worksite_id = :ws
+            ORDER BY e.data ASC
+        ");
+        $stmt->execute([':ws' => $worksiteId]);
+
+        $out = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $out[(int)$row['rental_id']][] = substr((string)$row['data'], 0, 10);
+        }
+        return $out;
+    }
+
+    /** Allinea le date extra del rental alla lista inviata dal form. */
+    public function syncExtraDays(int $rentalId, array $dates, int $userId): void
+    {
+        // normalizza e dedup
+        $clean = [];
+        foreach ($dates as $d) {
+            $d = substr(trim((string)$d), 0, 10);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) $clean[$d] = true;
+        }
+        $clean = array_keys($clean);
+
+        $stmt = $this->conn->prepare("SELECT data FROM bb_lifting_extra_days WHERE rental_id = :r");
+        $stmt->execute([':r' => $rentalId]);
+        $existing = array_map(fn($v) => substr((string)$v, 0, 10), $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $toAdd    = array_diff($clean, $existing);
+        $toRemove = array_diff($existing, $clean);
+
+        if (!empty($toAdd)) {
+            $ins = $this->conn->prepare("
+                INSERT IGNORE INTO bb_lifting_extra_days (rental_id, data, created_by)
+                VALUES (:r, :d, :u)
+            ");
+            foreach ($toAdd as $d) {
+                $ins->execute([':r' => $rentalId, ':d' => $d, ':u' => $userId ?: null]);
+            }
+        }
+        if (!empty($toRemove)) {
+            $del = $this->conn->prepare("DELETE FROM bb_lifting_extra_days WHERE rental_id = :r AND data = :d");
+            foreach ($toRemove as $d) {
+                $del->execute([':r' => $rentalId, ':d' => $d]);
+            }
         }
     }
 
@@ -302,9 +390,9 @@ final class EquipmentRepository
             $stmt = $this->conn->prepare("
                 INSERT INTO bb_worksite_lifting
                     (lifting_equipment_id, worksite_id, quantita, costo_giornaliero,
-                     tipo_noleggio, data_inizio, data_fine, stato)
+                     tipo_noleggio, calendario, festivi_inclusi, data_inizio, data_fine, stato)
                 VALUES
-                    (:le_id, :ws, :qt, :costo, :tipo, :di, :df, 'Completato')
+                    (:le_id, :ws, :qt, :costo, :tipo, :cal, :fest, :di, :df, 'Completato')
             ");
             $stmt->execute([
                 ':le_id' => $mezzo['lifting_equipment_id'],
@@ -312,6 +400,8 @@ final class EquipmentRepository
                 ':qt'    => $qt,
                 ':costo' => $mezzo['costo_giornaliero'],
                 ':tipo'  => $mezzo['tipo_noleggio'],
+                ':cal'   => $mezzo['calendario'] ?? 'lun_ven',
+                ':fest'  => (int)($mezzo['festivi_inclusi'] ?? 0),
                 ':di'    => $mezzo['data_inizio'],
                 ':df'    => $dataFine,
             ]);

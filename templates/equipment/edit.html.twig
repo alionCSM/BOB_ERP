@@ -1,123 +1,216 @@
 {% extends 'layout/base.html.twig' %}
 
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/equipment/noleggio.css">
+{% endblock %}
+
+{% set dowNames = {'1':'Lun','2':'Mar','3':'Mer','4':'Gio','5':'Ven','6':'Sab','7':'Dom'} %}
+{% set costoLabels = {'Giornaliero':'Costo € / giorno','Settimanale':'Costo € / settimana','Mensile':'Costo € / mese','Una Tantum':'Costo €'} %}
+
 {% block content %}
-<div class="intro-y box p-5 mt-5">
-    <h2 class="text-lg font-medium mb-4">
-        Modifica Mezzi Noleggio - {{ worksite.worksite_code }} {{ worksite.name }}
-    </h2>
+<div class="rn-page">
+
+    <div class="rn-hero">
+        <div class="rn-hero-content">
+            <div class="rn-hero-left">
+                <div class="rn-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18M10 12h4"/></svg>
+                </div>
+                <div>
+                    <h1 class="rn-hero-title">Noleggio Mezzi Sollevamento</h1>
+                    <p class="rn-hero-sub">
+                        <span><b>{{ worksite.worksite_code }}</b> — {{ worksite.name }}</span>
+                        <span>{{ mezzi|filter(m => m.stato == 'Attivo')|length }} attivi · {{ mezzi|length }} totali</span>
+                    </p>
+                </div>
+            </div>
+            <a href="/worksites/{{ worksiteId }}" class="rn-btn-back">
+                <svg viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                Torna al cantiere
+            </a>
+        </div>
+    </div>
 
     {% if message is not empty %}
-        <div class="alert alert-success mb-4 flex justify-between items-center p-4 bg-green-100 rounded">
-            <span>{{ message }}</span>
-            <button type="button" data-dismiss-alert class="text-green-800 text-lg font-bold ml-4">&times;</button>
+        <div class="rn-toast">
+            <span>✓ {{ message }}</span>
+            <button type="button" data-dismiss-alert>&times;</button>
         </div>
     {% endif %}
 
+    {% if mezzi is empty %}
+        <div class="rn-empty">
+            <svg viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l12-5v18"/></svg>
+            <p class="rn-empty-text">Nessun noleggio per questo cantiere.</p>
+        </div>
+    {% else %}
     <form method="POST">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         <input type="hidden" name="save_changes" value="1">
 
-        <table class="table w-full text-sm">
-            <thead class="bg-sky-100 text-slate-700">
-            <tr>
-                <th>Mezzo</th>
-                <th>Tipo</th>
-                <th>Quantità</th>
-                <th>Costo €/gg</th>
-                <th>Data Inizio</th>
-                <th>Stato</th>
-                <th>Azioni</th>
-            </tr>
-            </thead>
-            <tbody>
-            {# Mostriamo TUTTI i noleggi (Attivo + Completato + Finito).
-               Il template internamente rende readonly quelli completati.
-               Prima un filtro esterno "solo Attivo" nascondeva tutto cio'
-               che era stato terminato via /equipment/rentals/.../complete,
-               lasciando visibili solo le "Una Tantum" (es. Trasporto A/R)
-               che la pagina Termina non gestisce. #}
-            {% for row in mezzi %}
-                <tr class="hover:bg-slate-100 {{ row.stato in ['Completato','Finito'] ? 'bg-slate-50 opacity-90' : '' }}">
-                    <td>
-                        {{ row.mezzo_descrizione }}
-                        {% if row.stato in ['Completato','Finito'] and row.data_fine %}
-                            <div class="text-xs text-slate-500">Terminato il {{ row.data_fine|date('d/m/Y') }}</div>
-                        {% endif %}
-                        <input type="hidden" name="id[]" value="{{ row.id }}">
-                    </td>
-                    <td>
-                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            <select name="tipo_noleggio[]" class="form-select w-full" disabled>
-                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
-                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
-                            </select>
-                            <input type="hidden" name="tipo_noleggio[]" value="{{ row.tipo_noleggio }}">
-                        {% else %}
-                            <select name="tipo_noleggio[]" class="form-select w-full">
-                                <option value="Giornaliero" {{ row.tipo_noleggio == 'Giornaliero' ? 'selected' : '' }}>Giornaliero</option>
-                                <option value="Una Tantum" {{ row.tipo_noleggio == 'Una Tantum' ? 'selected' : '' }}>Una Tantum</option>
-                            </select>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            {{ row.quantita }}
-                            <input type="hidden" name="quantita[]" value="{{ row.quantita }}">
-                        {% else %}
-                            <input type="number" name="quantita[]" class="form-input w-20 text-center" min="1" value="{{ row.quantita }}">
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            {{ row.costo_giornaliero|number_format(2, ',', '.') }}
-                            <input type="hidden" name="costo[]" value="{{ row.costo_giornaliero }}">
-                        {% else %}
-                            <input type="number" step="0.01" name="costo[]" class="form-input w-full" value="{{ row.costo_giornaliero }}">
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            {{ row.data_inizio|date('d/m/Y') }}
-                            <input type="hidden" name="data_inizio[]" value="{{ row.data_inizio }}">
-                        {% else %}
-                            <input type="date" name="data_inizio[]" class="form-input w-full" value="{{ row.data_inizio }}">
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if row.stato == 'Completato' or row.stato == 'Finito' %}
-                            <select name="stato[]" class="form-select w-full">
-                                <option value="Completato" selected>Completato</option>
-                                <option value="Attivo">Attivo</option>
-                            </select>
-                        {% else %}
-                            <span class="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                                Attivo
-                            </span>
-                            <input type="hidden" name="stato[]" value="Attivo">
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if row.stato == 'Attivo' %}
-                            <button type="button" class="btn btn-danger text-xs px-3 py-1" data-delete-id="{{ row.id }}">
-                                Elimina
-                            </button>
-                        {% else %}
-                            <span class="text-xs text-slate-400">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+        {% for row in mezzi %}
+            {% set done   = row.stato in ['Completato', 'Finito'] %}
+            {% set cal    = (row.calendario ?? '1,2,3,4,5')|split(',') %}
+            {% set extras = extraDays[row.id] ?? [] %}
+            <div class="rn-card {{ done ? 'is-done' : '' }}">
+                <input type="hidden" name="id[]" value="{{ row.id }}">
 
-        <div class="text-right mt-5">
-            <button type="submit" class="btn btn-primary">
-                Salva Modifiche
+                <div class="rn-card-head">
+                    <h3 class="rn-card-title">
+                        {{ row.mezzo_descrizione }}
+                        <span class="rn-qty">× {{ row.quantita }}</span>
+                    </h3>
+                    <div>
+                        {% if row.tipo_noleggio == 'Una Tantum' %}
+                            <span class="rn-badge rn-badge-servizio">Servizio</span>
+                        {% elseif done %}
+                            <span class="rn-badge rn-badge-completato">Terminato{{ row.data_fine ? ' il ' ~ row.data_fine|date('d/m/Y') : '' }}</span>
+                        {% else %}
+                            <span class="rn-badge rn-badge-attivo">● Attivo</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="rn-card-body">
+                {% if done %}
+                    {# ── Terminato: sola lettura, campi inviati come hidden ── #}
+                    <div class="rn-grid">
+                        <div>
+                            <span class="rn-field-label">Tipo</span>
+                            <div class="rn-field-value">{{ row.tipo_noleggio }}</div>
+                        </div>
+                        {% if row.tipo_noleggio == 'Giornaliero' %}
+                        <div>
+                            <span class="rn-field-label">Giorni conteggiati</span>
+                            <div class="rn-field-value">
+                                {% for n in cal %}{{ dowNames[n] ?? n }}{{ not loop.last ? ' · ' }}{% endfor %}
+                                {{ row.festivi_inclusi ? ' + festivi' : '' }}
+                                {% if extras|length > 0 %} · {{ extras|length }} gg extra{% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div>
+                            <span class="rn-field-label">{{ costoLabels[row.tipo_noleggio] ?? 'Costo €' }}</span>
+                            <div class="rn-field-value">{{ row.costo_giornaliero|number_format(2, ',', '.') }} €</div>
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Periodo</span>
+                            <div class="rn-field-value">{{ row.data_inizio|date('d/m/Y') }} → {{ row.data_fine ? row.data_fine|date('d/m/Y') : '—' }}</div>
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Stato</span>
+                            <select name="stato[]" class="rn-select">
+                                <option value="Completato" selected>Completato</option>
+                                <option value="Attivo">Riattiva</option>
+                            </select>
+                        </div>
+                    </div>
+                    <input type="hidden" name="tipo_noleggio[]"   value="{{ row.tipo_noleggio }}">
+                    <input type="hidden" name="calendario[]"      value="{{ row.calendario ?? '1,2,3,4,5' }}">
+                    <input type="hidden" name="festivi_inclusi[]" value="{{ row.festivi_inclusi ? '1' : '' }}">
+                    <input type="hidden" name="quantita[]"        value="{{ row.quantita }}">
+                    <input type="hidden" name="costo[]"           value="{{ row.costo_giornaliero }}">
+                    <input type="hidden" name="data_inizio[]"     value="{{ row.data_inizio }}">
+                    {% for d in extras %}
+                        <input type="hidden" name="extra_days[{{ row.id }}][]" value="{{ d }}">
+                    {% endfor %}
+                    <div class="rn-card-foot">
+                        <span class="rn-done-note">Noleggio terminato: seleziona "Riattiva" e salva per riaprirlo.</span>
+                    </div>
+                {% else %}
+                    {# ── Editabile ── #}
+                    <div class="rn-grid">
+                        <div>
+                            <span class="rn-field-label">Tipo noleggio</span>
+                            <select name="tipo_noleggio[]" class="rn-select tipo-select">
+                                <option value="Giornaliero"  {{ row.tipo_noleggio == 'Giornaliero'  ? 'selected' : '' }}>Giornaliero</option>
+                                <option value="Settimanale"  {{ row.tipo_noleggio == 'Settimanale'  ? 'selected' : '' }}>Settimanale</option>
+                                <option value="Mensile"      {{ row.tipo_noleggio == 'Mensile'      ? 'selected' : '' }}>Mensile</option>
+                                <option value="Una Tantum"   {{ row.tipo_noleggio == 'Una Tantum'   ? 'selected' : '' }}>Una Tantum</option>
+                            </select>
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Quantità</span>
+                            <input type="number" name="quantita[]" min="1" class="rn-input" value="{{ row.quantita }}">
+                        </div>
+                        <div>
+                            <span class="rn-field-label costo-label">{{ costoLabels[row.tipo_noleggio] ?? 'Costo €' }}</span>
+                            <input type="number" step="0.01" name="costo[]" class="rn-input" value="{{ row.costo_giornaliero }}">
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Data inizio</span>
+                            <input type="date" name="data_inizio[]" class="rn-input" value="{{ row.data_inizio }}">
+                        </div>
+                    </div>
+                    <input type="hidden" name="stato[]" value="Attivo">
+
+                    {# ── Conteggio giorni: solo Giornaliero ── #}
+                    <div class="rn-count-panel {{ row.tipo_noleggio != 'Giornaliero' ? 'rn-hidden' : '' }}">
+                        <div>
+                            <span class="rn-field-label">Giorni conteggiati</span>
+                            <div class="rn-days">
+                                {% for n, label in dowNames %}
+                                    <button type="button"
+                                            class="rn-day {{ n in cal ? 'on' : '' }} {{ n in ['6','7'] ? 'is-weekend' : '' }}"
+                                            data-day="{{ n }}">{{ label }}</button>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="calendario[]" class="cal-value" value="{{ row.calendario ?? '1,2,3,4,5' }}">
+                        </div>
+                        <div>
+                            <span class="rn-field-label">Festivi nazionali</span>
+                            <button type="button" class="rn-fest-chip fest-chip {{ row.festivi_inclusi ? 'on' : '' }}">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                <span class="fest-chip-text">{{ row.festivi_inclusi ? 'Festivi inclusi' : 'Festivi esclusi' }}</span>
+                            </button>
+                            <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="{{ row.festivi_inclusi ? '1' : '' }}">
+                        </div>
+                    </div>
+
+                    {# ── Giorni extra (date specifiche fuori calendario) ── #}
+                    <div class="rn-extra {{ row.tipo_noleggio != 'Giornaliero' ? 'rn-hidden' : '' }}" data-rental="{{ row.id }}">
+                        <div class="rn-extra-head">
+                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="rn-extra-title">Giorni extra</span>
+                        </div>
+                        <p class="rn-extra-desc">Date fuori dal calendario in cui il mezzo è stato usato comunque (es. un sabato lavorato): vengono aggiunte al conteggio.</p>
+                        <div class="rn-extra-chips">
+                            {% for d in extras %}
+                                <span class="rn-chip">
+                                    {{ dowNames[d|date('N')] }} {{ d|date('d/m/Y') }}
+                                    <input type="hidden" name="extra_days[{{ row.id }}][]" value="{{ d }}">
+                                    <button type="button" class="rn-chip-x" title="Rimuovi">&times;</button>
+                                </span>
+                            {% endfor %}
+                        </div>
+                        <div class="rn-extra-add">
+                            <input type="date" class="rn-extra-date">
+                            <button type="button" class="rn-btn-add-day">+ Aggiungi giorno</button>
+                        </div>
+                    </div>
+
+                    <div class="rn-card-foot">
+                        <span></span>
+                        <button type="button" class="rn-btn rn-btn-delete" data-delete-id="{{ row.id }}">
+                            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Elimina noleggio
+                        </button>
+                    </div>
+                {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+
+        <div class="rn-savebar">
+            <button type="submit" class="rn-btn-save">
+                <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Salva modifiche
             </button>
         </div>
     </form>
-</div>
+    {% endif %}
 
+</div>
 {% endblock %}
 
 {% block scripts %}
