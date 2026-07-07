@@ -56,6 +56,7 @@
         <button class="ex-filter-btn" data-filter="company">Aziendali</button>
         <button class="ex-filter-btn" data-filter="worker">Operai</button>
         <span class="ex-count-label" id="ex-count">{{ totalExpired }} risultat{{ totalExpired == 1 ? 'o' : 'i' }}</span>
+        <a href="/documents/expiring" class="ex-filter-btn" style="margin-left:auto; text-decoration:none;">→ Vedi in scadenza (30gg)</a>
     </div>
 
     <!-- ── COMPANY DOCS SECTION ────────────── -->
@@ -113,9 +114,9 @@
                                 <span class="ex-days">{{ daysAgo }} giorn{{ daysAgo == 1 ? 'o' : 'i' }} fa</span>
                             </td>
                             <td style="text-align:center;">
-                                <a href="/companies/{{ doc.company_id }}" class="ex-view-link">
+                                <a href="/companies/{{ doc.company_id }}" class="ex-view-link" title="Vai alla scheda azienda">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                                    Apri
+                                    Azienda
                                 </a>
                             </td>
                         </tr>
@@ -184,10 +185,16 @@
                                 <span class="ex-days">{{ daysAgo }} giorn{{ daysAgo == 1 ? 'o' : 'i' }} fa</span>
                             </td>
                             <td style="text-align:center;">
-                                <a href="/users/{{ doc.worker_id }}/edit?uid={{ doc.worker_uid }}" class="ex-view-link">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                                    Apri
-                                </a>
+                                <span style="display:inline-flex; gap:6px;">
+                                    <a href="/users/{{ doc.worker_id }}/edit?uid={{ doc.worker_uid }}" class="ex-view-link" title="Vai alla scheda operaio">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                        Operaio
+                                    </a>
+                                    <a href="/documents/serve?id={{ doc.id }}" target="_blank" class="ex-view-link" title="Apri il documento PDF">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                        Documento
+                                    </a>
+                                </span>
                             </td>
                         </tr>
                     {% endfor %}
