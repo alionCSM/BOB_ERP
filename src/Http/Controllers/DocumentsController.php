@@ -151,6 +151,49 @@ final class DocumentsController
         ]);
     }
 
+    // ── GET /documents/expiring ───────────────────────────────────────────────
+
+    /**
+     * Documenti in scadenza nei prossimi 30 giorni (non ancora scaduti).
+     * Stessa struttura di /documents/expired, con giorni rimanenti.
+     */
+    public function expiring(Request $request): void
+    {
+        $days = 30;
+
+        $controller   = new WorkerDocumentController($this->conn);
+        $expiringData = $controller->getExpiringDocuments($request->user(), $days);
+        $companyDocs  = $expiringData['companyDocs'];
+        $workerDocs   = $expiringData['workerDocs'];
+
+        // ordina per scadenza piu' vicina
+        usort($companyDocs, static fn($a, $b) => strcmp((string)$a['scadenza_norm'], (string)$b['scadenza_norm']));
+        usort($workerDocs,  static fn($a, $b) => strcmp((string)$a['scadenza_norm'], (string)$b['scadenza_norm']));
+
+        $totalExpiring = count($companyDocs) + count($workerDocs);
+        $companyCount  = count($companyDocs);
+        $workerCount   = count($workerDocs);
+
+        // quanti scadono entro 7 giorni (urgenti)
+        $urgentCount = 0;
+        $limit7 = date('Y-m-d', strtotime('+7 days'));
+        foreach (array_merge($companyDocs, $workerDocs) as $d) {
+            if ((string)$d['scadenza_norm'] <= $limit7) {
+                $urgentCount++;
+            }
+        }
+
+        Response::view('documents/expiring.html.twig', $request, [
+            'companyDocs'   => $companyDocs,
+            'workerDocs'    => $workerDocs,
+            'totalExpiring' => $totalExpiring,
+            'companyCount'  => $companyCount,
+            'workerCount'   => $workerCount,
+            'urgentCount'   => $urgentCount,
+            'daysWindow'    => $days,
+        ]);
+    }
+
     // ── GET /documents/expired-cv ─────────────────────────────────────────────
 
     public function expiredCv(Request $request): void
