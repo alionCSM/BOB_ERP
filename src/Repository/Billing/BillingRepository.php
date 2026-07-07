@@ -479,6 +479,44 @@ final class BillingRepository
         }
     }
 
+    /**
+     * Sync massivo del flag emessa da Yard per TUTTE le righe bb_billing con
+     * yard_id (cron notturno). Aggiorna solo le righe cambiate.
+     *
+     * Senza questo, il flag e' fresco solo per i clienti la cui pagina
+     * /billing e' stata aperta di recente — e l'AI (WorksiteContextBuilder)
+     * risponderebbe con dati vecchi.
+     *
+     * @return array{checked:int, updated:int}
+     */
+    public function syncEmessaAll(YardWorksiteBilling $yardBilling): array
+    {
+        $rows = $this->conn->query("
+            SELECT id, yard_id, emessa
+            FROM bb_billing
+            WHERE yard_id IS NOT NULL
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($rows)) {
+            return ['checked' => 0, 'updated' => 0];
+        }
+
+        $map = $yardBilling->getEmessaMap(array_column($rows, 'yard_id'));
+
+        $upd = $this->conn->prepare("UPDATE bb_billing SET emessa = :emessa WHERE id = :id");
+        $updated = 0;
+        foreach ($rows as $r) {
+            $yardId = (int)$r['yard_id'];
+            if (!array_key_exists($yardId, $map)) continue; // riga sparita su Yard: non tocchiamo
+            $new = $map[$yardId] ? 1 : 0;
+            if ((int)$r['emessa'] !== $new) {
+                $upd->execute([':emessa' => $new, ':id' => $r['id']]);
+                $updated++;
+            }
+        }
+        return ['checked' => count($rows), 'updated' => $updated];
+    }
+
     public function syncEmessaFromYardForMovedWorksites(
         ?int $companyId,
         int $year,
