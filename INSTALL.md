@@ -76,14 +76,21 @@ sudo ACCEPT_EULA=Y apt install -y msodbcsql18
 sudo apt install -y php8.1-dev php-pear
 sudo pecl install sqlsrv pdo_sqlsrv
 
-# Abilita le estensioni
-echo "extension=sqlsrv.so"     | sudo tee /etc/php/8.1/mods-available/sqlsrv.ini
-echo "extension=pdo_sqlsrv.so" | sudo tee /etc/php/8.1/mods-available/pdo_sqlsrv.ini
-sudo phpenmod sqlsrv pdo_sqlsrv
+# Abilita le estensioni. IMPORTANTE: pdo_sqlsrv deve caricarsi DOPO pdo
+# (priority > 10), altrimenti in CLI si ottiene:
+#   "undefined symbol: php_pdo_unregister_driver"
+printf "; priority=30\nextension=sqlsrv.so\n"     | sudo tee /etc/php/8.1/mods-available/sqlsrv.ini
+printf "; priority=30\nextension=pdo_sqlsrv.so\n" | sudo tee /etc/php/8.1/mods-available/pdo_sqlsrv.ini
+sudo phpenmod -v ALL -s ALL sqlsrv pdo_sqlsrv
 sudo systemctl restart php8.1-fpm
 
-# Verifica
-php -m | grep -i sqlsrv     # deve elencare: pdo_sqlsrv, sqlsrv
+# ⚠️ pecl a volte aggiunge da solo "extension=pdo_sqlsrv.so" in cima a
+# /etc/php/8.1/cli/php.ini (o apache2/php.ini): quella riga carica
+# l'estensione PRIMA di pdo e va RIMOSSA — si usa solo mods-available.
+grep -n "sqlsrv" /etc/php/8.1/cli/php.ini /etc/php/8.1/fpm/php.ini   # non deve trovare nulla
+
+# Verifica (sia FPM che CLI, i cron girano in CLI)
+php -m | grep -i -E '^(pdo|pdo_sqlsrv|sqlsrv)$'   # devono esserci tutti e tre
 ```
 
 > La connessione usa DSN `sqlsrv:Server=host,porta;Database=...;Encrypt=...;TrustServerCertificate=...`.
