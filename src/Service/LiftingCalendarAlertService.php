@@ -68,7 +68,7 @@ class LiftingCalendarAlertService
             JOIN bb_worksites w         ON w.id  = wl.worksite_id
             WHERE wl.tipo_noleggio = 'Giornaliero'
               AND wl.data_inizio <= :to
-              AND (wl.data_fine IS NULL OR wl.data_fine >= :from)
+              AND (wl.data_fine IS NULL OR wl.data_fine = '0000-00-00' OR wl.data_fine >= :from)
         ");
         $stmt->execute([':from' => $from, ':to' => $to]);
         $rentals = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -84,8 +84,11 @@ class LiftingCalendarAlertService
             }
 
             // finestra effettiva del noleggio dentro il lookback
-            $rFrom = max($r['data_inizio'], $from);
-            $rTo   = min($r['data_fine'] ?: $to, $to);
+            // ('0000-00-00' = nessuna fine, come NULL)
+            $fine  = (string)($r['data_fine'] ?? '');
+            $fine  = ($fine !== '' && $fine !== '0000-00-00') ? substr($fine, 0, 10) : null;
+            $rFrom = max(substr((string)$r['data_inizio'], 0, 10), $from);
+            $rTo   = min($fine ?? $to, $to);
 
             $extraDays = $this->extraDaysForRental((int)$r['id']);
 

@@ -180,18 +180,24 @@ class AnomalyCheckerService
         echo "── Checking Mezzi Sollevamento...\n";
 
         // 1. Noleggio active but cantiere has no presenze for 2+ weeks — GROUPED BY CANTIERE
+        // Solo noleggi a tempo (Giornaliero/Settimanale/Mensile): un servizio
+        // Una Tantum "attivo" non matura costi e non e' un mezzo fermo.
+        // Il costo giornaliero indicativo considera solo i Giornalieri
+        // (per settimanali/mensili la tariffa non e' per-giorno) e la quantita'.
         $stmt = $this->conn->prepare("
             SELECT wl.worksite_id, w.name AS worksite_name, w.worksite_code,
                    GROUP_CONCAT(DISTINCT le.descrizione SEPARATOR ', ') AS equipment_list,
-                   COUNT(*) AS num_mezzi,
-                   SUM(wl.costo_giornaliero) AS total_daily_cost,
+                   SUM(wl.quantita) AS num_mezzi,
+                   SUM(CASE WHEN wl.tipo_noleggio = 'Giornaliero'
+                            THEN wl.costo_giornaliero * wl.quantita ELSE 0 END) AS total_daily_cost,
                    (SELECT MAX(p.data) FROM bb_presenze p WHERE p.worksite_id = wl.worksite_id) AS last_presenza_nostri,
                    (SELECT MAX(pc.data_presenza) FROM bb_presenze_consorziate pc WHERE pc.worksite_id = wl.worksite_id) AS last_presenza_cons
             FROM bb_worksite_lifting wl
             JOIN bb_worksites w ON w.id = wl.worksite_id
             LEFT JOIN bb_lifting_equipment le ON le.id = wl.lifting_equipment_id
             WHERE wl.stato IN ('Attivo','attivo')
-              AND (wl.data_fine IS NULL OR wl.data_fine >= CURDATE())
+              AND wl.tipo_noleggio <> 'Una Tantum'
+              AND (wl.data_fine IS NULL OR wl.data_fine = '0000-00-00' OR wl.data_fine >= CURDATE())
             GROUP BY wl.worksite_id
         ");
         $stmt->execute();
@@ -212,7 +218,7 @@ class AnomalyCheckerService
                     $msg .= " ma non risulta nessuna presenza registrata.";
                 }
                 if ($row['total_daily_cost'] > 0) {
-                    $msg .= " Costo giornaliero totale: " . $this->eur((float)$row['total_daily_cost']) . ".";
+                    $msg .= " Costo giornaliero indicativo (soli noleggi giornalieri): " . $this->eur((float)$row['total_daily_cost']) . ".";
                 }
                 $msg .= " Potrebbe essere il caso di verificare se i mezzi sono ancora necessari.";
 
@@ -224,8 +230,12 @@ class AnomalyCheckerService
 
         // 2. Price anomalies — same equipment type, very different prices
         // Skip "trasporto" unless the difference is huge (>€1000)
+        // NB: confronto SOLO tra noleggi con la stessa periodicita' — una
+        // tariffa giornaliera e una mensile dello stesso mezzo non sono
+        // confrontabili tra loro.
         $stmt = $this->conn->prepare("
             SELECT le.descrizione AS equipment_name, le.id AS equip_id,
+                   wl.tipo_noleggio,
                    MIN(wl.costo_giornaliero) AS min_price,
                    MAX(wl.costo_giornaliero) AS max_price,
                    AVG(wl.costo_giornaliero) AS avg_price,
@@ -234,7 +244,7 @@ class AnomalyCheckerService
             JOIN bb_lifting_equipment le ON le.id = wl.lifting_equipment_id
             WHERE wl.costo_giornaliero > 0
               AND wl.data_inizio >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-            GROUP BY le.id
+            GROUP BY le.id, wl.tipo_noleggio
             HAVING count >= 2 AND max_price > min_price * 1.5
             ORDER BY (max_price - min_price) DESC
         ");
@@ -248,8 +258,9 @@ class AnomalyCheckerService
                 continue;
             }
 
+            $tipoLbl = strtolower((string)($row['tipo_noleggio'] ?? ''));
             $this->addFinding('mezzi', 'info', 'anomaly_mezzi',
-                "Abbiamo notato una variazione significativa di prezzo per \"{$row['equipment_name']}\": da " .
+                "Abbiamo notato una variazione significativa di prezzo per \"{$row['equipment_name']}\" (noleggio {$tipoLbl}): da " .
                 $this->eur((float)$row['min_price']) . " a " . $this->eur((float)$row['max_price']) .
                 " (media " . $this->eur((float)$row['avg_price']) .
                 ") su {$row['count']} noleggi nell'ultimo anno. Potrebbe valere la pena verificare.",
