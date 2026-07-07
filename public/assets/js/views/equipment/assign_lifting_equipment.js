@@ -105,11 +105,12 @@
         </div>
         <div class="col-span-3 cal-wrap">
             <label class="form-label">Festivi nazionali</label>
-            <label class="rn-fest">
-                <input type="checkbox" class="fest-check">
-                <span class="rn-fest-track"></span>
-                <span class="rn-fest-label">Conta anche i festivi</span>
-            </label>
+            <div>
+                <button type="button" class="rn-fest-chip fest-chip">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span class="fest-chip-text">Festivi esclusi</span>
+                </button>
+            </div>
             <input type="hidden" name="festivi_inclusi[]" class="fest-value" value="">
         </div>
     `;
@@ -199,12 +200,15 @@
                 });
             });
         }
-        const festCheck = row.querySelector('.fest-check');
+        const festChip  = row.querySelector('.fest-chip');
         const festValue = row.querySelector('input.fest-value');
-        if (festCheck && festValue && !festCheck.dataset.bound) {
-            festCheck.dataset.bound = '1';
-            festCheck.addEventListener('change', () => {
-                festValue.value = festCheck.checked ? '1' : '';
+        if (festChip && festValue && !festChip.dataset.bound) {
+            festChip.dataset.bound = '1';
+            festChip.addEventListener('click', () => {
+                const on = festChip.classList.toggle('on');
+                const txt = festChip.querySelector('.fest-chip-text');
+                if (txt) txt.textContent = on ? 'Festivi inclusi' : 'Festivi esclusi';
+                festValue.value = on ? '1' : '';
             });
         }
     }

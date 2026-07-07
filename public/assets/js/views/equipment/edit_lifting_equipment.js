@@ -72,13 +72,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ── Festivi: switch → hidden ─────────────────────────────────────────────
-    document.querySelectorAll('.fest-check').forEach(function (chk) {
-        chk.addEventListener('change', function () {
-            var hidden = chk.closest('.rn-count-panel')
-                ? chk.closest('.rn-count-panel').querySelector('input.fest-value')
-                : null;
-            if (hidden) hidden.value = chk.checked ? '1' : '';
+    // ── Festivi: chip toggle → hidden ────────────────────────────────────────
+    document.querySelectorAll('.fest-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            var on = chip.classList.toggle('on');
+            var txt = chip.querySelector('.fest-chip-text');
+            if (txt) txt.textContent = on ? 'Festivi inclusi' : 'Festivi esclusi';
+            var panel  = chip.closest('.rn-count-panel');
+            var hidden = panel ? panel.querySelector('input.fest-value') : null;
+            if (hidden) hidden.value = on ? '1' : '';
         });
     });
 
