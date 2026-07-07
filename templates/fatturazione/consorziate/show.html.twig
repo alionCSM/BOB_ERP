@@ -18,11 +18,16 @@
             <div class="fc-nostra-tot is-pending" title="Bozza in lavorazione, non ancora applicata">€ {{ nostraBozzaTotal|number_format(2, ',', '.') }} <span class="fc-nostra-tag">in bozza</span></div>
         {% endif %}
         {% if righeInPeriod|length > 0 %}
-            <ul class="fc-righe-list fc-righe-list-in">
+            {# righe nascoste di default: a prima vista si vedono solo i totali #}
+            <button type="button" class="fc-righe-toggle" data-toggle-righe>
+                {{ righeInPeriod|length }} rig{{ righeInPeriod|length == 1 ? 'a' : 'he' }}
+                <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <ul class="fc-righe-list fc-righe-list-in hidden">
             {% for rf in righeInPeriod %}
                 <li>
                     <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
-                    <span class="fc-righe-descr">{{ rf.descrizione }}</span>
+                    <span class="fc-righe-descr" title="{{ rf.descrizione|e('html_attr') }}">{{ rf.descrizione }}</span>
                     <span class="fc-righe-amt {{ rf.applied ? 'is-applied' : 'is-pending' }}"
                           title="{{ rf.applied ? 'Bozza applicata' : 'Bozza in lavorazione' }}">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
                 </li>

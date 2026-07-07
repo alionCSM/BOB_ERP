@@ -16,6 +16,16 @@ document.addEventListener('click', function (e) {
         toggleStorico();
     }
 
+    // Espandi/chiudi le righe fattura nella cella "Nostra fattura"
+    var toggleRighe = e.target.closest('[data-toggle-righe]');
+    if (toggleRighe) {
+        var list = toggleRighe.parentElement.querySelector('.fc-righe-list');
+        if (list) {
+            list.classList.toggle('hidden');
+            toggleRighe.classList.toggle('open', !list.classList.contains('hidden'));
+        }
+    }
+
     // Impostazione manuale "Già pagato" (saldo iniziale / rettifica)
     var editBtn = e.target.closest('[data-set-pagato]');
     if (editBtn) {

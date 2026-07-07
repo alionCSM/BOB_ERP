@@ -28,7 +28,7 @@ final class DashboardController
 
         match ($role) {
             'admin'            => $data += $this->dataForAdmin($name),
-            'document_manager' => $data += $this->dataForDocuments($userId, $name),
+            'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
             'offerte'          => $data += ['name' => $name],
             default            => $data += ['name' => $name],
         };
@@ -202,69 +202,26 @@ final class DashboardController
     // Document manager dashboard data
     // ──────────────────────────────────────────────────────────────
 
-    private function dataForDocuments(int $userId, string $name): array
+    private function dataForDocuments(int $userId, string $name, \App\Domain\User $user): array
     {
         $conn     = $this->conn;
         $linkRepo = new SharedLinkRepository($conn);
 
-        $dateFilter = "d.scadenza IS NOT NULL AND d.scadenza != '' AND d.scadenza != 'INDETERMINATO'";
+        /* ── Scaduti / in scadenza — STESSA fonte delle pagine
+              /documents/expired e /documents/expiring, cosi' i numeri
+              delle card coincidono sempre con le liste.
+              NB: "in 30gg" INCLUDE anche quelli entro 7gg (finestra 0-30). ── */
+        $docCtrl    = new \App\Service\Documents\WorkerDocumentController($conn);
+        $expired    = $docCtrl->getExpiredDocuments($user);
+        $expiring30 = $docCtrl->getExpiringDocuments($user, 30);
+        $expiring7  = $docCtrl->getExpiringDocuments($user, 7);
 
-        /* ── Expired counts ── */
-        $expiredWorkerCount = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_worker_documents d
-            JOIN bb_workers w ON w.id = d.worker_id
-            WHERE w.active = 'Y' AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') < CURDATE()
-        ")->fetchColumn();
+        $expiredWorkerCount  = count($expired['workerDocs']);
+        $expiredCompanyCount = count($expired['companyDocs']);
+        $expiredTotal        = $expiredWorkerCount + $expiredCompanyCount;
 
-        $expiredCompanyCount = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_company_documents d
-            JOIN bb_companies c ON c.id = d.company_id
-            WHERE c.active = 1 AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') < CURDATE()
-        ")->fetchColumn();
-
-        $expiredTotal = $expiredWorkerCount + $expiredCompanyCount;
-
-        /* ── Expiring in 7 days ── */
-        $expiring7Worker = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_worker_documents d
-            JOIN bb_workers w ON w.id = d.worker_id
-            WHERE w.active = 'Y' AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
-        ")->fetchColumn();
-
-        $expiring7Company = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_company_documents d
-            JOIN bb_companies c ON c.id = d.company_id
-            WHERE c.active = 1 AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
-        ")->fetchColumn();
-
-        $expiring7Total = $expiring7Worker + $expiring7Company;
-
-        /* ── Expiring in 30 days ── */
-        $expiring30Worker = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_worker_documents d
-            JOIN bb_workers w ON w.id = d.worker_id
-            WHERE w.active = 'Y' AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 30 DAY
-        ")->fetchColumn();
-
-        $expiring30Company = (int)$conn->query("
-            SELECT COUNT(*)
-            FROM bb_company_documents d
-            JOIN bb_companies c ON c.id = d.company_id
-            WHERE c.active = 1 AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 30 DAY
-        ")->fetchColumn();
-
-        $expiring30Total = $expiring30Worker + $expiring30Company;
+        $expiring7Total  = count($expiring7['workerDocs'])  + count($expiring7['companyDocs']);
+        $expiring30Total = count($expiring30['workerDocs']) + count($expiring30['companyDocs']);
 
         /* ── Shared links ── */
         $allLinks        = $linkRepo->getAllLinks();
@@ -286,59 +243,42 @@ final class DashboardController
             ")->fetchColumn();
         } catch (\PDOException $e) { /* table may not exist yet */ }
 
-        /* ── Top companies with expired docs ── */
-        $companyExpiredStmt = $conn->query("
-            SELECT w.company AS company_name, COUNT(*) AS cnt
-            FROM bb_worker_documents d
-            JOIN bb_workers w ON w.id = d.worker_id
-            WHERE w.active = 'Y' AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') < CURDATE()
-              AND w.company IS NOT NULL AND w.company != ''
-            GROUP BY w.company
-            ORDER BY cnt DESC
-            LIMIT 6
-        ");
+        /* ── Top companies with expired docs (dagli stessi dati delle card) ── */
         $topCompaniesExpired = [];
-        foreach ($companyExpiredStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-            $topCompaniesExpired[$row['company_name']] = (int)$row['cnt'];
+        foreach ($expired['workerDocs'] as $d) {
+            $cn = trim((string)($d['company_name'] ?? ''));
+            if ($cn === '') continue;
+            $topCompaniesExpired[$cn] = ($topCompaniesExpired[$cn] ?? 0) + 1;
         }
-        $maxCompanyExpired = !empty($topCompaniesExpired) ? max($topCompaniesExpired) : 1;
+        arsort($topCompaniesExpired);
+        $topCompaniesExpired = array_slice($topCompaniesExpired, 0, 6, true);
+        $maxCompanyExpired   = !empty($topCompaniesExpired) ? max($topCompaniesExpired) : 1;
 
-        /* ── Urgent expirations (next 7 days — detail rows) ── */
-        $urgentWorkerRows = $conn->query("
-            SELECT d.tipo_documento, w.company AS company_name,
-                   CONCAT(w.first_name, ' ', w.last_name) AS entity_name,
-                   STR_TO_DATE(d.scadenza, '%d/%m/%Y') AS scadenza_date,
-                   'operaio' AS doc_type
-            FROM bb_worker_documents d
-            JOIN bb_workers w ON w.id = d.worker_id
-            WHERE w.active = 'Y' AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
-            ORDER BY scadenza_date ASC
-            LIMIT 8
-        ")->fetchAll(\PDO::FETCH_ASSOC);
-
-        $urgentCompanyRows = $conn->query("
-            SELECT d.tipo_documento, c.name AS company_name,
-                   c.name AS entity_name,
-                   STR_TO_DATE(d.scadenza, '%d/%m/%Y') AS scadenza_date,
-                   'azienda' AS doc_type
-            FROM bb_company_documents d
-            JOIN bb_companies c ON c.id = d.company_id
-            WHERE c.active = 1 AND {$dateFilter}
-              AND STR_TO_DATE(d.scadenza, '%d/%m/%Y') BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
-            ORDER BY scadenza_date ASC
-            LIMIT 8
-        ")->fetchAll(\PDO::FETCH_ASSOC);
-
-        $urgentDocs = array_merge($urgentWorkerRows, $urgentCompanyRows);
-        usort($urgentDocs, fn($a, $b) => ($a['scadenza_date'] ?? '') <=> ($b['scadenza_date'] ?? ''));
+        /* ── Urgent expirations (next 7 days — detail rows, stessi dati) ── */
+        $urgentDocs = [];
+        foreach ($expiring7['workerDocs'] as $d) {
+            $urgentDocs[] = [
+                'tipo_documento' => $d['tipo_documento'],
+                'entity_name'    => $d['worker_name'] ?? '—',
+                'doc_type'       => 'operaio',
+                'scadenza_date'  => (string)$d['scadenza_norm'],
+            ];
+        }
+        foreach ($expiring7['companyDocs'] as $d) {
+            $urgentDocs[] = [
+                'tipo_documento' => $d['tipo_documento'],
+                'entity_name'    => $d['company_name'] ?? '—',
+                'doc_type'       => 'azienda',
+                'scadenza_date'  => (string)$d['scadenza_norm'],
+            ];
+        }
+        usort($urgentDocs, fn($a, $b) => $a['scadenza_date'] <=> $b['scadenza_date']);
         $urgentDocs = array_slice($urgentDocs, 0, 8);
 
         // Pre-compute days_left so the template doesn't need DateTime logic
         $today = new \DateTime();
         foreach ($urgentDocs as &$doc) {
-            $expDate        = new \DateTime($doc['scadenza_date']);
+            $expDate          = new \DateTime($doc['scadenza_date']);
             $doc['days_left'] = (int)$today->diff($expDate)->format('%r%a');
         }
         unset($doc);
