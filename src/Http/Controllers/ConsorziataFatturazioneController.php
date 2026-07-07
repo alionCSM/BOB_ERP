@@ -63,6 +63,7 @@ final class ConsorziataFatturazioneController
         $totalPresenze       = array_sum(array_column($rows, 'presenze_gg'));
         $totalContratto      = array_sum(array_column($rows, 'totale_contratto'));
         $totalNostraFattura  = array_sum(array_column($rows, 'nostra_fattura'));
+        $totalNostraBozza    = array_sum(array_column($rows, 'nostra_fattura_bozza'));
         $totalOrdine         = array_sum(array_column($rows, 'valore_ordine'));
         $totalGiaPagato      = array_sum(array_column($rows, 'gia_pagato'));
         $totalSpese          = array_sum(array_column($rows, 'spese_consorziata'));
@@ -74,7 +75,7 @@ final class ConsorziataFatturazioneController
         Response::view('fatturazione/consorziate/show.html.twig', $request, compact(
             'consorziata', 'from', 'to', 'fromLabel', 'toLabel',
             'rows', 'payments', 'ordiniByWorksite', 'righeByWorksite',
-            'totalPresenze', 'totalContratto', 'totalNostraFattura',
+            'totalPresenze', 'totalContratto', 'totalNostraFattura', 'totalNostraBozza',
             'totalOrdine', 'totalGiaPagato', 'totalSpese', 'totalStorico'
         ));
     }

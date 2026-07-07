@@ -5,13 +5,17 @@
 {% endblock %}
 
 {# ── Macro: render the "Nostra fattura" cell content ────────────────────
-   Period-scoped only: shows the orange total + the righe whose data
-   is inside [from, to]. Righe fuori periodo are esclusi. #}
-{% macro nostra_fattura_cell(nostraFatturaTotal, righe) %}
+   Period-scoped only: totals + righe whose data is inside [from, to].
+   VERDE  = riga passata per una bozza APPLICATA (status fatturata)
+   ARANCIO = riga in una bozza ancora in lavorazione (non applicata) #}
+{% macro nostra_fattura_cell(nostraFatturaTotal, nostraBozzaTotal, righe) %}
     {% set righeInPeriod = righe|filter(rf => rf.in_period) %}
-    {% if nostraFatturaTotal > 0 or righeInPeriod|length > 0 %}
+    {% if nostraFatturaTotal > 0 or nostraBozzaTotal > 0 or righeInPeriod|length > 0 %}
         {% if nostraFatturaTotal > 0 %}
-            <div class="fc-nostra-tot">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
+            <div class="fc-nostra-tot is-applied" title="Bozza applicata (fatturata)">€ {{ nostraFatturaTotal|number_format(2, ',', '.') }}</div>
+        {% endif %}
+        {% if nostraBozzaTotal > 0 %}
+            <div class="fc-nostra-tot is-pending" title="Bozza in lavorazione, non ancora applicata">€ {{ nostraBozzaTotal|number_format(2, ',', '.') }} <span class="fc-nostra-tag">in bozza</span></div>
         {% endif %}
         {% if righeInPeriod|length > 0 %}
             <ul class="fc-righe-list fc-righe-list-in">
@@ -19,7 +23,8 @@
                 <li>
                     <span class="fc-righe-date">{% if rf.data %}{{ rf.data|date('d/m/Y') }}{% endif %}</span>
                     <span class="fc-righe-descr">{{ rf.descrizione }}</span>
-                    <span class="fc-righe-amt">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
+                    <span class="fc-righe-amt {{ rf.applied ? 'is-applied' : 'is-pending' }}"
+                          title="{{ rf.applied ? 'Bozza applicata' : 'Bozza in lavorazione' }}">€ {{ rf.totale_imponibile|number_format(2, ',', '.') }}</span>
                 </li>
             {% endfor %}
             </ul>
@@ -89,7 +94,7 @@
             <div>
                 <div class="fp-stat-value">€ {{ totalNostraFattura|number_format(0, ',', '.') }}</div>
                 <div class="fp-stat-label">Nostra fattura</div>
-                <div class="fp-stat-sub">da bozze fatturate</div>
+                <div class="fp-stat-sub">da bozze applicate{% if totalNostraBozza > 0 %} · <span style="color:#b45309;font-weight:600;">€ {{ totalNostraBozza|number_format(0, ',', '.') }} in bozza</span>{% endif %}</div>
             </div>
         </div>
         <div class="fp-stat">
@@ -197,7 +202,7 @@
                                             <td class="right">
                                                 {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                             </td>
-                                            <td>{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                            <td>{{ nf.nostra_fattura_cell(r.nostra_fattura, r.nostra_fattura_bozza, wsRighe) }}</td>
                                             <td><span class="fp-dash">—</span></td>
                                             <td class="right"><span class="fp-dash">—</span></td>
                                             <td class="right"><span class="fp-dash">—</span></td>
@@ -234,7 +239,7 @@
                                                     <td rowspan="{{ rowCount }}" class="right">
                                                         {% if r.totale_contratto > 0 %}€ {{ r.totale_contratto|number_format(2, ',', '.') }}{% else %}<span class="fp-dash">—</span>{% endif %}
                                                     </td>
-                                                    <td rowspan="{{ rowCount }}">{{ nf.nostra_fattura_cell(r.nostra_fattura, wsRighe) }}</td>
+                                                    <td rowspan="{{ rowCount }}">{{ nf.nostra_fattura_cell(r.nostra_fattura, r.nostra_fattura_bozza, wsRighe) }}</td>
                                                 {% endif %}
                                                 {# Per-ordine cells #}
                                                 <td>
