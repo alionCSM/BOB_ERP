@@ -1229,6 +1229,14 @@ final class UsersController
                     'notif_beppe_azione'       => ['label' => 'Notifica: Info Beppe da gestire',  'icon' => 'M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0', 'color' => '#5b21b6'],
                 ],
             ],
+            'bob_ai' => [
+                'label' => 'BOB AI',
+                'icon'  => 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+                'color' => '#6366f1',
+                'perms' => [
+                    'ai_chat' => ['label' => 'Accesso BOB AI (chat)', 'icon' => 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', 'color' => '#6366f1'],
+                ],
+            ],
             'anomaly' => [
                 'label' => 'BOB AI - Anomalie',
                 'icon'  => 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',

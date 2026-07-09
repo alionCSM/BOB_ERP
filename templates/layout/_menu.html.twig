@@ -73,9 +73,9 @@
             </li>
             <li class="side-nav__devider my-6"></li>
 
-            {# ── AI CHAT — restricted to a small allowlist (mirrors AiSqlController::USERS_WITH_AI_ACCESS) ── #}
-            {% set aiAllowedUsers = ['alion', 'laura', 'osman', 'elena', 'ermal'] %}
-            {% if user.id == 1 or user.username in aiAllowedUsers %}
+            {# ── AI CHAT — permesso 'ai_chat' in bb_user_permissions
+                 (gestibile da Utenti → Permessi; superadmin id 1 sempre) ── #}
+            {% if user.canAccess('ai_chat') %}
                 {% set aiChatActive = currentPath starts with '/ai' %}
                 <li>
                     <a href="/ai/chat" class="side-menu {{ aiChatActive ? 'side-menu--active' : '' }}">

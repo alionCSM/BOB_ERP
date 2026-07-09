@@ -62,10 +62,12 @@ if (!$worker) {
 }
 
 // ── Fetch documents ──
+// nascondere='S' = documento non visibile all'esterno (come l'hide!=1 del
+// vecchio portale scadenze): non deve comparire nella pagina pubblica.
 $stmt = $conn->prepare(
     "SELECT d.id, d.tipo_documento, d.data_emissione, d.scadenza
      FROM bb_worker_documents d
-     WHERE d.worker_id = ?
+     WHERE d.worker_id = ? AND d.nascondere = 'N'
      ORDER BY d.scadenza ASC, d.tipo_documento ASC"
 );
 $stmt->execute([(int)$worker['id']]);
@@ -204,7 +206,7 @@ function attestatoFooter(): void
 {
     ?>
         <footer class="attestato-footer">
-            &copy; <?= date('Y') ?> Consorzio Soluzione Montaggi &mdash; Documento interno
+            &copy; <?= date('Y') ?> Consorzio Soluzione Montaggi
         </footer>
     </body>
     </html>

@@ -508,6 +508,12 @@ class User {
         // SuperAdmin (ID 1) → accesso totale
         if ($this->id == 1) return true;
 
+        // Lazy-load: chiamabile anche da Twig (menu) prima che i permessi
+        // siano stati caricati esplicitamente.
+        if (empty($this->permissions)) {
+            $this->loadPermissions();
+        }
+
         return !empty($this->permissions[$module]);
     }
 
