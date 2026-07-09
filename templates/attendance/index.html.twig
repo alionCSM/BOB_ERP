@@ -267,13 +267,16 @@
                         <td>{{ row.cantiere }}</td>
                         <td style="text-align:center;">
                             {# quantita e' DECIMAL: 2.000000 → 2, 7.500000 → 7,5 #}
-                            {% set q = row.quantita + 0 %}
+                            {% set q = row.quantita matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.quantita + 0 : 0 %}
                             <span class="fe-badge" style="background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe;">{{ q == q|round ? q|number_format(0, ',', '.') : q|number_format(1, ',', '.') }}</span>
                         </td>
                         <td style="text-align:center;" class="fe-amount">{{ row.costo_unitario|number_format(2, ',', '.') }} €</td>
-                        <td style="text-align:center;">{{ (row.pasti + 0) > 0 ? (row.pasti|number_format(2, ',', '.') ~ ' €') : '—' }}</td>
+                        {# pasti/hotel possono essere testo libero ('-', note): formatta in € solo se numerici #}
+                        {% set pastiNum = row.pasti matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.pasti + 0 : null %}
+                        <td style="text-align:center;">{{ pastiNum is not null ? (pastiNum > 0 ? pastiNum|number_format(2, ',', '.') ~ ' €' : '—') : (row.pasti ?: '—') }}</td>
                         <td style="text-align:center;">{{ row.auto ?: '—' }}</td>
-                        <td style="text-align:center;">{{ (row.hotel + 0) > 0 ? (row.hotel|number_format(2, ',', '.') ~ ' €') : (row.hotel ?: '—') }}</td>
+                        {% set hotelNum = row.hotel matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.hotel + 0 : null %}
+                        <td style="text-align:center;">{{ hotelNum is not null ? (hotelNum > 0 ? hotelNum|number_format(2, ',', '.') ~ ' €' : '—') : (row.hotel ?: '—') }}</td>
                         <td style="font-size:12px; color:#64748b; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
                         <td>
                             <div style="display:flex; gap:6px; justify-content:flex-end;">
