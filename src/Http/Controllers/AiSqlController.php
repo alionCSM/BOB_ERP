@@ -14,11 +14,6 @@ class AiSqlController
     // NB: price visibility is now managed via the `view_prices` permission
     // in bb_user_permissions; use User::canSeePrices() / User::usernamesWithPriceAccess().
 
-    // Only these users (plus user id 1) may use the AI module. The feature
-    // executes LLM-generated SQL; access must stay narrow until that surface
-    // is properly hardened.
-    private const USERS_WITH_AI_ACCESS = ['alion', 'laura', 'osman', 'elena', 'ermal'];
-
     private \PDO $conn;
     private \App\Service\OllamaClient $client;
 
@@ -28,19 +23,18 @@ class AiSqlController
         $this->client = $client;
     }
 
+    /**
+     * Accesso al modulo AI: permesso 'ai_chat' in bb_user_permissions
+     * (gestibile da Utenti → Permessi). Il modulo esegue SQL generato
+     * dall'LLM: concedere il permesso con criterio. Superadmin (id 1)
+     * passa sempre; il menu usa lo stesso check (user.canAccess).
+     */
     private function assertAiAccess(Request $request): void
     {
-        $user     = $request->user();
-        $userId   = (int)($user->id ?? 0);
-        $username = (string)($user->username ?? '');
-
-        if ($userId === 1) {
+        $user = $request->user();
+        if ($user && $user->canAccess('ai_chat')) {
             return;
         }
-        if ($username !== '' && in_array($username, self::USERS_WITH_AI_ACCESS, true)) {
-            return;
-        }
-
         Response::error('Accesso negato.', 403);
     }
 
