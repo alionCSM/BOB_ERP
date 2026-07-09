@@ -57,36 +57,37 @@
     </div>
 </div>
 
+{# activeTab: il tab consorziate resta aperto dopo un filtro consorziate #}
 <ul class="nav nav-tabs fe-tabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link"
                 data-tw-target="#tab-presenze" role="tab"
-                aria-controls="tab-presenze" aria-selected="true">
+                aria-controls="tab-presenze" aria-selected="{{ activeTab == 'nostri' ? 'true' : 'false' }}">
             Presenze Nostri
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link"
                 data-tw-target="#tab-consorziate" role="tab"
-                aria-controls="tab-consorziate" aria-selected="false">
+                aria-controls="tab-consorziate" aria-selected="{{ activeTab == 'consorziate' ? 'true' : 'false' }}">
            Presenze Consorziate
         </button>
     </li>
 </ul>
 
 <div class="tab-content mt-5">
-    <div id="tab-presenze" class="tab-pane active" role="tabpanel">
+    <div id="tab-presenze" class="tab-pane {{ activeTab == 'nostri' ? 'active' : 'hidden' }}" role="tabpanel">
         <!-- FILTRI -->
         <div class="fe-card">
             <div class="fe-card-body" style="padding:16px 22px;">
                 <form method="GET" style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
                     <div>
                         <span class="fe-label">Data Inizio</span>
-                        <input type="date" name="start_date" value="{{ startDate }}" class="fe-input" style="width:170px;">
+                        <input type="date" name="start_date" value="{{ startDate }}" class="fe-input" style="width:170px;" data-range-start>
                     </div>
                     <div>
                         <span class="fe-label">Data Fine</span>
-                        <input type="date" name="end_date" value="{{ endDate }}" class="fe-input" style="width:170px;">
+                        <input type="date" name="end_date" value="{{ endDate }}" class="fe-input" style="width:170px;" data-range-end>
                     </div>
                     <div style="min-width:230px;">
                         <span class="fe-label">Cantiere</span>
@@ -109,6 +110,13 @@
                         Filtra
                     </button>
                     <a href="/attendance" class="fe-btn" style="color:#64748b; border-color:#e2e8f0; padding:9px 18px;">Reset filtri</a>
+                    <div class="fe-presets" style="width:100%;">
+                        <span class="fe-presets-lbl">Rapidi:</span>
+                        <button type="button" class="fe-preset" data-preset="oggi">Oggi</button>
+                        <button type="button" class="fe-preset" data-preset="settimana">Questa settimana</button>
+                        <button type="button" class="fe-preset" data-preset="mese">Questo mese</button>
+                        <button type="button" class="fe-preset" data-preset="mese-scorso">Mese scorso</button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -188,32 +196,49 @@
         </div>
     </div>
 
-    <div id="tab-consorziate" class="tab-pane hidden" role="tabpanel">
+    <div id="tab-consorziate" class="tab-pane {{ activeTab == 'consorziate' ? 'active' : 'hidden' }}" role="tabpanel">
         <div class="fe-card">
             <div class="fe-card-body" style="padding:16px 22px;">
                 <form method="GET" action="/attendance" style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
                     <input type="hidden" name="type" value="consorziata">
                     <div>
                         <span class="fe-label">Data Inizio</span>
-                        <input type="date" name="cons_start_date" class="fe-input" style="width:170px;">
+                        <input type="date" name="cons_start_date" value="{{ consStartDate }}" class="fe-input" style="width:170px;" data-range-start>
                     </div>
                     <div>
                         <span class="fe-label">Data Fine</span>
-                        <input type="date" name="cons_end_date" class="fe-input" style="width:170px;">
+                        <input type="date" name="cons_end_date" value="{{ consEndDate }}" class="fe-input" style="width:170px;" data-range-end>
                     </div>
                     <div style="min-width:230px;">
                         <span class="fe-label">Cantiere</span>
-                        <select name="cons_cantiere_id" id="consCantiereSelect" style="width:100%;"></select>
+                        <select name="cons_cantiere_id" id="consCantiereSelect" style="width:100%;">
+                            {% if consCantiereId is not empty %}
+                                <option value="{{ consCantiereId }}" selected>{{ selectedConsCantiere }}</option>
+                            {% endif %}
+                        </select>
                     </div>
-                    <div style="min-width:200px;">
+                    <div style="min-width:230px;">
                         <span class="fe-label">Consorziata</span>
-                        <input type="text" name="cons_name" class="fe-input" placeholder="Nome consorziata">
+                        {# solo aziende con consorziata=1, niente testo libero #}
+                        <select name="cons_azienda_id" id="consAziendaSelect" style="width:100%;">
+                            <option value="">Tutte le consorziate</option>
+                            {% for c in consorziateList %}
+                                <option value="{{ c.id }}" {{ consAziendaId == c.id ? 'selected' : '' }}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <button type="submit" class="fe-btn-save" style="padding:9px 22px;">
                         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         Filtra
                     </button>
                     <a href="/attendance?type=consorziata" class="fe-btn" style="color:#64748b; border-color:#e2e8f0; padding:9px 18px;">Reset</a>
+                    <div class="fe-presets" style="width:100%;">
+                        <span class="fe-presets-lbl">Rapidi:</span>
+                        <button type="button" class="fe-preset" data-preset="oggi">Oggi</button>
+                        <button type="button" class="fe-preset" data-preset="settimana">Questa settimana</button>
+                        <button type="button" class="fe-preset" data-preset="mese">Questo mese</button>
+                        <button type="button" class="fe-preset" data-preset="mese-scorso">Mese scorso</button>
+                    </div>
                 </form>
             </div>
         </div>

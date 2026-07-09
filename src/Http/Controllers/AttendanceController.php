@@ -32,10 +32,10 @@ final class AttendanceController
         $consStartDate  = $request->get('cons_start_date', '');
         $consEndDate    = $request->get('cons_end_date', '');
         $consCantiereId = $request->get('cons_cantiere_id', '');
-        $consName       = $request->get('cons_name', '');
+        $consAziendaId  = $request->get('cons_azienda_id', '');
 
         $presenze            = $repo->getFiltered($startDate, $endDate, $cantiereId ? (int)$cantiereId : null, $workerId ? (int)$workerId : null, 200);
-        $presenzeConsorziate = $repo->getConsorziateFiltered($consStartDate, $consEndDate, $consCantiereId ?: null, $consName ?: null, 200);
+        $presenzeConsorziate = $repo->getConsorziateFiltered($consStartDate, $consEndDate, $consCantiereId ? (int)$consCantiereId : null, $consAziendaId ? (int)$consAziendaId : null, 200);
 
         // Resolve filter labels for Twig (Twig cannot call static methods or object methods inline)
         $selectedCantiere = '';
@@ -49,12 +49,29 @@ final class AttendanceController
             $selectedWorker = $this->workerRepo->getFullById((int)$workerId);
         }
 
+        $selectedConsCantiere = '';
+        if (!empty($consCantiereId)) {
+            $ws = $this->worksiteRepo->findById((int)$consCantiereId);
+            $selectedConsCantiere = $ws ? ($ws['worksite_code'] . ' - ' . $ws['name']) : '';
+        }
+
+        // Elenco consorziate per il filtro (TomSelect statico, niente testo libero)
+        $consorziateList = $this->conn->query("
+            SELECT id, name FROM bb_companies
+            WHERE consorziata = 1 AND active = 1
+            ORDER BY name ASC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Tab da mostrare all'apertura: consorziate se si e' filtrato li'
+        $activeTab = ($request->get('type') === 'consorziata') ? 'consorziate' : 'nostri';
+
         $pageTitle = 'Presenze';
         Response::view('attendance/index.html.twig', $request, compact(
             'startDate', 'endDate', 'cantiereId', 'workerId',
-            'consStartDate', 'consEndDate', 'consCantiereId', 'consName',
+            'consStartDate', 'consEndDate', 'consCantiereId', 'consAziendaId',
             'presenze', 'presenzeConsorziate',
-            'selectedCantiere', 'selectedWorker',
+            'selectedCantiere', 'selectedWorker', 'selectedConsCantiere',
+            'consorziateList', 'activeTab',
             'pageTitle'
         ));
     }
