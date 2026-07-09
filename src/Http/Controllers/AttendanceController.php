@@ -179,7 +179,12 @@ final class AttendanceController
         $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);
         $righe = $repo->getAll();
         $pageTitle = 'Ferie e Permessi';
-        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle'));
+
+        $successMsg = $_SESSION['success'] ?? null;
+        $errorMsg   = $_SESSION['error']   ?? null;
+        unset($_SESSION['success'], $_SESSION['error']);
+
+        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle', 'successMsg', 'errorMsg'));
     }
 
     public function saveLeave(Request $request): never

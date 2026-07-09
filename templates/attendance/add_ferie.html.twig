@@ -2,114 +2,366 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<style>
+  .fe-page { margin-top: 16px; }
+
+  /* ── Hero (allineato a wd-/rn-/fp-) ─────────────────────────── */
+  .fe-hero {
+      position: relative; overflow: hidden;
+      border-radius: 18px;
+      padding: 26px 30px 22px;
+      background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+      color: #fff; margin-bottom: 18px;
+  }
+  .fe-hero::before {
+      content: ''; position: absolute; top: -80px; right: -40px;
+      width: 220px; height: 220px; border-radius: 50%;
+      background: rgba(14,165,233,.16); pointer-events: none;
+  }
+  .fe-hero::after {
+      content: ''; position: absolute; bottom: -100px; left: 30%;
+      width: 260px; height: 260px; border-radius: 50%;
+      background: rgba(245,158,11,.12); pointer-events: none;
+  }
+  .fe-hero-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
+  .fe-hero-icon {
+      width: 46px; height: 46px; border-radius: 13px;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12);
+      display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .fe-hero-icon svg { width: 23px; height: 23px; stroke: #38bdf8; stroke-width: 1.6; fill: none; }
+  .fe-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 3px; letter-spacing: -.2px; }
+  .fe-hero-sub { font-size: 13px; opacity: .6; margin: 0; }
+
+  .fe-hero-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; position: relative; z-index: 1; }
+  .fe-stat {
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px; padding: 9px 16px; min-width: 105px;
+  }
+  .fe-stat-num { font-size: 19px; font-weight: 800; line-height: 1.1; }
+  .fe-stat-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; opacity: .55; font-weight: 700; }
+
+  /* ── Toast ──────────────────────────────────────────────────── */
+  .fe-toast {
+      display: flex; justify-content: space-between; align-items: center;
+      border-radius: 12px; padding: 12px 18px; margin-bottom: 14px;
+      font-size: 13px; font-weight: 600;
+  }
+  .fe-toast-ok  { background: #dcfce7; border: 1.5px solid #86efac; color: #166534; }
+  .fe-toast-err { background: #fee2e2; border: 1.5px solid #fca5a5; color: #991b1b; }
+  .fe-toast button { font-size: 18px; font-weight: 800; background: none; border: 0; cursor: pointer; color: inherit; }
+
+  /* ── Card form ──────────────────────────────────────────────── */
+  .fe-card {
+      background: #fff; border-radius: 16px;
+      border: 1px solid #e6ecf2;
+      box-shadow: 0 1px 3px rgba(15,23,42,.05);
+      margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .fe-card::before {
+      content: ''; position: absolute; top: 0; left: 0; bottom: 0;
+      width: 4px; background: linear-gradient(180deg, #38bdf8, #0284c7);
+  }
+  .fe-card-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 22px 14px; border-bottom: 1px solid #f1f5f9;
+  }
+  .fe-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
+  .fe-card-body { padding: 18px 22px; }
+
+  .fe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+  }
+  .fe-label {
+      color: #8ea0b5; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; font-size: 10px; margin-bottom: 5px; display: block;
+  }
+  .fe-input, .fe-select, .fe-textarea {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 9px;
+      padding: 8px 11px; font-size: 13px; color: #0f172a; background: #fff;
+      transition: border-color .12s, box-shadow .12s;
+  }
+  .fe-input:focus, .fe-select:focus, .fe-textarea:focus {
+      outline: none; border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56,189,248,.14);
+  }
+  .fe-hint { font-size: 10.5px; color: #94a3b8; margin-top: 3px; display: block; }
+
+  /* chips tipo (ferie/permesso) */
+  .fe-tipo { display: flex; gap: 6px; }
+  .fe-tipo-chip {
+      flex: 1; padding: 8px 0; text-align: center;
+      border-radius: 9px; border: 1.5px solid #dbe3ec;
+      background: #fff; color: #94a3b8;
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      transition: all .12s; user-select: none;
+  }
+  .fe-tipo-chip.on-ferie {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-color: #2563eb; color: #fff;
+      box-shadow: 0 2px 6px rgba(37,99,235,.25);
+  }
+  .fe-tipo-chip.on-permesso {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border-color: #d97706; color: #fff;
+      box-shadow: 0 2px 6px rgba(217,119,6,.25);
+  }
+
+  .fe-form-foot { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; }
+  .fe-btn-save {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 26px; border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #fff; font-size: 13.5px; font-weight: 700;
+      border: 0; cursor: pointer; transition: all .15s;
+  }
+  .fe-btn-save:hover { box-shadow: 0 6px 16px rgba(37,99,235,.3); }
+  .fe-btn-save svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .fe-btn-cancel {
+      display: none; align-items: center; gap: 6px;
+      padding: 10px 18px; border-radius: 10px;
+      background: #fff; color: #64748b; font-size: 13px; font-weight: 600;
+      border: 1.5px solid #e2e8f0; cursor: pointer;
+  }
+  .fe-btn-cancel.visible { display: inline-flex; }
+
+  /* ── Toolbar ────────────────────────────────────────────────── */
+  .fe-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .fe-search { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
+  .fe-search svg {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      width: 15px; height: 15px; stroke: #94a3b8; fill: none; stroke-width: 2;
+      pointer-events: none;
+  }
+  .fe-search input {
+      width: 100%; border: 1.5px solid #e2e8f0; border-radius: 11px;
+      padding: 10px 14px 10px 36px; font-size: 13px; background: #fff;
+      transition: border-color .12s, box-shadow .12s;
+  }
+  .fe-search input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.14); }
+
+  /* ── Tabella ────────────────────────────────────────────────── */
+  .fe-table-wrap {
+      background: #fff; border-radius: 16px; border: 1px solid #e6ecf2;
+      box-shadow: 0 1px 3px rgba(15,23,42,.05);
+      overflow: auto;
+  }
+  .fe-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fe-table thead th {
+      text-align: left; padding: 13px 18px;
+      background: #f8fafc; color: #8ea0b5;
+      font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+      border-bottom: 1px solid #eef2f6; white-space: nowrap;
+  }
+  .fe-table tbody td {
+      padding: 13px 18px; border-bottom: 1px solid #f4f7fa;
+      color: #1e293b; vertical-align: middle;
+  }
+  .fe-table tbody tr:last-child td { border-bottom: 0; }
+  .fe-table tbody tr { transition: background .1s; }
+  .fe-table tbody tr:hover { background: #f8fbff; }
+
+  .fe-badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 12px; border-radius: 999px;
+      font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  }
+  .fe-badge-ferie    { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .fe-badge-permesso { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+  .fe-badge-oggi     { background: #dcfce7; color: #15803d; border: 1px solid #86efac; margin-left: 6px; }
+
+  .fe-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 13px; border-radius: 9px;
+      font-size: 12.5px; font-weight: 600;
+      border: 1.5px solid; cursor: pointer;
+      text-decoration: none; transition: all .12s; background: #fff;
+  }
+  .fe-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .fe-btn-edit { color: #2563eb; border-color: #bfdbfe; }
+  .fe-btn-edit:hover { background: #eff6ff; }
+  .fe-btn-del { color: #dc2626; border-color: #fca5a5; }
+  .fe-btn-del:hover { background: #fee2e2; }
+
+  .fe-empty {
+      text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px;
+  }
+  .hidden { display: none; }
+</style>
 {% endblock %}
 
+{% set today = "now"|date('Y-m-d') %}
+{% set ferieCount = righe|filter(r => r.tipo == 'ferie')|length %}
+{% set permessiCount = righe|filter(r => r.tipo == 'permesso')|length %}
+{% set oggiAssenti = righe|filter(r => r.data_inizio <= today and r.data_fine >= today)|length %}
+
 {% block content %}
-<div class="intro-y mt-8">
-    <h2 class="text-lg font-medium mb-4">Ferie e Permessi</h2>
-</div>
+<div class="fe-page">
 
-<div class="intro-y box p-5 mb-4">
-    <form method="POST" action="/attendance/leaves/save" class="grid grid-cols-12 gap-4 items-end">
-        <input type="hidden" name="record_id" value="">
-        <div class="col-span-12 md:col-span-2">
-            <label class="form-label">Tipo</label>
-            <select name="tipo" id="tipoSelect" class="form-select" required>
-                <option value="ferie">Ferie</option>
-                <option value="permesso">Permesso</option>
-            </select>
+    <div class="fe-hero">
+        <div class="fe-hero-content">
+            <div class="fe-hero-icon">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </div>
+            <div>
+                <h1 class="fe-hero-title">Ferie e Permessi</h1>
+                <p class="fe-hero-sub">Registra e gestisci le assenze degli operai</p>
+            </div>
         </div>
-        <div class="col-span-12 md:col-span-4">
-            <label class="form-label">Nome Operaio</label>
-            <select id="operaioSelect" name="operaio_id" class="form-control" required></select>
+        <div class="fe-hero-stats">
+            <div class="fe-stat">
+                <div class="fe-stat-num">{{ oggiAssenti }}</div>
+                <div class="fe-stat-lbl">Assenti oggi</div>
+            </div>
+            <div class="fe-stat">
+                <div class="fe-stat-num">{{ ferieCount }}</div>
+                <div class="fe-stat-lbl">Ferie</div>
+            </div>
+            <div class="fe-stat">
+                <div class="fe-stat-num">{{ permessiCount }}</div>
+                <div class="fe-stat-lbl">Permessi</div>
+            </div>
         </div>
-        <div class="col-span-6 md:col-span-2">
-            <label class="form-label">Dal</label>
-            <input type="date" name="data_inizio" class="form-control" required>
-        </div>
-        <div class="col-span-6 md:col-span-2">
-            <label class="form-label">Al</label>
-            <input type="date" name="data_fine" class="form-control">
-            <span style="font-size:11px;color:#94a3b8;">Vuoto = giorno singolo</span>
-        </div>
-        <div class="col-span-6 md:col-span-2 ore-wrap hidden">
-            <label class="form-label">Ore</label>
-            <input type="number" name="ore" step="0.5" min="0.5" max="12" class="form-control" placeholder="es. 4">
-            <span style="font-size:11px;color:#94a3b8;">Vuoto = giornata intera</span>
-        </div>
-        <div class="col-span-12">
-            <label class="form-label">Note</label>
-            <textarea name="note" class="form-control" rows="2" placeholder="Eventuali note (motivo, riferimenti...)"></textarea>
-        </div>
-        <div class="col-span-12 md:col-span-1">
-            <button type="submit" class="btn btn-primary w-full">Salva</button>
-        </div>
-    </form>
-</div>
+    </div>
 
-<div class="intro-y box p-5 mb-4">
-    <label class="form-label">Cerca nella tabella</label>
-    <input type="text" id="searchInput" class="form-control" placeholder="Cerca per nome operaio, azienda o data...">
-</div>
+    {% if successMsg %}
+        <div class="fe-toast fe-toast-ok"><span>✓ {{ successMsg }}</span><button type="button" data-dismiss-alert>&times;</button></div>
+    {% endif %}
+    {% if errorMsg %}
+        <div class="fe-toast fe-toast-err"><span>{{ errorMsg }}</span><button type="button" data-dismiss-alert>&times;</button></div>
+    {% endif %}
 
-<div class="intro-y col-span-12 overflow-auto">
-    <table class="table table-report -mt-2" id="ferieTable">
-        <thead>
-        <tr>
-            <th class="whitespace-nowrap">Tipo</th>
-            <th class="whitespace-nowrap">Operaio</th>
-            <th class="whitespace-nowrap">Azienda</th>
-            <th class="whitespace-nowrap">Dal</th>
-            <th class="whitespace-nowrap">Al</th>
-            <th class="whitespace-nowrap">Ore</th>
-            <th class="whitespace-nowrap">Note</th>
-            <th class="text-center whitespace-nowrap">Azioni</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for row in righe %}
-            <tr class="intro-x">
-                <td>
-                    {% if row.tipo == 'ferie' %}
-                        <span style="display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#dbeafe; color:#1d4ed8;">Ferie</span>
-                    {% else %}
-                        <span style="display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#fef3c7; color:#b45309;">Permesso</span>
-                    {% endif %}
-                </td>
-                <td class="font-medium">{{ row.operaio_nome }}</td>
-                <td>{{ row.operaio_azienda ?: '—' }}</td>
-                <td>{{ row.data_inizio|date('d/m/Y') }}</td>
-                <td>{{ row.data_fine|date('d/m/Y') }}</td>
-                <td>{{ row.ore ? row.ore ~ ' h' : '—' }}</td>
-                <td>{{ row.note }}</td>
-                <td class="table-report__action w-56">
-                    <div class="flex justify-center items-center">
-                        <button type="button" class="flex items-center mr-3 edit-btn"
-                                data-id="{{ row.id }}"
-                                data-tipo="{{ row.tipo }}"
-                                data-operaio="{{ row.operaio_id }}"
-                                data-operaio-nome="{{ row.operaio_nome }}"
-                                data-dal="{{ row.data_inizio }}"
-                                data-al="{{ row.data_fine }}"
-                                data-ore="{{ row.ore }}"
-                                data-note="{{ row.note }}">
-                            <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Modifica
-                        </button>
-                        <form method="POST"
-                              action="/attendance/leaves/save"
-                              class="inline-block"
-                              data-confirm="Confermi eliminazione di questo record?">
-                            <input type="hidden" name="delete_id" value="{{ row.id }}">
-                            <button type="submit" class="flex items-center text-danger">
-                                <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
-                            </button>
-                        </form>
+    {# ── Form registrazione ── #}
+    <div class="fe-card">
+        <div class="fe-card-head">
+            <h3 class="fe-card-title" id="fe-form-title">Registra nuova assenza</h3>
+        </div>
+        <div class="fe-card-body">
+            <form method="POST" action="/attendance/leaves/save" id="fe-form">
+                <input type="hidden" name="record_id" value="">
+                <div class="fe-grid">
+                    <div>
+                        <span class="fe-label">Tipo</span>
+                        <div class="fe-tipo">
+                            <button type="button" class="fe-tipo-chip on-ferie" data-tipo="ferie">Ferie</button>
+                            <button type="button" class="fe-tipo-chip" data-tipo="permesso">Permesso</button>
+                        </div>
+                        <select name="tipo" id="tipoSelect" class="hidden">
+                            <option value="ferie" selected>Ferie</option>
+                            <option value="permesso">Permesso</option>
+                        </select>
                     </div>
-                </td>
+                    <div style="grid-column: span 2; min-width: 220px;">
+                        <span class="fe-label">Operaio</span>
+                        <select id="operaioSelect" name="operaio_id" required></select>
+                    </div>
+                    <div>
+                        <span class="fe-label">Dal</span>
+                        <input type="date" name="data_inizio" class="fe-input" required>
+                    </div>
+                    <div>
+                        <span class="fe-label">Al</span>
+                        <input type="date" name="data_fine" class="fe-input">
+                        <span class="fe-hint">Vuoto = giorno singolo</span>
+                    </div>
+                    <div class="ore-wrap hidden">
+                        <span class="fe-label">Ore</span>
+                        <input type="number" name="ore" step="0.5" min="0.5" max="12" class="fe-input" placeholder="es. 4">
+                        <span class="fe-hint">Vuoto = giornata intera</span>
+                    </div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <span class="fe-label">Note</span>
+                    <textarea name="note" class="fe-textarea" rows="2" placeholder="Eventuali note (motivo, riferimenti...)"></textarea>
+                </div>
+                <div class="fe-form-foot">
+                    <button type="button" class="fe-btn-cancel" id="fe-cancel">Annulla modifica</button>
+                    <button type="submit" class="fe-btn-save">
+                        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Toolbar ── #}
+    <div class="fe-toolbar">
+        <div class="fe-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Cerca per operaio, azienda o data...">
+        </div>
+    </div>
+
+    {# ── Tabella ── #}
+    <div class="fe-table-wrap">
+        <table class="fe-table" id="ferieTable">
+            <thead>
+            <tr>
+                <th>Tipo</th>
+                <th>Operaio</th>
+                <th>Azienda</th>
+                <th>Dal</th>
+                <th>Al</th>
+                <th>Ore</th>
+                <th>Note</th>
+                <th style="text-align:right;">Azioni</th>
             </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+            {% for row in righe %}
+                {% set inCorso = row.data_inizio <= today and row.data_fine >= today %}
+                <tr>
+                    <td style="white-space:nowrap;">
+                        {% if row.tipo == 'ferie' %}
+                            <span class="fe-badge fe-badge-ferie">Ferie</span>
+                        {% else %}
+                            <span class="fe-badge fe-badge-permesso">Permesso</span>
+                        {% endif %}
+                        {% if inCorso %}<span class="fe-badge fe-badge-oggi">● oggi</span>{% endif %}
+                    </td>
+                    <td style="font-weight:600;">{{ row.operaio_nome }}</td>
+                    <td style="color:#64748b;">{{ row.operaio_azienda ?: '—' }}</td>
+                    <td style="white-space:nowrap;">{{ row.data_inizio|date('d/m/Y') }}</td>
+                    <td style="white-space:nowrap;">{{ row.data_fine|date('d/m/Y') }}</td>
+                    <td>{{ row.ore ? row.ore ~ ' h' : '—' }}</td>
+                    <td style="font-size:12px; color:#64748b; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
+                    <td>
+                        <div style="display:flex; gap:6px; justify-content:flex-end;">
+                            <button type="button" class="fe-btn fe-btn-edit edit-btn"
+                                    data-id="{{ row.id }}"
+                                    data-tipo="{{ row.tipo }}"
+                                    data-operaio="{{ row.operaio_id }}"
+                                    data-operaio-nome="{{ row.operaio_nome }}"
+                                    data-dal="{{ row.data_inizio }}"
+                                    data-al="{{ row.data_fine }}"
+                                    data-ore="{{ row.ore }}"
+                                    data-note="{{ row.note|e('html_attr') }}">
+                                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Modifica
+                            </button>
+                            <form method="POST"
+                                  action="/attendance/leaves/save"
+                                  class="inline-block"
+                                  data-confirm="Confermi eliminazione di questo record?">
+                                <input type="hidden" name="delete_id" value="{{ row.id }}">
+                                <button type="submit" class="fe-btn fe-btn-del">
+                                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    Elimina
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="fe-empty">Nessuna ferie o permesso registrato. Usa il form qui sopra per iniziare.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
 </div>
 {% endblock %}
 
