@@ -72,6 +72,25 @@
                     {% endif %}
                 </form>
 
+                {# ── QR attestati: apre la pagina pubblica docs.csmontaggi.it/attestati/{uid} ── #}
+                <div style="margin-top:12px; text-align:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 10px;">
+                    <div data-qr-render="{{ workerData.uid }}" style="display:flex; justify-content:center;"></div>
+                    <p style="font-size:10px; color:#94a3b8; margin:8px 0 10px;">QR attestati — pagina pubblica del tesserino</p>
+                    <div style="display:flex; gap:6px; justify-content:center;">
+                        <button type="button"
+                                data-qr-uid="{{ workerData.uid }}"
+                                data-qr-name="{{ workerData.first_name ~ ' ' ~ workerData.last_name }}"
+                                style="display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border-radius:8px; border:1.5px solid #bfdbfe; background:#fff; color:#2563eb; font-size:12px; font-weight:600; cursor:pointer;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Scarica QR
+                        </button>
+                        <a href="{{ attestatoUrl }}/attestati/{{ workerData.uid }}" target="_blank"
+                           style="display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border-radius:8px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; font-size:12px; font-weight:600; text-decoration:none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                            Apri
+                        </a>
+                    </div>
+                </div>
 
                 {% if tempPassword is not empty %}
                     <div class="ue-temp-pass" style="margin-top:12px;">
@@ -382,5 +401,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/assets/js/includes/worker_qr.js"></script>
 <script src="/assets/js/views/users/edit.js"></script>
 {% endblock %}

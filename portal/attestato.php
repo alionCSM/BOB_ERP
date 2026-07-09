@@ -206,7 +206,7 @@ function attestatoFooter(): void
 {
     ?>
         <footer class="attestato-footer">
-            &copy; <?= date('Y') ?> Consorzio Soluzione Montaggi &mdash; Documento interno
+            &copy; <?= date('Y') ?> Consorzio Soluzione Montaggi
         </footer>
     </body>
     </html>

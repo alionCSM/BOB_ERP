@@ -102,6 +102,8 @@
 }
 .ul-act-view { background: #eff6ff; color: #1d4ed8; }
 .ul-act-view:hover { background: #dbeafe; }
+.ul-act-qr { background: #f0fdf4; color: #15803d; }
+.ul-act-qr:hover { background: #dcfce7; }
 .ul-act-del { background: #fef2f2; color: #dc2626; }
 .ul-act-del:hover { background: #fee2e2; }
 
