@@ -1,0 +1,201 @@
+/* ============================================================
+   Modulo Presenze — design system condiviso (fe-*)
+   Usato da: Ferie/Permessi, Anticipi, Multe, Rimborsi,
+   Cerca presenze, Inserisci presenze.
+   Stesso linguaggio hero+card delle pagine moderne di BOB.
+   ============================================================ */
+
+.fe-page { margin-top: 16px; }
+
+/* ── Hero ───────────────────────────────────────────────────── */
+.fe-hero {
+    position: relative; overflow: hidden;
+    border-radius: 18px;
+    padding: 26px 30px 22px;
+    background: linear-gradient(135deg, #0c1929 0%, #122444 40%, #1e3a5f 100%);
+    color: #fff; margin-bottom: 18px;
+}
+.fe-hero::before {
+    content: ''; position: absolute; top: -80px; right: -40px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: rgba(14,165,233,.16); pointer-events: none;
+}
+.fe-hero::after {
+    content: ''; position: absolute; bottom: -100px; left: 30%;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: rgba(245,158,11,.12); pointer-events: none;
+}
+.fe-hero-content {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 14px;
+}
+.fe-hero-left { display: flex; align-items: center; gap: 14px; }
+.fe-hero-icon {
+    width: 46px; height: 46px; border-radius: 13px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12);
+    display: flex; align-items: center; justify-content: center; flex: none;
+}
+.fe-hero-icon svg { width: 23px; height: 23px; stroke: #38bdf8; stroke-width: 1.6; fill: none; }
+.fe-hero-title { font-size: 20px; font-weight: 800; margin: 0 0 3px; letter-spacing: -.2px; }
+.fe-hero-sub { font-size: 13px; opacity: .6; margin: 0; }
+
+.fe-hero-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; position: relative; z-index: 1; }
+.fe-stat {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 12px; padding: 9px 16px; min-width: 105px;
+}
+.fe-stat-num { font-size: 19px; font-weight: 800; line-height: 1.1; }
+.fe-stat-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; opacity: .55; font-weight: 700; }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.fe-toast {
+    display: flex; justify-content: space-between; align-items: center;
+    border-radius: 12px; padding: 12px 18px; margin-bottom: 14px;
+    font-size: 13px; font-weight: 600;
+}
+.fe-toast-ok  { background: #dcfce7; border: 1.5px solid #86efac; color: #166534; }
+.fe-toast-err { background: #fee2e2; border: 1.5px solid #fca5a5; color: #991b1b; }
+.fe-toast button { font-size: 18px; font-weight: 800; background: none; border: 0; cursor: pointer; color: inherit; }
+
+/* ── Card ───────────────────────────────────────────────────── */
+.fe-card {
+    background: #fff; border-radius: 16px;
+    border: 1px solid #e6ecf2;
+    box-shadow: 0 1px 3px rgba(15,23,42,.05);
+    margin-bottom: 16px; position: relative; overflow: hidden;
+}
+.fe-card::before {
+    content: ''; position: absolute; top: 0; left: 0; bottom: 0;
+    width: 4px; background: linear-gradient(180deg, #38bdf8, #0284c7);
+}
+.fe-card.accent-green::before  { background: linear-gradient(180deg, #4ade80, #16a34a); }
+.fe-card.accent-red::before    { background: linear-gradient(180deg, #f87171, #dc2626); }
+.fe-card.accent-amber::before  { background: linear-gradient(180deg, #fbbf24, #d97706); }
+.fe-card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 22px 14px; border-bottom: 1px solid #f1f5f9;
+}
+.fe-card-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
+.fe-card-body { padding: 18px 22px; }
+
+/* ── Campi form ─────────────────────────────────────────────── */
+.fe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+}
+.fe-label {
+    color: #8ea0b5; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; font-size: 10px; margin-bottom: 5px; display: block;
+}
+.fe-input, .fe-select, .fe-textarea {
+    width: 100%; border: 1.5px solid #e2e8f0; border-radius: 9px;
+    padding: 8px 11px; font-size: 13px; color: #0f172a; background: #fff;
+    transition: border-color .12s, box-shadow .12s;
+}
+.fe-input:focus, .fe-select:focus, .fe-textarea:focus {
+    outline: none; border-color: #38bdf8;
+    box-shadow: 0 0 0 3px rgba(56,189,248,.14);
+}
+.fe-hint { font-size: 10.5px; color: #94a3b8; margin-top: 3px; display: block; }
+
+/* chips tipo (ferie/permesso) */
+.fe-tipo { display: flex; gap: 6px; }
+.fe-tipo-chip {
+    flex: 1; padding: 8px 0; text-align: center;
+    border-radius: 9px; border: 1.5px solid #dbe3ec;
+    background: #fff; color: #94a3b8;
+    font-size: 12.5px; font-weight: 700; cursor: pointer;
+    transition: all .12s; user-select: none;
+}
+.fe-tipo-chip.on-ferie {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #2563eb; color: #fff;
+    box-shadow: 0 2px 6px rgba(37,99,235,.25);
+}
+.fe-tipo-chip.on-permesso {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-color: #d97706; color: #fff;
+    box-shadow: 0 2px 6px rgba(217,119,6,.25);
+}
+
+.fe-form-foot { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; }
+.fe-btn-save {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 26px; border-radius: 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: #fff; font-size: 13.5px; font-weight: 700;
+    border: 0; cursor: pointer; transition: all .15s;
+}
+.fe-btn-save:hover { box-shadow: 0 6px 16px rgba(37,99,235,.3); }
+.fe-btn-save svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }
+.fe-btn-cancel {
+    display: none; align-items: center; gap: 6px;
+    padding: 10px 18px; border-radius: 10px;
+    background: #fff; color: #64748b; font-size: 13px; font-weight: 600;
+    border: 1.5px solid #e2e8f0; cursor: pointer;
+}
+.fe-btn-cancel.visible { display: inline-flex; }
+
+/* ── Toolbar ────────────────────────────────────────────────── */
+.fe-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.fe-search { position: relative; flex: 1; min-width: 220px; max-width: 340px; }
+.fe-search svg {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; stroke: #94a3b8; fill: none; stroke-width: 2;
+    pointer-events: none;
+}
+.fe-search input {
+    width: 100%; border: 1.5px solid #e2e8f0; border-radius: 11px;
+    padding: 10px 14px 10px 36px; font-size: 13px; background: #fff;
+    transition: border-color .12s, box-shadow .12s;
+}
+.fe-search input:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.14); }
+
+/* ── Tabella ────────────────────────────────────────────────── */
+.fe-table-wrap {
+    background: #fff; border-radius: 16px; border: 1px solid #e6ecf2;
+    box-shadow: 0 1px 3px rgba(15,23,42,.05);
+    overflow: auto;
+}
+.fe-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fe-table thead th {
+    text-align: left; padding: 13px 18px;
+    background: #f8fafc; color: #8ea0b5;
+    font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+    border-bottom: 1px solid #eef2f6; white-space: nowrap;
+}
+.fe-table tbody td {
+    padding: 13px 18px; border-bottom: 1px solid #f4f7fa;
+    color: #1e293b; vertical-align: middle;
+}
+.fe-table tbody tr:last-child td { border-bottom: 0; }
+.fe-table tbody tr { transition: background .1s; }
+.fe-table tbody tr:hover { background: #f8fbff; }
+
+.fe-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 12px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: .3px;
+}
+.fe-badge-ferie    { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.fe-badge-permesso { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.fe-badge-oggi     { background: #dcfce7; color: #15803d; border: 1px solid #86efac; margin-left: 6px; }
+
+.fe-amount { font-weight: 700; white-space: nowrap; }
+
+.fe-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border-radius: 9px;
+    font-size: 12.5px; font-weight: 600;
+    border: 1.5px solid; cursor: pointer;
+    text-decoration: none; transition: all .12s; background: #fff;
+}
+.fe-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+.fe-btn-edit { color: #2563eb; border-color: #bfdbfe; }
+.fe-btn-edit:hover { background: #eff6ff; }
+.fe-btn-del { color: #dc2626; border-color: #fca5a5; }
+.fe-btn-del:hover { background: #fee2e2; }
+
+.fe-empty { text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px; }
