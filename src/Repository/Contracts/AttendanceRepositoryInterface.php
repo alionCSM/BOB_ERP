@@ -50,7 +50,7 @@ interface AttendanceRepositoryInterface
         ?string $startDate,
         ?string $endDate,
         ?int $cantiereId,
-        ?string $consName,
+        ?int $consAziendaId,
         int $limit = 200
     ): array;
 
