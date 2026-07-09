@@ -272,6 +272,9 @@ final class UsersController
             $presenzeTotali = ['giornate' => (float)($tot['gg'] ?? 0), 'count' => (int)($tot['n'] ?? 0)];
         }
 
+        // ── Tab Ferie/Permessi ──
+        $ferieRows = (new \App\Repository\Attendance\LeaveRepository($this->conn))->getByWorker($workerId);
+
         // Capture legacy PHP document partials as HTML strings for Twig
         // The partials expect: $workerId, $connection, $user, $conn
         $connection = $this->conn;
@@ -291,7 +294,7 @@ final class UsersController
             'allowedCompanyNames', 'userService', 'workerUser', 'canCreateUser',
             'tempPassword', 'companyHistory', 'pageTitle',
             'documentiAziendali', 'documentiPersonali',
-            'companiesList', 'isConsorziataWorker', 'presenzeRows', 'presenzeTotali'
+            'companiesList', 'isConsorziataWorker', 'presenzeRows', 'presenzeTotali', 'ferieRows'
         ));
     }
 

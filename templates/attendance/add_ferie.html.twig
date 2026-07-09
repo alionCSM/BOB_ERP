@@ -1,0 +1,119 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="intro-y mt-8">
+    <h2 class="text-lg font-medium mb-4">Ferie e Permessi</h2>
+</div>
+
+<div class="intro-y box p-5 mb-4">
+    <form method="POST" action="/attendance/leaves/save" class="grid grid-cols-12 gap-4 items-end">
+        <input type="hidden" name="record_id" value="">
+        <div class="col-span-12 md:col-span-2">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" id="tipoSelect" class="form-select" required>
+                <option value="ferie">Ferie</option>
+                <option value="permesso">Permesso</option>
+            </select>
+        </div>
+        <div class="col-span-12 md:col-span-4">
+            <label class="form-label">Nome Operaio</label>
+            <select id="operaioSelect" name="operaio_id" class="form-control" required></select>
+        </div>
+        <div class="col-span-6 md:col-span-2">
+            <label class="form-label">Dal</label>
+            <input type="date" name="data_inizio" class="form-control" required>
+        </div>
+        <div class="col-span-6 md:col-span-2">
+            <label class="form-label">Al</label>
+            <input type="date" name="data_fine" class="form-control">
+            <span style="font-size:11px;color:#94a3b8;">Vuoto = giorno singolo</span>
+        </div>
+        <div class="col-span-6 md:col-span-2 ore-wrap hidden">
+            <label class="form-label">Ore</label>
+            <input type="number" name="ore" step="0.5" min="0.5" max="12" class="form-control" placeholder="es. 4">
+            <span style="font-size:11px;color:#94a3b8;">Vuoto = giornata intera</span>
+        </div>
+        <div class="col-span-12">
+            <label class="form-label">Note</label>
+            <textarea name="note" class="form-control" rows="2" placeholder="Eventuali note (motivo, riferimenti...)"></textarea>
+        </div>
+        <div class="col-span-12 md:col-span-1">
+            <button type="submit" class="btn btn-primary w-full">Salva</button>
+        </div>
+    </form>
+</div>
+
+<div class="intro-y box p-5 mb-4">
+    <label class="form-label">Cerca nella tabella</label>
+    <input type="text" id="searchInput" class="form-control" placeholder="Cerca per nome operaio, azienda o data...">
+</div>
+
+<div class="intro-y col-span-12 overflow-auto">
+    <table class="table table-report -mt-2" id="ferieTable">
+        <thead>
+        <tr>
+            <th class="whitespace-nowrap">Tipo</th>
+            <th class="whitespace-nowrap">Operaio</th>
+            <th class="whitespace-nowrap">Azienda</th>
+            <th class="whitespace-nowrap">Dal</th>
+            <th class="whitespace-nowrap">Al</th>
+            <th class="whitespace-nowrap">Ore</th>
+            <th class="whitespace-nowrap">Note</th>
+            <th class="text-center whitespace-nowrap">Azioni</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in righe %}
+            <tr class="intro-x">
+                <td>
+                    {% if row.tipo == 'ferie' %}
+                        <span style="display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#dbeafe; color:#1d4ed8;">Ferie</span>
+                    {% else %}
+                        <span style="display:inline-block; padding:3px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#fef3c7; color:#b45309;">Permesso</span>
+                    {% endif %}
+                </td>
+                <td class="font-medium">{{ row.operaio_nome }}</td>
+                <td>{{ row.operaio_azienda ?: '—' }}</td>
+                <td>{{ row.data_inizio|date('d/m/Y') }}</td>
+                <td>{{ row.data_fine|date('d/m/Y') }}</td>
+                <td>{{ row.ore ? row.ore ~ ' h' : '—' }}</td>
+                <td>{{ row.note }}</td>
+                <td class="table-report__action w-56">
+                    <div class="flex justify-center items-center">
+                        <button type="button" class="flex items-center mr-3 edit-btn"
+                                data-id="{{ row.id }}"
+                                data-tipo="{{ row.tipo }}"
+                                data-operaio="{{ row.operaio_id }}"
+                                data-operaio-nome="{{ row.operaio_nome }}"
+                                data-dal="{{ row.data_inizio }}"
+                                data-al="{{ row.data_fine }}"
+                                data-ore="{{ row.ore }}"
+                                data-note="{{ row.note }}">
+                            <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Modifica
+                        </button>
+                        <form method="POST"
+                              action="/attendance/leaves/save"
+                              class="inline-block"
+                              data-confirm="Confermi eliminazione di questo record?">
+                            <input type="hidden" name="delete_id" value="{{ row.id }}">
+                            <button type="submit" class="flex items-center text-danger">
+                                <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/add_ferie.js"></script>
+{% endblock %}

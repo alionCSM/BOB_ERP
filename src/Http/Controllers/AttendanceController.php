@@ -172,6 +172,57 @@ final class AttendanceController
         Response::view('attendance/add_rimborso.html.twig', $request, compact('rimborsi', 'pageTitle'));
     }
 
+    // ── Ferie / Permessi ───────────────────────────────────────────────────────
+
+    public function leaves(Request $request): void
+    {
+        $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);
+        $righe = $repo->getAll();
+        $pageTitle = 'Ferie e Permessi';
+        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle'));
+    }
+
+    public function saveLeave(Request $request): never
+    {
+        $repo = new \App\Repository\Attendance\LeaveRepository($this->conn);
+
+        try {
+            if (isset($_POST['delete_id'])) {
+                $repo->delete((int)$_POST['delete_id']);
+                $_SESSION['success'] = "Record eliminato.";
+            } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $workerId = (int)($_POST['operaio_id'] ?? 0);
+                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso'], true) ? $_POST['tipo'] : '';
+                $from     = $_POST['data_inizio'] ?? '';
+                $to       = $_POST['data_fine']   ?: $from; // vuoto = giorno singolo
+                $ore      = ($_POST['ore'] ?? '') !== '' ? (float)$_POST['ore'] : null;
+                $note     = trim($_POST['note'] ?? '');
+                $id       = (int)($_POST['record_id'] ?? 0);
+                $userId   = (int)($request->user()->id ?? 0);
+
+                if ($to < $from) {
+                    [$from, $to] = [$to, $from];
+                }
+
+                if ($workerId && $tipo && $from) {
+                    if ($id > 0) {
+                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note);
+                        $_SESSION['success'] = ucfirst($tipo) . " aggiornato.";
+                    } else {
+                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId);
+                        $_SESSION['success'] = ucfirst($tipo) . " registrato.";
+                    }
+                } else {
+                    $_SESSION['error'] = "Dati non validi.";
+                }
+            }
+        } catch (\Exception $e) {
+            $_SESSION['error'] = "Errore durante l'operazione.";
+        }
+
+        Response::redirect('/attendance/leaves');
+    }
+
     // ── Save bulk (POST JSON) ──────────────────────────────────────────────────
 
     public function saveBulk(Request $request): never
