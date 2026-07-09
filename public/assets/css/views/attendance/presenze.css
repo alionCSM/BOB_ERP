@@ -59,15 +59,18 @@
 .fe-toast button { font-size: 18px; font-weight: 800; background: none; border: 0; cursor: pointer; color: inherit; }
 
 /* ── Card ───────────────────────────────────────────────────── */
+/* NB: overflow visibile, NON hidden: dentro le card ci sono i dropdown
+   TomSelect e i risultati verrebbero tagliati al bordo della card. */
 .fe-card {
     background: #fff; border-radius: 16px;
     border: 1px solid #e6ecf2;
     box-shadow: 0 1px 3px rgba(15,23,42,.05);
-    margin-bottom: 16px; position: relative; overflow: hidden;
+    margin-bottom: 16px; position: relative;
 }
 .fe-card::before {
     content: ''; position: absolute; top: 0; left: 0; bottom: 0;
     width: 4px; background: linear-gradient(180deg, #38bdf8, #0284c7);
+    border-radius: 16px 0 0 16px;
 }
 .fe-card.accent-green::before  { background: linear-gradient(180deg, #4ade80, #16a34a); }
 .fe-card.accent-red::before    { background: linear-gradient(180deg, #f87171, #dc2626); }
