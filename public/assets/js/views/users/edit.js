@@ -134,6 +134,16 @@
         modal.show();
     }
 
+    // Cambia Azienda: solo aziende a listino, ricercabili (niente testo libero)
+    if (document.getElementById('company-change-select')) {
+        new TomSelect('#company-change-select', {
+            create: false,
+            maxItems: 1,
+            placeholder: 'Cerca azienda...',
+            sortField: { field: 'text', direction: 'asc' }
+        });
+    }
+
     if (document.getElementById('worker-search')) {
         new TomSelect('#worker-search', {
             valueField: 'id',

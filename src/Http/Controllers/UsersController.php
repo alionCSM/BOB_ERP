@@ -232,6 +232,46 @@ final class UsersController
         $companyHistory      = $this->workerRepo->getCompanyHistory($workerData['fiscal_code'] ?? '');
         $pageTitle           = 'Modifica Profilo';
 
+        // Aziende a listino per il "Cambia Azienda" (TomSelect, niente testo
+        // libero: il nome deve combaciare con bb_companies).
+        $companiesList = $this->conn->query("
+            SELECT name FROM bb_companies WHERE active = 1 ORDER BY name ASC
+        ")->fetchAll(\PDO::FETCH_COLUMN);
+
+        // ── Tab Presenze ──
+        // Le presenze individuali (bb_presenze) esistono solo per gli operai
+        // di aziende NON consorziate: per le consorziate si registrano
+        // quantita' aggregate per azienda (bb_presenze_consorziate), quindi
+        // non c'e' un dettaglio per singolo operaio da mostrare.
+        $stmt = $this->conn->prepare("SELECT consorziata FROM bb_companies WHERE name = :n LIMIT 1");
+        $stmt->execute([':n' => (string)($workerData['company'] ?? '')]);
+        $isConsorziataWorker = ((int)$stmt->fetchColumn() === 1);
+
+        $presenzeRows  = [];
+        $presenzeTotali = ['giornate' => 0.0, 'count' => 0];
+        if (!$isConsorziataWorker) {
+            $stmt = $this->conn->prepare("
+                SELECT p.data, p.turno, p.pranzo, p.cena, p.hotel, p.trasferta, p.note,
+                       w.name AS worksite_name, w.worksite_code, w.id AS worksite_id
+                FROM bb_presenze p
+                LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+                WHERE p.worker_id = :wid
+                ORDER BY p.data DESC
+                LIMIT 200
+            ");
+            $stmt->execute([':wid' => $workerId]);
+            $presenzeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) AS n,
+                       COALESCE(SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END), 0) AS gg
+                FROM bb_presenze WHERE worker_id = :wid
+            ");
+            $stmt->execute([':wid' => $workerId]);
+            $tot = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $presenzeTotali = ['giornate' => (float)($tot['gg'] ?? 0), 'count' => (int)($tot['n'] ?? 0)];
+        }
+
         // Capture legacy PHP document partials as HTML strings for Twig
         // The partials expect: $workerId, $connection, $user, $conn
         $connection = $this->conn;
@@ -250,7 +290,8 @@ final class UsersController
             'workerId', 'workerData', 'isCompanyScopedUser', 'isExternalLimitedUi',
             'allowedCompanyNames', 'userService', 'workerUser', 'canCreateUser',
             'tempPassword', 'companyHistory', 'pageTitle',
-            'documentiAziendali', 'documentiPersonali'
+            'documentiAziendali', 'documentiPersonali',
+            'companiesList', 'isConsorziataWorker', 'presenzeRows', 'presenzeTotali'
         ));
     }
 

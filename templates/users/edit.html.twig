@@ -272,7 +272,15 @@
                                             {% endfor %}
                                         </select>
                                     {% else %}
-                                        <input name="company" type="text" class="ue-input" required>
+                                        {# solo aziende a listino (bb_companies): niente testo libero #}
+                                        <select name="company" id="company-change-select" required>
+                                            <option value="">Seleziona azienda...</option>
+                                            {% for companyName in companiesList %}
+                                                {% if companyName != workerData.company %}
+                                                    <option value="{{ companyName }}">{{ companyName }}</option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </select>
                                     {% endif %}
                                 </div>
                                 <div class="ue-field">
@@ -300,6 +308,84 @@
                     </div>
                 </div>
             </form>
+
+            <!-- Presenze -->
+            {% if not isExternalLimitedUi %}
+            <div id="presenze" class="tab-content hidden">
+                <div class="ue-card">
+                    <div class="ue-card-header">
+                        <div class="ue-card-header-icon" style="background:#ecfdf5; color:#059669;">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="14" height="14" rx="2"/><path d="M3 8h14M7 2v4m6-4v4"/></svg>
+                        </div>
+                        <div>
+                            <div class="ue-card-header-title">Presenze</div>
+                            <div class="ue-card-header-sub">
+                                {% if isConsorziataWorker %}
+                                    Operaio di azienda consorziata
+                                {% else %}
+                                    {{ presenzeTotali.count }} presenze · {{ presenzeTotali.giornate|number_format(1, ',', '.') }} giornate equivalenti
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ue-card-body">
+                        {% if isConsorziataWorker %}
+                            <div style="text-align:center; padding:36px 20px;">
+                                <div style="width:56px; height:56px; border-radius:50%; background:#fef3c7; display:flex; align-items:center; justify-content:center; margin:0 auto 14px;">
+                                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                                </div>
+                                <p style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 6px;">Operaio di azienda consorziata</p>
+                                <p style="font-size:13px; color:#64748b; max-width:420px; margin:0 auto; line-height:1.6;">
+                                    Le presenze di <b>{{ workerData.company }}</b> vengono registrate in forma aggregata
+                                    per azienda (quantità per cantiere e giorno), non per singolo operaio.
+                                    Il dettaglio individuale non è quindi disponibile.
+                                </p>
+                            </div>
+                        {% elseif presenzeRows is empty %}
+                            <div style="text-align:center; padding:36px 20px;">
+                                <p style="font-size:14px; color:#94a3b8; margin:0;">Nessuna presenza registrata per questo operaio.</p>
+                            </div>
+                        {% else %}
+                            <div style="overflow-x:auto;">
+                                <table class="ue-archive-table" style="width:100%;">
+                                    <thead>
+                                        <tr><th>Data</th><th>Cantiere</th><th>Turno</th><th>Pranzo</th><th>Cena</th><th>Hotel</th><th>Note</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for p in presenzeRows %}
+                                        <tr>
+                                            <td style="white-space:nowrap; font-weight:600;">{{ p.data|date('d/m/Y') }}</td>
+                                            <td>
+                                                {% if p.worksite_id %}
+                                                    <a href="/worksites/{{ p.worksite_id }}" style="color:#2563eb; text-decoration:none;">
+                                                        {{ p.worksite_code ? p.worksite_code ~ ' — ' : '' }}{{ p.worksite_name }}
+                                                    </a>
+                                                {% else %}—{% endif %}
+                                            </td>
+                                            <td>
+                                                <span style="display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:700; {{ p.turno == 'Intero' ? 'background:#dcfce7; color:#15803d;' : 'background:#fef3c7; color:#b45309;' }}">
+                                                    {{ p.turno }}
+                                                </span>
+                                            </td>
+                                            <td>{{ p.pranzo ?: '—' }}</td>
+                                            <td>{{ p.cena ?: '—' }}</td>
+                                            <td>{{ p.hotel and p.hotel != '-' ? p.hotel : '—' }}</td>
+                                            <td style="font-size:12px; color:#64748b;">{{ p.note ?: '' }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if presenzeTotali.count > 200 %}
+                                <p style="font-size:11px; color:#94a3b8; margin-top:10px; text-align:center;">
+                                    Mostrate le ultime 200 presenze di {{ presenzeTotali.count }} totali.
+                                </p>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Document Tabs -->
             <div id="documents" class="tab-content hidden">
