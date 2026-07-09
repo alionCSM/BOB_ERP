@@ -225,6 +225,7 @@ if ($uri === '/users' || str_starts_with($uri, '/users/')) {
            ->post('/users/permissions/{id}',        [UsersController::class, 'permissionsEdit'])
            ->post('/users',                         [UsersController::class, 'store'])
            ->get('/users/{id}/edit',                [UsersController::class, 'show'])
+           ->get('/users/{id}/presenze-data',       [UsersController::class, 'presenzeData'])
            ->get('/users/{id}/worker-profile',      [UsersController::class, 'workerProfile'])
            ->post('/users/{id}/update',             [UsersController::class, 'update'])
            ->post('/users/{id}/photo',              [UsersController::class, 'updatePhoto'])

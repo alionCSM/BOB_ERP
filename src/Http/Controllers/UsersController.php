@@ -247,21 +247,12 @@ final class UsersController
         $stmt->execute([':n' => (string)($workerData['company'] ?? '')]);
         $isConsorziataWorker = ((int)$stmt->fetchColumn() === 1);
 
-        $presenzeRows  = [];
+        // La lista vera viene caricata via JSON (/users/{id}/presenze-data)
+        // con ricerca, filtri anno/mese e paginazione. Qui solo i totali e
+        // gli anni disponibili per popolare il filtro.
         $presenzeTotali = ['giornate' => 0.0, 'count' => 0];
+        $presenzeYears  = [];
         if (!$isConsorziataWorker) {
-            $stmt = $this->conn->prepare("
-                SELECT p.data, p.turno, p.pranzo, p.cena, p.hotel, p.trasferta, p.note,
-                       w.name AS worksite_name, w.worksite_code, w.id AS worksite_id
-                FROM bb_presenze p
-                LEFT JOIN bb_worksites w ON w.id = p.worksite_id
-                WHERE p.worker_id = :wid
-                ORDER BY p.data DESC
-                LIMIT 200
-            ");
-            $stmt->execute([':wid' => $workerId]);
-            $presenzeRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
             $stmt = $this->conn->prepare("
                 SELECT COUNT(*) AS n,
                        COALESCE(SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END), 0) AS gg
@@ -270,6 +261,13 @@ final class UsersController
             $stmt->execute([':wid' => $workerId]);
             $tot = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
             $presenzeTotali = ['giornate' => (float)($tot['gg'] ?? 0), 'count' => (int)($tot['n'] ?? 0)];
+
+            $stmt = $this->conn->prepare("
+                SELECT DISTINCT YEAR(data) AS y FROM bb_presenze
+                WHERE worker_id = :wid ORDER BY y DESC
+            ");
+            $stmt->execute([':wid' => $workerId]);
+            $presenzeYears = array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
         }
 
         // ── Tab Ferie/Permessi ──
@@ -294,8 +292,83 @@ final class UsersController
             'allowedCompanyNames', 'userService', 'workerUser', 'canCreateUser',
             'tempPassword', 'companyHistory', 'pageTitle',
             'documentiAziendali', 'documentiPersonali',
-            'companiesList', 'isConsorziataWorker', 'presenzeRows', 'presenzeTotali', 'ferieRows'
+            'companiesList', 'isConsorziataWorker', 'presenzeTotali', 'presenzeYears', 'ferieRows'
         ));
+    }
+
+    /**
+     * GET /users/{id}/presenze-data — righe presenze del singolo operaio
+     * per il tab Presenze del profilo: ricerca (cantiere/note), filtri
+     * anno/mese, paginazione. JSON.
+     */
+    public function presenzeData(Request $request): never
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        $workerId    = $request->intParam('id');
+        $providedUid = (string)($request->get('uid') ?? '');
+        if (!validateWorkerUid($this->conn, $workerId, $providedUid)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Accesso negato']);
+            exit;
+        }
+        // il tab presenze e' riservato agli utenti interni
+        if (isCompanyScopedUserByContext($this->conn, $request->user())) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Accesso negato']);
+            exit;
+        }
+
+        $year    = (int)($request->get('year') ?? 0);
+        $month   = (int)($request->get('month') ?? 0);
+        $q       = trim((string)($request->get('q') ?? ''));
+        $page    = max(1, (int)($request->get('page') ?? 1));
+        $perPage = 25;
+
+        $where  = "p.worker_id = :wid";
+        $params = [':wid' => $workerId];
+        if ($year >= 2000)                 { $where .= " AND YEAR(p.data) = :y";  $params[':y'] = $year; }
+        if ($month >= 1 && $month <= 12)   { $where .= " AND MONTH(p.data) = :m"; $params[':m'] = $month; }
+        if ($q !== '') {
+            $where .= " AND (w.name LIKE :q1 OR w.worksite_code LIKE :q2 OR p.note LIKE :q3)";
+            $like = '%' . $q . '%';
+            $params[':q1'] = $like; $params[':q2'] = $like; $params[':q3'] = $like;
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*) AS n,
+                   COALESCE(SUM(CASE p.turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END), 0) AS gg
+            FROM bb_presenze p
+            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+            WHERE {$where}
+        ");
+        $stmt->execute($params);
+        $tot   = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $total = (int)($tot['n'] ?? 0);
+        $pages = max(1, (int)ceil($total / $perPage));
+        $page  = min($page, $pages);
+
+        $stmt = $this->conn->prepare("
+            SELECT p.data, p.turno, p.pranzo, p.cena, p.hotel, p.note,
+                   w.name AS worksite_name, w.worksite_code, w.id AS worksite_id
+            FROM bb_presenze p
+            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+            WHERE {$where}
+            ORDER BY p.data DESC, p.id DESC
+            LIMIT " . (($page - 1) * $perPage) . ", {$perPage}
+        ");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'ok'       => true,
+            'rows'     => $rows,
+            'total'    => $total,
+            'giornate' => (float)($tot['gg'] ?? 0),
+            'page'     => $page,
+            'pages'    => $pages,
+        ]);
+        exit;
     }
 
     public function update(Request $request): void

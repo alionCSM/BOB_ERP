@@ -134,6 +134,105 @@
         modal.show();
     }
 
+    // ── Tab Presenze: lista via JSON con ricerca/filtri/paginazione ─────────
+    (function () {
+        var app = document.getElementById('presenze-app');
+        if (!app) return;
+
+        var workerId = app.dataset.worker;
+        var uid      = app.dataset.uid;
+        var body     = document.getElementById('pz-body');
+        var summary  = document.getElementById('pz-summary');
+        var pageLbl  = document.getElementById('pz-page');
+        var prevBtn  = document.getElementById('pz-prev');
+        var nextBtn  = document.getElementById('pz-next');
+        var search   = document.getElementById('pz-search');
+        var yearSel  = document.getElementById('pz-year');
+        var monthSel = document.getElementById('pz-month');
+
+        var page = 1, pages = 1, loaded = false, debounce = null;
+
+        function esc(s) {
+            var d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+
+        function fmtDate(iso) {
+            if (!iso) return '';
+            var p = String(iso).slice(0, 10).split('-');
+            return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+        }
+
+        function load() {
+            body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8;">Caricamento…</td></tr>';
+            var params = new URLSearchParams({
+                uid: uid, page: page,
+                q: search.value.trim(),
+                year: yearSel.value, month: monthSel.value
+            });
+            fetch('/users/' + workerId + '/presenze-data?' + params)
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (!data.ok) throw new Error(data.error || 'errore');
+                    pages = data.pages;
+                    page  = data.page;
+
+                    summary.textContent = data.total + ' presenze · ' +
+                        (data.giornate || 0).toLocaleString('it-IT', { maximumFractionDigits: 1 }) +
+                        ' giornate equivalenti (filtri attuali)';
+                    pageLbl.textContent = 'Pagina ' + page + ' di ' + pages;
+                    prevBtn.style.visibility = page > 1     ? 'visible' : 'hidden';
+                    nextBtn.style.visibility = page < pages ? 'visible' : 'hidden';
+
+                    if (!data.rows.length) {
+                        body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8;">Nessuna presenza con questi filtri.</td></tr>';
+                        return;
+                    }
+
+                    body.innerHTML = data.rows.map(function (p) {
+                        var cantiere = p.worksite_id
+                            ? '<a href="/worksites/' + p.worksite_id + '" style="color:#2563eb; text-decoration:none;">' +
+                              esc((p.worksite_code ? p.worksite_code + ' — ' : '') + (p.worksite_name || '')) + '</a>'
+                            : '—';
+                        var turnoStyle = p.turno === 'Intero'
+                            ? 'background:#dcfce7; color:#15803d;'
+                            : 'background:#fef3c7; color:#b45309;';
+                        return '<tr>' +
+                            '<td style="white-space:nowrap; font-weight:600;">' + fmtDate(p.data) + '</td>' +
+                            '<td>' + cantiere + '</td>' +
+                            '<td><span style="display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:700; ' + turnoStyle + '">' + esc(p.turno) + '</span></td>' +
+                            '<td>' + esc(p.pranzo || '—') + '</td>' +
+                            '<td>' + esc(p.cena || '—') + '</td>' +
+                            '<td>' + esc(p.hotel && p.hotel !== '-' ? p.hotel : '—') + '</td>' +
+                            '<td style="font-size:12px; color:#64748b;">' + esc(p.note || '') + '</td>' +
+                            '</tr>';
+                    }).join('');
+                })
+                .catch(function () {
+                    body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#dc2626;">Errore di caricamento. Riprova.</td></tr>';
+                });
+        }
+
+        function reset() { page = 1; load(); }
+
+        prevBtn.addEventListener('click', function () { if (page > 1) { page--; load(); } });
+        nextBtn.addEventListener('click', function () { if (page < pages) { page++; load(); } });
+        yearSel.addEventListener('change', reset);
+        monthSel.addEventListener('change', reset);
+        search.addEventListener('input', function () {
+            clearTimeout(debounce);
+            debounce = setTimeout(reset, 350);
+        });
+
+        // lazy: carica solo alla prima apertura del tab
+        document.querySelectorAll('.tab-link[data-tab="presenze"]').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                if (!loaded) { loaded = true; load(); }
+            });
+        });
+    })();
+
     // Cambia Azienda: solo aziende a listino, ricercabili (niente testo libero)
     if (document.getElementById('company-change-select')) {
         new TomSelect('#company-change-select', {

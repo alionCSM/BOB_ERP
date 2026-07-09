@@ -341,46 +341,48 @@
                                     Il dettaglio individuale non è quindi disponibile.
                                 </p>
                             </div>
-                        {% elseif presenzeRows is empty %}
+                        {% elseif presenzeTotali.count == 0 %}
                             <div style="text-align:center; padding:36px 20px;">
                                 <p style="font-size:14px; color:#94a3b8; margin:0;">Nessuna presenza registrata per questo operaio.</p>
                             </div>
                         {% else %}
-                            <div style="overflow-x:auto;">
-                                <table class="ue-archive-table" style="width:100%;">
-                                    <thead>
-                                        <tr><th>Data</th><th>Cantiere</th><th>Turno</th><th>Pranzo</th><th>Cena</th><th>Hotel</th><th>Note</th></tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for p in presenzeRows %}
-                                        <tr>
-                                            <td style="white-space:nowrap; font-weight:600;">{{ p.data|date('d/m/Y') }}</td>
-                                            <td>
-                                                {% if p.worksite_id %}
-                                                    <a href="/worksites/{{ p.worksite_id }}" style="color:#2563eb; text-decoration:none;">
-                                                        {{ p.worksite_code ? p.worksite_code ~ ' — ' : '' }}{{ p.worksite_name }}
-                                                    </a>
-                                                {% else %}—{% endif %}
-                                            </td>
-                                            <td>
-                                                <span style="display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:700; {{ p.turno == 'Intero' ? 'background:#dcfce7; color:#15803d;' : 'background:#fef3c7; color:#b45309;' }}">
-                                                    {{ p.turno }}
-                                                </span>
-                                            </td>
-                                            <td>{{ p.pranzo ?: '—' }}</td>
-                                            <td>{{ p.cena ?: '—' }}</td>
-                                            <td>{{ p.hotel and p.hotel != '-' ? p.hotel : '—' }}</td>
-                                            <td style="font-size:12px; color:#64748b;">{{ p.note ?: '' }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
+                            {# lista caricata via /users/{id}/presenze-data: ricerca + filtri + paginazione #}
+                            <div id="presenze-app" data-worker="{{ workerId }}" data-uid="{{ workerData.uid }}">
+                                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+                                    <input type="text" id="pz-search" class="ue-input" placeholder="Cerca cantiere o note..." style="flex:1; min-width:180px; max-width:300px;">
+                                    <select id="pz-year" class="ue-input" style="width:auto;">
+                                        <option value="">Tutti gli anni</option>
+                                        {% for y in presenzeYears %}
+                                            <option value="{{ y }}">{{ y }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <select id="pz-month" class="ue-input" style="width:auto;">
+                                        <option value="">Tutti i mesi</option>
+                                        {% for m in 1..12 %}
+                                            <option value="{{ m }}">{{ ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'][m-1] }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div id="pz-summary" style="font-size:12px; color:#64748b; margin-bottom:8px;"></div>
+
+                                <div style="overflow-x:auto;">
+                                    <table class="ue-archive-table" style="width:100%;">
+                                        <thead>
+                                            <tr><th>Data</th><th>Cantiere</th><th>Turno</th><th>Pranzo</th><th>Cena</th><th>Hotel</th><th>Note</th></tr>
+                                        </thead>
+                                        <tbody id="pz-body">
+                                            <tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8;">Caricamento…</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                                    <button type="button" id="pz-prev" class="ue-btn-photo-hero" style="cursor:pointer;">&larr; Precedenti</button>
+                                    <span id="pz-page" style="font-size:12px; color:#64748b;"></span>
+                                    <button type="button" id="pz-next" class="ue-btn-photo-hero" style="cursor:pointer;">Successive &rarr;</button>
+                                </div>
                             </div>
-                            {% if presenzeTotali.count > 200 %}
-                                <p style="font-size:11px; color:#94a3b8; margin-top:10px; text-align:center;">
-                                    Mostrate le ultime 200 presenze di {{ presenzeTotali.count }} totali.
-                                </p>
-                            {% endif %}
                         {% endif %}
                     </div>
                 </div>
