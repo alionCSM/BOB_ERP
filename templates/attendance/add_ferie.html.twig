@@ -188,7 +188,8 @@
   .fe-empty {
       text-align: center; padding: 48px 20px; color: #94a3b8; font-size: 14px;
   }
-  .hidden { display: none; }
+  /* NB: niente `.hidden` globale qui — app.css (Tailwind) la definisce gia'
+     e ridefinirla dopo rompe le classi responsive del top bar (hidden sm:flex). */
 </style>
 {% endblock %}
 
