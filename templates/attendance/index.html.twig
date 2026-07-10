@@ -2,163 +2,175 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/attendance/attendance_list.css">
+<link rel="stylesheet" href="/assets/css/views/attendance/presenze.css">
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="intro-y mt-8">
-    <h2 class="text-lg font-medium">Presenze</h2>
-</div>
-
-<div class="intro-y col-span-12 flex flex-wrap xl:flex-nowrap items-center mt-2">
-
-    <a href="/attendance/create" class="btn btn-primary shadow-md mr-2"><i class="fa fa-plus mr-1"></i> Aggiungi Presenza</a>
-
-    <div class="dropdown">
-        <button class="dropdown-toggle btn px-2 box" aria-expanded="false" data-tw-toggle="dropdown">
-            <span class="w-5 h-5 flex items-center justify-center"> <i class="w-4 h-4" data-lucide="plus"></i> </span>
-        </button>
-        <div class="dropdown-menu lg:w-56">
-            <ul class="dropdown-content">
-                <li>
-                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelOperaio"
-                       class="dropdown-item">
-                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Operaio
-                    </button>
-                </li>
-
-                <li>
-                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelBulkOperai"
-                       class="dropdown-item">
-                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Bulk Operai (ZIP)
-                    </button>
-                </li>
-
-                <li>
-                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelAzienda"
-                       class="dropdown-item">
-                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Azienda
-                    </button>
-                </li>
-
-                <li>
-                    <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelCommittente"
-                       class="dropdown-item">
-                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Committente
-                    </button>
-                </li>
-            </ul>
+<div class="fe-hero" style="margin-top:16px;">
+    <div class="fe-hero-content">
+        <div class="fe-hero-left">
+            <div class="fe-hero-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4m8-4v4"/><path d="M9 16l2 2 4-4"/></svg>
+            </div>
+            <div>
+                <h1 class="fe-hero-title">Presenze</h1>
+                <p class="fe-hero-sub">Cerca, filtra ed esporta le presenze registrate</p>
+            </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; position:relative; z-index:1;">
+            <a href="/attendance/create" class="fe-btn-add">
+                <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Inserisci presenze
+            </a>
+            <div class="dropdown">
+                <button class="dropdown-toggle fe-btn" style="color:#fff; border-color:rgba(255,255,255,.25); background:rgba(255,255,255,.1); padding:10px 16px;" aria-expanded="false" data-tw-toggle="dropdown">
+                    <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Esporta
+                </button>
+                <div class="dropdown-menu lg:w-56">
+                    <ul class="dropdown-content">
+                        <li>
+                            <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelOperaio" class="dropdown-item">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Operaio
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelBulkOperai" class="dropdown-item">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Bulk Operai (ZIP)
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelAzienda" class="dropdown-item">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Azienda
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" data-tw-toggle="modal" data-tw-target="#modalExcelCommittente" class="dropdown-item">
+                                <i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Excel Committente
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<br>
-<ul class="nav nav-tabs" role="tablist">
-    <li class="nav-item flex-1" role="presentation">
-        <button
-                class="nav-link w-full py-2 !bg-blue-500 !text-white font-medium rounded-t-md border border-b-0"
+{# activeTab: il tab consorziate resta aperto dopo un filtro consorziate #}
+<ul class="nav nav-tabs fe-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link"
                 data-tw-target="#tab-presenze" role="tab"
-                aria-controls="tab-presenze" aria-selected="true">
+                aria-controls="tab-presenze" aria-selected="{{ activeTab == 'nostri' ? 'true' : 'false' }}">
             Presenze Nostri
         </button>
     </li>
-    <li class="nav-item flex-1" role="presentation">
-        <button
-                class="nav-link w-full py-2 !bg-white !text-slate-600 font-medium rounded-t-md border border-b-0"
+    <li class="nav-item" role="presentation">
+        <button class="nav-link"
                 data-tw-target="#tab-consorziate" role="tab"
-                aria-controls="tab-consorziate" aria-selected="false">
+                aria-controls="tab-consorziate" aria-selected="{{ activeTab == 'consorziate' ? 'true' : 'false' }}">
            Presenze Consorziate
         </button>
     </li>
 </ul>
 
 <div class="tab-content mt-5">
-    <div id="tab-presenze" class="tab-pane active" role="tabpanel">
+    <div id="tab-presenze" class="tab-pane {{ activeTab == 'nostri' ? 'active' : 'hidden' }}" role="tabpanel">
         <!-- FILTRI -->
-        <form method="GET" class="intro-y mt-4 flex flex-wrap gap-4 items-end">
-            <div>
-                <label class="form-label">Data Inizio</label><br>
-                <input type="date" name="start_date" value="{{ startDate }}" class="form-control w-56">
+        <div class="fe-card">
+            <div class="fe-card-body" style="padding:16px 22px;">
+                <form method="GET" style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
+                    <div>
+                        <span class="fe-label">Data Inizio</span>
+                        <input type="date" name="start_date" value="{{ startDate }}" class="fe-input" style="width:170px;" data-range-start>
+                    </div>
+                    <div>
+                        <span class="fe-label">Data Fine</span>
+                        <input type="date" name="end_date" value="{{ endDate }}" class="fe-input" style="width:170px;" data-range-end>
+                    </div>
+                    <div style="min-width:230px;">
+                        <span class="fe-label">Cantiere</span>
+                        <select name="cantiere_id" id="cantiereSelect" style="width:100%;">
+                            {% if cantiereId is not empty %}
+                                <option value="{{ cantiereId }}" selected>{{ selectedCantiere }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div style="min-width:230px;">
+                        <span class="fe-label">Operaio</span>
+                        <select name="worker_id" id="workerSelect" style="width:100%;">
+                            {% if workerId is not empty %}
+                                <option value="{{ selectedWorker.id }}" selected>{{ selectedWorker.first_name }} {{ selectedWorker.last_name }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <button type="submit" class="fe-btn-save" style="padding:9px 22px;">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        Filtra
+                    </button>
+                    <a href="/attendance" class="fe-btn" style="color:#64748b; border-color:#e2e8f0; padding:9px 18px;">Reset filtri</a>
+                    <div class="fe-presets" style="width:100%;">
+                        <span class="fe-presets-lbl">Rapidi:</span>
+                        <button type="button" class="fe-preset" data-preset="oggi">Oggi</button>
+                        <button type="button" class="fe-preset" data-preset="settimana">Questa settimana</button>
+                        <button type="button" class="fe-preset" data-preset="mese">Questo mese</button>
+                        <button type="button" class="fe-preset" data-preset="mese-scorso">Mese scorso</button>
+                    </div>
+                </form>
             </div>
-            <div>
-                <label class="form-label">Data Fine</label><br>
-                <input type="date" name="end_date" value="{{ endDate }}" class="form-control w-56">
-            </div>
-            <div>
-                <label class="form-label">Cantiere</label><br>
-                <select name="cantiere_id" id="cantiereSelect" class="w-72">
-                    {% if cantiereId is not empty %}
-                        <option value="{{ cantiereId }}" selected>{{ selectedCantiere }}</option>
-                    {% endif %}
-                </select>
-            </div>
-            <div>
-                <label class="form-label">Operaio</label><br>
-                <select name="worker_id" id="workerSelect" class="w-72">
-                    {% if workerId is not empty %}
-                        <option value="{{ selectedWorker.id }}" selected>{{ selectedWorker.first_name }} {{ selectedWorker.last_name }}</option>
-                    {% endif %}
-                </select>
-            </div>
-            <div>
-                <label class="form-label">&nbsp;</label><br>
-                <button type="submit" class="btn btn-primary w-40">Filtra</button>
-            </div>
-            <div>
-                <label class="form-label">&nbsp;</label><br>
-                <a href="/attendance" class="btn btn-outline-primary w-40">Reset filtri</a>
-            </div>
-        </form>
+        </div>
 
         <!-- TABELLA -->
-        <div class="intro-y col-span-12 overflow-auto mt-6">
-            <table class="table table-report -mt-2">
+        <div class="fe-table-wrap">
+            <table class="fe-table">
                 <thead>
                 <tr>
-                    <th class="whitespace-nowrap">Data</th>
-                    <th class="whitespace-nowrap">Operaio</th>
-                    <th class="whitespace-nowrap">Cantiere</th>
-                    <th class="text-center whitespace-nowrap">Turno</th>
-                    <th class="text-center whitespace-nowrap">Pranzo</th>
-                    <th class="text-center whitespace-nowrap">Cena</th>
-                    <th class="text-center whitespace-nowrap">Hotel</th>
-                    <th class="text-center whitespace-nowrap">Targa</th>
-                    <th class="whitespace-nowrap">Note</th>
-                    <th class="text-center whitespace-nowrap">Azioni</th>
+                    <th>Data</th>
+                    <th>Operaio</th>
+                    <th>Cantiere</th>
+                    <th style="text-align:center;">Turno</th>
+                    <th style="text-align:center;">Pranzo</th>
+                    <th style="text-align:center;">Cena</th>
+                    <th style="text-align:center;">Hotel</th>
+                    <th style="text-align:center;">Targa</th>
+                    <th>Note</th>
+                    <th style="text-align:right;">Azioni</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for row in presenze %}
-                    <tr class="intro-x">
-                        <td>{{ row.data|date('d/m/Y') }}</td>
-                        <td>{{ row.lavoratore }}</td>
+                    <tr>
+                        <td style="white-space:nowrap; font-weight:600;">{{ row.data|date('d/m/Y') }}</td>
+                        <td style="font-weight:600;">{{ row.lavoratore }}</td>
                         <td>{{ row.cantiere }}</td>
-                        <td class="text-center">
-                            <span class="{{ row.turno == 'Mezzo' ? 'text-orange-600 font-semibold' : '' }}">
+                        <td style="text-align:center;">
+                            <span class="fe-badge" style="{{ row.turno == 'Mezzo' ? 'background:#fef3c7; color:#b45309; border:1px solid #fde68a;' : 'background:#dcfce7; color:#15803d; border:1px solid #86efac;' }}">
                                 {{ row.turno }}
                             </span>
                         </td>
-                        <td class="text-center">
+                        <td style="text-align:center;">
                             {% if row.pranzo == 'Noi' and row.pranzo_prezzo is not null %}
                                 {{ row.pranzo_prezzo|number_format(2, ',', '') }} €
                             {% else %}
                                 {{ row.pranzo }}
                             {% endif %}
                         </td>
-                        <td class="text-center">
+                        <td style="text-align:center;">
                             {% if row.cena == 'Noi' and row.cena_prezzo is not null %}
                                 {{ row.cena_prezzo|number_format(2, ',', '') }} €
                             {% else %}
                                 {{ row.cena }}
                             {% endif %}
                         </td>
-                        <td class="text-center">{{ row.hotel }}</td>
-                        <td class="text-center">{{ row.targa_auto }}</td>
-                        <td>{{ row.note }}</td>
-                        <td class="table-report__action w-56">
-                            <div class="flex justify-center items-center">
-                                <a class="flex items-center mr-3" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data|url_encode }}">
-                                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Edit
+                        <td style="text-align:center;">{{ row.hotel }}</td>
+                        <td style="text-align:center; font-family:monospace;">{{ row.targa_auto }}</td>
+                        <td style="font-size:12px; color:#64748b; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
+                        <td>
+                            <div style="display:flex; gap:6px; justify-content:flex-end;">
+                                <a class="fe-btn fe-btn-edit" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data|url_encode }}">
+                                    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Edit
                                 </a>
                                 <form
                                         action="/attendance/delete"
@@ -168,80 +180,109 @@
                                 >
                                     <input type="hidden" name="type" value="nostri">
                                     <input type="hidden" name="id"   value="{{ row.id }}">
-                                    <button type="submit" class="flex items-center text-danger">
-                                        <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                                    <button type="submit" class="fe-btn fe-btn-del">
+                                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        Elimina
                                     </button>
                                 </form>
                             </div>
                         </td>
                     </tr>
+                {% else %}
+                    <tr><td colspan="10" class="fe-empty">Nessuna presenza trovata con questi filtri.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    <div id="tab-consorziate" class="tab-pane hidden" role="tabpanel">
-        <form method="GET" action="/attendance" class="intro-y mt-4 flex flex-wrap gap-4 items-end">
-            <input type="hidden" name="type" value="consorziata">
-            <div>
-                <label class="form-label">Data Inizio</label><br>
-                <input type="date" name="cons_start_date" class="form-control w-56">
+    <div id="tab-consorziate" class="tab-pane {{ activeTab == 'consorziate' ? 'active' : 'hidden' }}" role="tabpanel">
+        <div class="fe-card">
+            <div class="fe-card-body" style="padding:16px 22px;">
+                <form method="GET" action="/attendance" style="display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;">
+                    <input type="hidden" name="type" value="consorziata">
+                    <div>
+                        <span class="fe-label">Data Inizio</span>
+                        <input type="date" name="cons_start_date" value="{{ consStartDate }}" class="fe-input" style="width:170px;" data-range-start>
+                    </div>
+                    <div>
+                        <span class="fe-label">Data Fine</span>
+                        <input type="date" name="cons_end_date" value="{{ consEndDate }}" class="fe-input" style="width:170px;" data-range-end>
+                    </div>
+                    <div style="min-width:230px;">
+                        <span class="fe-label">Cantiere</span>
+                        <select name="cons_cantiere_id" id="consCantiereSelect" style="width:100%;">
+                            {% if consCantiereId is not empty %}
+                                <option value="{{ consCantiereId }}" selected>{{ selectedConsCantiere }}</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div style="min-width:230px;">
+                        <span class="fe-label">Consorziata</span>
+                        {# solo aziende con consorziata=1, niente testo libero #}
+                        <select name="cons_azienda_id" id="consAziendaSelect" style="width:100%;">
+                            <option value="">Tutte le consorziate</option>
+                            {% for c in consorziateList %}
+                                <option value="{{ c.id }}" {{ consAziendaId == c.id ? 'selected' : '' }}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="fe-btn-save" style="padding:9px 22px;">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        Filtra
+                    </button>
+                    <a href="/attendance?type=consorziata" class="fe-btn" style="color:#64748b; border-color:#e2e8f0; padding:9px 18px;">Reset</a>
+                    <div class="fe-presets" style="width:100%;">
+                        <span class="fe-presets-lbl">Rapidi:</span>
+                        <button type="button" class="fe-preset" data-preset="oggi">Oggi</button>
+                        <button type="button" class="fe-preset" data-preset="settimana">Questa settimana</button>
+                        <button type="button" class="fe-preset" data-preset="mese">Questo mese</button>
+                        <button type="button" class="fe-preset" data-preset="mese-scorso">Mese scorso</button>
+                    </div>
+                </form>
             </div>
-            <div>
-                <label class="form-label">Data Fine</label><br>
-                <input type="date" name="cons_end_date" class="form-control w-56">
-            </div>
-            <div>
-                <label class="form-label">Cantiere</label><br>
-                <select name="cons_cantiere_id" id="consCantiereSelect" class="form-control w-72"></select>
-            </div>
-            <div>
-                <label class="form-label">Consorziata</label><br>
-                <input type="text" name="cons_name" class="form-control w-72" placeholder="Nome consorziata">
-            </div>
-            <div>
-                <label class="form-label">&nbsp;</label><br>
-                <button type="submit" class="btn btn-primary w-40">Filtra</button>
-            </div>
-            <div>
-                <label class="form-label">&nbsp;</label><br>
-                <a href="/attendance?type=consorziata" class="btn btn-outline-primary w-40">Reset</a>
-            </div>
-        </form>
+        </div>
 
-        <div class="intro-y col-span-12 overflow-auto mt-6">
-            <table class="table table-report -mt-2">
+        <div class="fe-table-wrap">
+            <table class="fe-table">
                 <thead>
                 <tr>
-                    <th class="whitespace-nowrap">Data</th>
-                    <th class="whitespace-nowrap">Consorziata</th>
-                    <th class="whitespace-nowrap">Cantiere</th>
-                    <th class="text-center whitespace-nowrap">N. Operai</th>
-                    <th class="text-center whitespace-nowrap">Costo Unitario</th>
-                    <th class="text-center whitespace-nowrap">Pasti</th>
-                    <th class="text-center whitespace-nowrap">Auto</th>
-                    <th class="text-center whitespace-nowrap">Hotel</th>
-                    <th class="text-center whitespace-nowrap">Note</th>
-                    <th class="text-center whitespace-nowrap">Azioni</th>
+                    <th>Data</th>
+                    <th>Consorziata</th>
+                    <th>Cantiere</th>
+                    <th style="text-align:center;">N. Operai</th>
+                    <th style="text-align:center;">Costo Unitario</th>
+                    <th style="text-align:center;">Pasti</th>
+                    <th style="text-align:center;">Auto</th>
+                    <th style="text-align:center;">Hotel</th>
+                    <th>Note</th>
+                    <th style="text-align:right;">Azioni</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for row in presenzeConsorziate %}
-                    <tr class="intro-x">
-                        <td>{{ row.data_presenza|date('d/m/Y') }}</td>
-                        <td>{{ row.consorziata_name }}</td>
+                    <tr>
+                        <td style="white-space:nowrap; font-weight:600;">{{ row.data_presenza|date('d/m/Y') }}</td>
+                        <td style="font-weight:600;">{{ row.consorziata_name }}</td>
                         <td>{{ row.cantiere }}</td>
-                        <td class="text-center">{{ row.quantita }}</td>
-                        <td class="text-center">{{ row.costo_unitario|number_format(2) }} €</td>
-                        <td class="text-center">{{ row.pasti }}</td>
-                        <td class="text-center">{{ row.auto }}</td>
-                        <td class="text-center">{{ row.hotel }}</td>
-                        <td>{{ row.note }}</td>
-                        <td class="table-report__action w-56">
-                            <div class="flex justify-center items-center">
-                                <a class="flex items-center mr-3" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data_presenza|url_encode }}">
-                                    <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Edit
+                        <td style="text-align:center;">
+                            {# quantita e' DECIMAL: 2.000000 → 2, 7.500000 → 7,5 #}
+                            {% set q = row.quantita matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.quantita + 0 : 0 %}
+                            <span class="fe-badge" style="background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe;">{{ q == q|round ? q|number_format(0, ',', '.') : q|number_format(1, ',', '.') }}</span>
+                        </td>
+                        <td style="text-align:center;" class="fe-amount">{{ row.costo_unitario|number_format(2, ',', '.') }} €</td>
+                        {# pasti/hotel possono essere testo libero ('-', note): formatta in € solo se numerici #}
+                        {% set pastiNum = row.pasti matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.pasti + 0 : null %}
+                        <td style="text-align:center;">{{ pastiNum is not null ? (pastiNum > 0 ? pastiNum|number_format(2, ',', '.') ~ ' €' : '—') : (row.pasti ?: '—') }}</td>
+                        <td style="text-align:center;">{{ row.auto ?: '—' }}</td>
+                        {% set hotelNum = row.hotel matches '/^\\s*-?\\d+(\\.\\d+)?\\s*$/' ? row.hotel + 0 : null %}
+                        <td style="text-align:center;">{{ hotelNum is not null ? (hotelNum > 0 ? hotelNum|number_format(2, ',', '.') ~ ' €' : '—') : (row.hotel ?: '—') }}</td>
+                        <td style="font-size:12px; color:#64748b; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
+                        <td>
+                            <div style="display:flex; gap:6px; justify-content:flex-end;">
+                                <a class="fe-btn fe-btn-edit" href="/attendance/edit?cantiere={{ row.cantiere_id|url_encode }}&data={{ row.data_presenza|url_encode }}">
+                                    <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    Edit
                                 </a>
                                 <form
                                         action="/attendance/delete"
@@ -251,13 +292,16 @@
                                 >
                                     <input type="hidden" name="type" value="consorziata">
                                     <input type="hidden" name="id"   value="{{ row.id }}">
-                                    <button type="submit" class="flex items-center text-danger">
-                                        <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
+                                    <button type="submit" class="fe-btn fe-btn-del">
+                                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        Elimina
                                     </button>
                                 </form>
                             </div>
                         </td>
                     </tr>
+                {% else %}
+                    <tr><td colspan="10" class="fe-empty">Nessuna presenza consorziata trovata con questi filtri.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

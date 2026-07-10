@@ -396,7 +396,7 @@ class AttendanceRepository implements AttendanceRepositoryInterface
         ?string $startDate,
         ?string $endDate,
         ?int $cantiereId,
-        ?string $consName,
+        ?int $consAziendaId,
         int $limit = 200
     ): array {
 
@@ -436,9 +436,9 @@ class AttendanceRepository implements AttendanceRepositoryInterface
             $params[':cantiereId'] = $cantiereId;
         }
 
-        if ($consName) {
-            $sql .= " AND c.name LIKE :consName";
-            $params[':consName'] = '%' . $consName . '%';
+        if ($consAziendaId) {
+            $sql .= " AND p.azienda_id = :consAziendaId";
+            $params[':consAziendaId'] = $consAziendaId;
         }
 
         $sql .= " ORDER BY p.data_presenza DESC LIMIT :limit";

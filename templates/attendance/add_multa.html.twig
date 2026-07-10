@@ -2,92 +2,140 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/attendance/presenze.css">
 {% endblock %}
 
+{% set totaleMulte = 0 %}
+{% for r in multe %}{% set totaleMulte = totaleMulte + r.importo %}{% endfor %}
+
 {% block content %}
-<div class="intro-y mt-8">
-    <h2 class="text-lg font-medium mb-4">Gestione Multe</h2>
-</div>
+<div class="fe-page">
 
-<div class="intro-y box p-5 mb-4">
-    <form method="POST" action="/attendance/fines/save" class="grid grid-cols-12 gap-4 items-end">
-        <input type="hidden" name="multa_id" value="">
-        <div class="col-span-12 md:col-span-3">
-            <label class="form-label">Data</label>
-            <input type="date" name="data" class="form-control" required>
+    <div class="fe-hero">
+        <div class="fe-hero-content">
+            <div class="fe-hero-left">
+                <div class="fe-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11v4"/><path d="M12 18h.01"/></svg>
+                </div>
+                <div>
+                    <h1 class="fe-hero-title">Multe</h1>
+                    <p class="fe-hero-sub">Sanzioni ricevute con i mezzi aziendali</p>
+                </div>
+            </div>
         </div>
-        <div class="col-span-12 md:col-span-4">
-            <label class="form-label">Nome Operaio</label>
-            <select id="operaioSelect" name="operaio_id" class="form-control" required></select>
+        <div class="fe-hero-stats">
+            <div class="fe-stat">
+                <div class="fe-stat-num">{{ multe|length }}</div>
+                <div class="fe-stat-lbl">Multe</div>
+            </div>
+            <div class="fe-stat">
+                <div class="fe-stat-num">€ {{ totaleMulte|number_format(0, ',', '.') }}</div>
+                <div class="fe-stat-lbl">Totale</div>
+            </div>
         </div>
-        <div class="col-span-12 md:col-span-2">
-            <label class="form-label">Importo (€)</label>
-            <input type="number" name="importo" step="0.01" min="0" class="form-control" required>
-        </div>
-        <div class="col-span-12 md:col-span-3">
-            <label class="form-label">Targa</label>
-            <input type="text" name="targa" class="form-control" required>
-        </div>
-        <div class="col-span-12 md:col-span-12">
-            <label class="form-label">Note</label>
-            <textarea name="note" class="form-control" rows="2" placeholder="Inserisci eventuali note..."></textarea>
-        </div>
-        <div class="col-span-12 md:col-span-1">
-            <button type="submit" class="btn btn-primary w-full">Salva</button>
-        </div>
-    </form>
-</div>
+    </div>
 
-<div class="intro-y box p-5 mb-4">
-    <label class="form-label">Cerca nella tabella</label>
-    <input type="text" id="searchInput" class="form-control" placeholder="Cerca per nome, data, targa o note...">
-</div>
-
-<div class="intro-y col-span-12 overflow-auto">
-    <table class="table table-report -mt-2" id="multeTable">
-        <thead>
-        <tr>
-            <th class="whitespace-nowrap">Data</th>
-            <th class="whitespace-nowrap">Operaio</th>
-            <th class="whitespace-nowrap">Importo (€)</th>
-            <th class="whitespace-nowrap">Targa</th>
-            <th class="whitespace-nowrap">Note</th>
-            <th class="text-center whitespace-nowrap">Azioni</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for row in multe %}
-            <tr class="intro-x">
-                <td>{{ row.data|date('d/m/Y') }}</td>
-                <td>{{ row.operaio_nome }}</td>
-                <td>{{ row.importo|number_format(2, ',', '.') }}</td>
-                <td>{{ row.targa }}</td>
-                <td>{{ row.note }}</td>
-                <td class="table-report__action w-56">
-                    <div class="flex justify-center items-center">
-                        <button type="button" class="flex items-center mr-3 edit-btn"
-                                data-id="{{ row.id }}"
-                                data-data="{{ row.data }}"
-                                data-operaio="{{ row.operaio_id }}"
-                                data-importo="{{ row.importo }}"
-                                data-targa="{{ row.targa }}"
-                                data-note="{{ row.note }}">
-                            <i data-lucide="check-square" class="w-4 h-4 mr-1"></i> Modifica
-                        </button>
-                        <form method="POST"
-                              action="/attendance/fines/save"
-                              data-confirm="Confermi eliminazione di questa multa?">
-                            <input type="hidden" name="delete_id" value="{{ row.id }}">
-                            <button type="submit" class="flex items-center text-danger">
-                                <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i> Elimina
-                            </button>
-                        </form>
+    {# ── Form ── #}
+    <div class="fe-card accent-red">
+        <div class="fe-card-head">
+            <h3 class="fe-card-title">Registra nuova multa</h3>
+        </div>
+        <div class="fe-card-body">
+            <form method="POST" action="/attendance/fines/save">
+                <input type="hidden" name="multa_id" value="">
+                <div class="fe-grid">
+                    <div>
+                        <span class="fe-label">Data</span>
+                        <input type="date" name="data" class="fe-input" required>
                     </div>
-                </td>
+                    <div style="grid-column: span 2; min-width: 220px;">
+                        <span class="fe-label">Operaio</span>
+                        <select id="operaioSelect" name="operaio_id" required></select>
+                    </div>
+                    <div>
+                        <span class="fe-label">Importo (€)</span>
+                        <input type="number" name="importo" step="0.01" min="0" class="fe-input" placeholder="0,00" required>
+                    </div>
+                    <div>
+                        <span class="fe-label">Targa</span>
+                        <input type="text" name="targa" class="fe-input" placeholder="es. AB123CD" required>
+                    </div>
+                </div>
+                <div style="margin-top: 14px;">
+                    <span class="fe-label">Note</span>
+                    <textarea name="note" class="fe-textarea" rows="2" placeholder="Inserisci eventuali note..."></textarea>
+                </div>
+                <div class="fe-form-foot">
+                    <button type="submit" class="fe-btn-save">
+                        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ── Toolbar ── #}
+    <div class="fe-toolbar">
+        <div class="fe-search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Cerca per nome, data, targa o note...">
+        </div>
+    </div>
+
+    {# ── Tabella ── #}
+    <div class="fe-table-wrap">
+        <table class="fe-table" id="multeTable">
+            <thead>
+            <tr>
+                <th>Data</th>
+                <th>Operaio</th>
+                <th>Importo (€)</th>
+                <th>Targa</th>
+                <th>Note</th>
+                <th style="text-align:right;">Azioni</th>
             </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+            {% for row in multe %}
+                <tr>
+                    <td style="white-space:nowrap; font-weight:600;">{{ row.data|date('d/m/Y') }}</td>
+                    <td>{{ row.operaio_nome }}</td>
+                    <td class="fe-amount">€ {{ row.importo|number_format(2, ',', '.') }}</td>
+                    <td style="white-space:nowrap; font-family:monospace; font-weight:600;">{{ row.targa }}</td>
+                    <td style="font-size:12px; color:#64748b; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
+                    <td>
+                        <div style="display:flex; gap:6px; justify-content:flex-end;">
+                            <button type="button" class="fe-btn fe-btn-edit edit-btn"
+                                    data-id="{{ row.id }}"
+                                    data-data="{{ row.data }}"
+                                    data-operaio="{{ row.operaio_id }}"
+                                    data-importo="{{ row.importo }}"
+                                    data-targa="{{ row.targa|e('html_attr') }}"
+                                    data-note="{{ row.note|e('html_attr') }}">
+                                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                Modifica
+                            </button>
+                            <form method="POST"
+                                  action="/attendance/fines/save"
+                                  class="inline-block"
+                                  data-confirm="Confermi eliminazione di questa multa?">
+                                <input type="hidden" name="delete_id" value="{{ row.id }}">
+                                <button type="submit" class="fe-btn fe-btn-del">
+                                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    Elimina
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="6" class="fe-empty">Nessuna multa registrata. Usa il form qui sopra per iniziare.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
 </div>
 {% endblock %}
 

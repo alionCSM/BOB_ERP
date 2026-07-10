@@ -3,11 +3,25 @@
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/views/attendance/add_attendance.css">
+<link rel="stylesheet" href="/assets/css/views/attendance/presenze.css">
 {% endblock %}
 
 {% block content %}
-<div class="intro-y box p-5 mt-5">
-    <h2 class="text-lg font-medium mb-4">Inserisci Presenze</h2>
+<div class="fe-hero" style="margin-top:16px;">
+    <div class="fe-hero-content">
+        <div class="fe-hero-left">
+            <div class="fe-hero-icon">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4m8-4v4"/><path d="M12 13v6m-3-3h6"/></svg>
+            </div>
+            <div>
+                <h1 class="fe-hero-title">Inserisci Presenze</h1>
+                <p class="fe-hero-sub">Registrazione giornaliera per operai nostri e consorziate</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="intro-y box p-5 fe-scope">
 
     <div class="flex gap-4 border-b mb-4">
         <button type="button" id="tab-nostri" class="tab-button tab-active">Nostri</button>

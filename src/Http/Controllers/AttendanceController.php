@@ -32,10 +32,10 @@ final class AttendanceController
         $consStartDate  = $request->get('cons_start_date', '');
         $consEndDate    = $request->get('cons_end_date', '');
         $consCantiereId = $request->get('cons_cantiere_id', '');
-        $consName       = $request->get('cons_name', '');
+        $consAziendaId  = $request->get('cons_azienda_id', '');
 
         $presenze            = $repo->getFiltered($startDate, $endDate, $cantiereId ? (int)$cantiereId : null, $workerId ? (int)$workerId : null, 200);
-        $presenzeConsorziate = $repo->getConsorziateFiltered($consStartDate, $consEndDate, $consCantiereId ?: null, $consName ?: null, 200);
+        $presenzeConsorziate = $repo->getConsorziateFiltered($consStartDate, $consEndDate, $consCantiereId ? (int)$consCantiereId : null, $consAziendaId ? (int)$consAziendaId : null, 200);
 
         // Resolve filter labels for Twig (Twig cannot call static methods or object methods inline)
         $selectedCantiere = '';
@@ -49,12 +49,29 @@ final class AttendanceController
             $selectedWorker = $this->workerRepo->getFullById((int)$workerId);
         }
 
+        $selectedConsCantiere = '';
+        if (!empty($consCantiereId)) {
+            $ws = $this->worksiteRepo->findById((int)$consCantiereId);
+            $selectedConsCantiere = $ws ? ($ws['worksite_code'] . ' - ' . $ws['name']) : '';
+        }
+
+        // Elenco consorziate per il filtro (TomSelect statico, niente testo libero)
+        $consorziateList = $this->conn->query("
+            SELECT id, name FROM bb_companies
+            WHERE consorziata = 1 AND active = 1
+            ORDER BY name ASC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Tab da mostrare all'apertura: consorziate se si e' filtrato li'
+        $activeTab = ($request->get('type') === 'consorziata') ? 'consorziate' : 'nostri';
+
         $pageTitle = 'Presenze';
         Response::view('attendance/index.html.twig', $request, compact(
             'startDate', 'endDate', 'cantiereId', 'workerId',
-            'consStartDate', 'consEndDate', 'consCantiereId', 'consName',
+            'consStartDate', 'consEndDate', 'consCantiereId', 'consAziendaId',
             'presenze', 'presenzeConsorziate',
-            'selectedCantiere', 'selectedWorker',
+            'selectedCantiere', 'selectedWorker', 'selectedConsCantiere',
+            'consorziateList', 'activeTab',
             'pageTitle'
         ));
     }
@@ -170,6 +187,62 @@ final class AttendanceController
         $rimborsi = $repo->getAll();
         $pageTitle = 'Rimborsi';
         Response::view('attendance/add_rimborso.html.twig', $request, compact('rimborsi', 'pageTitle'));
+    }
+
+    // ── Ferie / Permessi ───────────────────────────────────────────────────────
+
+    public function leaves(Request $request): void
+    {
+        $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);
+        $righe = $repo->getAll();
+        $pageTitle = 'Ferie e Permessi';
+
+        $successMsg = $_SESSION['success'] ?? null;
+        $errorMsg   = $_SESSION['error']   ?? null;
+        unset($_SESSION['success'], $_SESSION['error']);
+
+        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle', 'successMsg', 'errorMsg'));
+    }
+
+    public function saveLeave(Request $request): never
+    {
+        $repo = new \App\Repository\Attendance\LeaveRepository($this->conn);
+
+        try {
+            if (isset($_POST['delete_id'])) {
+                $repo->delete((int)$_POST['delete_id']);
+                $_SESSION['success'] = "Record eliminato.";
+            } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $workerId = (int)($_POST['operaio_id'] ?? 0);
+                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso'], true) ? $_POST['tipo'] : '';
+                $from     = $_POST['data_inizio'] ?? '';
+                $to       = $_POST['data_fine']   ?: $from; // vuoto = giorno singolo
+                $ore      = ($_POST['ore'] ?? '') !== '' ? (float)$_POST['ore'] : null;
+                $note     = trim($_POST['note'] ?? '');
+                $id       = (int)($_POST['record_id'] ?? 0);
+                $userId   = (int)($request->user()->id ?? 0);
+
+                if ($to < $from) {
+                    [$from, $to] = [$to, $from];
+                }
+
+                if ($workerId && $tipo && $from) {
+                    if ($id > 0) {
+                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note);
+                        $_SESSION['success'] = ucfirst($tipo) . " aggiornato.";
+                    } else {
+                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId);
+                        $_SESSION['success'] = ucfirst($tipo) . " registrato.";
+                    }
+                } else {
+                    $_SESSION['error'] = "Dati non validi.";
+                }
+            }
+        } catch (\Exception $e) {
+            $_SESSION['error'] = "Errore durante l'operazione.";
+        }
+
+        Response::redirect('/attendance/leaves');
     }
 
     // ── Save bulk (POST JSON) ──────────────────────────────────────────────────
