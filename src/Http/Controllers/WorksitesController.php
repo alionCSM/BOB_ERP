@@ -613,7 +613,7 @@ final class WorksitesController
 
         // Presenze
         $presenze     = $this->attendanceRepo->getByWorksiteId($worksite_id);
-        $presenzeCons = $this->attendanceRepo->getConsorziateFiltered('', '', $worksite_id, '');
+        $presenzeCons = $this->attendanceRepo->getConsorziateFiltered('', '', $worksite_id, null);
         $allPresenze  = $presenze;
 
         $stmt = $this->conn->prepare("
