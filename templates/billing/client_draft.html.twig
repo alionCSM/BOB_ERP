@@ -1,8 +1,11 @@
 {% extends "layout/base.html.twig" %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/billing/billing_detail.css">
-<link rel="stylesheet" href="/assets/css/views/billing/billing_draft.css">
+{# ?v= = cache busting: senza, il browser continua a servire la versione
+   vecchia di CSS/JS finche' l'utente non fa un hard refresh.
+   Va incrementato a ogni modifica di questi due file. #}
+<link rel="stylesheet" href="/assets/css/views/billing/billing_detail.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/billing/billing_draft.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -375,5 +378,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/billing/billing_draft.js?v=6"></script>
+<script src="/assets/js/views/billing/billing_draft.js?v=7"></script>
 {% endblock %}

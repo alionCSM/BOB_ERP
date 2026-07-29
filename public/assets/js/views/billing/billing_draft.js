@@ -168,7 +168,17 @@
     function autosize(el) {
         if (!el || !el.classList.contains('bd-cell-textarea')) return;
         el.style.height = 'auto';
-        el.style.height = el.scrollHeight + 'px';
+        var h = el.scrollHeight;
+        // elemento non ancora visibile (scrollHeight 0): lascia il min-height
+        // del CSS, ci ripensa il prossimo autosize
+        if (!h) { el.style.height = ''; return; }
+        // con box-sizing:border-box l'altezza comprende i bordi, che
+        // scrollHeight non conta: senza questo resta una barra di scroll
+        var cs = window.getComputedStyle(el);
+        if (cs.boxSizing === 'border-box') {
+            h += (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+        }
+        el.style.height = h + 'px';
     }
 
     function autosizeAll() {
@@ -176,6 +186,8 @@
     }
 
     autosizeAll();
+    // i font di sistema possono caricarsi dopo e cambiare l'altezza del testo
+    window.addEventListener('load', autosizeAll);
     // le larghezze delle colonne cambiano col viewport: ricalcola le altezze
     window.addEventListener('resize', autosizeAll);
 
