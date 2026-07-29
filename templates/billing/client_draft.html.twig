@@ -263,11 +263,15 @@
                 </td>
 
                 <td class="bd-cell-descrizione">
-                    <input type="text"
-                           class="bd-cell-input"
-                           data-field="descrizione"
-                           value="{{ l.descrizione }}"
-                           {% if not isEditable %}readonly{% endif %}>
+                    {# textarea auto-espandibile: le descrizioni lunghe devono
+                       essere leggibili PER INTERO prima di mandare la fattura
+                       al cliente. Il dato resta su una riga sola (Invio salva,
+                       gli a capo vengono rimossi) perche' finisce cosi' anche
+                       su bb_billing, sull'Excel e su Yard. #}
+                    <textarea rows="1"
+                              class="bd-cell-input bd-cell-textarea"
+                              data-field="descrizione"
+                              {% if not isEditable %}readonly{% endif %}>{{ l.descrizione }}</textarea>
                 </td>
 
                 <td class="bd-cell-imponibile right">

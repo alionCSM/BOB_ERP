@@ -118,6 +118,7 @@
                     if (!res.data.ok) {
                         // Revert + show error
                         input.value = prevValue;
+                        autosize(input);
                         input.classList.add('bd-cell-error');
                         setSaving('error', res.data.error || 'Errore');
                         input.title = res.data.error || '';
@@ -137,6 +138,12 @@
                             var p = iso.split('-');
                             if (p.length === 3) input.value = p[2] + '/' + p[1] + '/' + p[0];
                         }
+                    } else if (field === 'descrizione') {
+                        // il server normalizza spazi/a capo: riallinea altezza
+                        if (res.data.line.descrizione != null) {
+                            input.value = res.data.line.descrizione;
+                        }
+                        autosize(input);
                     }
                     input.dataset.lastSaved = input.value;
                     input.classList.add('bd-cell-success');
@@ -145,12 +152,43 @@
                 .catch(function (err) {
                     console.error(err);
                     input.value = prevValue;
+                    autosize(input);
                     input.classList.add('bd-cell-error');
                     setSaving('error', 'Errore di rete');
                 })
                 .finally(function () { input.dataset.committing = '0'; })
         );
     }
+
+    // ── Descrizione: textarea auto-espandibile ───────────────────────────────
+    // Cresce con il contenuto cosi' la descrizione e' sempre leggibile per
+    // intero. Il valore resta comunque su una riga (niente \n): finisce su
+    // bb_billing, sull'export Excel e su Yard.
+    function autosize(el) {
+        if (!el || !el.classList.contains('bd-cell-textarea')) return;
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
+    function autosizeAll() {
+        tbody.querySelectorAll('.bd-cell-textarea').forEach(autosize);
+    }
+
+    autosizeAll();
+    // le larghezze delle colonne cambiano col viewport: ricalcola le altezze
+    window.addEventListener('resize', autosizeAll);
+
+    tbody.addEventListener('input', function (e) {
+        var t = e.target;
+        if (!t || !t.classList || !t.classList.contains('bd-cell-textarea')) return;
+        // un incolla multi-riga diventa testo su una riga sola
+        if (t.value.indexOf('\n') !== -1 || t.value.indexOf('\r') !== -1) {
+            var pos = t.selectionStart;
+            t.value = t.value.replace(/[\r\n]+/g, ' ');
+            try { t.setSelectionRange(pos, pos); } catch (err) { /* noop */ }
+        }
+        autosize(t);
+    });
 
     if (isEditable) {
         tbody.addEventListener('blur', function (e) {
@@ -173,11 +211,13 @@
             if (!t || !t.classList || !t.classList.contains('bd-cell-input')) return;
             if (t.tagName === 'SELECT') return;
             if (e.key === 'Enter') {
+                // anche sulla textarea Invio salva (niente a capo nel dato)
                 e.preventDefault();
                 t.blur();
             } else if (e.key === 'Escape') {
                 var prev = t.dataset.lastSaved != null ? t.dataset.lastSaved : t.defaultValue;
                 t.value = prev;
+                autosize(t);
                 t.blur();
             }
         });
