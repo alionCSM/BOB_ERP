@@ -134,7 +134,8 @@
    le modifiche fatte dentro la bozza dall'utente sono gialle. #}
 {% set hasNew      = lines|filter(l => l.added_after_create)|length > 0 %}
 {% set hasExtMod   = lines|filter(l => l.externally_modified and not l.added_after_create)|length > 0 %}
-{% if hasNew or hasExtMod %}
+{% set hasDeleted  = lines|filter(l => l.source_deleted)|length > 0 %}
+{% if hasNew or hasExtMod or hasDeleted %}
 <div class="bd-row-legend">
     {% if hasNew %}
         <span class="bd-row-legend-item bd-row-legend-new">
@@ -146,6 +147,12 @@
         <span class="bd-row-legend-item bd-row-legend-ext">
             <span class="bd-row-legend-dot"></span>
             Modificate dal cantiere dopo lo snapshot
+        </span>
+    {% endif %}
+    {% if hasDeleted %}
+        <span class="bd-row-legend-item bd-row-legend-deleted">
+            <span class="bd-row-legend-dot"></span>
+            Eliminate dal cantiere dopo l'apertura bozza — escludile se non vanno fatturate
         </span>
     {% endif %}
 </div>
@@ -212,7 +219,7 @@
         {% if not isEditable %}
         <span class="bd-draft-phase-note">In sola lettura (stato: {{ draft.status|replace({'_': ' '}) }})</span>
         {% else %}
-        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare</span>
+        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare · nella descrizione Enter va a capo (Ctrl+Enter salva)</span>
         {% endif %}
     </div>
 
@@ -224,7 +231,7 @@
                 <th style="width:180px;">Cantiere</th>
                 <th>Descrizione</th>
                 <th class="right" style="width:140px;">Imponibile (€)</th>
-                <th style="width:200px;">IVA</th>
+                <th style="width:150px;">IVA</th>
                 <th class="center" style="width:120px;">Stato</th>
                 <th class="center" style="width:60px;"></th>
             </tr>
@@ -233,7 +240,8 @@
             {% for l in lines %}
             <tr class="bd-draft-row
                        {% if l.excluded %}bd-row-excluded{% endif %}
-                       {% if l.added_after_create %}bd-row-added-new
+                       {% if l.source_deleted %}bd-row-source-deleted
+                       {% elseif l.added_after_create %}bd-row-added-new
                        {% elseif l.externally_modified %}bd-row-ext-modified
                        {% elseif l.modified %}bd-row-modified
                        {% endif %}"
@@ -250,15 +258,20 @@
                 </td>
 
                 <td class="bd-cell-cantiere">
-                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere }}</a>
+                    {# cantiere puo' essere NULL se il cantiere e' stato rimosso #}
+                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere ?: 'Cantiere #' ~ l.worksite_id }}</a>
                 </td>
 
                 <td class="bd-cell-descrizione">
-                    <input type="text"
-                           class="bd-cell-input"
-                           data-field="descrizione"
-                           value="{{ l.descrizione }}"
-                           {% if not isEditable %}readonly{% endif %}>
+                    {# textarea auto-espandibile: la descrizione e' multi-riga
+                       (il cantiere la salva cosi' e la stampa con nl2br, l'Excel
+                       ha wrapText) e va letta PER INTERO prima di mandare la
+                       fattura al cliente. Enter va a capo, si salva uscendo dal
+                       campo o con Ctrl+Enter. #}
+                    <textarea rows="1"
+                              class="bd-cell-input bd-cell-textarea"
+                              data-field="descrizione"
+                              {% if not isEditable %}readonly{% endif %}>{{ l.descrizione }}</textarea>
                 </td>
 
                 <td class="bd-cell-imponibile right">
@@ -282,7 +295,11 @@
 
                 <td class="center bd-cell-status">
                     <span class="bd-pill bd-pill-danger"  data-tag="excluded" style="{% if not l.excluded %}display:none;{% endif %}">esclusa</span>
-                    {% if l.added_after_create %}
+                    {% if l.source_deleted %}
+                        <span class="bd-pill bd-pill-deleted" data-tag="source-deleted"
+                              title="La riga e' stata eliminata dal cantiere dopo l'apertura della bozza"
+                              style="{% if l.excluded %}display:none;{% endif %}">eliminata in cantiere</span>
+                    {% elseif l.added_after_create %}
                         <span class="bd-pill bd-pill-info"     data-tag="new" style="{% if l.excluded %}display:none;{% endif %}">nuova</span>
                     {% elseif l.externally_modified %}
                         <span class="bd-pill bd-pill-orange"   data-tag="ext-modified" style="{% if l.excluded %}display:none;{% endif %}">cambiata in cantiere</span>

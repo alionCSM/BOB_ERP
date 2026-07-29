@@ -711,9 +711,11 @@
                                 </td>
                                 <td>
                                     <div class="flex justify-center items-center">
+                                        {# dal cantiere l'azione tipica e' terminare il noleggio,
+                                           non modificarne i dati #}
                                         <a class="flex items-center mr-3"
-                                           href="/equipment/rentals/{{ worksite_id }}/edit?id={{ m.id }}">
-                                            <i data-lucide="edit" class="w-4 h-4 mr-1"></i> Modifica
+                                           href="/equipment/rentals/{{ worksite_id }}/complete">
+                                            <i data-lucide="check-circle" class="w-4 h-4 mr-1"></i> Termina
                                         </a>
                                     </div>
                                 </td>

@@ -355,6 +355,21 @@
 .bd-cell-input.bd-cell-number { text-align: right; font-variant-numeric: tabular-nums; }
 .bd-cell-input.bd-cell-date   { font-variant-numeric: tabular-nums; }
 
+/* Descrizione: textarea che cresce quanto basta (altezza gestita in JS).
+   Su una riga sola e' identica a un input; se il testo e' lungo va a capo
+   invece di nascondere meta' descrizione dentro un campo scrollabile. */
+.bd-cell-input.bd-cell-textarea {
+    height: auto;
+    min-height: 32px;
+    padding: 6px 8px;
+    line-height: 1.35;
+    resize: none;
+    overflow: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: block;
+}
+
 /* Select cell (IVA) — looks like an input but with a chevron */
 select.bd-cell-input.bd-cell-select {
     appearance: none;
@@ -411,6 +426,13 @@ select.bd-cell-input.bd-cell-select:disabled {
    in bozza) — qui il dato "vero" è cambiato fuori dalla nostra bozza. */
 .bd-row-ext-modified td { background: #fff7ed; }
 .bd-row-ext-modified td:first-child { box-shadow: inset 3px 0 0 #ea580c; }
+
+/* Source deleted (viola) — la riga bb_billing e' stata cancellata dal cantiere
+   dopo l'apertura della bozza. Resta visibile (e nell'export) finche' l'utente
+   non la esclude: prima spariva dalla bozza ma restava nell'Excel. */
+.bd-row-source-deleted td { background: #faf5ff; }
+.bd-row-source-deleted td:first-child { box-shadow: inset 3px 0 0 #9333ea; }
+.bd-pill-deleted { background: #f3e8ff; color: #6b21a8; }
 
 /* Excluded rows: red bg + strikethrough inputs */
 .bd-row-excluded .bd-cell-input { text-decoration: line-through; opacity: .65; }
@@ -557,3 +579,4 @@ select.bd-cell-input.bd-cell-select:disabled {
 }
 .bd-row-legend-new .bd-row-legend-dot { background: #3b82f6; }
 .bd-row-legend-ext .bd-row-legend-dot { background: #ea580c; }
+.bd-row-legend-deleted .bd-row-legend-dot { background: #9333ea; }

@@ -296,7 +296,8 @@ final class BillingDraftRepository
                    e bb_billing_draft_lines hanno collation differenti
                    (utf8mb4_general_ci vs utf8mb4_unicode_ci a seconda di
                    quando le tabelle sono state create). */
-                CASE WHEN COALESCE(l.added_after_create, 0) = 1 THEN 0
+                CASE WHEN b.id IS NULL THEN 0
+                     WHEN COALESCE(l.added_after_create, 0) = 1 THEN 0
                      WHEN (COALESCE(b.data, '1970-01-01') <> COALESCE(l.original_data, '1970-01-01'))
                        OR (COALESCE(b.descrizione, '') COLLATE utf8mb4_unicode_ci
                            <> COALESCE(l.original_descrizione, '') COLLATE utf8mb4_unicode_ci)
@@ -304,10 +305,15 @@ final class BillingDraftRepository
                        OR ABS(COALESCE(b.aliquota_iva, 0) - COALESCE(l.original_aliquota_iva, 0)) > 0.005
                      THEN 1
                      ELSE 0
-                END AS externally_modified
+                END AS externally_modified,
+                /* La riga di bb_billing e' stata cancellata dal cantiere DOPO
+                   la creazione della bozza. Con una INNER JOIN la riga sparirebbe
+                   silenziosamente dalla bozza pur restando nell'export Excel:
+                   la mostriamo con un badge cosi' l'utente puo' escluderla. */
+                CASE WHEN b.id IS NULL THEN 1 ELSE 0 END AS source_deleted
             FROM bb_billing_draft_lines l
-            JOIN bb_billing   b ON b.id = l.bb_billing_id
-            JOIN bb_worksites w ON w.id = l.worksite_id
+            LEFT JOIN bb_billing   b ON b.id = l.bb_billing_id
+            LEFT JOIN bb_worksites w ON w.id = l.worksite_id
             WHERE l.draft_id = :id
             ORDER BY l.display_order ASC, l.id ASC
         ");

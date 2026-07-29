@@ -118,6 +118,7 @@
                     if (!res.data.ok) {
                         // Revert + show error
                         input.value = prevValue;
+                        autosize(input);
                         input.classList.add('bd-cell-error');
                         setSaving('error', res.data.error || 'Errore');
                         input.title = res.data.error || '';
@@ -137,6 +138,12 @@
                             var p = iso.split('-');
                             if (p.length === 3) input.value = p[2] + '/' + p[1] + '/' + p[0];
                         }
+                    } else if (field === 'descrizione') {
+                        // riallinea l'altezza al valore salvato (a capo inclusi)
+                        if (res.data.line.descrizione != null) {
+                            input.value = res.data.line.descrizione;
+                        }
+                        autosize(input);
                     }
                     input.dataset.lastSaved = input.value;
                     input.classList.add('bd-cell-success');
@@ -145,12 +152,37 @@
                 .catch(function (err) {
                     console.error(err);
                     input.value = prevValue;
+                    autosize(input);
                     input.classList.add('bd-cell-error');
                     setSaving('error', 'Errore di rete');
                 })
                 .finally(function () { input.dataset.committing = '0'; })
         );
     }
+
+    // ── Descrizione: textarea auto-espandibile e MULTI-RIGA ──────────────────
+    // La descrizione e' multi-riga in tutto il flusso (il cantiere la salva
+    // con una textarea e la stampa con nl2br, l'export Excel ha wrapText):
+    // gli a capo vanno preservati. Qui la textarea cresce con il contenuto
+    // cosi' la riga e' sempre leggibile per intero, a capo compresi.
+    function autosize(el) {
+        if (!el || !el.classList.contains('bd-cell-textarea')) return;
+        el.style.height = 'auto';
+        el.style.height = el.scrollHeight + 'px';
+    }
+
+    function autosizeAll() {
+        tbody.querySelectorAll('.bd-cell-textarea').forEach(autosize);
+    }
+
+    autosizeAll();
+    // le larghezze delle colonne cambiano col viewport: ricalcola le altezze
+    window.addEventListener('resize', autosizeAll);
+
+    tbody.addEventListener('input', function (e) {
+        var t = e.target;
+        if (t && t.classList && t.classList.contains('bd-cell-textarea')) autosize(t);
+    });
 
     if (isEditable) {
         tbody.addEventListener('blur', function (e) {
@@ -172,12 +204,17 @@
             var t = e.target;
             if (!t || !t.classList || !t.classList.contains('bd-cell-input')) return;
             if (t.tagName === 'SELECT') return;
+            var isTextarea = t.classList.contains('bd-cell-textarea');
             if (e.key === 'Enter') {
+                // Nella descrizione (multi-riga) Invio va a capo: si salva
+                // uscendo dal campo (Tab / click) oppure con Ctrl+Invio.
+                if (isTextarea && !e.ctrlKey && !e.metaKey) return;
                 e.preventDefault();
                 t.blur();
             } else if (e.key === 'Escape') {
                 var prev = t.dataset.lastSaved != null ? t.dataset.lastSaved : t.defaultValue;
                 t.value = prev;
+                autosize(t);
                 t.blur();
             }
         });

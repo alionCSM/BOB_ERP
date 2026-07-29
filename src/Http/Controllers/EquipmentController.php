@@ -223,7 +223,11 @@ final class EquipmentController
             ($m['stato'] ?? '') === 'Attivo' && ($m['tipo_noleggio'] ?? '') !== 'Una Tantum'
         ));
 
-        Response::view('equipment/mark_completed.html.twig', $request, compact('worksiteId', 'message', 'mezzi', 'attivi'));
+        $stmt = $this->conn->prepare("SELECT worksite_code, name FROM bb_worksites WHERE id = :id");
+        $stmt->execute([':id' => $worksiteId]);
+        $worksite = $stmt->fetch(\PDO::FETCH_ASSOC) ?: null;
+
+        Response::view('equipment/mark_completed.html.twig', $request, compact('worksiteId', 'message', 'mezzi', 'attivi', 'worksite'));
     }
 
     // ── Search worksites (JSON) ────────────────────────────────────────────────

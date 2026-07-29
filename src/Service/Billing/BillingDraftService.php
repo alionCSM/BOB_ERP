@@ -425,6 +425,10 @@ final class BillingDraftService
                 return $iso;
 
             case 'descrizione':
+                // NB: la descrizione e' multi-riga per scelta — il cantiere la
+                // salva con una textarea e la mostra con |nl2br, e l'export
+                // Excel ha setWrapText sulla colonna. Gli a capo vanno quindi
+                // preservati: non normalizzare.
                 return (string)$raw;
 
             case 'totale_imponibile':
