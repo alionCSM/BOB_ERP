@@ -219,7 +219,7 @@
         {% if not isEditable %}
         <span class="bd-draft-phase-note">In sola lettura (stato: {{ draft.status|replace({'_': ' '}) }})</span>
         {% else %}
-        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare</span>
+        <span class="bd-draft-phase-note">Click su una cella per modificare · Tab/Enter per salvare · nella descrizione Enter va a capo (Ctrl+Enter salva)</span>
         {% endif %}
     </div>
 
@@ -231,7 +231,7 @@
                 <th style="width:180px;">Cantiere</th>
                 <th>Descrizione</th>
                 <th class="right" style="width:140px;">Imponibile (€)</th>
-                <th style="width:200px;">IVA</th>
+                <th style="width:150px;">IVA</th>
                 <th class="center" style="width:120px;">Stato</th>
                 <th class="center" style="width:60px;"></th>
             </tr>
@@ -263,11 +263,11 @@
                 </td>
 
                 <td class="bd-cell-descrizione">
-                    {# textarea auto-espandibile: le descrizioni lunghe devono
-                       essere leggibili PER INTERO prima di mandare la fattura
-                       al cliente. Il dato resta su una riga sola (Invio salva,
-                       gli a capo vengono rimossi) perche' finisce cosi' anche
-                       su bb_billing, sull'Excel e su Yard. #}
+                    {# textarea auto-espandibile: la descrizione e' multi-riga
+                       (il cantiere la salva cosi' e la stampa con nl2br, l'Excel
+                       ha wrapText) e va letta PER INTERO prima di mandare la
+                       fattura al cliente. Enter va a capo, si salva uscendo dal
+                       campo o con Ctrl+Enter. #}
                     <textarea rows="1"
                               class="bd-cell-input bd-cell-textarea"
                               data-field="descrizione"

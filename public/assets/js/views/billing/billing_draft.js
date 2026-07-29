@@ -139,7 +139,7 @@
                             if (p.length === 3) input.value = p[2] + '/' + p[1] + '/' + p[0];
                         }
                     } else if (field === 'descrizione') {
-                        // il server normalizza spazi/a capo: riallinea altezza
+                        // riallinea l'altezza al valore salvato (a capo inclusi)
                         if (res.data.line.descrizione != null) {
                             input.value = res.data.line.descrizione;
                         }
@@ -160,10 +160,11 @@
         );
     }
 
-    // ── Descrizione: textarea auto-espandibile ───────────────────────────────
-    // Cresce con il contenuto cosi' la descrizione e' sempre leggibile per
-    // intero. Il valore resta comunque su una riga (niente \n): finisce su
-    // bb_billing, sull'export Excel e su Yard.
+    // ── Descrizione: textarea auto-espandibile e MULTI-RIGA ──────────────────
+    // La descrizione e' multi-riga in tutto il flusso (il cantiere la salva
+    // con una textarea e la stampa con nl2br, l'export Excel ha wrapText):
+    // gli a capo vanno preservati. Qui la textarea cresce con il contenuto
+    // cosi' la riga e' sempre leggibile per intero, a capo compresi.
     function autosize(el) {
         if (!el || !el.classList.contains('bd-cell-textarea')) return;
         el.style.height = 'auto';
@@ -180,14 +181,7 @@
 
     tbody.addEventListener('input', function (e) {
         var t = e.target;
-        if (!t || !t.classList || !t.classList.contains('bd-cell-textarea')) return;
-        // un incolla multi-riga diventa testo su una riga sola
-        if (t.value.indexOf('\n') !== -1 || t.value.indexOf('\r') !== -1) {
-            var pos = t.selectionStart;
-            t.value = t.value.replace(/[\r\n]+/g, ' ');
-            try { t.setSelectionRange(pos, pos); } catch (err) { /* noop */ }
-        }
-        autosize(t);
+        if (t && t.classList && t.classList.contains('bd-cell-textarea')) autosize(t);
     });
 
     if (isEditable) {
@@ -210,8 +204,11 @@
             var t = e.target;
             if (!t || !t.classList || !t.classList.contains('bd-cell-input')) return;
             if (t.tagName === 'SELECT') return;
+            var isTextarea = t.classList.contains('bd-cell-textarea');
             if (e.key === 'Enter') {
-                // anche sulla textarea Invio salva (niente a capo nel dato)
+                // Nella descrizione (multi-riga) Invio va a capo: si salva
+                // uscendo dal campo (Tab / click) oppure con Ctrl+Invio.
+                if (isTextarea && !e.ctrlKey && !e.metaKey) return;
                 e.preventDefault();
                 t.blur();
             } else if (e.key === 'Escape') {

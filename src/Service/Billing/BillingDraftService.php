@@ -425,13 +425,11 @@ final class BillingDraftService
                 return $iso;
 
             case 'descrizione':
-                // Il campo e' modificato con una textarea (auto-espandibile),
-                // ma il dato deve restare su una riga sola: viene riscritto su
-                // bb_billing, esportato in Excel e spinto su Yard, dove un a
-                // capo romperebbe la descrizione della fattura.
-                $s = preg_replace('/[\r\n\t]+/u', ' ', (string)$raw) ?? (string)$raw;
-                $s = preg_replace('/ {2,}/u', ' ', $s) ?? $s;
-                return trim($s);
+                // NB: la descrizione e' multi-riga per scelta — il cantiere la
+                // salva con una textarea e la mostra con |nl2br, e l'export
+                // Excel ha setWrapText sulla colonna. Gli a capo vanno quindi
+                // preservati: non normalizzare.
+                return (string)$raw;
 
             case 'totale_imponibile':
             case 'aliquota_iva':
