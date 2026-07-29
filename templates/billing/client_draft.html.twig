@@ -134,7 +134,8 @@
    le modifiche fatte dentro la bozza dall'utente sono gialle. #}
 {% set hasNew      = lines|filter(l => l.added_after_create)|length > 0 %}
 {% set hasExtMod   = lines|filter(l => l.externally_modified and not l.added_after_create)|length > 0 %}
-{% if hasNew or hasExtMod %}
+{% set hasDeleted  = lines|filter(l => l.source_deleted)|length > 0 %}
+{% if hasNew or hasExtMod or hasDeleted %}
 <div class="bd-row-legend">
     {% if hasNew %}
         <span class="bd-row-legend-item bd-row-legend-new">
@@ -146,6 +147,12 @@
         <span class="bd-row-legend-item bd-row-legend-ext">
             <span class="bd-row-legend-dot"></span>
             Modificate dal cantiere dopo lo snapshot
+        </span>
+    {% endif %}
+    {% if hasDeleted %}
+        <span class="bd-row-legend-item bd-row-legend-deleted">
+            <span class="bd-row-legend-dot"></span>
+            Eliminate dal cantiere dopo l'apertura bozza — escludile se non vanno fatturate
         </span>
     {% endif %}
 </div>
@@ -233,7 +240,8 @@
             {% for l in lines %}
             <tr class="bd-draft-row
                        {% if l.excluded %}bd-row-excluded{% endif %}
-                       {% if l.added_after_create %}bd-row-added-new
+                       {% if l.source_deleted %}bd-row-source-deleted
+                       {% elseif l.added_after_create %}bd-row-added-new
                        {% elseif l.externally_modified %}bd-row-ext-modified
                        {% elseif l.modified %}bd-row-modified
                        {% endif %}"
@@ -250,7 +258,8 @@
                 </td>
 
                 <td class="bd-cell-cantiere">
-                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere }}</a>
+                    {# cantiere puo' essere NULL se il cantiere e' stato rimosso #}
+                    <a href="/worksites/{{ l.worksite_id }}" class="bd-link" target="_blank">{{ l.cantiere ?: 'Cantiere #' ~ l.worksite_id }}</a>
                 </td>
 
                 <td class="bd-cell-descrizione">
@@ -282,7 +291,11 @@
 
                 <td class="center bd-cell-status">
                     <span class="bd-pill bd-pill-danger"  data-tag="excluded" style="{% if not l.excluded %}display:none;{% endif %}">esclusa</span>
-                    {% if l.added_after_create %}
+                    {% if l.source_deleted %}
+                        <span class="bd-pill bd-pill-deleted" data-tag="source-deleted"
+                              title="La riga e' stata eliminata dal cantiere dopo l'apertura della bozza"
+                              style="{% if l.excluded %}display:none;{% endif %}">eliminata in cantiere</span>
+                    {% elseif l.added_after_create %}
                         <span class="bd-pill bd-pill-info"     data-tag="new" style="{% if l.excluded %}display:none;{% endif %}">nuova</span>
                     {% elseif l.externally_modified %}
                         <span class="bd-pill bd-pill-orange"   data-tag="ext-modified" style="{% if l.excluded %}display:none;{% endif %}">cambiata in cantiere</span>

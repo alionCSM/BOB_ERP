@@ -412,6 +412,13 @@ select.bd-cell-input.bd-cell-select:disabled {
 .bd-row-ext-modified td { background: #fff7ed; }
 .bd-row-ext-modified td:first-child { box-shadow: inset 3px 0 0 #ea580c; }
 
+/* Source deleted (viola) — la riga bb_billing e' stata cancellata dal cantiere
+   dopo l'apertura della bozza. Resta visibile (e nell'export) finche' l'utente
+   non la esclude: prima spariva dalla bozza ma restava nell'Excel. */
+.bd-row-source-deleted td { background: #faf5ff; }
+.bd-row-source-deleted td:first-child { box-shadow: inset 3px 0 0 #9333ea; }
+.bd-pill-deleted { background: #f3e8ff; color: #6b21a8; }
+
 /* Excluded rows: red bg + strikethrough inputs */
 .bd-row-excluded .bd-cell-input { text-decoration: line-through; opacity: .65; }
 .bd-row-excluded .bd-cell-input:focus { text-decoration: none; opacity: 1; }
@@ -557,3 +564,4 @@ select.bd-cell-input.bd-cell-select:disabled {
 }
 .bd-row-legend-new .bd-row-legend-dot { background: #3b82f6; }
 .bd-row-legend-ext .bd-row-legend-dot { background: #ea580c; }
+.bd-row-legend-deleted .bd-row-legend-dot { background: #9333ea; }

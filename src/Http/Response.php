@@ -32,8 +32,30 @@ final class Response
     {
         http_response_code($status);
         header('Content-Type: application/json; charset=utf-8');
+        self::noStore();
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
+    }
+
+    // ── Cache ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Vieta la cache per le risposte dinamiche (pagine HTML e JSON).
+     *
+     * Ogni pagina BOB dipende dall'utente loggato e dai dati live: senza questi
+     * header il browser (o un proxy) puo' servire una copia vecchia — sintomo
+     * tipico "manca un cliente / importo a 0, serve un hard refresh".
+     * `no-store` disabilita anche il bfcache, cosi' il tasto Indietro non
+     * ripropone dati (o sessioni) ormai superati.
+     */
+    private static function noStore(): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+        header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
     }
 
     // ── Error ────────────────────────────────────────────────────────────────
@@ -197,6 +219,7 @@ final class Response
         }
 
         // ── Legacy PHP view ───────────────────────────────────────────────
+        self::noStore();
         $authenticated_user = $GLOBALS['authenticated_user'] ?? [];
         $user               = $request->user();
         $conn               = $GLOBALS['connection'] ?? null;
@@ -215,6 +238,8 @@ final class Response
 
     private static function twig(string $template, array $data): never
     {
+        self::noStore();
+
         $conn     = $GLOBALS['connection']         ?? null;
         $authUser = $GLOBALS['authenticated_user'] ?? [];
         $user     = $GLOBALS['user']               ?? null;
