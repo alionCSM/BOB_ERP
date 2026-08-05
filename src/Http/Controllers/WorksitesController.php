@@ -1445,8 +1445,8 @@ final class WorksitesController
             Response::redirect("/worksites/{$worksite_id}#billing");
         }
 
-        // La colonna descrizione (qui e su Yard) e' limitata: senza questo
-        // controllo il testo verrebbe troncato in silenzio al salvataggio.
+        // La colonna bb_billing.descrizione e' limitata: senza questo controllo
+        // il testo verrebbe troncato in silenzio al salvataggio.
         $maxDescr = \App\Repository\Billing\BillingRepository::DESCRIZIONE_MAX_LENGTH;
         if (mb_strlen($descrizione) > $maxDescr) {
             $_SESSION['error'] = 'Descrizione troppo lunga: '

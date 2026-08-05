@@ -433,7 +433,7 @@ final class BillingDraftService
                 $max = \App\Repository\Billing\BillingRepository::DESCRIZIONE_MAX_LENGTH;
                 if (mb_strlen($s) > $max) {
                     // stesso limite del cantiere: la riga viene riscritta su
-                    // bb_billing e spinta su Yard, dove verrebbe troncata
+                    // bb_billing, la cui colonna descrizione e' limitata
                     throw new InvalidArgumentException(
                         'Descrizione troppo lunga: ' . mb_strlen($s) . " caratteri, il massimo e' {$max}."
                     );
