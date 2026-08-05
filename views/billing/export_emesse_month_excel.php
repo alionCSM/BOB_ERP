@@ -27,8 +27,13 @@ if (!$user) {
 }
 
 $spreadsheet = new Spreadsheet();
-$sheet       = $spreadsheet->getActiveSheet();
-$sheet->setTitle('Emesse ' . ($month ?? ''));
+
+// Due fogli: "Riepilogo" (una riga per fattura, con il suo totale) e
+// "Dettaglio" (una riga per voce di brogliaccio, filtrabile). I subtotali
+// stanno su un foglio a parte apposta: messi in mezzo al dettaglio
+// sporcherebbero il filtro automatico.
+$sheet = $spreadsheet->getActiveSheet();
+$sheet->setTitle('Dettaglio');
 
 $lastCol = 'F';
 
@@ -132,6 +137,69 @@ for ($r = 3; $r < $rowNum; $r++) {
 // filtro automatico sull'intestazione: comodo per isolare un cliente
 $sheet->setAutoFilter("A2:{$lastCol}" . ($rowNum - 1));
 $sheet->freezePane('A3');
+
+// ── Foglio "Riepilogo": una riga per fattura con il suo totale ──────────────
+$rec = $spreadsheet->createSheet(0);   // indice 0 = primo foglio, si apre qui
+$rec->setTitle('Riepilogo');
+
+$rec->mergeCells('A1:E1');
+$rec->setCellValue('A1', 'Fatture emesse — ' . $label . ' (totale per documento)');
+$rec->getStyle('A1')->applyFromArray([
+    'font'      => ['bold' => true, 'size' => 13, 'color' => ['rgb' => '1E3A5F']],
+    'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
+]);
+$rec->getRowDimension(1)->setRowHeight(24);
+
+foreach (['A2' => 'Numero', 'B2' => 'Data documento', 'C2' => 'Cliente',
+          'D2' => 'Voci',   'E2' => 'Imponibile (€)'] as $cell => $text) {
+    $rec->setCellValue($cell, $text);
+}
+$rec->getStyle('A2:E2')->applyFromArray([
+    'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+    'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E3A5F']],
+    'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+]);
+$rec->getRowDimension(2)->setRowHeight(20);
+
+$r = 3;
+foreach ($fatture as $f) {
+    $rec->setCellValue("A{$r}", $f['numero_label']);
+    $rec->setCellValueExplicit(
+        "B{$r}",
+        !empty($f['data']) ? date('d/m/Y', strtotime((string)$f['data'])) : '',
+        \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+    );
+    $rec->setCellValue("C{$r}", implode(', ', $f['clienti'] ?? []));
+    $rec->setCellValue("D{$r}", count($f['rows']));
+    $rec->setCellValue("E{$r}", (float)$f['totale']);
+    $r++;
+}
+
+if ($r === 3) {
+    $rec->mergeCells('A3:E3');
+    $rec->setCellValue('A3', 'Nessuna fattura emessa nel periodo.');
+    $rec->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $r++;
+}
+
+$rec->setCellValue("D{$r}", 'TOTALE');
+$rec->setCellValue("E{$r}", $totale);
+$rec->getStyle("A{$r}:E{$r}")->applyFromArray([
+    'font' => ['bold' => true],
+    'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'EEF2F7']],
+]);
+$rec->getStyle("D{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+$rec->getStyle("E3:E{$r}")->getNumberFormat()->setFormatCode('#,##0.00');
+$rec->getStyle("E3:E{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+$rec->getStyle("D3:D{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+foreach (['A', 'B', 'D', 'E'] as $col) {
+    $rec->getColumnDimension($col)->setAutoSize(true);
+}
+$rec->getColumnDimension('C')->setWidth(45);
+$rec->freezePane('A3');
+
+$spreadsheet->setActiveSheetIndex(0);
 
 // ── Output ──────────────────────────────────────────────────────────────────
 $filename = 'fatture_emesse_' . sprintf('%04d-%02d', $year, $month) . '.xlsx';
