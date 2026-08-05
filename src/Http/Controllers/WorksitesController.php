@@ -754,8 +754,23 @@ final class WorksitesController
         $totalExtraFatturato  = 0.0; // sum of righe linked to extras AND emessa on Yard
         $extraEmessaCount     = []; // extra_id => # of linked righe with emessa=1 (Yard)
         $extraLinkedCount     = []; // extra_id => # of linked righe (any state)
+        // Stato + numero + data documento di TUTTE le righe in una query sola
+        // (prima era una chiamata a Yard per ogni riga). Se Yard non risponde
+        // la scheda resta consultabile, semplicemente senza i dati fattura.
+        $yardDocInfo = [];
+        try {
+            $yardDocInfo = $yardBilling->getDocumentInfoMap(
+                array_column(array_filter($fatture, fn($f) => !empty($f['yard_id'])), 'yard_id')
+            );
+        } catch (\Throwable $e) {
+            error_log('[WorksitesController::show] Yard non raggiungibile: ' . $e->getMessage());
+        }
+
         foreach ($fatture as &$f) {
-            $f['emessa_reale'] = !empty($f['yard_id']) ? $yardBilling->isEmessa((int)$f['yard_id']) : false;
+            $info = !empty($f['yard_id']) ? ($yardDocInfo[(int)$f['yard_id']] ?? null) : null;
+            $f['emessa_reale']  = $info['emessa'] ?? false;
+            $f['numero_fattura'] = $info['numero_label'] ?? null;
+            $f['data_documento'] = $info['tm_datdoc']    ?? null;
             $imp = (float)($f['totale_imponibile'] ?? 0);
             $totalFatture += $imp;
             if ($f['emessa_reale']) {
@@ -1445,8 +1460,8 @@ final class WorksitesController
             Response::redirect("/worksites/{$worksite_id}#billing");
         }
 
-        // La colonna descrizione (qui e su Yard) e' limitata: senza questo
-        // controllo il testo verrebbe troncato in silenzio al salvataggio.
+        // La colonna bb_billing.descrizione e' limitata: senza questo controllo
+        // il testo verrebbe troncato in silenzio al salvataggio.
         $maxDescr = \App\Repository\Billing\BillingRepository::DESCRIZIONE_MAX_LENGTH;
         if (mb_strlen($descrizione) > $maxDescr) {
             $_SESSION['error'] = 'Descrizione troppo lunga: '

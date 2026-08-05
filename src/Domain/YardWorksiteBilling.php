@@ -108,6 +108,41 @@ class YardWorksiteBilling
     }
 
     /**
+     * Dati del documento (stato + numero + data) per un insieme di righe Yard,
+     * in una sola query. Usata dalla scheda cantiere per mostrare numero e data
+     * fattura accanto allo stato, senza interrogare Yard riga per riga.
+     *
+     * @param  int[] $yardIds
+     * @return array<int, array{emessa:bool, tm_anno:int, tm_numdoc:int, tm_datdoc:?string, numero_label:?string}>
+     */
+    public function getDocumentInfoMap(array $yardIds): array
+    {
+        $map = [];
+        $ids = array_values(array_unique(array_filter(array_map('intval', $yardIds))));
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $ph   = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = $this->conn->prepare("
+                SELECT id, emessa, tm_anno, tm_numdoc, tm_datdoc
+                FROM dbo.CNT_cantieri_brogliacci
+                WHERE id IN ({$ph})
+            ");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $anno = (int)($r['tm_anno']   ?? 0);
+                $num  = (int)($r['tm_numdoc'] ?? 0);
+                $map[(int)$r['id']] = [
+                    'emessa'       => ((int)$r['emessa'] === 1),
+                    'tm_anno'      => $anno,
+                    'tm_numdoc'    => $num,
+                    'tm_datdoc'    => $r['tm_datdoc'] ?? null,
+                    'numero_label' => ($anno > 0 && $num > 0) ? ($num . '/' . $anno) : null,
+                ];
+            }
+        }
+        return $map;
+    }
+
+    /**
      * Stato emessa per un insieme di righe Yard in un colpo solo
      * (per il sync massivo del cron: evita una query per riga).
      *
@@ -145,10 +180,17 @@ class YardWorksiteBilling
         $nextMonth = $month === 12 ? 1         : $month + 1;
         $endExcl   = sprintf('%04d-%02d-01', $nextYear, $nextMonth);
 
+        // La data di riferimento e' quella del DOCUMENTO (tm_datdoc), non la
+        // data della riga di brogliaccio (data): e' tm_datdoc a stabilire in
+        // che mese la fattura e' stata emessa.
+        // COALESCE come rete di sicurezza: una riga emessa senza tm_datdoc
+        // resterebbe altrimenti invisibile in qualsiasi mese.
         $stmt = $this->conn->prepare("
             SELECT
                 id,
-                data,
+                COALESCE(tm_datdoc, data) AS data,
+                data                      AS data_riga,
+                tm_datdoc,
                 nome_cliente,
                 nome_cantiere,
                 descrizione,
@@ -158,9 +200,9 @@ class YardWorksiteBilling
             FROM dbo.CNT_cantieri_brogliacci
             WHERE emessa  = 1
               AND obsoleto = 0
-              AND data >= :start
-              AND data <  :endExcl
-            ORDER BY data DESC, id DESC
+              AND COALESCE(tm_datdoc, data) >= :start
+              AND COALESCE(tm_datdoc, data) <  :endExcl
+            ORDER BY COALESCE(tm_datdoc, data) DESC, id DESC
         ");
         $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -187,8 +229,8 @@ class YardWorksiteBilling
             FROM dbo.CNT_cantieri_brogliacci
             WHERE emessa = 1
               AND obsoleto = 0
-              AND data >= :start
-              AND data <  :endExcl
+              AND COALESCE(tm_datdoc, data) >= :start
+              AND COALESCE(tm_datdoc, data) <  :endExcl
         ");
         $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['cnt' => 0, 'tot' => 0];

@@ -39,9 +39,12 @@ final class BillingRepository
 
     /**
      * Lunghezza massima della descrizione di una riga di fatturazione.
-     * Vincolo della colonna bb_billing.descrizione (e della corrispondente
-     * colonna su Yard): oltre questa soglia il testo verrebbe troncato in
-     * silenzio, quindi va bloccato prima di scrivere.
+     *
+     * Il vincolo e' della colonna MySQL bb_billing.descrizione: oltre questa
+     * soglia il testo verrebbe troncato in silenzio, quindi va bloccato prima
+     * di scrivere. Su Yard NON c'e' limite (CNT_cantieri_brogliacci.descrizione
+     * e' nvarchar(max)), quindi il vincolo nasce e finisce qui: se un giorno la
+     * colonna MySQL viene allargata, basta alzare questa costante.
      */
     public const DESCRIZIONE_MAX_LENGTH = 255;
 
