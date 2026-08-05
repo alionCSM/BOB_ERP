@@ -429,7 +429,16 @@ final class BillingDraftService
                 // salva con una textarea e la mostra con |nl2br, e l'export
                 // Excel ha setWrapText sulla colonna. Gli a capo vanno quindi
                 // preservati: non normalizzare.
-                return (string)$raw;
+                $s   = (string)$raw;
+                $max = \App\Repository\Billing\BillingRepository::DESCRIZIONE_MAX_LENGTH;
+                if (mb_strlen($s) > $max) {
+                    // stesso limite del cantiere: la riga viene riscritta su
+                    // bb_billing e spinta su Yard, dove verrebbe troncata
+                    throw new InvalidArgumentException(
+                        'Descrizione troppo lunga: ' . mb_strlen($s) . " caratteri, il massimo e' {$max}."
+                    );
+                }
+                return $s;
 
             case 'totale_imponibile':
             case 'aliquota_iva':

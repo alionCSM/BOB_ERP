@@ -1549,8 +1549,12 @@
                             </div>
                             <div class="mb-3">
                                 <label>Descrizione</label>
+                                {# 255 = limite della colonna (qui e su Yard): senza
+                                   maxlength il testo verrebbe troncato al salvataggio #}
                                 <textarea name="descrizione" id="billing-descrizione"
-                                          class="form-control" rows="3" required>{{ billingDefaultDescr }}</textarea>
+                                          class="form-control" rows="3" maxlength="255" required>{{ billingDefaultDescr }}</textarea>
+                                <div id="billing-descrizione-count"
+                                     style="font-size:11px; color:#94a3b8; text-align:right; margin-top:3px;"></div>
                             </div>
                             <div class="mb-3">
                                 <label>Totale €</label>
@@ -2148,7 +2152,9 @@
     <script src="/assets/js/includes/worksite_views/ordini.js"></script>
     <script src="/assets/js/includes/worksite_views/extra.js"></script>
     <script src="/assets/js/includes/worksite_views/attivita.js"></script>
-    <script src="/assets/js/includes/worksite_views/billing.js"></script>
+    {# ?v= da incrementare a ogni modifica del file, altrimenti il browser
+       continua a servire la versione in cache #}
+    <script src="/assets/js/includes/worksite_views/billing.js?v=2"></script>
 
     <script src="/assets/js/includes/worksite_views/disegni.js?v=2"></script>
     <script src="/assets/js/includes/worksite_views/tasks.js"></script>

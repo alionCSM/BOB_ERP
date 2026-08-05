@@ -38,6 +38,14 @@ final class BillingRepository
     }
 
     /**
+     * Lunghezza massima della descrizione di una riga di fatturazione.
+     * Vincolo della colonna bb_billing.descrizione (e della corrispondente
+     * colonna su Yard): oltre questa soglia il testo verrebbe troncato in
+     * silenzio, quindi va bloccato prima di scrivere.
+     */
+    public const DESCRIZIONE_MAX_LENGTH = 255;
+
+    /**
      * Single billing row by ID.
      */
     public function findById(int $id): ?array
