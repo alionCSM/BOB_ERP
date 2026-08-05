@@ -1485,6 +1485,16 @@
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="check" class="w-3 h-3"></i> Emessa
                                         </span>
+                                        {# numero e data documento presi da Yard (tm_numdoc / tm_datdoc) #}
+                                        {% if e.numero_fattura or e.data_documento %}
+                                            <div style="font-size:11px;color:#64748b;margin-top:3px;white-space:nowrap;">
+                                                {% if e.numero_fattura %}
+                                                    <span style="font-weight:600;color:#334155;">n. {{ e.numero_fattura }}</span>
+                                                {% endif %}
+                                                {% if e.numero_fattura and e.data_documento %} · {% endif %}
+                                                {% if e.data_documento %}{{ e.data_documento|date('d/m/Y') }}{% endif %}
+                                            </div>
+                                        {% endif %}
                                     {% else %}
                                         <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;font-size:11px;font-weight:500;white-space:nowrap;">
                                             <i data-lucide="clock" class="w-3 h-3"></i> Non emessa

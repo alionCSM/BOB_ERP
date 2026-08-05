@@ -287,9 +287,13 @@ final class BillingController
             $g['rows'][]  = $r;
             unset($g);
         }
+        // Ordinamento per numero fattura (anno, numero). Le righe senza numero
+        // documento finiscono in fondo, altrimenti con numero 0 starebbero in
+        // testa all'elenco.
         usort($groups, function ($a, $b) {
-            $c = strcasecmp($a['cliente_principale'] ?: 'zzz', $b['cliente_principale'] ?: 'zzz');
-            if ($c !== 0) return $c;
+            $aNoNum = ($a['tm_numdoc'] <= 0);
+            $bNoNum = ($b['tm_numdoc'] <= 0);
+            if ($aNoNum !== $bNoNum) return $aNoNum ? 1 : -1;
             if ($a['tm_anno'] !== $b['tm_anno']) return $a['tm_anno'] <=> $b['tm_anno'];
             return $a['tm_numdoc'] <=> $b['tm_numdoc'];
         });
