@@ -1445,6 +1445,15 @@ final class WorksitesController
             Response::redirect("/worksites/{$worksite_id}#billing");
         }
 
+        // La colonna descrizione (qui e su Yard) e' limitata: senza questo
+        // controllo il testo verrebbe troncato in silenzio al salvataggio.
+        $maxDescr = \App\Repository\Billing\BillingRepository::DESCRIZIONE_MAX_LENGTH;
+        if (mb_strlen($descrizione) > $maxDescr) {
+            $_SESSION['error'] = 'Descrizione troppo lunga: '
+                . mb_strlen($descrizione) . " caratteri, il massimo e' {$maxDescr}.";
+            Response::redirect("/worksites/{$worksite_id}#billing");
+        }
+
         $aliquota_iva = $this->billingRepo->getVatPercentageById((int)$iva_id);
         if ($aliquota_iva === null) {
             $_SESSION['error'] = 'IVA non trovata.';

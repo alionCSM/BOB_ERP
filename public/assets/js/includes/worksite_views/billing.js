@@ -43,6 +43,25 @@
                 });
             });
 
+            // --- Contatore caratteri descrizione ---
+            // Il maxlength blocca la digitazione ma tronca un incolla lungo
+            // senza dirlo: il contatore rende visibile il limite.
+            const descrField = document.getElementById('billing-descrizione');
+            const descrCount = document.getElementById('billing-descrizione-count');
+            if (descrField && descrCount) {
+                const MAX_DESCR = parseInt(descrField.getAttribute('maxlength'), 10) || 255;
+                const syncDescrCount = () => {
+                    const len = descrField.value.length;
+                    descrCount.textContent = len + ' / ' + MAX_DESCR;
+                    descrCount.style.color = len >= MAX_DESCR ? '#dc2626'
+                                           : (len > MAX_DESCR * 0.9 ? '#d97706' : '#94a3b8');
+                };
+                descrField.addEventListener('input', syncDescrCount);
+                // il campo viene ripopolato all'apertura del modal (nuova/modifica)
+                document.addEventListener('click', () => setTimeout(syncDescrCount, 0));
+                syncDescrCount();
+            }
+
             // --- Handle Italian numeric formatting ---
             const totField = document.getElementById('billing-totale');
             totField.addEventListener('focus', ()=> totField.value = totField.value.replace(/\./g,'').replace(',','.'));
