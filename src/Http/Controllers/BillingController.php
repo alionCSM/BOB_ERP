@@ -124,60 +124,10 @@ final class BillingController
             error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
         }
 
-        // Group brogliaccio line items into fatture by (tm_anno, tm_numdoc),
-        // sort the resulting fatture by primary cliente (A-Z), then by
-        // numero. Rows without tm_numdoc collapse under a single "senza
-        // numero" sentinel group so they're still visible.
-        $groupFn = function (array $rows): array {
-            $groups = [];
-            foreach ($rows as $r) {
-                $anno  = (int)($r['tm_anno']   ?? 0);
-                $num   = (int)($r['tm_numdoc'] ?? 0);
-                $key   = ($anno > 0 && $num > 0) ? ($anno . '-' . $num) : 'senza-numero';
-
-                if (!isset($groups[$key])) {
-                    $groups[$key] = [
-                        'key'                => $key,
-                        'tm_anno'            => $anno,
-                        'tm_numdoc'          => $num,
-                        'numero_label'       => ($anno > 0 && $num > 0) ? ($num . '/' . $anno) : 'Senza numero',
-                        'data'               => $r['data'] ?? null,   // will become MAX
-                        'clienti'            => [],                    // distinct, preserves first-seen order
-                        'cliente_principale' => (string)($r['nome_cliente'] ?? ''),
-                        'totale'             => 0.0,
-                        'rows'               => [],
-                    ];
-                }
-                $g =& $groups[$key];
-
-                // MAX(data)
-                if (!empty($r['data']) && (empty($g['data']) || $r['data'] > $g['data'])) {
-                    $g['data'] = $r['data'];
-                }
-
-                $cliente = (string)($r['nome_cliente'] ?? '');
-                if ($cliente !== '' && !in_array($cliente, $g['clienti'], true)) {
-                    $g['clienti'][] = $cliente;
-                }
-
-                $g['totale'] += (float)($r['totale_imponibile'] ?? 0);
-                $g['rows'][]  = $r;
-                unset($g);
-            }
-
-            // Sort: primary cliente A-Z, then by numero ascending
-            usort($groups, function ($a, $b) {
-                $c = strcasecmp($a['cliente_principale'] ?: 'zzz', $b['cliente_principale'] ?: 'zzz');
-                if ($c !== 0) return $c;
-                if ($a['tm_anno'] !== $b['tm_anno']) return $a['tm_anno'] <=> $b['tm_anno'];
-                return $a['tm_numdoc'] <=> $b['tm_numdoc'];
-            });
-
-            return $groups;
-        };
-
-        $emessRealCurFatture    = $groupFn($emessRealCurRows);
-        $emessRealPrevFatture   = $groupFn($emessRealPrevRows);
+        // Raggruppa le righe di brogliaccio in fatture — logica condivisa con
+        // il fragment del mese e con l'export Excel (vedi groupEmesseRows).
+        $emessRealCurFatture    = self::groupEmesseRows($emessRealCurRows);
+        $emessRealPrevFatture   = self::groupEmesseRows($emessRealPrevRows);
 
         // Authoritative footer totals computed in PHP — independent of the
         // Yard aggregate query above. If they disagree, something's off.
@@ -281,8 +231,33 @@ final class BillingController
             error_log('[BillingController::emesseMonthFragment] Yard unreachable: ' . $e->getMessage());
         }
 
-        // Same grouping logic as clientList (kept inline rather than extracted
-        // because the partial template lives only here).
+        $groups = self::groupEmesseRows($rows);
+
+        $total = 0.0;
+        foreach ($rows as $r) { $total += (float)($r['totale_imponibile'] ?? 0); }
+
+        $label = $monthLabels[$month - 1] . ' ' . $year;
+
+        Response::view('billing/_emesse_month_fragment.html.twig', $request, [
+            'fatture' => $groups,
+            'total'   => $total,
+            'label'   => $label,
+            'month'   => sprintf('%04d-%02d', $year, $month),
+        ]);
+    }
+
+    /**
+     * Raggruppa le righe di brogliaccio Yard in fatture per (tm_anno,
+     * tm_numdoc). Le righe senza numero documento finiscono in un unico
+     * gruppo "senza numero" cosi' restano comunque visibili.
+     *
+     * Usata dalla pagina clienti, dal fragment del mese e dall'export Excel.
+     *
+     * @param  array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    public static function groupEmesseRows(array $rows): array
+    {
         $groups = [];
         foreach ($rows as $r) {
             $anno = (int)($r['tm_anno'] ?? 0);
@@ -318,17 +293,37 @@ final class BillingController
             if ($a['tm_anno'] !== $b['tm_anno']) return $a['tm_anno'] <=> $b['tm_anno'];
             return $a['tm_numdoc'] <=> $b['tm_numdoc'];
         });
+        return $groups;
+    }
 
-        $total = 0.0;
-        foreach ($rows as $r) { $total += (float)($r['totale_imponibile'] ?? 0); }
+    // ── Export Excel del dettaglio mese (fatture emesse da Yard) ─────────────
 
+    public function exportEmesseMonth(Request $request): never
+    {
+        $raw = (string)($request->get('month') ?? '');
+        if (!preg_match('/^(\d{4})-(\d{2})$/', $raw, $m)
+            || (int)$m[2] < 1 || (int)$m[2] > 12
+            || (int)$m[1] < 2000 || (int)$m[1] > 2100) {
+            Response::error('Mese non valido', 400);
+        }
+        $year  = (int)$m[1];
+        $month = (int)$m[2];
+
+        try {
+            $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+            $rows = $yardBilling->getEmesseRowsForMonth($year, $month);
+        } catch (\Throwable $e) {
+            error_log('[BillingController::exportEmesseMonth] Yard unreachable: ' . $e->getMessage());
+            Response::error('Yard non raggiungibile: impossibile generare l\'export.', 503);
+        }
+
+        $fatture     = self::groupEmesseRows($rows);
+        $monthLabels = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                        'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
         $label = $monthLabels[$month - 1] . ' ' . $year;
 
-        Response::view('billing/_emesse_month_fragment.html.twig', $request, [
-            'fatture' => $groups,
-            'total'   => $total,
-            'label'   => $label,
-        ]);
+        require APP_ROOT . '/views/billing/export_emesse_month_excel.php';
+        exit;
     }
 
     // ── Per-client billing: detail (da emettere + emesse paginated) ───────────

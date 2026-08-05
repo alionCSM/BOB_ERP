@@ -452,6 +452,7 @@ if ($uri === '/billing' || str_starts_with($uri, '/billing/')) {
            ->get('/billing/export',                  [BillingController::class, 'export'])
            ->get('/billing/clients',                 [BillingController::class, 'clientList'])
            ->get('/billing/clients/emesse-month',    [BillingController::class, 'emesseMonthFragment'])
+           ->get('/billing/clients/emesse-month/export', [BillingController::class, 'exportEmesseMonth'])
            ->get('/billing/client/{id}',             [BillingController::class, 'clientDetail'])
            ->get('/billing/client/{id}/emesse',      [BillingController::class, 'clientEmesse'])
            ->get('/billing/client/{id}/export',      [BillingController::class, 'exportDaEmettere'])

@@ -145,10 +145,17 @@ class YardWorksiteBilling
         $nextMonth = $month === 12 ? 1         : $month + 1;
         $endExcl   = sprintf('%04d-%02d-01', $nextYear, $nextMonth);
 
+        // La data di riferimento e' quella del DOCUMENTO (tm_datdoc), non la
+        // data della riga di brogliaccio (data): e' tm_datdoc a stabilire in
+        // che mese la fattura e' stata emessa.
+        // COALESCE come rete di sicurezza: una riga emessa senza tm_datdoc
+        // resterebbe altrimenti invisibile in qualsiasi mese.
         $stmt = $this->conn->prepare("
             SELECT
                 id,
-                data,
+                COALESCE(tm_datdoc, data) AS data,
+                data                      AS data_riga,
+                tm_datdoc,
                 nome_cliente,
                 nome_cantiere,
                 descrizione,
@@ -158,9 +165,9 @@ class YardWorksiteBilling
             FROM dbo.CNT_cantieri_brogliacci
             WHERE emessa  = 1
               AND obsoleto = 0
-              AND data >= :start
-              AND data <  :endExcl
-            ORDER BY data DESC, id DESC
+              AND COALESCE(tm_datdoc, data) >= :start
+              AND COALESCE(tm_datdoc, data) <  :endExcl
+            ORDER BY COALESCE(tm_datdoc, data) DESC, id DESC
         ");
         $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -187,8 +194,8 @@ class YardWorksiteBilling
             FROM dbo.CNT_cantieri_brogliacci
             WHERE emessa = 1
               AND obsoleto = 0
-              AND data >= :start
-              AND data <  :endExcl
+              AND COALESCE(tm_datdoc, data) >= :start
+              AND COALESCE(tm_datdoc, data) <  :endExcl
         ");
         $stmt->execute([':start' => $start, ':endExcl' => $endExcl]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['cnt' => 0, 'tot' => 0];
