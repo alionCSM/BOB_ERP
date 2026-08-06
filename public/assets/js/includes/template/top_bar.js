@@ -630,6 +630,7 @@ async function dismissPriorityModal() {
         mMeta.innerHTML    = '';
         mMsg.textContent   = '';
         mRuns.innerHTML    = '<div class="cj-loading">Caricamento…</div>';
+        modal.hidden = false;
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
 
@@ -649,6 +650,7 @@ async function dismissPriorityModal() {
     function closeModal() {
         if (!modal) return;
         modal.classList.remove('is-open');
+        modal.hidden = true;
         modal.setAttribute('aria-hidden', 'true');
         mJob = null;
     }

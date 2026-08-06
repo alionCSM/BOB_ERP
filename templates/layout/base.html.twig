@@ -8,6 +8,10 @@
     <title>BOB - {{ pageTitle ?? '' }}</title>
     <link rel="stylesheet" href="{{ asset('/includes/template/dist/css/app.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    {# Deve stare nel <head>: contiene il display:none della modale job.
+       Caricato in fondo al body, la modale resterebbe visibile in cima
+       alla pagina fino all'arrivo del CSS. #}
+    <link rel="stylesheet" href="/assets/css/includes/template/cron_panel.css?v=4">
     {% block head %}{% endblock %}
 </head>
 <body class="py-5">
@@ -35,7 +39,6 @@
 </div>
 
 <link rel="stylesheet" href="/assets/css/includes/template/footer.css">
-<link rel="stylesheet" href="/assets/css/includes/template/cron_panel.css?v=3">
 <script src="/assets/js/includes/template/footer.js"></script>
 <script src="{{ asset('/includes/template/dist/js/app.js') }}"></script>
 <script>window._attestatoUrl = "{{ attestatoUrl }}";</script>

@@ -169,7 +169,10 @@
 
 {# Modale dettaglio job — DEVE stare fuori dal dropdown: quello ha un
    transform (Popper) che romperebbe il position:fixed dell'overlay. #}
-<div id="cj-modal" class="cj-modal" aria-hidden="true">
+{# `hidden` e' una rete di sicurezza se il CSS non fosse ancora arrivato:
+   quando si apre, .cj-modal.is-open{display:flex} vince comunque sullo
+   stile [hidden] del browser. #}
+<div id="cj-modal" class="cj-modal" aria-hidden="true" hidden>
     <div class="cj-modal-box" role="dialog" aria-modal="true" aria-labelledby="cj-modal-title">
         <div class="cj-modal-head">
             <div class="cj-modal-head-txt">
@@ -198,7 +201,7 @@
      data-vapid-public-key="{{ vapidPublicKey }}"
      hidden></div>
 {# ?v= da incrementare a ogni modifica del file, altrimenti resta in cache #}
-<script src="/assets/js/includes/template/top_bar.js?v=4"></script>
+<script src="/assets/js/includes/template/top_bar.js?v=5"></script>
 
 <div id="priority-notif-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:18px;width:95%;max-width:560px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.2);animation:pnm-in .3s ease;">
