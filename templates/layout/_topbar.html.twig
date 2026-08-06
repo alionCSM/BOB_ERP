@@ -43,6 +43,19 @@
                         </div>
                     </div>
                 </div>
+
+                {# ── Stato dei job schedulati (cron) di oggi ──
+                   Caricato via AJAX all'apertura del pannello: non pesa
+                   sul caricamento di ogni pagina. #}
+                <div class="border-t border-slate-200 mt-4 pt-3">
+                    <div class="flex items-center justify-between">
+                        <div class="font-medium">Job automatici</div>
+                        <span id="cron-status-date" class="text-xs text-slate-400"></span>
+                    </div>
+                    <div id="cron-status-list" class="mt-2 text-sm text-slate-500">
+                        Caricamento…
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -142,7 +155,8 @@
      data-has-high-priority="{{ hasHighPriority ? '1' : '0' }}"
      data-vapid-public-key="{{ vapidPublicKey }}"
      hidden></div>
-<script src="/assets/js/includes/template/top_bar.js"></script>
+{# ?v= da incrementare a ogni modifica del file, altrimenti resta in cache #}
+<script src="/assets/js/includes/template/top_bar.js?v=2"></script>
 
 <div id="priority-notif-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:18px;width:95%;max-width:560px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.2);animation:pnm-in .3s ease;">

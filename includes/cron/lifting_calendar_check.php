@@ -29,14 +29,18 @@ use App\Service\LiftingCalendarAlertService;
 
 echo "=== BOB Lifting Calendar Check — " . date('Y-m-d H:i:s') . " ===\n";
 
+$run = null;
 try {
     $conn    = (new Database())->connect();
+    $run     = \App\Service\CronRun::start($conn, 'lifting_calendar_check');
     $service = new LiftingCalendarAlertService($conn);
     $result  = $service->run();
 
     echo "Segnalazioni trovate: {$result['findings']}\n";
     echo "Email inviate:        {$result['emails_sent']}\n";
+    $run->ok("Segnalazioni: {$result['findings']}, email inviate: {$result['emails_sent']}");
 } catch (\Throwable $e) {
+    $run?->fail($e->getMessage());
     // il log su file puo' fallire (permessi: cron lanciato con utente diverso
     // da www-data) — non deve mascherare l'errore vero
     try {

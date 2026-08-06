@@ -32,8 +32,12 @@ use App\Repository\Billing\BillingRepository;
 
 echo "=== BOB Sync emessa da Yard — " . date('Y-m-d H:i:s') . " ===\n";
 
+$conn = null;
+$run  = null;
 try {
-    $conn        = (new Database())->connect();
+    $conn = (new Database())->connect();
+    $run  = \App\Service\CronRun::start($conn, 'sync_emessa_yard');
+
     $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
     $repo        = new BillingRepository($conn);
 
@@ -41,7 +45,9 @@ try {
 
     echo "Righe controllate: {$result['checked']}\n";
     echo "Righe aggiornate:  {$result['updated']}\n";
+    $run->ok("Righe controllate: {$result['checked']}, aggiornate: {$result['updated']}");
 } catch (\Throwable $e) {
+    $run?->fail($e->getMessage());
     // il log su file puo' fallire (permessi: cron lanciato con utente diverso
     // da www-data) — non deve mascherare l'errore vero
     try {

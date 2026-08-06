@@ -2376,6 +2376,93 @@ final class WorksitesController
         ]);
     }
 
+    // ── Stato dei job schedulati (pannello Servizi) ───────────────────────────
+
+    /**
+     * GET /services/cron-status — esito di oggi per ogni job noto.
+     *
+     * Elenca TUTTI i job del registro, anche quelli che oggi non sono partiti:
+     * un cron morto non lascia righe, quindi senza il registro sarebbe
+     * indistinguibile da uno che non e' ancora stato eseguito.
+     */
+    public function cronStatus(Request $request): never
+    {
+        $user = $request->user();
+        if (!$user || !$user->canAccess('dashboard')) {
+            Response::json(['ok' => false, 'error' => 'Accesso negato'], 403);
+        }
+
+        $today = date('Y-m-d');
+        $runs  = [];
+
+        try {
+            // ultima esecuzione di oggi per ciascun job
+            $stmt = $this->conn->prepare("
+                SELECT r.job, r.status, r.started_at, r.finished_at, r.duration_ms, r.message
+                FROM bb_cron_runs r
+                JOIN (
+                    SELECT job, MAX(id) AS max_id
+                    FROM bb_cron_runs
+                    WHERE DATE(started_at) = :d
+                    GROUP BY job
+                ) last ON last.max_id = r.id
+            ");
+            $stmt->execute([':d' => $today]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $runs[$row['job']] = $row;
+            }
+
+            // ultima esecuzione in assoluto, per i job non partiti oggi
+            $stmtPrev = $this->conn->prepare("
+                SELECT r.job, r.status, r.started_at
+                FROM bb_cron_runs r
+                JOIN (SELECT job, MAX(id) AS max_id FROM bb_cron_runs GROUP BY job) last
+                  ON last.max_id = r.id
+            ");
+            $stmtPrev->execute();
+            $lastEver = [];
+            foreach ($stmtPrev->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $lastEver[$row['job']] = $row;
+            }
+        } catch (\Throwable $e) {
+            // tabella non ancora creata (migration da applicare): non e' un
+            // errore bloccante, il pannello mostrera' tutto "mai eseguito"
+            error_log('[cronStatus] ' . $e->getMessage());
+            $lastEver = [];
+        }
+
+        $jobs = [];
+        foreach (\App\Service\CronRun::JOBS as $key => $label) {
+            $r = $runs[$key] ?? null;
+            if ($r) {
+                $jobs[] = [
+                    'job'      => $key,
+                    'label'    => $label,
+                    'status'   => $r['status'],
+                    'ora'      => $r['started_at'] ? date('H:i', strtotime($r['started_at'])) : null,
+                    'durata'   => $r['duration_ms'] !== null ? (int)$r['duration_ms'] : null,
+                    'message'  => $r['message'],
+                    'ultima'   => null,
+                ];
+                continue;
+            }
+            $prev = $lastEver[$key] ?? null;
+            $jobs[] = [
+                'job'     => $key,
+                'label'   => $label,
+                'status'  => 'mai',
+                'ora'     => null,
+                'durata'  => null,
+                'message' => null,
+                'ultima'  => $prev && !empty($prev['started_at'])
+                                ? date('d/m/Y H:i', strtotime($prev['started_at']))
+                                : null,
+            ];
+        }
+
+        Response::json(['ok' => true, 'jobs' => $jobs, 'data' => date('d/m/Y')]);
+    }
+
     // ── Yard status ───────────────────────────────────────────────────────────
 
     public function updateYardStatus(Request $request): never

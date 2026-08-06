@@ -303,6 +303,19 @@ if ($uri === '/documents' || str_starts_with($uri, '/documents/')) {
     $router->dispatch($request, $container);
 }
 
+// Stato dei job schedulati, letto dal pannello "Servizi" della top bar
+if (str_starts_with($uri, '/services/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/services/cron-status', [WorksitesController::class, 'cronStatus']);
+
+    $router->dispatch($request, $container);
+}
+
 if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

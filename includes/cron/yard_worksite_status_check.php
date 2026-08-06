@@ -10,18 +10,24 @@ require_once APP_ROOT . '/includes/bootstrap.php';
 
 $logger = \App\Infrastructure\LoggerFactory::app();
 
+$run = null;
 try {
     $dbMy  = new Database();
     $dbYrd = new SQLServer(new Config());
 
+    $connMy = $dbMy->connect();
+    $run    = \App\Service\CronRun::start($connMy, 'yard_worksite_status_check');
+
     $service = new YardWorksiteStatusService(
-        $dbMy->connect(),
+        $connMy,
         $dbYrd->connect()
     );
 
     $service->run();
     $logger->info('yard_worksite_status_check: completed');
+    $run->ok('Completato');
 } catch (Throwable $e) {
+    $run?->fail($e->getMessage());
     $logger->error('yard_worksite_status_check: fatal error', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),

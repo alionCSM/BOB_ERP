@@ -424,3 +424,81 @@ async function dismissPriorityModal() {
             }
         });
     })();
+
+// ── Stato job automatici (cron) nel pannello Servizi ─────────────────────────
+// Caricato al primo click sull'icona ingranaggio, poi tenuto in memoria:
+// evita una query a ogni caricamento di pagina.
+(function () {
+    const list = document.getElementById('cron-status-list');
+    if (!list) return;
+
+    const dateEl = document.getElementById('cron-status-date');
+    const toggle = list.closest('.dropdown')?.querySelector('.dropdown-toggle');
+    let loaded = false;
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function badge(job) {
+        if (job.status === 'ok')      return '<span style="color:#15803d;font-weight:600;">✓ ' + esc(job.ora) + '</span>';
+        if (job.status === 'error')   return '<span style="color:#b91c1c;font-weight:600;">✕ errore</span>';
+        if (job.status === 'running') return '<span style="color:#b45309;font-weight:600;">● in corso</span>';
+        return '<span style="color:#94a3b8;">non eseguito</span>';
+    }
+
+    function render(data) {
+        if (dateEl) dateEl.textContent = data.data || '';
+        if (!data.jobs || !data.jobs.length) {
+            list.innerHTML = '<div class="text-slate-400 text-xs">Nessun job configurato.</div>';
+            return;
+        }
+        list.innerHTML = data.jobs.map(function (j) {
+            // il dettaglio (errore o riepilogo) si apre cliccando sulla riga
+            const hasDetail = !!j.message || (j.status === 'mai' && j.ultima);
+            const detail = j.message
+                ? esc(j.message)
+                : (j.ultima ? 'Ultima esecuzione: ' + esc(j.ultima) : '');
+            const detailColor = j.status === 'error' ? '#b91c1c' : '#64748b';
+            return ''
+                + '<div class="cron-row" style="padding:5px 0;border-bottom:1px solid #f1f5f9;">'
+                +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;'
+                +        (hasDetail ? 'cursor:pointer;' : '') + '" ' + (hasDetail ? 'data-cron-toggle' : '') + '>'
+                +     '<span style="color:#334155;font-size:13px;">' + esc(j.label) + '</span>'
+                +     '<span style="font-size:12px;white-space:nowrap;">' + badge(j) + '</span>'
+                +   '</div>'
+                +   (hasDetail
+                        ? '<div class="cron-detail" style="display:none;font-size:11.5px;margin-top:3px;'
+                          + 'white-space:pre-wrap;word-break:break-word;color:' + detailColor + ';">' + detail + '</div>'
+                        : '')
+                + '</div>';
+        }).join('');
+    }
+
+    function load() {
+        list.innerHTML = '<div class="text-slate-400 text-xs">Caricamento…</div>';
+        fetch('/services/cron-status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) throw new Error(d.error || 'errore');
+                render(d);
+            })
+            .catch(() => {
+                list.innerHTML = '<div style="color:#b91c1c;font-size:12px;">Impossibile leggere lo stato dei job.</div>';
+            });
+    }
+
+    toggle?.addEventListener('click', function () {
+        if (!loaded) { loaded = true; load(); }
+    });
+
+    // apri/chiudi il dettaglio della riga
+    list.addEventListener('click', function (e) {
+        const head = e.target.closest('[data-cron-toggle]');
+        if (!head) return;
+        const det = head.parentElement.querySelector('.cron-detail');
+        if (det) det.style.display = det.style.display === 'none' ? 'block' : 'none';
+    });
+})();
