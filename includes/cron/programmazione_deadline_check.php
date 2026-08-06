@@ -83,7 +83,9 @@ function buildMessage(array $info, string $detail): string {
     return implode("\n", $lines);
 }
 
+$run = null;
 try {
+$run = \App\Service\CronRun::start($conn, 'programmazione_deadline_check');
 
 // Find rows starting within 7 days where any status is not completato
 $stmt = $conn->prepare("
@@ -106,6 +108,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 if (empty($rows)) {
     echo "No deadlines found.\n";
+    $run->ok('Nessuna scadenza nei prossimi 7 giorni');
     exit(0);
 }
 
@@ -180,8 +183,10 @@ foreach ($rows as $row) {
 
 echo "Done. Sent {$sent} notification groups.\n";
 $logger->info('programmazione_deadline_check: completed', ['sent' => $sent]);
+$run->ok("Gruppi di notifiche inviati: {$sent}");
 
 } catch (Throwable $e) {
+    $run?->fail($e->getMessage());
     $logger->error('programmazione_deadline_check: fatal error', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),

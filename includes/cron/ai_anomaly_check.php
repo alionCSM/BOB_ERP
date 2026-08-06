@@ -24,9 +24,11 @@ require_once APP_ROOT . '/includes/bootstrap.php';
 
 $logger = \App\Infrastructure\LoggerFactory::app();
 
+$run = null;
 try {
     $db   = new Database();
     $conn = $db->connect();
+    $run  = \App\Service\CronRun::start($conn, 'ai_anomaly_check');
 
     // Initialize AI client (optional — works without it too)
     $ai = null;
@@ -58,8 +60,12 @@ try {
     $findings = $service->run();
 
     $logger->info('ai_anomaly_check: completed', ['findings' => count($findings)]);
+    // NB: exit code 1 con anomalie trovate e' l'esito normale di questo job,
+    // non un errore: per il pannello resta "ok".
+    $run->ok('Anomalie rilevate: ' . count($findings));
     exit(empty($findings) ? 0 : 1);
 } catch (Throwable $e) {
+    $run?->fail($e->getMessage());
     $logger->error('ai_anomaly_check: fatal error', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),

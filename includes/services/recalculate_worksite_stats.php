@@ -20,7 +20,15 @@ $conn   = (new \App\Infrastructure\Database())->connect();
 $mailer = new \App\Service\Mailer();
 $appUrl = rtrim($_ENV['APP_URL'] ?? '', '/');
 
-$service = new \App\Service\WorksiteMarginService($conn, $mailer, $appUrl);
-$service->run();
+$run = \App\Service\CronRun::start($conn, 'recalculate_worksite_stats');
+try {
+    $service = new \App\Service\WorksiteMarginService($conn, $mailer, $appUrl);
+    $service->run();
+    $run->ok('Completato');
+} catch (\Throwable $e) {
+    $run->fail($e->getMessage());
+    echo "ERRORE: " . $e->getMessage() . "\n";
+    exit(1);
+}
 
 exit(0);

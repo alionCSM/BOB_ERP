@@ -424,3 +424,257 @@ async function dismissPriorityModal() {
             }
         });
     })();
+
+// ── Pannello "Job automatici" (cron) ────────────────────────────────────────
+// Stato di oggi per ogni job + avvio manuale. I job partono in background:
+// il pannello mostra "in corso" e si aggiorna da solo finche' finiscono.
+(function () {
+    const list = document.getElementById('cron-status-list');
+    if (!list) return;
+
+    const dateEl    = document.getElementById('cron-status-date');
+    const summaryEl = document.getElementById('cron-summary');
+    const toastEl   = document.getElementById('cron-toast');
+    const refreshEl = document.getElementById('cron-refresh');
+    const toggleEl  = document.getElementById('cron-panel-toggle');
+
+    let loaded = false;
+    let pollTimer = null;
+
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function fmtDurata(ms) {
+        if (ms == null) return '';
+        if (ms < 1000) return ms + ' ms';
+        const s = ms / 1000;
+        if (s < 60) return s.toFixed(1).replace('.', ',') + ' s';
+        return Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s';
+    }
+
+    function statoTesto(j) {
+        if (j.status === 'ok')      return { cls: 'ok',      txt: j.ora || 'ok' };
+        if (j.status === 'error')   return { cls: 'error',   txt: 'errore' };
+        if (j.status === 'running') return { cls: 'running', txt: 'in corso…' };
+        return { cls: 'mai', txt: 'non eseguito' };
+    }
+
+    function showToast(msg, isError) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.className = 'cj-toast ' + (isError ? 'is-err' : 'is-ok');
+        setTimeout(function () { toastEl.className = 'cj-toast'; }, 4000);
+    }
+
+    function render(data) {
+        if (dateEl) dateEl.textContent = data.data || '';
+        const jobs = data.jobs || [];
+
+        // riepilogo in testa
+        if (summaryEl) {
+            const ok   = jobs.filter(j => j.status === 'ok').length;
+            const err  = jobs.filter(j => j.status === 'error').length;
+            const wait = jobs.filter(j => j.status === 'mai' || j.status === 'running').length;
+            let html = '<span class="cj-chip cj-chip-ok">' + ok + ' ok</span>';
+            if (err > 0)  html += '<span class="cj-chip cj-chip-err">' + err + ' in errore</span>';
+            if (wait > 0) html += '<span class="cj-chip cj-chip-wait">' + wait + ' in attesa</span>';
+            summaryEl.innerHTML = html;
+        }
+
+        if (!jobs.length) {
+            list.innerHTML = '<div class="cj-empty">Nessun job configurato.</div>';
+            return;
+        }
+
+        list.innerHTML = jobs.map(function (j) {
+            const st = statoTesto(j);
+            const durata = j.durata != null ? ' · ' + fmtDurata(j.durata) : '';
+            // sottotitolo: se oggi il job non e' partito mostriamo quando lo
+            // ha fatto l'ultima volta, altrimenti la sua descrizione
+            const sub = (j.status === 'mai' && j.ultima)
+                ? 'Ultima esecuzione: ' + j.ultima
+                : (j.descr || '');
+
+            return ''
+              + '<div class="cj-row cj-row-clickable" data-job="' + esc(j.job) + '" title="Apri dettaglio">'
+              +   '<div class="cj-row-main">'
+              +     '<span class="cj-dot cj-dot-' + st.cls + '"></span>'
+              +     '<span class="cj-info">'
+              +       '<span class="cj-label">' + esc(j.label) + '</span>'
+              +       '<span class="cj-descr">' + esc(sub) + '</span>'
+              +     '</span>'
+              +     '<span class="cj-meta">'
+              +       '<span class="cj-time cj-time-' + st.cls + '" title="' + esc(st.txt + durata) + '">' + esc(st.txt) + '</span>'
+              +       '<button type="button" class="cj-btn-run" data-run="' + esc(j.job) + '" title="Esegui ora"'
+              +               (j.status === 'running' ? ' disabled' : '') + '>'
+              +         '<svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>'
+              +       '</button>'
+              +     '</span>'
+              +   '</div>'
+              + '</div>';
+        }).join('');
+
+        // se qualcosa e' in corso, ricontrolla tra poco
+        clearTimeout(pollTimer);
+        if (jobs.some(j => j.status === 'running')) {
+            pollTimer = setTimeout(load, 4000);
+        }
+    }
+
+    function load(silent) {
+        if (!silent) {
+            refreshEl?.classList.add('is-spinning');
+        }
+        fetch('/services/cron-status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) throw new Error(d.error || 'errore');
+                render(d);
+            })
+            .catch(() => {
+                list.innerHTML = '<div class="cj-error-box">Impossibile leggere lo stato dei job.</div>';
+            })
+            .finally(() => refreshEl?.classList.remove('is-spinning'));
+    }
+
+    toggleEl?.addEventListener('click', function () {
+        if (!loaded) { loaded = true; load(); }
+    });
+
+    refreshEl?.addEventListener('click', function (e) {
+        e.stopPropagation();
+        load();
+    });
+
+
+    function runJob(job) {
+        const fd = new FormData();
+        fd.append('job', job);
+        return fetch('/services/cron-run', { method: 'POST', body: fd }).then(r => r.json());
+    }
+
+    list.addEventListener('click', function (e) {
+        // avvio manuale dalla riga
+        const runBtn = e.target.closest('[data-run]');
+        if (runBtn) {
+            e.stopPropagation();
+            const job = runBtn.getAttribute('data-run');
+            runBtn.disabled = true;
+            runJob(job)
+                .then(d => {
+                    if (!d.ok) { showToast(d.error || 'Avvio non riuscito', true); runBtn.disabled = false; return; }
+                    showToast("Job avviato — l'esito compare qui appena termina", false);
+                    setTimeout(load, 1500);
+                })
+                .catch(() => { showToast('Errore di rete', true); runBtn.disabled = false; });
+            return;
+        }
+
+        // click sulla riga: apre la modale con dettaglio e storico
+        const row = e.target.closest('.cj-row');
+        if (row) openModal(row.getAttribute('data-job'));
+    });
+
+    // ── Modale dettaglio job ────────────────────────────────────────────────
+    const modal   = document.getElementById('cj-modal');
+    const mTitle  = document.getElementById('cj-modal-title');
+    const mDescr  = document.getElementById('cj-modal-descr');
+    const mMeta   = document.getElementById('cj-modal-meta');
+    const mRuns   = document.getElementById('cj-modal-runs');
+    const mMsg    = document.getElementById('cj-modal-msg');
+    const mRunBtn = document.getElementById('cj-modal-run');
+    let   mJob    = null;
+
+    function statoLabel(st) {
+        if (st === 'ok')      return 'Completato';
+        if (st === 'error')   return 'Errore';
+        if (st === 'running') return 'In corso';
+        return st || '—';
+    }
+
+    function renderRuns(d) {
+        mTitle.textContent = d.label || '';
+        mDescr.textContent = d.descr || '';
+        mMeta.innerHTML    = '<span class="cj-meta-pill">' + esc(d.script || '') + '</span>';
+        mMsg.textContent   = '';
+        mRunBtn.disabled   = false;
+
+        if (!d.runs || !d.runs.length) {
+            mRuns.innerHTML = '<div class="cj-empty">Nessuna esecuzione registrata finora.</div>';
+            return;
+        }
+        mRuns.innerHTML = d.runs.map(function (r) {
+            const durata = r.durata != null ? ' · ' + fmtDurata(r.durata) : '';
+            return ''
+              + '<div class="cj-run">'
+              +   '<div class="cj-run-when">' + esc(r.data || '') + '<small>' + esc(r.ora || '') + '</small></div>'
+              +   '<div class="cj-run-body">'
+              +     '<div class="cj-run-status cj-run-status-' + esc(r.status) + '">'
+              +       esc(statoLabel(r.status) + durata) + '</div>'
+              +     (r.message
+                      ? '<div class="cj-run-msg' + (r.status === 'error' ? ' is-error' : '') + '">' + esc(r.message) + '</div>'
+                      : '')
+              +   '</div>'
+              + '</div>';
+        }).join('');
+    }
+
+    function openModal(job) {
+        if (!job || !modal) return;
+        mJob = job;
+        mTitle.textContent = '—';
+        mDescr.textContent = '';
+        mMeta.innerHTML    = '';
+        mMsg.textContent   = '';
+        mRuns.innerHTML    = '<div class="cj-loading">Caricamento…</div>';
+        modal.hidden = false;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+
+        fetch('/services/cron-history?job=' + encodeURIComponent(job), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) throw new Error(d.error || 'errore');
+                renderRuns(d);
+            })
+            .catch(() => {
+                mRuns.innerHTML = '<div class="cj-error-box">Impossibile leggere lo storico.</div>';
+            });
+    }
+
+    function closeModal() {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        mJob = null;
+    }
+
+    // chiude cliccando sull'overlay o sulla X, non dentro la finestra
+    modal?.addEventListener('click', function (e) {
+        if (e.target === modal || e.target.closest('[data-cj-close]')) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) closeModal();
+    });
+
+    mRunBtn?.addEventListener('click', function () {
+        if (!mJob) return;
+        const job = mJob;
+        mRunBtn.disabled = true;
+        mMsg.textContent = 'Avvio in corso…';
+        runJob(job)
+            .then(d => {
+                if (!d.ok) { mMsg.textContent = d.error || 'Avvio non riuscito'; mRunBtn.disabled = false; return; }
+                mMsg.textContent = 'Job avviato: lo storico si aggiorna a fine esecuzione.';
+                setTimeout(function () { if (mJob === job) openModal(job); }, 2500);
+                setTimeout(load, 1500);
+            })
+            .catch(() => { mMsg.textContent = 'Errore di rete'; mRunBtn.disabled = false; });
+    });
+})();

@@ -19,13 +19,17 @@ require_once APP_ROOT . '/includes/bootstrap.php';
 
 $logger = \App\Infrastructure\LoggerFactory::app();
 
+$run = null;
 try {
     $db      = new Database();
     $conn    = $db->connect();
+    $run     = \App\Service\CronRun::start($conn, 'document_expiry_alerts');
     $service = new DocumentExpiryAlertService($conn);
     $service->run();
     $logger->info('document_expiry_alerts: completed');
+    $run->ok('Completato');
 } catch (Throwable $e) {
+    $run?->fail($e->getMessage());
     $logger->error('document_expiry_alerts: fatal error', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),

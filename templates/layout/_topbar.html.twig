@@ -43,6 +43,35 @@
                         </div>
                     </div>
                 </div>
+
+            </div>
+        </div>
+    </div>
+
+    {# ── Job automatici (cron): pannello dedicato ──
+       Caricato via AJAX alla prima apertura, cosi' non pesa sul
+       caricamento di ogni pagina. #}
+    <div class="intro-x dropdown mr-4 sm:mr-6">
+        <div id="cron-panel-toggle" class="dropdown-toggle notification cursor-pointer" role="button"
+             aria-expanded="false" data-tw-toggle="dropdown" title="Job automatici">
+            <i data-lucide="activity" class="notification__icon dark:text-slate-500"></i>
+        </div>
+        <div class="notification-content pt-2 dropdown-menu">
+            <div class="notification-content__box dropdown-content cj-panel">
+                <div class="cj-head">
+                    <div class="cj-head-left">
+                        <span class="cj-title">Job automatici</span>
+                        <span class="cj-date" id="cron-status-date"></span>
+                    </div>
+                    <button type="button" class="cj-refresh" id="cron-refresh" title="Aggiorna">
+                        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                </div>
+                <div class="cj-summary" id="cron-summary"></div>
+                <div class="cj-list" id="cron-status-list">
+                    <div class="cj-loading">Caricamento…</div>
+                </div>
+                <div class="cj-toast" id="cron-toast"></div>
             </div>
         </div>
     </div>
@@ -138,11 +167,41 @@
     </div>
 </div>
 
+{# Modale dettaglio job — DEVE stare fuori dal dropdown: quello ha un
+   transform (Popper) che romperebbe il position:fixed dell'overlay. #}
+{# `hidden` e' una rete di sicurezza se il CSS non fosse ancora arrivato:
+   quando si apre, .cj-modal.is-open{display:flex} vince comunque sullo
+   stile [hidden] del browser. #}
+<div id="cj-modal" class="cj-modal" aria-hidden="true" hidden>
+    <div class="cj-modal-box" role="dialog" aria-modal="true" aria-labelledby="cj-modal-title">
+        <div class="cj-modal-head">
+            <div class="cj-modal-head-txt">
+                <h3 class="cj-modal-title" id="cj-modal-title">—</h3>
+                <p class="cj-modal-descr" id="cj-modal-descr"></p>
+            </div>
+            <button type="button" class="cj-modal-close" data-cj-close aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="cj-modal-body">
+            <div class="cj-modal-meta" id="cj-modal-meta"></div>
+            <div class="cj-modal-runs-title">Ultime esecuzioni</div>
+            <div id="cj-modal-runs"><div class="cj-loading">Caricamento…</div></div>
+        </div>
+        <div class="cj-modal-foot">
+            <span class="cj-modal-foot-msg" id="cj-modal-msg"></span>
+            <button type="button" class="cj-modal-btn-run" id="cj-modal-run">
+                <svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                Esegui ora
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="top-bar-config"
      data-has-high-priority="{{ hasHighPriority ? '1' : '0' }}"
      data-vapid-public-key="{{ vapidPublicKey }}"
      hidden></div>
-<script src="/assets/js/includes/template/top_bar.js"></script>
+{# ?v= da incrementare a ogni modifica del file, altrimenti resta in cache #}
+<script src="/assets/js/includes/template/top_bar.js?v=5"></script>
 
 <div id="priority-notif-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:18px;width:95%;max-width:560px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.2);animation:pnm-in .3s ease;">

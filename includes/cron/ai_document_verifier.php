@@ -36,9 +36,11 @@ use App\Infrastructure\LoggerFactory;
 
 $logger = LoggerFactory::app();
 
+$run = null;
 try {
     $db   = new Database();
     $conn = $db->connect();
+    $run  = \App\Service\CronRun::start($conn, 'ai_document_verifier');
 
     // Endpoint LLM dedicato alla lettura documenti (es. modello più piccolo/
     // veloce). Cade su OLLAMA_URL/MODEL se DOC_CHECK_URL/DOC_CHECK_MODEL
@@ -47,6 +49,8 @@ try {
     $model     = $_ENV['DOC_CHECK_MODEL'] ?? ($_ENV['MODEL']      ?? '');
     if (!$ollamaUrl || !$model) {
         echo "DOC_CHECK_URL/MODEL (o OLLAMA_URL/MODEL come fallback) mancanti in .env. Esco.\n";
+        // uscita per configurazione mancante: non e' un errore del job
+        $run->ok('Saltato: DOC_CHECK_URL/MODEL non configurati');
         exit(2);
     }
     echo "Using LLM endpoint: {$model} @ {$ollamaUrl}\n";
@@ -54,6 +58,7 @@ try {
 
     if (empty($_ENV['MAIL_HOST'])) {
         echo "MAIL_HOST mancante in .env. Esco.\n";
+        $run->ok('Saltato: MAIL_HOST non configurato');
         exit(2);
     }
     $mailer = new Mailer();
@@ -62,8 +67,10 @@ try {
     $service->run();
 
     $logger->info('ai_document_verifier: completed');
+    $run->ok('Completato');
     exit(0);
 } catch (Throwable $e) {
+    $run?->fail($e->getMessage());
     $logger->error('ai_document_verifier: fatal error', [
         'error' => $e->getMessage(),
         'file'  => $e->getFile(),

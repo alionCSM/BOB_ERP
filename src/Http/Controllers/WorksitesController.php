@@ -2376,6 +2376,182 @@ final class WorksitesController
         ]);
     }
 
+    // ── Stato dei job schedulati (pannello Servizi) ───────────────────────────
+
+    /**
+     * GET /services/cron-status — esito di oggi per ogni job noto.
+     *
+     * Elenca TUTTI i job del registro, anche quelli che oggi non sono partiti:
+     * un cron morto non lascia righe, quindi senza il registro sarebbe
+     * indistinguibile da uno che non e' ancora stato eseguito.
+     */
+    public function cronStatus(Request $request): never
+    {
+        $user = $request->user();
+        if (!$user || !$user->canAccess('dashboard')) {
+            Response::json(['ok' => false, 'error' => 'Accesso negato'], 403);
+        }
+
+        $today = date('Y-m-d');
+        $runs  = [];
+
+        try {
+            // ultima esecuzione di oggi per ciascun job
+            $stmt = $this->conn->prepare("
+                SELECT r.job, r.status, r.started_at, r.finished_at, r.duration_ms, r.message
+                FROM bb_cron_runs r
+                JOIN (
+                    SELECT job, MAX(id) AS max_id
+                    FROM bb_cron_runs
+                    WHERE DATE(started_at) = :d
+                    GROUP BY job
+                ) last ON last.max_id = r.id
+            ");
+            $stmt->execute([':d' => $today]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $runs[$row['job']] = $row;
+            }
+
+            // ultima esecuzione in assoluto, per i job non partiti oggi
+            $stmtPrev = $this->conn->prepare("
+                SELECT r.job, r.status, r.started_at
+                FROM bb_cron_runs r
+                JOIN (SELECT job, MAX(id) AS max_id FROM bb_cron_runs GROUP BY job) last
+                  ON last.max_id = r.id
+            ");
+            $stmtPrev->execute();
+            $lastEver = [];
+            foreach ($stmtPrev->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $lastEver[$row['job']] = $row;
+            }
+        } catch (\Throwable $e) {
+            // tabella non ancora creata (migration da applicare): non e' un
+            // errore bloccante, il pannello mostrera' tutto "mai eseguito"
+            error_log('[cronStatus] ' . $e->getMessage());
+            $lastEver = [];
+        }
+
+        $jobs = [];
+        foreach (\App\Service\CronRun::JOBS as $key => $meta) {
+            $r    = $runs[$key] ?? null;
+            $prev = $lastEver[$key] ?? null;
+
+            $jobs[] = [
+                'job'     => $key,
+                'label'   => $meta['label'],
+                'descr'   => $meta['descr'],
+                'status'  => $r['status'] ?? 'mai',
+                'ora'     => ($r && $r['started_at']) ? date('H:i', strtotime($r['started_at'])) : null,
+                'durata'  => ($r && $r['duration_ms'] !== null) ? (int)$r['duration_ms'] : null,
+                'message' => $r['message'] ?? null,
+                'ultima'  => (!$r && $prev && !empty($prev['started_at']))
+                                ? date('d/m/Y H:i', strtotime($prev['started_at']))
+                                : null,
+            ];
+        }
+
+        Response::json(['ok' => true, 'jobs' => $jobs, 'data' => date('d/m/Y')]);
+    }
+
+    /**
+     * GET /services/cron-history?job=xxx — dettaglio di un job con lo storico
+     * delle ultime esecuzioni (data, esito, durata, messaggio).
+     */
+    public function cronHistory(Request $request): never
+    {
+        $user = $request->user();
+        if (!$user || !$user->canAccess('dashboard')) {
+            Response::json(['ok' => false, 'error' => 'Accesso negato'], 403);
+        }
+
+        $job = (string)($request->get('job') ?? '');
+        if (!isset(\App\Service\CronRun::JOBS[$job])) {
+            Response::json(['ok' => false, 'error' => 'Job sconosciuto'], 400);
+        }
+        $meta = \App\Service\CronRun::JOBS[$job];
+
+        $runs = [];
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT status, started_at, finished_at, duration_ms, message
+                FROM bb_cron_runs
+                WHERE job = :j
+                ORDER BY id DESC
+                LIMIT 20
+            ");
+            $stmt->execute([':j' => $job]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $runs[] = [
+                    'status'   => $r['status'],
+                    'data'     => $r['started_at'] ? date('d/m/Y', strtotime($r['started_at'])) : null,
+                    'ora'      => $r['started_at'] ? date('H:i:s', strtotime($r['started_at'])) : null,
+                    'durata'   => $r['duration_ms'] !== null ? (int)$r['duration_ms'] : null,
+                    'message'  => $r['message'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log('[cronHistory] ' . $e->getMessage());
+        }
+
+        Response::json([
+            'ok'     => true,
+            'job'    => $job,
+            'label'  => $meta['label'],
+            'descr'  => $meta['descr'],
+            'script' => $meta['script'],
+            'runs'   => $runs,
+        ]);
+    }
+
+    /**
+     * POST /services/cron-run — avvia manualmente un job.
+     *
+     * Il job viene lanciato in BACKGROUND: alcuni (quelli AI) durano minuti e
+     * una shell_exec sincrona farebbe scadere la richiesta. L'esito si legge
+     * poi da bb_cron_runs, che il job stesso aggiorna: il pannello mostra
+     * prima "in corso" e poi il risultato.
+     */
+    public function cronRunNow(Request $request): never
+    {
+        $user = $request->user();
+        // avvio manuale riservato a chi amministra: fa girare codice server-side
+        if (!$user || (($user->role ?? '') !== 'admin' && (int)($user->id ?? 0) !== 1)) {
+            Response::json(['ok' => false, 'error' => 'Accesso negato'], 403);
+        }
+
+        $job = (string)($_POST['job'] ?? '');
+        // whitelist: si esegue solo cio' che e' nel registro, mai un percorso
+        // che arriva dalla richiesta
+        if (!isset(\App\Service\CronRun::JOBS[$job])) {
+            Response::json(['ok' => false, 'error' => 'Job sconosciuto'], 400);
+        }
+
+        $script = APP_ROOT . '/' . \App\Service\CronRun::JOBS[$job]['script'];
+        if (!is_file($script)) {
+            Response::json(['ok' => false, 'error' => 'Script non trovato sul server'], 500);
+        }
+
+        // gia' in esecuzione? evita di lanciarlo due volte
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) FROM bb_cron_runs
+                WHERE job = :j AND status = 'running'
+                  AND started_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+            ");
+            $stmt->execute([':j' => $job]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                Response::json(['ok' => false, 'error' => 'Job gia\' in esecuzione'], 409);
+            }
+        } catch (\Throwable $e) {
+            // tabella assente: si prosegue comunque
+        }
+
+        $cmd = 'php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+        @shell_exec($cmd);
+
+        Response::json(['ok' => true, 'message' => 'Job avviato']);
+    }
+
     // ── Yard status ───────────────────────────────────────────────────────────
 
     public function updateYardStatus(Request $request): never
