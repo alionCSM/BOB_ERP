@@ -425,16 +425,21 @@ async function dismissPriorityModal() {
         });
     })();
 
-// ── Stato job automatici (cron) nel pannello Servizi ─────────────────────────
-// Caricato al primo click sull'icona ingranaggio, poi tenuto in memoria:
-// evita una query a ogni caricamento di pagina.
+// ── Pannello "Job automatici" (cron) ────────────────────────────────────────
+// Stato di oggi per ogni job + avvio manuale. I job partono in background:
+// il pannello mostra "in corso" e si aggiorna da solo finche' finiscono.
 (function () {
     const list = document.getElementById('cron-status-list');
     if (!list) return;
 
-    const dateEl = document.getElementById('cron-status-date');
-    const toggle = list.closest('.dropdown')?.querySelector('.dropdown-toggle');
+    const dateEl    = document.getElementById('cron-status-date');
+    const summaryEl = document.getElementById('cron-summary');
+    const toastEl   = document.getElementById('cron-toast');
+    const refreshEl = document.getElementById('cron-refresh');
+    const toggleEl  = document.getElementById('cron-panel-toggle');
+
     let loaded = false;
+    let pollTimer = null;
 
     function esc(s) {
         const d = document.createElement('div');
@@ -442,43 +447,89 @@ async function dismissPriorityModal() {
         return d.innerHTML;
     }
 
-    function badge(job) {
-        if (job.status === 'ok')      return '<span style="color:#15803d;font-weight:600;">✓ ' + esc(job.ora) + '</span>';
-        if (job.status === 'error')   return '<span style="color:#b91c1c;font-weight:600;">✕ errore</span>';
-        if (job.status === 'running') return '<span style="color:#b45309;font-weight:600;">● in corso</span>';
-        return '<span style="color:#94a3b8;">non eseguito</span>';
+    function fmtDurata(ms) {
+        if (ms == null) return '';
+        if (ms < 1000) return ms + ' ms';
+        const s = ms / 1000;
+        if (s < 60) return s.toFixed(1).replace('.', ',') + ' s';
+        return Math.floor(s / 60) + ' min ' + Math.round(s % 60) + ' s';
+    }
+
+    function statoTesto(j) {
+        if (j.status === 'ok')      return { cls: 'ok',      txt: j.ora || 'ok' };
+        if (j.status === 'error')   return { cls: 'error',   txt: 'errore' };
+        if (j.status === 'running') return { cls: 'running', txt: 'in corso…' };
+        return { cls: 'mai', txt: 'non eseguito' };
+    }
+
+    function showToast(msg, isError) {
+        if (!toastEl) return;
+        toastEl.textContent = msg;
+        toastEl.className = 'cj-toast ' + (isError ? 'is-err' : 'is-ok');
+        setTimeout(function () { toastEl.className = 'cj-toast'; }, 4000);
     }
 
     function render(data) {
         if (dateEl) dateEl.textContent = data.data || '';
-        if (!data.jobs || !data.jobs.length) {
-            list.innerHTML = '<div class="text-slate-400 text-xs">Nessun job configurato.</div>';
+        const jobs = data.jobs || [];
+
+        // riepilogo in testa
+        if (summaryEl) {
+            const ok   = jobs.filter(j => j.status === 'ok').length;
+            const err  = jobs.filter(j => j.status === 'error').length;
+            const wait = jobs.filter(j => j.status === 'mai' || j.status === 'running').length;
+            let html = '<span class="cj-chip cj-chip-ok">' + ok + ' ok</span>';
+            if (err > 0)  html += '<span class="cj-chip cj-chip-err">' + err + ' in errore</span>';
+            if (wait > 0) html += '<span class="cj-chip cj-chip-wait">' + wait + ' in attesa</span>';
+            summaryEl.innerHTML = html;
+        }
+
+        if (!jobs.length) {
+            list.innerHTML = '<div class="cj-empty">Nessun job configurato.</div>';
             return;
         }
-        list.innerHTML = data.jobs.map(function (j) {
-            // il dettaglio (errore o riepilogo) si apre cliccando sulla riga
-            const hasDetail = !!j.message || (j.status === 'mai' && j.ultima);
+
+        list.innerHTML = jobs.map(function (j) {
+            const st = statoTesto(j);
+            const durata = j.durata != null ? ' · ' + fmtDurata(j.durata) : '';
             const detail = j.message
-                ? esc(j.message)
+                ? esc(j.message) + (j.durata != null ? '\n\nDurata: ' + fmtDurata(j.durata) : '')
                 : (j.ultima ? 'Ultima esecuzione: ' + esc(j.ultima) : '');
-            const detailColor = j.status === 'error' ? '#b91c1c' : '#64748b';
+            const hasDetail = !!detail;
+
             return ''
-                + '<div class="cron-row" style="padding:5px 0;border-bottom:1px solid #f1f5f9;">'
-                +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;'
-                +        (hasDetail ? 'cursor:pointer;' : '') + '" ' + (hasDetail ? 'data-cron-toggle' : '') + '>'
-                +     '<span style="color:#334155;font-size:13px;">' + esc(j.label) + '</span>'
-                +     '<span style="font-size:12px;white-space:nowrap;">' + badge(j) + '</span>'
-                +   '</div>'
-                +   (hasDetail
-                        ? '<div class="cron-detail" style="display:none;font-size:11.5px;margin-top:3px;'
-                          + 'white-space:pre-wrap;word-break:break-word;color:' + detailColor + ';">' + detail + '</div>'
-                        : '')
-                + '</div>';
+              + '<div class="cj-row ' + (hasDetail ? 'cj-row-clickable' : '') + '" data-job="' + esc(j.job) + '">'
+              +   '<div class="cj-row-main">'
+              +     '<span class="cj-dot cj-dot-' + st.cls + '"></span>'
+              +     '<span class="cj-info">'
+              +       '<span class="cj-label">' + esc(j.label) + '</span>'
+              +       '<span class="cj-descr">' + esc(j.descr || '') + '</span>'
+              +     '</span>'
+              +     '<span class="cj-meta">'
+              +       '<span class="cj-time cj-time-' + st.cls + '" title="' + esc(st.txt + durata) + '">' + esc(st.txt) + '</span>'
+              +       '<button type="button" class="cj-btn-run" data-run="' + esc(j.job) + '" title="Esegui ora"'
+              +               (j.status === 'running' ? ' disabled' : '') + '>'
+              +         '<svg viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>'
+              +       '</button>'
+              +     '</span>'
+              +   '</div>'
+              +   (hasDetail
+                    ? '<div class="cj-detail' + (j.status === 'error' ? ' is-error' : '') + '">' + detail + '</div>'
+                    : '')
+              + '</div>';
         }).join('');
+
+        // se qualcosa e' in corso, ricontrolla tra poco
+        clearTimeout(pollTimer);
+        if (jobs.some(j => j.status === 'running')) {
+            pollTimer = setTimeout(load, 4000);
+        }
     }
 
-    function load() {
-        list.innerHTML = '<div class="text-slate-400 text-xs">Caricamento…</div>';
+    function load(silent) {
+        if (!silent) {
+            refreshEl?.classList.add('is-spinning');
+        }
         fetch('/services/cron-status', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(r => r.json())
             .then(d => {
@@ -486,19 +537,44 @@ async function dismissPriorityModal() {
                 render(d);
             })
             .catch(() => {
-                list.innerHTML = '<div style="color:#b91c1c;font-size:12px;">Impossibile leggere lo stato dei job.</div>';
-            });
+                list.innerHTML = '<div class="cj-error-box">Impossibile leggere lo stato dei job.</div>';
+            })
+            .finally(() => refreshEl?.classList.remove('is-spinning'));
     }
 
-    toggle?.addEventListener('click', function () {
+    toggleEl?.addEventListener('click', function () {
         if (!loaded) { loaded = true; load(); }
     });
 
-    // apri/chiudi il dettaglio della riga
+    refreshEl?.addEventListener('click', function (e) {
+        e.stopPropagation();
+        load();
+    });
+
     list.addEventListener('click', function (e) {
-        const head = e.target.closest('[data-cron-toggle]');
-        if (!head) return;
-        const det = head.parentElement.querySelector('.cron-detail');
-        if (det) det.style.display = det.style.display === 'none' ? 'block' : 'none';
+        // avvio manuale
+        const runBtn = e.target.closest('[data-run]');
+        if (runBtn) {
+            e.stopPropagation();
+            const job = runBtn.getAttribute('data-run');
+            runBtn.disabled = true;
+            const fd = new FormData();
+            fd.append('job', job);
+            fetch('/services/cron-run', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.ok) { showToast(d.error || 'Avvio non riuscito', true); runBtn.disabled = false; return; }
+                    showToast('Job avviato — l\'esito compare qui appena termina', false);
+                    setTimeout(load, 1500);
+                })
+                .catch(() => { showToast('Errore di rete', true); runBtn.disabled = false; });
+            return;
+        }
+
+        // apri/chiudi dettaglio
+        const row = e.target.closest('.cj-row-clickable');
+        if (!row) return;
+        const det = row.querySelector('.cj-detail');
+        if (det) det.classList.toggle('is-open');
     });
 })();

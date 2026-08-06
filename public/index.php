@@ -311,7 +311,8 @@ if (str_starts_with($uri, '/services/')) {
     $request = new \App\Http\Request();
     $router  = new \App\Http\Router();
 
-    $router->get('/services/cron-status', [WorksitesController::class, 'cronStatus']);
+    $router->get('/services/cron-status', [WorksitesController::class, 'cronStatus'])
+           ->post('/services/cron-run',   [WorksitesController::class, 'cronRunNow']);
 
     $router->dispatch($request, $container);
 }

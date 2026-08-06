@@ -44,18 +44,34 @@
                     </div>
                 </div>
 
-                {# ── Stato dei job schedulati (cron) di oggi ──
-                   Caricato via AJAX all'apertura del pannello: non pesa
-                   sul caricamento di ogni pagina. #}
-                <div class="border-t border-slate-200 mt-4 pt-3">
-                    <div class="flex items-center justify-between">
-                        <div class="font-medium">Job automatici</div>
-                        <span id="cron-status-date" class="text-xs text-slate-400"></span>
+            </div>
+        </div>
+    </div>
+
+    {# ── Job automatici (cron): pannello dedicato ──
+       Caricato via AJAX alla prima apertura, cosi' non pesa sul
+       caricamento di ogni pagina. #}
+    <div class="intro-x dropdown mr-4 sm:mr-6">
+        <div id="cron-panel-toggle" class="dropdown-toggle notification cursor-pointer" role="button"
+             aria-expanded="false" data-tw-toggle="dropdown" title="Job automatici">
+            <i data-lucide="activity" class="notification__icon dark:text-slate-500"></i>
+        </div>
+        <div class="notification-content pt-2 dropdown-menu">
+            <div class="notification-content__box dropdown-content w-[430px] max-w-full">
+                <div class="cj-head">
+                    <div class="cj-head-left">
+                        <span class="cj-title">Job automatici</span>
+                        <span class="cj-date" id="cron-status-date"></span>
                     </div>
-                    <div id="cron-status-list" class="mt-2 text-sm text-slate-500">
-                        Caricamento…
-                    </div>
+                    <button type="button" class="cj-refresh" id="cron-refresh" title="Aggiorna">
+                        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
                 </div>
+                <div class="cj-summary" id="cron-summary"></div>
+                <div class="cj-list" id="cron-status-list">
+                    <div class="cj-loading">Caricamento…</div>
+                </div>
+                <div class="cj-toast" id="cron-toast"></div>
             </div>
         </div>
     </div>
@@ -156,7 +172,7 @@
      data-vapid-public-key="{{ vapidPublicKey }}"
      hidden></div>
 {# ?v= da incrementare a ogni modifica del file, altrimenti resta in cache #}
-<script src="/assets/js/includes/template/top_bar.js?v=2"></script>
+<script src="/assets/js/includes/template/top_bar.js?v=3"></script>
 
 <div id="priority-notif-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:18px;width:95%;max-width:560px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.2);animation:pnm-in .3s ease;">

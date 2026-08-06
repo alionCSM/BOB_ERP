@@ -28,20 +28,58 @@ use Throwable;
 final class CronRun
 {
     /**
-     * Job conosciuti: chiave usata negli script => etichetta mostrata in UI.
-     * Serve anche a far comparire nel pannello i job che NON sono mai partiti
-     * oggi (altrimenti un cron morto sarebbe invisibile: nessuna riga = nessun
-     * problema apparente).
+     * Registro dei job: chiave usata negli script => etichetta, descrizione e
+     * percorso (relativo a APP_ROOT) dello script da eseguire.
+     *
+     * Serve a tre cose:
+     *  - far comparire nel pannello anche i job che oggi NON sono partiti
+     *    (nessuna riga = nessun problema apparente, ma il cron potrebbe
+     *    essere morto);
+     *  - dare l'etichetta leggibile in UI;
+     *  - avere una whitelist per l'avvio manuale: si esegue SOLO cio' che e'
+     *    elencato qui, mai un percorso che arriva dalla richiesta.
      */
     public const JOBS = [
-        'document_expiry_alerts'        => 'Avvisi scadenza documenti',
-        'ai_anomaly_check'              => 'Controllo anomalie (BOB AI)',
-        'ai_document_verifier'          => 'Verifica documenti (BOB AI)',
-        'lifting_calendar_check'        => 'Noleggi: presenze fuori calendario',
-        'sync_emessa_yard'              => 'Sync fatture emesse da Yard',
-        'yard_worksite_status_check'    => 'Controllo stato cantieri su Yard',
-        'programmazione_deadline_check' => 'Scadenze programmazione',
-        'recalculate_worksite_stats'    => 'Ricalcolo statistiche cantieri',
+        'document_expiry_alerts' => [
+            'label'  => 'Avvisi scadenza documenti',
+            'descr'  => 'Email ai responsabili sui documenti in scadenza',
+            'script' => 'includes/cron/document_expiry_alerts.php',
+        ],
+        'ai_anomaly_check' => [
+            'label'  => 'Controllo anomalie',
+            'descr'  => 'Analisi anomalie su presenze, mezzi, documenti, fatturazione',
+            'script' => 'includes/cron/ai_anomaly_check.php',
+        ],
+        'ai_document_verifier' => [
+            'label'  => 'Verifica documenti',
+            'descr'  => 'Controllo AI dei metadati dichiarati sui PDF',
+            'script' => 'includes/cron/ai_document_verifier.php',
+        ],
+        'lifting_calendar_check' => [
+            'label'  => 'Noleggi fuori calendario',
+            'descr'  => 'Presenze in giorni non conteggiati dai noleggi mezzi',
+            'script' => 'includes/cron/lifting_calendar_check.php',
+        ],
+        'sync_emessa_yard' => [
+            'label'  => 'Sync fatture emesse',
+            'descr'  => 'Allinea da Yard lo stato "emessa" delle righe',
+            'script' => 'includes/cron/sync_emessa_yard.php',
+        ],
+        'yard_worksite_status_check' => [
+            'label'  => 'Stato cantieri su Yard',
+            'descr'  => 'Confronto stato cantieri BOB / Yard',
+            'script' => 'includes/cron/yard_worksite_status_check.php',
+        ],
+        'programmazione_deadline_check' => [
+            'label'  => 'Scadenze programmazione',
+            'descr'  => 'Promemoria su mezzi, trasferte e info da completare',
+            'script' => 'includes/cron/programmazione_deadline_check.php',
+        ],
+        'recalculate_worksite_stats' => [
+            'label'  => 'Ricalcolo statistiche cantieri',
+            'descr'  => 'Ricalcolo costi e margini dei cantieri',
+            'script' => 'includes/services/recalculate_worksite_stats.php',
+        ],
     ];
 
     private ?int $id = null;
