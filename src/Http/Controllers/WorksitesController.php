@@ -2454,6 +2454,56 @@ final class WorksitesController
     }
 
     /**
+     * GET /services/cron-history?job=xxx — dettaglio di un job con lo storico
+     * delle ultime esecuzioni (data, esito, durata, messaggio).
+     */
+    public function cronHistory(Request $request): never
+    {
+        $user = $request->user();
+        if (!$user || !$user->canAccess('dashboard')) {
+            Response::json(['ok' => false, 'error' => 'Accesso negato'], 403);
+        }
+
+        $job = (string)($request->get('job') ?? '');
+        if (!isset(\App\Service\CronRun::JOBS[$job])) {
+            Response::json(['ok' => false, 'error' => 'Job sconosciuto'], 400);
+        }
+        $meta = \App\Service\CronRun::JOBS[$job];
+
+        $runs = [];
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT status, started_at, finished_at, duration_ms, message
+                FROM bb_cron_runs
+                WHERE job = :j
+                ORDER BY id DESC
+                LIMIT 20
+            ");
+            $stmt->execute([':j' => $job]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $runs[] = [
+                    'status'   => $r['status'],
+                    'data'     => $r['started_at'] ? date('d/m/Y', strtotime($r['started_at'])) : null,
+                    'ora'      => $r['started_at'] ? date('H:i:s', strtotime($r['started_at'])) : null,
+                    'durata'   => $r['duration_ms'] !== null ? (int)$r['duration_ms'] : null,
+                    'message'  => $r['message'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log('[cronHistory] ' . $e->getMessage());
+        }
+
+        Response::json([
+            'ok'     => true,
+            'job'    => $job,
+            'label'  => $meta['label'],
+            'descr'  => $meta['descr'],
+            'script' => $meta['script'],
+            'runs'   => $runs,
+        ]);
+    }
+
+    /**
      * POST /services/cron-run — avvia manualmente un job.
      *
      * Il job viene lanciato in BACKGROUND: alcuni (quelli AI) durano minuti e

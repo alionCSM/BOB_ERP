@@ -492,18 +492,19 @@ async function dismissPriorityModal() {
         list.innerHTML = jobs.map(function (j) {
             const st = statoTesto(j);
             const durata = j.durata != null ? ' · ' + fmtDurata(j.durata) : '';
-            const detail = j.message
-                ? esc(j.message) + (j.durata != null ? '\n\nDurata: ' + fmtDurata(j.durata) : '')
-                : (j.ultima ? 'Ultima esecuzione: ' + esc(j.ultima) : '');
-            const hasDetail = !!detail;
+            // sottotitolo: se oggi il job non e' partito mostriamo quando lo
+            // ha fatto l'ultima volta, altrimenti la sua descrizione
+            const sub = (j.status === 'mai' && j.ultima)
+                ? 'Ultima esecuzione: ' + j.ultima
+                : (j.descr || '');
 
             return ''
-              + '<div class="cj-row ' + (hasDetail ? 'cj-row-clickable' : '') + '" data-job="' + esc(j.job) + '">'
+              + '<div class="cj-row cj-row-clickable" data-job="' + esc(j.job) + '" title="Apri dettaglio">'
               +   '<div class="cj-row-main">'
               +     '<span class="cj-dot cj-dot-' + st.cls + '"></span>'
               +     '<span class="cj-info">'
               +       '<span class="cj-label">' + esc(j.label) + '</span>'
-              +       '<span class="cj-descr">' + esc(j.descr || '') + '</span>'
+              +       '<span class="cj-descr">' + esc(sub) + '</span>'
               +     '</span>'
               +     '<span class="cj-meta">'
               +       '<span class="cj-time cj-time-' + st.cls + '" title="' + esc(st.txt + durata) + '">' + esc(st.txt) + '</span>'
@@ -513,9 +514,6 @@ async function dismissPriorityModal() {
               +       '</button>'
               +     '</span>'
               +   '</div>'
-              +   (hasDetail
-                    ? '<div class="cj-detail' + (j.status === 'error' ? ' is-error' : '') + '">' + detail + '</div>'
-                    : '')
               + '</div>';
         }).join('');
 
@@ -551,30 +549,130 @@ async function dismissPriorityModal() {
         load();
     });
 
+
+    function runJob(job) {
+        const fd = new FormData();
+        fd.append('job', job);
+        return fetch('/services/cron-run', { method: 'POST', body: fd }).then(r => r.json());
+    }
+
     list.addEventListener('click', function (e) {
-        // avvio manuale
+        // avvio manuale dalla riga
         const runBtn = e.target.closest('[data-run]');
         if (runBtn) {
             e.stopPropagation();
             const job = runBtn.getAttribute('data-run');
             runBtn.disabled = true;
-            const fd = new FormData();
-            fd.append('job', job);
-            fetch('/services/cron-run', { method: 'POST', body: fd })
-                .then(r => r.json())
+            runJob(job)
                 .then(d => {
                     if (!d.ok) { showToast(d.error || 'Avvio non riuscito', true); runBtn.disabled = false; return; }
-                    showToast('Job avviato — l\'esito compare qui appena termina', false);
+                    showToast("Job avviato — l'esito compare qui appena termina", false);
                     setTimeout(load, 1500);
                 })
                 .catch(() => { showToast('Errore di rete', true); runBtn.disabled = false; });
             return;
         }
 
-        // apri/chiudi dettaglio
-        const row = e.target.closest('.cj-row-clickable');
-        if (!row) return;
-        const det = row.querySelector('.cj-detail');
-        if (det) det.classList.toggle('is-open');
+        // click sulla riga: apre la modale con dettaglio e storico
+        const row = e.target.closest('.cj-row');
+        if (row) openModal(row.getAttribute('data-job'));
+    });
+
+    // ── Modale dettaglio job ────────────────────────────────────────────────
+    const modal   = document.getElementById('cj-modal');
+    const mTitle  = document.getElementById('cj-modal-title');
+    const mDescr  = document.getElementById('cj-modal-descr');
+    const mMeta   = document.getElementById('cj-modal-meta');
+    const mRuns   = document.getElementById('cj-modal-runs');
+    const mMsg    = document.getElementById('cj-modal-msg');
+    const mRunBtn = document.getElementById('cj-modal-run');
+    let   mJob    = null;
+
+    function statoLabel(st) {
+        if (st === 'ok')      return 'Completato';
+        if (st === 'error')   return 'Errore';
+        if (st === 'running') return 'In corso';
+        return st || '—';
+    }
+
+    function renderRuns(d) {
+        mTitle.textContent = d.label || '';
+        mDescr.textContent = d.descr || '';
+        mMeta.innerHTML    = '<span class="cj-meta-pill">' + esc(d.script || '') + '</span>';
+        mMsg.textContent   = '';
+        mRunBtn.disabled   = false;
+
+        if (!d.runs || !d.runs.length) {
+            mRuns.innerHTML = '<div class="cj-empty">Nessuna esecuzione registrata finora.</div>';
+            return;
+        }
+        mRuns.innerHTML = d.runs.map(function (r) {
+            const durata = r.durata != null ? ' · ' + fmtDurata(r.durata) : '';
+            return ''
+              + '<div class="cj-run">'
+              +   '<div class="cj-run-when">' + esc(r.data || '') + '<small>' + esc(r.ora || '') + '</small></div>'
+              +   '<div class="cj-run-body">'
+              +     '<div class="cj-run-status cj-run-status-' + esc(r.status) + '">'
+              +       esc(statoLabel(r.status) + durata) + '</div>'
+              +     (r.message
+                      ? '<div class="cj-run-msg' + (r.status === 'error' ? ' is-error' : '') + '">' + esc(r.message) + '</div>'
+                      : '')
+              +   '</div>'
+              + '</div>';
+        }).join('');
+    }
+
+    function openModal(job) {
+        if (!job || !modal) return;
+        mJob = job;
+        mTitle.textContent = '—';
+        mDescr.textContent = '';
+        mMeta.innerHTML    = '';
+        mMsg.textContent   = '';
+        mRuns.innerHTML    = '<div class="cj-loading">Caricamento…</div>';
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+
+        fetch('/services/cron-history?job=' + encodeURIComponent(job), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok) throw new Error(d.error || 'errore');
+                renderRuns(d);
+            })
+            .catch(() => {
+                mRuns.innerHTML = '<div class="cj-error-box">Impossibile leggere lo storico.</div>';
+            });
+    }
+
+    function closeModal() {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        mJob = null;
+    }
+
+    // chiude cliccando sull'overlay o sulla X, non dentro la finestra
+    modal?.addEventListener('click', function (e) {
+        if (e.target === modal || e.target.closest('[data-cj-close]')) closeModal();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) closeModal();
+    });
+
+    mRunBtn?.addEventListener('click', function () {
+        if (!mJob) return;
+        const job = mJob;
+        mRunBtn.disabled = true;
+        mMsg.textContent = 'Avvio in corso…';
+        runJob(job)
+            .then(d => {
+                if (!d.ok) { mMsg.textContent = d.error || 'Avvio non riuscito'; mRunBtn.disabled = false; return; }
+                mMsg.textContent = 'Job avviato: lo storico si aggiorna a fine esecuzione.';
+                setTimeout(function () { if (mJob === job) openModal(job); }, 2500);
+                setTimeout(load, 1500);
+            })
+            .catch(() => { mMsg.textContent = 'Errore di rete'; mRunBtn.disabled = false; });
     });
 })();
