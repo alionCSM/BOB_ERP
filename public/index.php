@@ -303,6 +303,21 @@ if ($uri === '/documents' || str_starts_with($uri, '/documents/')) {
     $router->dispatch($request, $container);
 }
 
+// Andamento fatturato dal gestionale Business (direzione, sola lettura)
+if (str_starts_with($uri, '/report/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    require_once APP_ROOT . '/src/Http/Controllers/BusinessReportController.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/report/fatturato',          [BusinessReportController::class, 'index'])
+           ->get('/report/fatturato/causali',  [BusinessReportController::class, 'causali']);
+
+    $router->dispatch($request, $container);
+}
+
 // Stato dei job schedulati, letto dal pannello "Servizi" della top bar
 if (str_starts_with($uri, '/services/')) {
     require_once APP_ROOT . '/includes/middleware.php';
