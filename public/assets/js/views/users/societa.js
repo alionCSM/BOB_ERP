@@ -32,6 +32,27 @@
         if (e.key === 'Escape' && modal && !modal.hidden) chiudi();
     });
 
+    // ── Moduli abilitati ────────────────────────────────────────────────────
+    // "Tutti i moduli" spegne l'elenco invece di nasconderlo: si continua a
+    // vedere cosa comprende, senza poterlo modificare.
+    var tutti = document.getElementById('sg-tutti');
+    var corpo = document.getElementById('sg-moduli-body');
+
+    tutti && corpo && tutti.addEventListener('change', function () {
+        corpo.classList.toggle('is-off', tutti.checked);
+    });
+
+    document.querySelectorAll('[data-sg-gruppo]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var lista = document.querySelector('.sg-mod-lista[data-gruppo="' + b.dataset.sgGruppo + '"]');
+            if (!lista) return;
+            var caselle = lista.querySelectorAll('input[type="checkbox"]');
+            // se sono gia' tutte spuntate il pulsante le toglie
+            var tutteOn = Array.prototype.every.call(caselle, function (c) { return c.checked; });
+            caselle.forEach(function (c) { c.checked = !tutteOn; });
+        });
+    });
+
     // ── Ricerca utenti ──────────────────────────────────────────────────────
     var cerca = document.getElementById('sg-cerca');
     var righe = Array.prototype.slice.call(document.querySelectorAll('.sg-user'));

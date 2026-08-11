@@ -860,7 +860,7 @@ final class UsersController
         $users = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         // Get all available modules
-        $groups = $this->buildPermissionGroups();
+        $groups = self::buildPermissionGroups();
         $allModules = [];
         foreach ($groups as $g) {
             foreach ($g['perms'] as $key => $mod) {
@@ -892,7 +892,7 @@ final class UsersController
             Response::redirect('/users/permissions');
         }
 
-        $groups  = $this->buildPermissionGroups();
+        $groups  = self::buildPermissionGroups();
         $modules = [];
         foreach ($groups as $g) {
             foreach ($g['perms'] as $key => $mod) {
@@ -1263,7 +1263,14 @@ final class UsersController
         Response::redirect('/users/' . $workerId . '/edit');
     }
 
-    private function buildPermissionGroups(): array
+    /**
+     * Elenco dei moduli di BOB, raggruppati.
+     *
+     * Pubblico e statico perche' e' la stessa lista usata dalla pagina delle
+     * societa' del gruppo per scegliere quali moduli abilitare: tenerne due
+     * copie vorrebbe dire vederle divergere al primo modulo nuovo.
+     */
+    public static function buildPermissionGroups(): array
     {
         return [
             'generale' => [

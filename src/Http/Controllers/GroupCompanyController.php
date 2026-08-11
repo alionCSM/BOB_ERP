@@ -102,13 +102,59 @@ final class GroupCompanyController
             $sel = (int)$societa[0]['id'];
         }
 
+        $scelta = $sel ? $repo->find($sel) : null;
+
         Response::view('users/societa.html.twig', $request, [
-            'societa'    => $societa,
-            'selezionata'=> $sel ? $repo->find($sel) : null,
-            'utenti'     => $sel ? $repo->usersForCompany($sel) : [],
-            'salvato'    => isset($_GET['salvato']),
-            'errore'     => $_GET['errore'] ?? null,
+            'societa'     => $societa,
+            'selezionata' => $scelta,
+            'utenti'      => $sel ? $repo->usersForCompany($sel) : [],
+            'gruppiModuli'=> \UsersController::buildPermissionGroups(),
+            // vuoto in tabella = tutti i moduli abilitati
+            'moduliAttivi'=> $this->moduliDi($scelta),
+            'tuttiModuli' => $scelta === null || empty($scelta['moduli']),
+            'salvato'     => isset($_GET['salvato']),
+            'errore'      => $_GET['errore'] ?? null,
         ]);
+    }
+
+    /**
+     * Moduli abilitati di una societa', come elenco.
+     * @return string[]
+     */
+    private function moduliDi(?array $societa): array
+    {
+        if (!$societa || empty($societa['moduli'])) {
+            return [];
+        }
+        return array_filter(array_map('trim', explode(',', (string)$societa['moduli'])));
+    }
+
+    /**
+     * Moduli scelti nel form, come CSV da salvare.
+     *
+     * Stringa vuota = tutti abilitati. Si accettano solo i codici che
+     * esistono davvero nel registro dei moduli, cosi' un campo manomesso
+     * non finisce in tabella.
+     */
+    private function moduliDaForm(): string
+    {
+        if (!empty($_POST['tutti_moduli'])) {
+            return '';
+        }
+
+        $validi = [];
+        foreach (\UsersController::buildPermissionGroups() as $g) {
+            foreach (array_keys($g['perms']) as $codice) {
+                $validi[$codice] = true;
+            }
+        }
+
+        $scelti = array_filter(
+            (array)($_POST['moduli'] ?? []),
+            static fn($m) => isset($validi[$m])
+        );
+
+        return implode(',', array_unique($scelti));
     }
 
     /** POST /societa/salva */
@@ -132,7 +178,7 @@ final class GroupCompanyController
             'nome'        => $nome,
             'codice'      => $codice,
             'colore'      => trim((string)($_POST['colore'] ?? '#1e3a5f')),
-            'moduli'      => trim((string)($_POST['moduli'] ?? '')),
+            'moduli'      => $this->moduliDaForm(),
             'attiva'      => !empty($_POST['attiva']),
             'ordinamento' => (int)($_POST['ordinamento'] ?? 0),
         ]);

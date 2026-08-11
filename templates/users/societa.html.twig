@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/users/societa.css?v=1">
+<link rel="stylesheet" href="/assets/css/views/users/societa.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -82,12 +82,37 @@
                             <span>Attiva</span>
                         </label>
 
-                        <label class="sg-field sg-col-2">
-                            <span>Moduli abilitati</span>
-                            <input type="text" name="moduli" value="{{ selezionata.moduli }}"
-                                   placeholder="vuoto = tutti i moduli">
-                            <small>Elenco separato da virgole. Lasciare vuoto per abilitarli tutti.</small>
-                        </label>
+                        <div class="sg-moduli sg-col-4">
+                            <div class="sg-moduli-head">
+                                <span>Moduli abilitati</span>
+                                <label class="sg-tutti">
+                                    <input type="checkbox" name="tutti_moduli" value="1"
+                                           id="sg-tutti" {{ tuttiModuli ? 'checked' : '' }}>
+                                    <span>Tutti i moduli</span>
+                                </label>
+                            </div>
+
+                            <div class="sg-moduli-body{{ tuttiModuli ? ' is-off' : '' }}" id="sg-moduli-body">
+                                {% for chiave, g in gruppiModuli %}
+                                    <div class="sg-mod-gruppo">
+                                        <div class="sg-mod-gruppo-tit">
+                                            <span class="sg-mod-pallino" style="background: {{ g.color }}"></span>
+                                            {{ g.label }}
+                                            <button type="button" class="sg-link" data-sg-gruppo="{{ chiave }}">tutti</button>
+                                        </div>
+                                        <div class="sg-mod-lista" data-gruppo="{{ chiave }}">
+                                            {% for codice, m in g.perms %}
+                                                <label class="sg-mod">
+                                                    <input type="checkbox" name="moduli[]" value="{{ codice }}"
+                                                           {{ codice in moduliAttivi ? 'checked' : '' }}>
+                                                    <span>{{ m.label }}</span>
+                                                </label>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
 
                         <div class="sg-actions">
                             <button class="sg-btn sg-btn-primary">Salva</button>
@@ -172,10 +197,13 @@
                     <span>Attiva</span>
                 </label>
 
-                <label class="sg-field sg-col-2">
-                    <span>Moduli abilitati</span>
-                    <input type="text" name="moduli" placeholder="vuoto = tutti i moduli">
-                </label>
+                {# la societa' nasce con tutti i moduli: si restringono dopo,
+                   dalla scheda, dove c'e' l'elenco completo #}
+                <input type="hidden" name="tutti_moduli" value="1">
+
+                <div class="sg-nota sg-col-4">
+                    I moduli si scelgono dopo aver creato la societa', dalla sua scheda.
+                </div>
 
                 <div class="sg-actions">
                     <button type="button" class="sg-btn" data-sg-close>Annulla</button>
@@ -189,5 +217,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/users/societa.js?v=1"></script>
+<script src="/assets/js/views/users/societa.js?v=2"></script>
 {% endblock %}
