@@ -37,6 +37,8 @@
     transition: all .18s;
 }
 .da-stat:hover { border-color: #cbd5e1; box-shadow: 0 4px 16px rgba(0,0,0,.04); transform: translateY(-1px); }
+/* le card della societa' attiva sono cliccabili: portano al loro modulo */
+a.da-stat { text-decoration: none; color: inherit; }
 .da-stat-icon {
     width: 44px; height: 44px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
