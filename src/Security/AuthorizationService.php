@@ -20,12 +20,16 @@ class AuthorizationService
         return (int)$user->id === 1;
     }
 
+    /**
+     * Il superadmin salta i permessi, ma non i confini fra societa'.
+     *
+     * User::canAccess() applica il limite dei moduli della societa' attiva
+     * prima del proprio bypass: qui si passa sempre da li', altrimenti il
+     * bypass di questo metodo lo scavalcherebbe e il capo dentro Poti
+     * continuerebbe a raggiungere i moduli del Consorzio.
+     */
     public function canAccessModule(User $user, string $module): bool
     {
-        if ($this->isSuperAdmin($user)) {
-            return true;
-        }
-
         return $user->canAccess($module);
     }
 

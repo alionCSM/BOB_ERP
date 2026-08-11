@@ -26,6 +26,11 @@ final class DashboardController
 
         $data = compact('username', 'name', 'role', 'pageTitle');
 
+        // Chi arriva qui rimbalzato da una pagina di un'altra societa' deve
+        // capire perche', invece di ritrovarsi sulla dashboard senza motivo.
+        $data['fuoriSocieta']  = isset($_GET['fuori_societa']);
+        $data['societaAttiva'] = ($GLOBALS['currentCompany'] ?? null)?->current()['nome'] ?? '';
+
         match ($role) {
             'admin'            => $data += $this->dataForAdmin($name),
             'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
