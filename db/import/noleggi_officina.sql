@@ -145,13 +145,17 @@ START TRANSACTION;
 --     La matricola diventa la targa. Il GROUP BY tiene una riga sola per
 --     matricola: e' unica per societa', e senza raggruppamento due mezzi con
 --     la stessa matricola farebbero fallire tutto l'insert.
+-- Il COLLATE non e' un vezzo: BOB usa utf8mb4_unicode_ci e il vecchio
+-- database utf8mb4_0900_ai_ci, quindi ogni confronto fra testo delle due
+-- basi va dichiarato, altrimenti MySQL si ferma con "Illegal mix of
+-- collations".
 INSERT INTO pn_autocarrate
     (group_company_id, targa, modello, note, stato, origine_id)
 SELECT
     @soc,
-    UPPER(TRIM(s.matricola)),
-    NULLIF(TRIM(COALESCE(s.modello, '')), ''),
-    NULLIF(TRIM(COALESCE(s.descr,   '')), ''),
+    UPPER(TRIM(s.matricola))                    COLLATE utf8mb4_unicode_ci,
+    NULLIF(TRIM(COALESCE(s.modello, '')), '')   COLLATE utf8mb4_unicode_ci,
+    NULLIF(TRIM(COALESCE(s.descr,   '')), '')   COLLATE utf8mb4_unicode_ci,
     CASE WHEN s.stato = 1 THEN 'attiva' ELSE 'dismessa' END,
     s.id
 FROM noleggi_officina.mezzi_soll s
@@ -167,7 +171,8 @@ WHERE NOT EXISTS (
         WHERE a.group_company_id = @soc AND a.origine_id = s.id)
   AND NOT EXISTS (
         SELECT 1 FROM pn_autocarrate a
-        WHERE a.group_company_id = @soc AND a.targa = UPPER(TRIM(s.matricola)));
+        WHERE a.group_company_id = @soc
+          AND a.targa = UPPER(TRIM(s.matricola)) COLLATE utf8mb4_unicode_ci);
 
 -- 3.2 Prenotazioni
 --     LEAST/GREATEST raddrizza le date invertite invece di scartare la riga.
@@ -180,8 +185,8 @@ INSERT INTO pn_prenotazioni
 SELECT
     @soc,
     a.id,
-    COALESCE(NULLIF(TRIM(m.cliente), ''), 'senza nome'),
-    NULLIF(TRIM(COALESCE(m.cantiere, '')), ''),
+    COALESCE(NULLIF(TRIM(m.cliente), ''), 'senza nome') COLLATE utf8mb4_unicode_ci,
+    NULLIF(TRIM(COALESCE(m.cantiere, '')), '')          COLLATE utf8mb4_unicode_ci,
     LEAST(m.inizio, m.fine),
     GREATEST(m.inizio, m.fine),
     'confermata',
@@ -189,9 +194,9 @@ SELECT
         WHEN num.pulito REGEXP '^-?[0-9]+(\\.[0-9]+)?$' THEN CAST(num.pulito AS DECIMAL(10,2))
         ELSE NULL
     END,
-    NULLIF(TRIM(COALESCE(m.note,      '')), ''),
-    NULLIF(TRIM(COALESCE(m.contratto, '')), ''),
-    NULLIF(TRIM(COALESCE(m.commerc,   '')), ''),
+    NULLIF(TRIM(COALESCE(m.note,      '')), '') COLLATE utf8mb4_unicode_ci,
+    NULLIF(TRIM(COALESCE(m.contratto, '')), '') COLLATE utf8mb4_unicode_ci,
+    NULLIF(TRIM(COALESCE(m.commerc,   '')), '') COLLATE utf8mb4_unicode_ci,
     'da_pagare',
     m.id
 FROM noleggi_officina.mov_mezzi m
