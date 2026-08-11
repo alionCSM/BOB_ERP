@@ -146,6 +146,33 @@ final class AutocarrateController
         ]);
     }
 
+    // ── GET /autocarrate/prenotazioni/occupati ───────────────────────────────
+    // Chi e' gia' impegnato nel periodo, per togliere dall'elenco i mezzi
+    // che non si possono prenotare. E' solo un aiuto: il controllo che vale
+    // resta quello al salvataggio, che vede anche cosa e' cambiato nel
+    // frattempo da un altro utente.
+
+    public function occupati(Request $request): void
+    {
+        $this->assertAccess($request);
+
+        $dal = $this->data($_GET['dal'] ?? '', '');
+        $al  = $this->data($_GET['al'] ?? '', '');
+
+        if (!$dal || !$al || $al < $dal) {
+            Response::json(['ok' => false, 'occupati' => []]);
+        }
+
+        $occupati = (new AutocarrataRepository($this->conn))->occupatiTra(
+            $this->companyId(),
+            $dal,
+            $al,
+            (int)($_GET['escludi'] ?? 0) ?: null
+        );
+
+        Response::json(['ok' => true, 'occupati' => $occupati]);
+    }
+
     // ── POST /autocarrate/prenotazioni/salva ─────────────────────────────────
 
     public function salvaPrenotazione(Request $request): void

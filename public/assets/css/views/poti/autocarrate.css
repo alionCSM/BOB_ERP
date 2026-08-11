@@ -154,6 +154,11 @@
 
 .ac-f textarea { resize: vertical; font-family: inherit; }
 
+/* esito della ricerca disponibilita' sotto l'elenco dei mezzi */
+.ac-avviso { font-size: 11px; color: #64748b; }
+.ac-avviso.is-ok { color: #16a34a; }
+.ac-avviso.is-ko { color: #b91c1c; font-weight: 600; }
+
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {
     padding: 8px 11px;

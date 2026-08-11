@@ -50,6 +50,16 @@
         var comm = campo('ac-p-commerciale');
         if (comm && comm.dataset.predefinito) comm.textContent = comm.dataset.predefinito;
 
+        // l'elenco dei mezzi torna completo: una precedente ricerca puo'
+        // averne tolti, e senza questo il mezzo da modificare non ci sarebbe
+        var sel = campo('ac-p-mezzo');
+        if (sel && tutteOpz.length) {
+            sel.innerHTML = '';
+            tutteOpz.forEach(function (o) { sel.add(new Option(o.text, o.value)); });
+        }
+        var av = campo('ac-p-avviso');
+        if (av) { av.textContent = ''; av.className = 'ac-avviso'; }
+
         var id = campo(isPren ? 'ac-p-id' : 'ac-m-id');
         if (id) id.value = '';
         var del = campo('ac-p-elimina');
@@ -61,6 +71,7 @@
         b.addEventListener('click', function () {
             svuota();
             apri(isPren ? 'Nuova prenotazione' : 'Nuova autocarrata');
+            if (isPren) aggiornaMezzi();
         });
     });
 
@@ -104,6 +115,9 @@
                     del.dataset.id = d.id;
                 }
                 apri('Prenotazione di ' + (d.cliente || ''));
+                // le date sono state impostate da codice, quindi l'evento
+                // change non scatta: l'elenco va aggiornato a mano
+                aggiornaMezzi();
             } else {
                 campo('ac-m-id').value      = d.id;
                 campo('ac-m-targa').value   = d.targa || '';
@@ -153,6 +167,89 @@
     [tariffa, campo('ac-p-dal'), campo('ac-p-al')].forEach(function (el) {
         el && el.addEventListener('change', aggiorna);
         el && el.addEventListener('input', aggiorna);
+    });
+
+    // ── Mezzi disponibili nel periodo ───────────────────────────────────────
+    // Scelte le date, dall'elenco spariscono le autocarrate gia' impegnate:
+    // meglio non poterle scegliere che scoprirlo dopo aver compilato tutto.
+    // Resta comunque il controllo al salvataggio, che e' quello che conta se
+    // nel frattempo prenota qualcun altro.
+    var selMezzo = campo('ac-p-mezzo');
+    var avviso   = campo('ac-p-avviso');
+    var tutteOpz = selMezzo
+        ? Array.prototype.map.call(selMezzo.options, function (o) {
+              return { value: o.value, text: o.text };
+          })
+        : [];
+
+    function aggiornaMezzi() {
+        if (!selMezzo) return;
+
+        var dal = campo('ac-p-dal'), al = campo('ac-p-al');
+        var scelto = selMezzo.value;
+
+        function ripristina(nota) {
+            selMezzo.innerHTML = '';
+            tutteOpz.forEach(function (o) {
+                selMezzo.add(new Option(o.text, o.value));
+            });
+            selMezzo.value = scelto;
+            if (avviso) avviso.textContent = nota || '';
+        }
+
+        if (!dal || !al || !dal.value || !al.value || al.value < dal.value) {
+            ripristina('');
+            return;
+        }
+
+        var q = '?dal=' + dal.value + '&al=' + al.value;
+        var idAttuale = campo('ac-p-id') ? campo('ac-p-id').value : '';
+        if (idAttuale) q += '&escludi=' + idAttuale;
+
+        fetch('/autocarrate/prenotazioni/occupati' + q, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.ok) { ripristina(''); return; }
+
+                var nascoste = 0;
+                selMezzo.innerHTML = '';
+
+                tutteOpz.forEach(function (o) {
+                    var occ = d.occupati[o.value];
+                    // in modifica il mezzo gia' assegnato resta in elenco,
+                    // altrimenti sparirebbe da sotto gli occhi
+                    if (occ && o.value !== scelto) { nascoste++; return; }
+                    selMezzo.add(new Option(o.text, o.value));
+                });
+
+                if (selMezzo.options.length) {
+                    selMezzo.value = scelto && selMezzo.querySelector('option[value="' + scelto + '"]')
+                        ? scelto
+                        : selMezzo.options[0].value;
+                }
+
+                if (avviso) {
+                    if (!selMezzo.options.length) {
+                        avviso.textContent = 'Nessuna autocarrata libera in queste date.';
+                        avviso.className = 'ac-avviso is-ko';
+                    } else if (nascoste) {
+                        avviso.textContent = nascoste + (nascoste === 1
+                            ? ' autocarrata nascosta perche\' occupata'
+                            : ' autocarrate nascoste perche\' occupate');
+                        avviso.className = 'ac-avviso';
+                    } else {
+                        avviso.textContent = 'Tutte libere nel periodo.';
+                        avviso.className = 'ac-avviso is-ok';
+                    }
+                }
+            })
+            .catch(function () { ripristina(''); });
+    }
+
+    [campo('ac-p-dal'), campo('ac-p-al')].forEach(function (el) {
+        el && el.addEventListener('change', aggiornaMezzi);
     });
 
     // ── Eliminazione ────────────────────────────────────────────────────────

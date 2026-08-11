@@ -146,6 +146,7 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
            ->get('/autocarrate/mezzi',                 [AutocarrateController::class, 'mezzi'])
            ->post('/autocarrate/mezzi/salva',          [AutocarrateController::class, 'salvaMezzo'])
            ->get('/autocarrate/prenotazioni',          [AutocarrateController::class, 'prenotazioni'])
+           ->get('/autocarrate/prenotazioni/occupati', [AutocarrateController::class, 'occupati'])
            ->post('/autocarrate/prenotazioni/salva',   [AutocarrateController::class, 'salvaPrenotazione'])
            ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione']);
 

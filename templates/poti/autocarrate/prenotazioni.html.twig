@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=5">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=6">
 {% endblock %}
 
 {% block content %}
@@ -122,11 +122,14 @@
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <input type="hidden" name="id" id="ac-p-id" value="">
 
+                {# l'elenco si restringe alle sole libere quando si scelgono
+                   le date: vedi sotto l'avviso con quante ne sono sparite #}
                 <label class="ac-f ac-f-2">
                     <span>Autocarrata</span>
                     <select name="autocarrata_id" id="ac-p-mezzo" required>
                         {% for m in mezzi %}<option value="{{ m.id }}">{{ m.targa }} — {{ m.modello ?: 'senza modello' }}</option>{% endfor %}
                     </select>
+                    <small class="ac-avviso" id="ac-p-avviso"></small>
                 </label>
 
                 <label class="ac-f">
@@ -230,5 +233,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=5"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=6"></script>
 {% endblock %}

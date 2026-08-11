@@ -161,6 +161,50 @@ final class AutocarrataRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Mezzi gia' impegnati in un periodo, con il motivo.
+     *
+     * Serve a togliere dall'elenco le autocarrate che non si possono
+     * prenotare, invece di lasciarle scegliere e rifiutarle al salvataggio.
+     *
+     * @return array<int, array{cliente:string, fino:string}>
+     */
+    public function occupatiTra(int $companyId, string $dal, string $al, ?int $escludiId = null): array
+    {
+        $sql = "
+            SELECT autocarrata_id, cliente, data_fine
+            FROM   pn_prenotazioni
+            WHERE  group_company_id = :cid
+              AND  stato <> 'annullata'
+              AND  data_inizio <= :al
+              AND  data_fine   >= :dal
+        ";
+        $args = [':cid' => $companyId, ':dal' => $dal, ':al' => $al];
+
+        if ($escludiId) {
+            $sql .= ' AND id <> :id';
+            $args[':id'] = $escludiId;
+        }
+        $sql .= ' ORDER BY data_fine DESC';
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($args);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $mezzo = (int)$r['autocarrata_id'];
+            // ordinate per data_fine decrescente: la prima che arriva e'
+            // quella che libera il mezzo piu' tardi, ed e' quella da dire
+            if (!isset($out[$mezzo])) {
+                $out[$mezzo] = [
+                    'cliente' => (string)$r['cliente'],
+                    'fino'    => (string)$r['data_fine'],
+                ];
+            }
+        }
+        return $out;
+    }
+
     public function salvaPrenotazione(int $companyId, ?int $id, array $d, ?int $userId): int
     {
         $p = [
