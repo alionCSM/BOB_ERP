@@ -134,10 +134,9 @@ final class AutocarrateController
         Response::view('poti/autocarrate/prenotazioni.html.twig', $request, [
             'prenotazioni' => $repo->prenotazioni($cid, $dal, $al, (int)($_GET['mezzo'] ?? 0) ?: null),
             'mezzi'        => $repo->mezzi($cid, true),
-            'commerciali'  => $repo->commerciali($cid),
             'stati'        => self::STATI_PREN,
             'pagamenti'    => self::PAGAMENTI,
-            'utenteId'     => (int)$this->utente($request)->id,
+            'utenteNome'   => $this->nomeUtente($request),
             'dal'          => $dal,
             'al'           => $al,
             'mezzoId'      => (int)($_GET['mezzo'] ?? 0),
@@ -203,11 +202,6 @@ final class AutocarrateController
             'totale'         => $this->importo($_POST['totale'] ?? ''),
             'contratto'      => trim((string)($_POST['contratto'] ?? '')),
             'importo'        => $this->importo($_POST['importo'] ?? ''),
-            // il commerciale e' chi sta inserendo, a meno che non venga
-            // scelta un'altra persona: in ufficio capita di registrare una
-            // trattativa seguita da un collega
-            'commerciale_user_id' => (int)($_POST['commerciale_user_id'] ?? 0)
-                                     ?: (int)$this->utente($request)->id,
             'pagamento'      => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
                                 ? (string)$_POST['pagamento']
                                 : 'da_pagare',
@@ -238,6 +232,18 @@ final class AutocarrateController
             Response::error('Accesso negato', 403);
         }
         return $user;
+    }
+
+    /** Nome dell'utente collegato, per mostrarlo come commerciale. */
+    private function nomeUtente(Request $request): string
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''),
+                            username) AS nome
+            FROM bb_users WHERE id = :id
+        ");
+        $stmt->execute([':id' => (int)$this->utente($request)->id]);
+        return (string)($stmt->fetchColumn() ?: '');
     }
 
     private function assertAccess(Request $request): void
@@ -370,8 +376,14 @@ final class AutocarrateController
 
             for ($g = $da; $g <= $a; $g = date('Y-m-d', strtotime($g . ' +1 day'))) {
                 $out[(int)$p['autocarrata_id']][$g] = [
-                    'stato' => $p['stato'],
-                    'testo' => $testo,
+                    'stato'   => $p['stato'],
+                    'testo'   => $testo,
+                    // servono per arrotondare solo i due capi della barra:
+                    // i giorni in mezzo restano squadrati e si saldano fra
+                    // loro, cosi' un impegno si legge come un blocco unico
+                    'inizio'  => $g === $p['data_inizio'],
+                    'fine'    => $g === $p['data_fine'],
+                    'cliente' => $p['cliente'],
                 ];
             }
         }

@@ -154,6 +154,19 @@
 
 .ac-f textarea { resize: vertical; font-family: inherit; }
 
+/* campo mostrato ma non modificabile (il commerciale) */
+.ac-fisso {
+    padding: 8px 11px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ── Schede mezzo ───────────────────────────────────────────────────────── */
 .ac-mezzi {
     display: grid;
@@ -295,49 +308,89 @@
 /* ── Timeline ───────────────────────────────────────────────────────────── */
 .ac-tl-wrap { overflow-x: auto; }
 
-.ac-tl { border-collapse: collapse; font-size: 11px; }
+.ac-tl { border-collapse: collapse; font-size: 12px; }
 
-.ac-tl th,
-.ac-tl td { border: 1px solid #eef2f7; }
+/* solo righe orizzontali: le verticali su ogni giorno facevano rumore e
+   spezzavano visivamente le barre */
+.ac-tl td { border-bottom: 1px solid #f1f5f9; }
+.ac-tl thead th { border-bottom: 1px solid #e2e8f0; }
 
 /* la colonna del mezzo resta visibile mentre si scorrono i giorni */
 .ac-tl-mezzo {
     position: sticky;
     left: 0;
     z-index: 2;
-    min-width: 92px;
-    padding: 6px 10px;
+    min-width: 120px;
+    padding: 0 14px;
     background: #fff;
     text-align: left;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: .03em;
     color: #0f172a;
     white-space: nowrap;
+    border-right: 1px solid #e2e8f0;
 }
 
 .ac-tl thead .ac-tl-mezzo { background: #f8fafc; z-index: 3; }
+.ac-tl tbody tr:hover .ac-tl-mezzo { background: #f8fafc; }
 
 .ac-tl-g {
-    width: 26px;
-    padding: 4px 0;
+    width: 34px;
+    padding: 7px 0;
     text-align: center;
     background: #f8fafc;
     color: #64748b;
 }
 
-.ac-tl-g.is-fest { background: #f1f5f9; color: #94a3b8; }
+.ac-tl-g.is-fest { background: #eef2f7; color: #94a3b8; }
 
-.ac-tl-wd { display: block; font-size: 9px; text-transform: uppercase; }
-.ac-tl-n  { display: block; font-weight: 700; }
+.ac-tl-wd { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+.ac-tl-n  { display: block; font-size: 13px; font-weight: 700; color: #334155; }
 
-.ac-tl-c { height: 26px; padding: 3px; }
+/* niente padding laterale: e' cosi' che i giorni consecutivi si saldano
+   e l'impegno si legge come una barra sola */
+.ac-tl-c {
+    height: 40px;
+    padding: 6px 0;
+}
+
 .ac-tl-c.is-fest { background: #fafbfc; }
+.ac-tl tbody tr:hover td { background: #f8fafc; }
+.ac-tl tbody tr:hover .ac-tl-c.is-fest { background: #f1f5f9; }
 
 .ac-barra {
-    display: block;
-    height: 14px;
-    border-radius: 3px;
+    position: relative;   /* riferimento per il nome del cliente */
+    display: flex;
+    align-items: center;
+    height: 28px;
     background: #cbd5e1;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .10);
+}
+
+.ac-barra.is-inizio {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    padding-left: 8px;
+}
+.ac-barra.is-fine {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* il nome del cliente parte dal primo giorno e sborda sui successivi:
+   la barra e' fatta di piu' celle, quindi il testo non puo' stare dentro
+   una sola senza essere tagliato */
+.ac-barra-txt {
+    position: absolute;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    pointer-events: none;
 }
 
 .ac-barra-confermata { background: #2563eb; }
@@ -354,7 +407,7 @@
 }
 
 .ac-legenda span { display: flex; align-items: center; gap: 6px; }
-.ac-legenda i { width: 16px; height: 10px; }
+.ac-legenda i { width: 18px; height: 12px; border-radius: 3px; box-shadow: none; }
 
 /* ── Calendario ─────────────────────────────────────────────────────────── */
 .ac-vista { display: flex; gap: 4px; }

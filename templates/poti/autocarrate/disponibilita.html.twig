@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=5">
 {% endblock %}
 
 {% block content %}
@@ -152,10 +152,12 @@
                             {% set righeMezzo = griglia[m.id]|default({}) %}
                             {% for g in giorni %}
                                 {% set cella = righeMezzo[g.iso]|default(null) %}
-                                <td class="ac-tl-c{{ g.festivo ? ' is-fest' : '' }}">
+                                <td class="ac-tl-c{{ g.festivo ? ' is-fest' : '' }}{{ cella ? ' is-pieno' : '' }}">
                                     {% if cella %}
-                                        <span class="ac-barra ac-barra-{{ cella.stato }}"
-                                              title="{{ cella.testo }}"></span>
+                                        <span class="ac-barra ac-barra-{{ cella.stato }}{{ cella.inizio ? ' is-inizio' : '' }}{{ cella.fine ? ' is-fine' : '' }}"
+                                              title="{{ cella.testo }}">
+                                            {% if cella.inizio %}<span class="ac-barra-txt">{{ cella.cliente }}</span>{% endif %}
+                                        </span>
                                     {% endif %}
                                 </td>
                             {% endfor %}
@@ -176,5 +178,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=4"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=5"></script>
 {% endblock %}

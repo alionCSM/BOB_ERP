@@ -45,9 +45,10 @@
             .forEach(function (i) { i.value = ''; });
         modal.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
 
-        // il commerciale torna a chi sta usando BOB, non alla prima voce
+        // il commerciale e' solo mostrato: su una nuova prenotazione torna
+        // a chi sta usando BOB
         var comm = campo('ac-p-commerciale');
-        if (comm && comm.dataset.predefinito) comm.value = comm.dataset.predefinito;
+        if (comm && comm.dataset.predefinito) comm.textContent = comm.dataset.predefinito;
 
         var id = campo(isPren ? 'ac-p-id' : 'ac-m-id');
         if (id) id.value = '';
@@ -84,10 +85,10 @@
                 campo('ac-p-contratto').value = d.contratto || '';
                 campo('ac-p-pagamento').value = d.pagamento || 'da_pagare';
 
-                // in modifica si tiene il commerciale registrato; se manca
-                // (prenotazioni vecchie) resta quello proposto
+                // in modifica si mostra chi l'aveva registrata, non chi sta
+                // correggendo: il commerciale non cambia piu'
                 var comm = campo('ac-p-commerciale');
-                if (comm && d.commerciale_user_id) comm.value = d.commerciale_user_id;
+                if (comm) comm.textContent = d.commerciale_nome || '—';
 
                 // i campi prezzo esistono solo per chi puo' vederli
                 var t = campo('ac-p-tariffa');

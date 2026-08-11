@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=5">
 {% endblock %}
 
 {% block content %}
@@ -176,16 +176,15 @@
                     </select>
                 </label>
 
-                {# preselezionato su chi sta inserendo, ma modificabile:
-                   in ufficio capita di registrare la trattativa di un collega #}
-                <label class="ac-f">
+                {# il commerciale non si sceglie: e' chi registra la
+                   prenotazione, e resta quello anche se poi la corregge
+                   qualcun altro #}
+                <div class="ac-f">
                     <span>Commerciale</span>
-                    <select name="commerciale_user_id" id="ac-p-commerciale" data-predefinito="{{ utenteId }}">
-                        {% for c in commerciali %}
-                            <option value="{{ c.id }}" {{ c.id == utenteId ? 'selected' : '' }}>{{ c.nome }}</option>
-                        {% endfor %}
-                    </select>
-                </label>
+                    <div class="ac-fisso" id="ac-p-commerciale" data-predefinito="{{ utenteNome }}">
+                        {{ utenteNome }}
+                    </div>
+                </div>
 
                 {% if canSeePrices %}
                     <label class="ac-f">
@@ -231,5 +230,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=4"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=5"></script>
 {% endblock %}

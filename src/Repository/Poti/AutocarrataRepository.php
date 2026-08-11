@@ -86,48 +86,6 @@ final class AutocarrataRepository
         return (int)$stmt->fetchColumn() > 0;
     }
 
-    /**
-     * Utenti selezionabili come commerciale.
-     *
-     * Sono quelli assegnati alla societa': mettere in elenco tutti gli utenti
-     * di BOB significherebbe proporre persone che con Poti non c'entrano.
-     * Se nessuno risulta assegnato si ripiega sugli utenti interni, cosi' il
-     * campo resta utilizzabile prima di aver sistemato le assegnazioni.
-     */
-    public function commerciali(int $companyId): array
-    {
-        $sql = "
-            SELECT u.id,
-                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
-                            u.username) AS nome
-            FROM   bb_users u
-            JOIN   bb_user_companies uc ON uc.user_id = u.id AND uc.group_company_id = :cid
-            WHERE  u.type NOT IN ('worker', 'client')
-            ORDER BY nome ASC
-        ";
-
-        try {
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([':cid' => $companyId]);
-            $righe = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            if ($righe) {
-                return $righe;
-            }
-        } catch (\Throwable $e) {
-            error_log('[AutocarrataRepository] commerciali: ' . $e->getMessage());
-        }
-
-        $stmt = $this->conn->query("
-            SELECT u.id,
-                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
-                            u.username) AS nome
-            FROM   bb_users u
-            WHERE  u.type NOT IN ('worker', 'client')
-            ORDER BY nome ASC
-        ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
     // ── Prenotazioni ─────────────────────────────────────────────────────────
 
     /**
@@ -218,19 +176,20 @@ final class AutocarrataRepository
             ':note'     => $d['note'] !== '' ? $d['note'] : null,
             ':contratto'=> $d['contratto'] !== '' ? $d['contratto'] : null,
             ':importo'  => $d['importo'] !== '' ? $d['importo'] : null,
-            ':comm'     => $d['commerciale_user_id'] ?: null,
             ':pag'      => $d['pagamento'],
             ':cid'      => $companyId,
         ];
 
+        // Il commerciale si scrive solo alla creazione: e' chi ha preso la
+        // prenotazione, non chi la corregge dopo, quindi la UPDATE non lo
+        // tocca nemmeno e il parametro non compare fra i suoi.
         if ($id) {
             $stmt = $this->conn->prepare("
                 UPDATE pn_prenotazioni
                 SET autocarrata_id = :mid, cliente = :cliente, telefono = :telefono,
                     luogo = :luogo, data_inizio = :dal, data_fine = :al, stato = :stato,
                     tariffa_giorno = :tariffa, totale = :totale, note = :note,
-                    contratto = :contratto, importo = :importo, commerciale_user_id = :comm,
-                    pagamento = :pag
+                    contratto = :contratto, importo = :importo, pagamento = :pag
                 WHERE id = :id AND group_company_id = :cid
             ");
             $stmt->execute($p + [':id' => $id]);
@@ -246,7 +205,7 @@ final class AutocarrataRepository
                     :dal, :al, :stato, :tariffa, :totale, :note,
                     :contratto, :importo, :comm, :pag, :uid)
         ");
-        $stmt->execute($p + [':uid' => $userId]);
+        $stmt->execute($p + [':uid' => $userId, ':comm' => $userId]);
         return (int)$this->conn->lastInsertId();
     }
 
