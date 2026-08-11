@@ -119,6 +119,27 @@ final class LayoutDataProvider
 
     private function recentNotifications(int $userId): array
     {
+        // La societa' si aggiunge con una LEFT JOIN e in un try: chi non ha
+        // ancora applicato la migration continua a vedere le notifiche.
+        try {
+            $stmt = $this->conn->prepare('
+                SELECT n.*, u.first_name, u.last_name, w.photo,
+                       g.codice AS societa_codice, g.colore AS societa_colore
+                FROM   bb_notifications n
+                LEFT JOIN bb_users           u ON n.created_by = u.id
+                LEFT JOIN bb_workers         w ON u.worker_id  = w.id
+                LEFT JOIN bb_group_companies g ON g.id = n.group_company_id
+                WHERE  n.user_id  = :uid
+                  AND  n.is_read  = 0
+                ORDER  BY n.created_at DESC
+                LIMIT  10
+            ');
+            $stmt->execute([':uid' => $userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('[LayoutDataProvider] notifiche senza societa\': ' . $e->getMessage());
+        }
+
         $stmt = $this->conn->prepare('
             SELECT n.*, u.first_name, u.last_name, w.photo
             FROM   bb_notifications n

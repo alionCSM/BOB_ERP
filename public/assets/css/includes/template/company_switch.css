@@ -50,6 +50,19 @@
     color: #64748b;
 }
 
+/* etichetta societa' sulle notifiche */
+.gc-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    vertical-align: middle;
+}
+
 /* ── Menu a tendina ────────────────────────────────────────────────────── */
 /* il menu e' in posizione assoluta: max-width in % non lo limiterebbe,
    serve il viewport (stesso motivo del pannello job) */

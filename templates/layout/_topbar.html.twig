@@ -134,7 +134,14 @@
                                 </div>
                                 <div class="flex-1 overflow-hidden">
                                     <div class="flex items-center justify-between">
-                                        <span class="font-medium mr-2">{{ ((notif.first_name ?? '') ~ ' ' ~ (notif.last_name ?? ''))|trim }}</span>
+                                        <span class="font-medium mr-2">
+                                            {{ ((notif.first_name ?? '') ~ ' ' ~ (notif.last_name ?? ''))|trim }}
+                                            {# la societa' si mostra solo a chi ne ha piu' di una:
+                                               agli altri sarebbe un'etichetta sempre uguale #}
+                                            {% if groupCompanies|length > 1 and notif.societa_codice is not empty %}
+                                                <span class="gc-tag" style="background: {{ notif.societa_colore }}">{{ notif.societa_codice }}</span>
+                                            {% endif %}
+                                        </span>
                                         <div class="text-xs text-slate-400 whitespace-nowrap">{{ date_fmt(notif.created_at) }}</div>
                                     </div>
                                     <div class="text-slate-500 mt-1 whitespace-normal break-words">{{ notif.message }}</div>
@@ -234,7 +241,7 @@
      data-vapid-public-key="{{ vapidPublicKey }}"
      hidden></div>
 {# ?v= da incrementare a ogni modifica del file, altrimenti resta in cache #}
-<script src="/assets/js/includes/template/top_bar.js?v=5"></script>
+<script src="/assets/js/includes/template/top_bar.js?v=6"></script>
 
 <div id="priority-notif-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:18px;width:95%;max-width:560px;max-height:80vh;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,.2);animation:pnm-in .3s ease;">

@@ -231,9 +231,13 @@ async function dismissPriorityModal() {
                 const createdAt = n.created_at ? new Date(n.created_at.replace(' ', 'T')).toLocaleString('it-IT') : '-';
                 const readAt = n.read_at ? new Date(n.read_at.replace(' ', 'T')).toLocaleString('it-IT') : '-';
                 const open = n.link ? `<a href="${n.link}" class="text-blue-600 underline">Apri</a>` : '';
+                // la societa' compare solo se la notifica ne porta una
+                const soc = n.societa_codice
+                    ? `<span class="gc-tag" style="background: ${n.societa_colore || '#1e3a5f'}">${n.societa_codice}</span>`
+                    : '';
                 return `
                     <div class="border-b py-2">
-                        <div class="font-medium">${n.title || 'Notifica'}</div>
+                        <div class="font-medium">${n.title || 'Notifica'}${soc}</div>
                         <div class="text-slate-600">${n.message || ''}</div>
                         <div class="text-xs text-slate-500 mt-1">Da: ${n.created_by_name || 'Sistema'}</div>
                         <div class="text-xs text-slate-400 mt-1">Creata: ${createdAt} • Letta: ${readAt}</div>

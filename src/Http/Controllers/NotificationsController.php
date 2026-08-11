@@ -40,27 +40,31 @@ final class NotificationsController
                 $hasReadAt = true;
             }
 
-            if ($hasReadAt) {
-                $stmt = $this->conn->prepare('
-                    SELECT n.id, n.title, n.message, n.link, n.created_at, n.read_at,
-                           COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
-                    FROM bb_notifications n
-                    LEFT JOIN bb_users u ON n.created_by = u.id
-                    WHERE n.user_id = :uid AND n.is_read = 1
-                    ORDER BY COALESCE(n.read_at, n.created_at) DESC
-                    LIMIT 50
-                ');
-            } else {
-                $stmt = $this->conn->prepare('
-                    SELECT n.id, n.title, n.message, n.link, n.created_at, NULL AS read_at,
-                           COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
-                    FROM bb_notifications n
-                    LEFT JOIN bb_users u ON n.created_by = u.id
-                    WHERE n.user_id = :uid AND n.is_read = 1
-                    ORDER BY n.created_at DESC
-                    LIMIT 50
-                ');
-            }
+            // stessa cautela usata per read_at: la colonna della societa'
+            // esiste solo dove la migration e' stata applicata
+            $socStmt   = $this->conn->query("SHOW COLUMNS FROM bb_notifications LIKE 'group_company_id'");
+            $hasSocieta = (bool)($socStmt && $socStmt->fetch(\PDO::FETCH_ASSOC));
+
+            $colSocieta  = $hasSocieta
+                ? ', g.codice AS societa_codice, g.colore AS societa_colore'
+                : ', NULL AS societa_codice, NULL AS societa_colore';
+            $joinSocieta = $hasSocieta
+                ? ' LEFT JOIN bb_group_companies g ON g.id = n.group_company_id'
+                : '';
+
+            $letta  = $hasReadAt ? 'n.read_at' : 'NULL AS read_at';
+            $ordine = $hasReadAt ? 'COALESCE(n.read_at, n.created_at)' : 'n.created_at';
+
+            $stmt = $this->conn->prepare('
+                SELECT n.id, n.title, n.message, n.link, n.created_at, ' . $letta . ',
+                       COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
+                       ' . $colSocieta . '
+                FROM bb_notifications n
+                LEFT JOIN bb_users u ON n.created_by = u.id' . $joinSocieta . '
+                WHERE n.user_id = :uid AND n.is_read = 1
+                ORDER BY ' . $ordine . ' DESC
+                LIMIT 50
+            ');
 
             $stmt->execute([':uid' => $request->user()->id]);
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);

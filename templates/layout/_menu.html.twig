@@ -74,11 +74,9 @@
             <li class="side-nav__devider my-6"></li>
 
             {# ── POTI NOLEGGI — autocarrate
-                 Doppia condizione: il permesso dell'utente e i moduli della
-                 societa' in cui sta lavorando, cosi' la voce non compare
-                 mentre si e' dentro il Consorzio. moduliSocieta null = tutti. #}
-            {% if user.canAccess('pn_autocarrate')
-                  and (moduliSocieta is null or 'pn_autocarrate' in moduliSocieta) %}
+                 canAccess tiene conto anche dei moduli della societa' attiva,
+                 quindi la voce sparisce da sola quando si entra nel Consorzio #}
+            {% if user.canAccess('pn_autocarrate') %}
                 {% set acActive = currentPath starts with '/autocarrate' %}
                 <li>
                     <a href="/autocarrate" class="side-menu {{ acActive ? 'side-menu--active' : '' }}">
