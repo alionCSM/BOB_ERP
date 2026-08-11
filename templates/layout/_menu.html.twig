@@ -73,6 +73,22 @@
             </li>
             <li class="side-nav__devider my-6"></li>
 
+            {# ── POTI NOLEGGI — autocarrate
+                 Doppia condizione: il permesso dell'utente e i moduli della
+                 societa' in cui sta lavorando, cosi' la voce non compare
+                 mentre si e' dentro il Consorzio. moduliSocieta null = tutti. #}
+            {% if user.canAccess('pn_autocarrate')
+                  and (moduliSocieta is null or 'pn_autocarrate' in moduliSocieta) %}
+                {% set acActive = currentPath starts with '/autocarrate' %}
+                <li>
+                    <a href="/autocarrate" class="side-menu {{ acActive ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="truck"></i></div>
+                        <div class="side-menu__title">Autocarrate</div>
+                    </a>
+                </li>
+                <li class="side-nav__devider my-6"></li>
+            {% endif %}
+
             {# ── AI CHAT — permesso 'ai_chat' in bb_user_permissions
                  (gestibile da Utenti → Permessi; superadmin id 1 sempre) ── #}
             {% if user.canAccess('ai_chat') %}

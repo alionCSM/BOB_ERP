@@ -84,9 +84,18 @@ final class LayoutDataProvider
             }
         }
 
+        // null = tutti i moduli abilitati (caso del Consorzio); altrimenti
+        // il menu mostra solo le voci della societa' in cui si sta lavorando
+        $moduli = null;
+        $dati   = $service->current();
+        if ($dati && !empty($dati['moduli'])) {
+            $moduli = array_filter(array_map('trim', explode(',', (string)$dati['moduli'])));
+        }
+
         return [
             'groupCompanies'      => $lista,
             'currentGroupCompany' => $attiva,
+            'moduliSocieta'       => $moduli,
         ];
     }
 

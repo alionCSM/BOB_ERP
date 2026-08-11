@@ -134,6 +134,24 @@ if (in_array($uri, ['/change-password', '/confirm-email'], true)) {
     $router->dispatch($request, $container);
 }
 
+// ── Poti Noleggi — autocarrate ───────────────────────────────────────────────
+if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/autocarrate',                       [AutocarrateController::class, 'index'])
+           ->get('/autocarrate/mezzi',                 [AutocarrateController::class, 'mezzi'])
+           ->post('/autocarrate/mezzi/salva',          [AutocarrateController::class, 'salvaMezzo'])
+           ->get('/autocarrate/prenotazioni',          [AutocarrateController::class, 'prenotazioni'])
+           ->post('/autocarrate/prenotazioni/salva',   [AutocarrateController::class, 'salvaPrenotazione'])
+           ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione']);
+
+    $router->dispatch($request, $container);
+}
+
 // ── Societa' del gruppo (multi-azienda) ──────────────────────────────────────
 if (in_array($uri, ['/select-company', '/switch-company'], true)
     || $uri === '/societa' || str_starts_with($uri, '/societa/')) {
