@@ -3,24 +3,28 @@
  * Prefisso gc- per restare fuori dagli stili generici del template.
  */
 
+/* la top bar ha sfondo chiaro (il breadcrumb usa la variante scura, non
+   breadcrumb-light): il testo deve essere scuro, non bianco */
 .gc-current {
     display: flex;
     align-items: center;
     gap: 8px;
-    max-width: 200px;
-    padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, .25);
+    max-width: 220px;
+    padding: 7px 12px;
+    border: 1px solid #d9e0ea;
     border-radius: 8px;
-    color: #fff;
+    background: #fff;
+    color: #1e293b;
     font-size: 13px;
     font-weight: 600;
     line-height: 1;
-    transition: background .15s, border-color .15s;
+    transition: background .15s, border-color .15s, box-shadow .15s;
 }
 
 .gc-current:hover {
-    background: rgba(255, 255, 255, .12);
-    border-color: rgba(255, 255, 255, .45);
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
 }
 
 .gc-dot {
@@ -28,7 +32,7 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, .25);
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, .08);
 }
 
 /* il codice societa' non deve spingere fuori la barra su schermi stretti */
@@ -43,7 +47,7 @@
     flex: 0 0 auto;
     width: 14px;
     height: 14px;
-    opacity: .7;
+    color: #64748b;
 }
 
 /* ── Menu a tendina ────────────────────────────────────────────────────── */
@@ -102,6 +106,15 @@
     .gc-nome    { display: none; }
     .gc-chevron { width: 12px; height: 12px; }
 }
+
+.dark .gc-current {
+    background: #232c41;
+    border-color: #2f3a52;
+    color: #e2e8f0;
+}
+.dark .gc-current:hover { background: #2a3348; }
+.dark .gc-chevron { color: #94a3b8; }
+.dark .gc-dot { box-shadow: 0 0 0 2px rgba(255, 255, 255, .12); }
 
 .dark .gc-item { color: #e2e8f0; }
 .dark .gc-item:hover { background: rgba(255, 255, 255, .06); }
