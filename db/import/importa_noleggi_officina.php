@@ -11,8 +11,11 @@
  *
  * Opzioni:
  *   --societa=N        id della societa' del gruppo di destinazione (obbligatorio)
- *   --descr=parola     quali mezzi sono autocarrate, per parola in descr
- *                      (default: autocarr, che prende AUTOCARRATA e simili)
+ *   --descr=parola     quali mezzi sono autocarrate, per parola in descr.
+ *                      Default "autocarr": nel vecchio database le
+ *                      autocarrate hanno descr = AUTOCARRATA, e la parola
+ *                      parziale prende anche eventuali AUTOCARRATE o
+ *                      varianti scritte diversamente.
  *   --tipo=N           in alternativa, filtra i movimenti per mov_mezzi.tipo
  *   --stato-annullato=N  valore di mov_mezzi.stato da importare come annullata
  *   --esegui           scrive davvero

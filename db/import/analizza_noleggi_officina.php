@@ -71,7 +71,7 @@ tabella($old, 'SELECT (SELECT COUNT(*) FROM mezzi_soll) AS mezzi,
 titolo('mezzi_soll.stato — quali valori esistono e quanti sono');
 tabella($old, 'SELECT stato, COUNT(*) AS quanti FROM mezzi_soll GROUP BY stato ORDER BY quanti DESC');
 
-titolo('mezzi_soll.descr — serve a capire quali sono autocarrate');
+titolo('mezzi_soll.descr — le autocarrate sono quelle con descr = AUTOCARRATA');
 tabella($old, 'SELECT descr, COUNT(*) AS quanti FROM mezzi_soll GROUP BY descr ORDER BY quanti DESC LIMIT 40');
 
 titolo('mezzi_soll — prime 15 righe');
