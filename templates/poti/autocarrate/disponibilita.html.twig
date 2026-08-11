@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=3">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=4">
 {% endblock %}
 
 {% block content %}
@@ -81,6 +81,10 @@
     <div class="ac-box">
         <div class="ac-box-head">
             <span>Impegni</span>
+            <div class="ac-vista">
+                <button type="button" class="ac-vista-b on" data-ac-vista="calendario">Calendario</button>
+                <button type="button" class="ac-vista-b" data-ac-vista="timeline">Timeline</button>
+            </div>
             <form method="GET" class="ac-periodo">
                 <input type="date" name="dal" value="{{ dal }}">
                 <span>→</span>
@@ -91,8 +95,44 @@
             </form>
         </div>
 
+        {# ── Calendario ──────────────────────────────────────────────────── #}
+        <div class="ac-cal" id="ac-vista-calendario">
+            {% for m in calendario %}
+                <div class="ac-cal-mese">
+                    <div class="ac-cal-tit">{{ m.titolo }}</div>
+                    <div class="ac-cal-wd">
+                        {% for d in ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'] %}
+                            <span>{{ d }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="ac-cal-grid">
+                        {% for c in m.celle %}
+                            {% if c.vuota %}
+                                <div class="ac-cal-c is-vuota"></div>
+                            {% else %}
+                                <div class="ac-cal-c{{ c.festivo ? ' is-fest' : '' }}{{ c.oggi ? ' is-oggi' : '' }}">
+                                    <span class="ac-cal-n">{{ c.g }}</span>
+                                    {% for e in c.eventi|slice(0, 3) %}
+                                        <span class="ac-ev ac-ev-{{ e.stato }}"
+                                              title="{{ e.targa }} — {{ e.cliente }}{{ e.luogo ? ' — ' ~ e.luogo : '' }}">
+                                            {{ e.targa }}
+                                        </span>
+                                    {% endfor %}
+                                    {% if c.eventi|length > 3 %}
+                                        <span class="ac-ev-piu">+{{ c.eventi|length - 3 }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="ac-empty">Nessun mese nel periodo scelto.</div>
+            {% endfor %}
+        </div>
+
         {# scorre in orizzontale: il periodo puo' essere piu' largo dello schermo #}
-        <div class="ac-tl-wrap">
+        <div class="ac-tl-wrap" id="ac-vista-timeline" hidden>
             <table class="ac-tl" style="--giorni: {{ giorni|length }}">
                 <thead>
                     <tr>
@@ -133,4 +173,8 @@
     {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/autocarrate.js?v=4"></script>
 {% endblock %}

@@ -5,16 +5,17 @@
 (function () {
     'use strict';
 
-    // ── Calendario / elenco ─────────────────────────────────────────────────
-    var vistaCal = document.getElementById('ac-vista-calendario');
-    var vistaEle = document.getElementById('ac-vista-elenco');
+    // ── Cambio vista ────────────────────────────────────────────────────────
+    // Ogni pulsante data-ac-vista="x" mostra il blocco con id ac-vista-x e
+    // nasconde gli altri: cosi' la stessa logica vale per qualsiasi coppia
+    // di viste, senza id scritti a mano qui dentro.
+    var pulsantiVista = document.querySelectorAll('[data-ac-vista]');
 
-    document.querySelectorAll('[data-ac-vista]').forEach(function (b) {
+    pulsantiVista.forEach(function (b) {
         b.addEventListener('click', function () {
-            var cal = b.dataset.acVista === 'calendario';
-            if (vistaCal) vistaCal.hidden = !cal;
-            if (vistaEle) vistaEle.hidden = cal;
-            document.querySelectorAll('[data-ac-vista]').forEach(function (x) {
+            pulsantiVista.forEach(function (x) {
+                var blocco = document.getElementById('ac-vista-' + x.dataset.acVista);
+                if (blocco) blocco.hidden = (x !== b);
                 x.classList.toggle('on', x === b);
             });
         });
