@@ -101,13 +101,13 @@
                 var comm = campo('ac-p-commerciale');
                 if (comm) comm.textContent = d.commerciale_nome || '—';
 
-                // i campi prezzo esistono solo per chi puo' vederli
+                campo('ac-p-importo').value = d.importo || '';
+
+                // tariffa e totale esistono solo per chi puo' vedere i prezzi
                 var t = campo('ac-p-tariffa');
                 if (t) t.value = d.tariffa_giorno || '';
                 var tot = campo('ac-p-totale');
                 if (tot) tot.value = d.totale || '';
-                var imp = campo('ac-p-importo');
-                if (imp) imp.value = d.importo || '';
 
                 var del = campo('ac-p-elimina');
                 if (del) {

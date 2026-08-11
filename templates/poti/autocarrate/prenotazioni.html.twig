@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=6">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=7">
 {% endblock %}
 
 {% block content %}
@@ -54,11 +54,11 @@
                         <th>Al</th>
                         <th class="right">Giorni</th>
                         <th>Contratto</th>
+                        <th class="right">Importo</th>
                         <th>Commerciale</th>
                         {% if canSeePrices %}
                             <th class="right">Tariffa</th>
                             <th class="right">Totale</th>
-                            <th class="right">Importo</th>
                         {% endif %}
                         <th>Stato</th>
                         <th>Pagamento</th>
@@ -78,15 +78,15 @@
                             <td>{{ p.data_fine|date('d/m/Y') }}</td>
                             <td class="right">{{ p.giorni }}</td>
                             <td>{{ p.contratto ?: '—' }}</td>
+                            {# se l'importo di contratto non coincide col totale calcolato
+                               si evidenzia, perche' e' proprio il caso da guardare #}
+                            <td class="right{{ p.importo and p.totale and p.importo != p.totale ? ' ac-diff' : '' }}">
+                                {{ p.importo ? '€ ' ~ p.importo|number_format(2, ',', '.') : '—' }}
+                            </td>
                             <td>{{ p.commerciale_nome ?: '—' }}</td>
                             {% if canSeePrices %}
                                 <td class="right">{{ p.tariffa_giorno ? '€ ' ~ p.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
                                 <td class="right">{{ p.totale ? '€ ' ~ p.totale|number_format(2, ',', '.') : '—' }}</td>
-                                {# importo di contratto: se non coincide col totale calcolato
-                                   si evidenzia, perche' e' proprio il caso da guardare #}
-                                <td class="right{{ p.importo and p.totale and p.importo != p.totale ? ' ac-diff' : '' }}">
-                                    {{ p.importo ? '€ ' ~ p.importo|number_format(2, ',', '.') : '—' }}
-                                </td>
                             {% endif %}
                             <td><span class="ac-stato ac-stato-{{ p.stato }}">{{ p.stato }}</span></td>
                             <td>
@@ -101,7 +101,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="{{ canSeePrices ? 14 : 11 }}" class="ac-empty">
+                            <td colspan="{{ canSeePrices ? 14 : 12 }}" class="ac-empty">
                                 Nessuna prenotazione nel periodo.
                             </td>
                         </tr>
@@ -170,6 +170,14 @@
                            placeholder="rif. contratto">
                 </label>
 
+                {# fuori dal blocco prezzi: l'importo di contratto serve a chi
+                   gestisce le prenotazioni anche senza il permesso prezzi #}
+                <label class="ac-f">
+                    <span>Importo contratto</span>
+                    <input type="text" name="importo" id="ac-p-importo" inputmode="decimal"
+                           placeholder="0,00">
+                </label>
+
                 <label class="ac-f">
                     <span>Pagamento</span>
                     <select name="pagamento" id="ac-p-pagamento">
@@ -201,11 +209,6 @@
                         <small id="ac-p-calcolo"></small>
                     </label>
 
-                    <label class="ac-f">
-                        <span>Importo contratto</span>
-                        <input type="text" name="importo" id="ac-p-importo" inputmode="decimal">
-                        <small>quello scritto nel contratto</small>
-                    </label>
                 {% endif %}
 
                 <label class="ac-f ac-f-4">
@@ -233,5 +236,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=6"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=7"></script>
 {% endblock %}

@@ -230,7 +230,6 @@
 .ac-stato-manutenzione  { background: #fef3c7; color: #92400e; }
 .ac-stato-dismessa      { background: #e2e8f0; color: #475569; }
 .ac-stato-confermata    { background: #dbeafe; color: #1e40af; }
-.ac-stato-opzione       { background: #fef3c7; color: #92400e; }
 .ac-stato-annullata     { background: #fee2e2; color: #991b1b; }
 .ac-pag-pagata          { background: #dcfce7; color: #166534; }
 .ac-pag-da_pagare       { background: #fef3c7; color: #92400e; }
@@ -399,7 +398,6 @@
 }
 
 .ac-barra-confermata { background: #2563eb; }
-.ac-barra-opzione    { background: #f59e0b; }
 
 .ac-legenda {
     display: flex;
@@ -413,6 +411,12 @@
 
 .ac-legenda span { display: flex; align-items: center; gap: 6px; }
 .ac-legenda i { width: 18px; height: 12px; border-radius: 3px; box-shadow: none; }
+
+.ac-cal-oggi-esempio {
+    display: inline-block;
+    border: 1px solid #0369a1;
+    box-shadow: inset 0 0 0 1px #0369a1;
+}
 
 /* ── Calendario ─────────────────────────────────────────────────────────── */
 .ac-vista { display: flex; gap: 4px; }
@@ -494,7 +498,6 @@
 }
 
 .ac-ev-confermata { background: #2563eb; }
-.ac-ev-opzione    { background: #f59e0b; }
 .ac-ev-annullata  { background: #cbd5e1; }
 
 .ac-ev-piu { display: block; margin-top: 2px; font-size: 9px; color: #94a3b8; }

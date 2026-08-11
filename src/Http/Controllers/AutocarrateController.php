@@ -16,7 +16,7 @@ use App\Service\CurrentCompany;
 final class AutocarrateController
 {
     private const STATI_MEZZO = ['attiva', 'manutenzione', 'dismessa'];
-    private const STATI_PREN  = ['opzione', 'confermata', 'annullata'];
+    private const STATI_PREN  = ['confermata', 'annullata'];
     private const PAGAMENTI   = ['da_pagare', 'pagata'];
 
     public function __construct(private \PDO $conn) {}
