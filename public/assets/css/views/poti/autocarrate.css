@@ -154,6 +154,13 @@
 
 .ac-f textarea { resize: vertical; font-family: inherit; }
 
+/* l'elenco mezzi resta spento finche' non ci sono le date */
+.ac-f select:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
 /* esito della ricerca disponibilita' sotto l'elenco dei mezzi */
 .ac-avviso { font-size: 11px; color: #64748b; }
 .ac-avviso.is-ok { color: #16a34a; }

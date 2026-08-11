@@ -186,7 +186,12 @@
         if (!selMezzo) return;
 
         var dal = campo('ac-p-dal'), al = campo('ac-p-al');
-        var scelto = selMezzo.value;
+        var idAttuale = campo('ac-p-id') ? campo('ac-p-id').value : '';
+        // in modifica il mezzo assegnato va protetto dal filtro, altrimenti
+        // sparirebbe da sotto gli occhi; su una prenotazione nuova invece
+        // non c'e' niente da proteggere e va nascosto come gli altri
+        var daTenere = idAttuale ? selMezzo.value : null;
+        var scelto   = selMezzo.value;
 
         function ripristina(nota) {
             selMezzo.innerHTML = '';
@@ -194,16 +199,19 @@
                 selMezzo.add(new Option(o.text, o.value));
             });
             selMezzo.value = scelto;
-            if (avviso) avviso.textContent = nota || '';
+            selMezzo.disabled = false;
+            if (avviso) { avviso.textContent = nota || ''; avviso.className = 'ac-avviso'; }
         }
 
         if (!dal || !al || !dal.value || !al.value || al.value < dal.value) {
-            ripristina('');
+            // senza date non si puo' sapere chi e' libero: meglio non far
+            // scegliere che far scegliere a caso
+            ripristina('Scegli prima le date.');
+            selMezzo.disabled = true;
             return;
         }
 
         var q = '?dal=' + dal.value + '&al=' + al.value;
-        var idAttuale = campo('ac-p-id') ? campo('ac-p-id').value : '';
         if (idAttuale) q += '&escludi=' + idAttuale;
 
         fetch('/autocarrate/prenotazioni/occupati' + q, {
@@ -215,17 +223,16 @@
 
                 var nascoste = 0;
                 selMezzo.innerHTML = '';
+                selMezzo.disabled = false;
 
                 tutteOpz.forEach(function (o) {
                     var occ = d.occupati[o.value];
-                    // in modifica il mezzo gia' assegnato resta in elenco,
-                    // altrimenti sparirebbe da sotto gli occhi
-                    if (occ && o.value !== scelto) { nascoste++; return; }
+                    if (occ && o.value !== daTenere) { nascoste++; return; }
                     selMezzo.add(new Option(o.text, o.value));
                 });
 
                 if (selMezzo.options.length) {
-                    selMezzo.value = scelto && selMezzo.querySelector('option[value="' + scelto + '"]')
+                    selMezzo.value = selMezzo.querySelector('option[value="' + scelto + '"]')
                         ? scelto
                         : selMezzo.options[0].value;
                 }

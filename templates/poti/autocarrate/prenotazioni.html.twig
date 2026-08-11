@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=7">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=8">
 {% endblock %}
 
 {% block content %}
@@ -122,14 +122,37 @@
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <input type="hidden" name="id" id="ac-p-id" value="">
 
-                {# l'elenco si restringe alle sole libere quando si scelgono
-                   le date: vedi sotto l'avviso con quante ne sono sparite #}
+                {# Prima le date, poi il mezzo: l'elenco delle autocarrate si
+                   puo' restringere alle sole libere solo dopo aver saputo
+                   per quando serve. #}
+                <label class="ac-f">
+                    <span>Dal</span>
+                    <input type="date" name="data_inizio" id="ac-p-dal" required>
+                </label>
+
+                <label class="ac-f">
+                    <span>Al</span>
+                    <input type="date" name="data_fine" id="ac-p-al" required>
+                </label>
+
                 <label class="ac-f ac-f-2">
                     <span>Autocarrata</span>
+                    {# il blocco lo mette il JS: se non parte, il campo resta
+                       usabile e il controllo lo fa comunque il server #}
                     <select name="autocarrata_id" id="ac-p-mezzo" required>
                         {% for m in mezzi %}<option value="{{ m.id }}">{{ m.targa }} — {{ m.modello ?: 'senza modello' }}</option>{% endfor %}
                     </select>
-                    <small class="ac-avviso" id="ac-p-avviso"></small>
+                    <small class="ac-avviso" id="ac-p-avviso">Scegli prima le date.</small>
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Cliente</span>
+                    <input type="text" name="cliente" id="ac-p-cliente" required maxlength="160">
+                </label>
+
+                <label class="ac-f">
+                    <span>Telefono</span>
+                    <input type="text" name="telefono" id="ac-p-tel" maxlength="40">
                 </label>
 
                 <label class="ac-f">
@@ -139,29 +162,9 @@
                     </select>
                 </label>
 
-                <label class="ac-f">
-                    <span>Telefono</span>
-                    <input type="text" name="telefono" id="ac-p-tel" maxlength="40">
-                </label>
-
-                <label class="ac-f ac-f-2">
-                    <span>Cliente</span>
-                    <input type="text" name="cliente" id="ac-p-cliente" required maxlength="160">
-                </label>
-
                 <label class="ac-f ac-f-2">
                     <span>Luogo</span>
                     <input type="text" name="luogo" id="ac-p-luogo" maxlength="200">
-                </label>
-
-                <label class="ac-f">
-                    <span>Dal</span>
-                    <input type="date" name="data_inizio" id="ac-p-dal" required>
-                </label>
-
-                <label class="ac-f">
-                    <span>Al</span>
-                    <input type="date" name="data_fine" id="ac-p-al" required>
                 </label>
 
                 <label class="ac-f">
@@ -236,5 +239,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=7"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=8"></script>
 {% endblock %}
