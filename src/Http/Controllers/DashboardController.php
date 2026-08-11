@@ -24,13 +24,22 @@ final class DashboardController
         $role      = $userInfo['role']       ?? '';
         $pageTitle = 'Dashboard';
 
-        $data = compact('username', 'name', 'role', 'pageTitle');
-
         // Le dashboard fisse (admin, documenti) sono fatte sui dati del
         // Consorzio: dentro un'altra societa' mostrerebbero cantieri e
         // documenti che li' non c'entrano. In quel caso si usa comunque
         // quella dinamica, che si costruisce sui moduli della societa'.
         $ruoloEffettivo = $this->societaLimitata() ? 'dinamica' : $role;
+
+        // Il ruolo passato alla vista e' quello effettivo, non quello
+        // dell'utente: il template sceglie da li' quale dashboard disegnare,
+        // e se non coincide con i dati calcolati si ritrova a riempire
+        // riquadri per cui non ha ricevuto niente.
+        $data = [
+            'username'  => $username,
+            'name'      => $name,
+            'role'      => $ruoloEffettivo,
+            'pageTitle' => $pageTitle,
+        ];
 
         match ($ruoloEffettivo) {
             'admin'            => $data += $this->dataForAdmin($name),
