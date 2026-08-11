@@ -219,6 +219,7 @@ final class AutocarrataRepository
             ':contratto'=> $d['contratto'] !== '' ? $d['contratto'] : null,
             ':importo'  => $d['importo'] !== '' ? $d['importo'] : null,
             ':comm'     => $d['commerciale_user_id'] ?: null,
+            ':pag'      => $d['pagamento'],
             ':cid'      => $companyId,
         ];
 
@@ -228,7 +229,8 @@ final class AutocarrataRepository
                 SET autocarrata_id = :mid, cliente = :cliente, telefono = :telefono,
                     luogo = :luogo, data_inizio = :dal, data_fine = :al, stato = :stato,
                     tariffa_giorno = :tariffa, totale = :totale, note = :note,
-                    contratto = :contratto, importo = :importo, commerciale_user_id = :comm
+                    contratto = :contratto, importo = :importo, commerciale_user_id = :comm,
+                    pagamento = :pag
                 WHERE id = :id AND group_company_id = :cid
             ");
             $stmt->execute($p + [':id' => $id]);
@@ -239,10 +241,10 @@ final class AutocarrataRepository
             INSERT INTO pn_prenotazioni
                 (group_company_id, autocarrata_id, cliente, telefono, luogo,
                  data_inizio, data_fine, stato, tariffa_giorno, totale, note,
-                 contratto, importo, commerciale_user_id, created_by)
+                 contratto, importo, commerciale_user_id, pagamento, created_by)
             VALUES (:cid, :mid, :cliente, :telefono, :luogo,
                     :dal, :al, :stato, :tariffa, :totale, :note,
-                    :contratto, :importo, :comm, :uid)
+                    :contratto, :importo, :comm, :pag, :uid)
         ");
         $stmt->execute($p + [':uid' => $userId]);
         return (int)$this->conn->lastInsertId();

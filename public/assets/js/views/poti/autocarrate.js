@@ -5,6 +5,21 @@
 (function () {
     'use strict';
 
+    // ── Calendario / elenco ─────────────────────────────────────────────────
+    var vistaCal = document.getElementById('ac-vista-calendario');
+    var vistaEle = document.getElementById('ac-vista-elenco');
+
+    document.querySelectorAll('[data-ac-vista]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var cal = b.dataset.acVista === 'calendario';
+            if (vistaCal) vistaCal.hidden = !cal;
+            if (vistaEle) vistaEle.hidden = cal;
+            document.querySelectorAll('[data-ac-vista]').forEach(function (x) {
+                x.classList.toggle('on', x === b);
+            });
+        });
+    });
+
     var modal = document.getElementById('ac-modal-mezzo') || document.getElementById('ac-modal-pren');
     if (!modal) return;
 
@@ -28,6 +43,11 @@
         modal.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], textarea')
             .forEach(function (i) { i.value = ''; });
         modal.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
+
+        // il commerciale torna a chi sta usando BOB, non alla prima voce
+        var comm = campo('ac-p-commerciale');
+        if (comm && comm.dataset.predefinito) comm.value = comm.dataset.predefinito;
+
         var id = campo(isPren ? 'ac-p-id' : 'ac-m-id');
         if (id) id.value = '';
         var del = campo('ac-p-elimina');
@@ -60,8 +80,13 @@
                 campo('ac-p-stato').value   = d.stato || 'confermata';
                 campo('ac-p-note').value    = d.note || '';
 
-                campo('ac-p-contratto').value   = d.contratto || '';
-                campo('ac-p-commerciale').value = d.commerciale_user_id || '0';
+                campo('ac-p-contratto').value = d.contratto || '';
+                campo('ac-p-pagamento').value = d.pagamento || 'da_pagare';
+
+                // in modifica si tiene il commerciale registrato; se manca
+                // (prenotazioni vecchie) resta quello proposto
+                var comm = campo('ac-p-commerciale');
+                if (comm && d.commerciale_user_id) comm.value = d.commerciale_user_id;
 
                 // i campi prezzo esistono solo per chi puo' vederli
                 var t = campo('ac-p-tariffa');

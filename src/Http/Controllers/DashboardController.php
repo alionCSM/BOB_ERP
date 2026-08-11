@@ -26,7 +26,13 @@ final class DashboardController
 
         $data = compact('username', 'name', 'role', 'pageTitle');
 
-        match ($role) {
+        // Le dashboard fisse (admin, documenti) sono fatte sui dati del
+        // Consorzio: dentro un'altra societa' mostrerebbero cantieri e
+        // documenti che li' non c'entrano. In quel caso si usa comunque
+        // quella dinamica, che si costruisce sui moduli della societa'.
+        $ruoloEffettivo = $this->societaLimitata() ? 'dinamica' : $role;
+
+        match ($ruoloEffettivo) {
             'admin'            => $data += $this->dataForAdmin($name),
             'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
             // tutti gli altri ruoli: dashboard dinamica costruita sui permessi
@@ -34,6 +40,18 @@ final class DashboardController
         };
 
         Response::view('dashboard/index.html.twig', $request, $data);
+    }
+
+    /**
+     * True se la societa' attiva ha un elenco di moduli, cioe' non e' il
+     * Consorzio che li ha tutti. Serve a capire se le dashboard fisse
+     * hanno ancora senso.
+     */
+    private function societaLimitata(): bool
+    {
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        $dati    = $service->current();
+        return $dati !== null && !empty($dati['moduli']);
     }
 
     // ──────────────────────────────────────────────────────────────

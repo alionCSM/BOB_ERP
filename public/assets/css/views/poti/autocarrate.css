@@ -77,7 +77,6 @@
 .ac-alert.is-ko { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 
 /* ── Ricerca disponibilita' ─────────────────────────────────────────────── */
-.ac-cerca,
 .ac-filtri {
     display: flex;
     align-items: flex-end;
@@ -90,11 +89,43 @@
     border-radius: 10px;
 }
 
-.ac-cerca-tit {
-    align-self: center;
-    font-size: 13px;
+/* ── Verifica disponibilita' ────────────────────────────────────────────── */
+.ac-check {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ac-check-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    background: linear-gradient(120deg, #0c4a6e 0%, #0369a1 100%);
+    color: #fff;
+    font-size: 14px;
     font-weight: 700;
-    color: #1e293b;
+}
+
+.ac-check-tile i { width: 20px; height: 20px; }
+
+.ac-check-campi {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    flex: 1 1 auto;
+}
+
+@media (max-width: 620px) {
+    .ac-check-tile { width: 100%; justify-content: center; }
 }
 
 .ac-f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
@@ -183,6 +214,8 @@
 .ac-stato-confermata    { background: #dbeafe; color: #1e40af; }
 .ac-stato-opzione       { background: #fef3c7; color: #92400e; }
 .ac-stato-annullata     { background: #fee2e2; color: #991b1b; }
+.ac-pag-pagata          { background: #dcfce7; color: #166534; }
+.ac-pag-da_pagare       { background: #fef3c7; color: #92400e; }
 
 /* ── Riquadri e tabelle ─────────────────────────────────────────────────── */
 .ac-box {
@@ -322,6 +355,91 @@
 
 .ac-legenda span { display: flex; align-items: center; gap: 6px; }
 .ac-legenda i { width: 16px; height: 10px; }
+
+/* ── Calendario ─────────────────────────────────────────────────────────── */
+.ac-vista { display: flex; gap: 4px; }
+
+.ac-vista-b {
+    padding: 5px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+}
+.ac-vista-b.on { background: #0369a1; border-color: #0369a1; color: #fff; }
+
+.ac-cal {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 18px;
+}
+
+.ac-cal[hidden] { display: none; }
+
+.ac-cal-tit {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ac-cal-wd,
+.ac-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+}
+
+.ac-cal-wd span {
+    padding: 3px 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.ac-cal-c {
+    min-height: 62px;
+    padding: 3px;
+    border: 1px solid #eef2f7;
+    border-radius: 5px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.ac-cal-c.is-vuota { border-color: transparent; background: transparent; }
+.ac-cal-c.is-fest  { background: #f8fafc; }
+.ac-cal-c.is-oggi  { border-color: #0369a1; box-shadow: inset 0 0 0 1px #0369a1; }
+
+.ac-cal-n { display: block; font-size: 10px; font-weight: 700; color: #64748b; }
+
+/* le targhe possono essere piu' larghe della casella: si troncano invece
+   di allargare la griglia */
+.ac-ev {
+    display: block;
+    margin-top: 2px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.ac-ev-confermata { background: #2563eb; }
+.ac-ev-opzione    { background: #f59e0b; }
+.ac-ev-annullata  { background: #cbd5e1; }
+
+.ac-ev-piu { display: block; margin-top: 2px; font-size: 9px; color: #94a3b8; }
 
 /* ── Modali ─────────────────────────────────────────────────────────────── */
 /* hidden come attributo: la modale non lampeggia prima che arrivi il CSS */

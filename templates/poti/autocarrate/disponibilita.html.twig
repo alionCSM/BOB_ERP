@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=3">
 {% endblock %}
 
 {% block content %}
@@ -19,22 +19,27 @@
     </div>
 
     {# ── Ricerca disponibilita' ──────────────────────────────────────────── #}
-    <form method="GET" class="ac-cerca">
-        <div class="ac-cerca-tit">Mi serve un'autocarrata</div>
-        <label class="ac-f">
-            <span>dal</span>
-            <input type="date" name="cerca_dal" value="{{ cercaDal }}">
-        </label>
-        <label class="ac-f">
-            <span>al</span>
-            <input type="date" name="cerca_al" value="{{ cercaAl }}">
-        </label>
-        <input type="hidden" name="dal" value="{{ dal }}">
-        <input type="hidden" name="al" value="{{ al }}">
-        <button class="ac-btn ac-btn-primary">Cerca</button>
-        {% if ricercaAttiva %}
-            <a href="/autocarrate" class="ac-link">azzera</a>
-        {% endif %}
+    <form method="GET" class="ac-check">
+        <div class="ac-check-tile">
+            <i data-lucide="calendar"></i>
+            <span>Verifica disponibilita'</span>
+        </div>
+        <div class="ac-check-campi">
+            <label class="ac-f">
+                <span>dal</span>
+                <input type="date" name="cerca_dal" value="{{ cercaDal }}">
+            </label>
+            <label class="ac-f">
+                <span>al</span>
+                <input type="date" name="cerca_al" value="{{ cercaAl }}">
+            </label>
+            <input type="hidden" name="dal" value="{{ dal }}">
+            <input type="hidden" name="al" value="{{ al }}">
+            <button class="ac-btn ac-btn-primary">Verifica</button>
+            {% if ricercaAttiva %}
+                <a href="/autocarrate" class="ac-link">azzera</a>
+            {% endif %}
+        </div>
     </form>
 
     {# ── Elenco mezzi ────────────────────────────────────────────────────── #}

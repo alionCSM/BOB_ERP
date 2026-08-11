@@ -17,6 +17,7 @@ final class AutocarrateController
 {
     private const STATI_MEZZO = ['attiva', 'manutenzione', 'dismessa'];
     private const STATI_PREN  = ['opzione', 'confermata', 'annullata'];
+    private const PAGAMENTI   = ['da_pagare', 'pagata'];
 
     public function __construct(private \PDO $conn) {}
 
@@ -134,6 +135,9 @@ final class AutocarrateController
             'mezzi'        => $repo->mezzi($cid, true),
             'commerciali'  => $repo->commerciali($cid),
             'stati'        => self::STATI_PREN,
+            'pagamenti'    => self::PAGAMENTI,
+            'utenteId'     => (int)$this->utente($request)->id,
+            'calendario'   => $this->calendario($dal, $al, $repo->prenotazioni($cid, $dal, $al)),
             'dal'          => $dal,
             'al'           => $al,
             'mezzoId'      => (int)($_GET['mezzo'] ?? 0),
@@ -199,7 +203,14 @@ final class AutocarrateController
             'totale'         => $this->importo($_POST['totale'] ?? ''),
             'contratto'      => trim((string)($_POST['contratto'] ?? '')),
             'importo'        => $this->importo($_POST['importo'] ?? ''),
-            'commerciale_user_id' => (int)($_POST['commerciale_user_id'] ?? 0),
+            // il commerciale e' chi sta inserendo, a meno che non venga
+            // scelta un'altra persona: in ufficio capita di registrare una
+            // trattativa seguita da un collega
+            'commerciale_user_id' => (int)($_POST['commerciale_user_id'] ?? 0)
+                                     ?: (int)$this->utente($request)->id,
+            'pagamento'      => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
+                                ? (string)$_POST['pagamento']
+                                : 'da_pagare',
             'note'           => trim((string)($_POST['note'] ?? '')),
         ], (int)$this->utente($request)->id);
 
@@ -255,6 +266,81 @@ final class AutocarrateController
     {
         $v = str_replace(',', '.', trim((string)$valore));
         return is_numeric($v) ? $v : '';
+    }
+
+    private const MESI = ['', 'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+                          'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+
+    /**
+     * Calendario a mesi con gli impegni di ogni giorno.
+     *
+     * Le settimane partono da lunedi' e i mesi sono completati con i giorni
+     * vuoti agli estremi, altrimenti la griglia risulterebbe sfalsata.
+     *
+     * @return array<int, array{titolo:string, celle:array}>
+     */
+    private function calendario(string $dal, string $al, array $prenotazioni): array
+    {
+        // impegni indicizzati per giorno: cosi' il template non deve
+        // scorrere tutte le prenotazioni per ogni casella
+        $perGiorno = [];
+        foreach ($prenotazioni as $p) {
+            for ($g = $p['data_inizio']; $g <= $p['data_fine']; $g = date('Y-m-d', strtotime($g . ' +1 day'))) {
+                $perGiorno[$g][] = [
+                    'targa'   => $p['targa'],
+                    'cliente' => $p['cliente'],
+                    'stato'   => $p['stato'],
+                    'luogo'   => $p['luogo'] ?? '',
+                ];
+            }
+        }
+
+        $oggi  = date('Y-m-d');
+        $mesi  = [];
+        $cur   = strtotime(date('Y-m-01', strtotime($dal)));
+        $fine  = strtotime(date('Y-m-01', strtotime($al)));
+
+        // tetto: oltre sei mesi la pagina diventa lunghissima e poco utile
+        while ($cur <= $fine && count($mesi) < 6) {
+            $anno   = (int)date('Y', $cur);
+            $mese   = (int)date('n', $cur);
+            $giorni = (int)date('t', $cur);
+
+            $celle = [];
+
+            // caselle vuote prima del primo giorno, per allineare i lunedi'
+            $primoWd = (int)date('N', mktime(0, 0, 0, $mese, 1, $anno));
+            for ($i = 1; $i < $primoWd; $i++) {
+                $celle[] = ['vuota' => true];
+            }
+
+            for ($g = 1; $g <= $giorni; $g++) {
+                $iso = sprintf('%04d-%02d-%02d', $anno, $mese, $g);
+                $wd  = (int)date('N', strtotime($iso));
+                $celle[] = [
+                    'vuota'   => false,
+                    'iso'     => $iso,
+                    'g'       => $g,
+                    'festivo' => $wd >= 6,
+                    'oggi'    => $iso === $oggi,
+                    'eventi'  => $perGiorno[$iso] ?? [],
+                ];
+            }
+
+            // e dopo l'ultimo, per chiudere l'ultima riga
+            while (count($celle) % 7 !== 0) {
+                $celle[] = ['vuota' => true];
+            }
+
+            $mesi[] = [
+                'titolo' => self::MESI[$mese] . ' ' . $anno,
+                'celle'  => $celle,
+            ];
+
+            $cur = strtotime('+1 month', $cur);
+        }
+
+        return $mesi;
     }
 
     /**

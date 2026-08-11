@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=3">
 {% endblock %}
 
 {% block content %}
@@ -42,8 +42,52 @@
         <button class="ac-btn ac-btn-primary">Filtra</button>
     </form>
 
+    {# ── Calendario ──────────────────────────────────────────────────────── #}
     <div class="ac-box">
-        <div class="ac-table-wrap">
+        <div class="ac-box-head">
+            <span>Calendario</span>
+            <div class="ac-vista">
+                <button type="button" class="ac-vista-b on" data-ac-vista="calendario">Calendario</button>
+                <button type="button" class="ac-vista-b" data-ac-vista="elenco">Elenco</button>
+            </div>
+        </div>
+
+        <div class="ac-cal" id="ac-vista-calendario">
+            {% for m in calendario %}
+                <div class="ac-cal-mese">
+                    <div class="ac-cal-tit">{{ m.titolo }}</div>
+                    <div class="ac-cal-wd">
+                        {% for d in ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'] %}
+                            <span>{{ d }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="ac-cal-grid">
+                        {% for c in m.celle %}
+                            {% if c.vuota %}
+                                <div class="ac-cal-c is-vuota"></div>
+                            {% else %}
+                                <div class="ac-cal-c{{ c.festivo ? ' is-fest' : '' }}{{ c.oggi ? ' is-oggi' : '' }}">
+                                    <span class="ac-cal-n">{{ c.g }}</span>
+                                    {% for e in c.eventi|slice(0, 3) %}
+                                        <span class="ac-ev ac-ev-{{ e.stato }}"
+                                              title="{{ e.targa }} — {{ e.cliente }}{{ e.luogo ? ' — ' ~ e.luogo : '' }}">
+                                            {{ e.targa }}
+                                        </span>
+                                    {% endfor %}
+                                    {% if c.eventi|length > 3 %}
+                                        <span class="ac-ev-piu">+{{ c.eventi|length - 3 }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="ac-empty">Nessun mese nel periodo scelto.</div>
+            {% endfor %}
+        </div>
+
+        <div class="ac-table-wrap" id="ac-vista-elenco" hidden>
             <table class="ac-table">
                 <thead>
                     <tr>
@@ -61,6 +105,7 @@
                             <th class="right">Importo</th>
                         {% endif %}
                         <th>Stato</th>
+                        <th>Pagamento</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -88,6 +133,11 @@
                                 </td>
                             {% endif %}
                             <td><span class="ac-stato ac-stato-{{ p.stato }}">{{ p.stato }}</span></td>
+                            <td>
+                                <span class="ac-stato ac-pag-{{ p.pagamento|default('da_pagare') }}">
+                                    {{ p.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
+                                </span>
+                            </td>
                             <td class="right">
                                 <button type="button" class="ac-link"
                                         data-ac-modifica="{{ p|json_encode|e('html_attr') }}">modifica</button>
@@ -95,7 +145,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="{{ canSeePrices ? 13 : 10 }}" class="ac-empty">
+                            <td colspan="{{ canSeePrices ? 14 : 11 }}" class="ac-empty">
                                 Nessuna prenotazione nel periodo.
                             </td>
                         </tr>
@@ -162,11 +212,21 @@
                 </label>
 
                 <label class="ac-f">
+                    <span>Pagamento</span>
+                    <select name="pagamento" id="ac-p-pagamento">
+                        {% for p in pagamenti %}
+                            <option value="{{ p }}">{{ p == 'pagata' ? 'pagata' : 'da pagare' }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                {# preselezionato su chi sta inserendo, ma modificabile:
+                   in ufficio capita di registrare la trattativa di un collega #}
+                <label class="ac-f">
                     <span>Commerciale</span>
-                    <select name="commerciale_user_id" id="ac-p-commerciale">
-                        <option value="0">—</option>
+                    <select name="commerciale_user_id" id="ac-p-commerciale" data-predefinito="{{ utenteId }}">
                         {% for c in commerciali %}
-                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                            <option value="{{ c.id }}" {{ c.id == utenteId ? 'selected' : '' }}>{{ c.nome }}</option>
                         {% endfor %}
                     </select>
                 </label>
@@ -215,5 +275,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=2"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=3"></script>
 {% endblock %}
