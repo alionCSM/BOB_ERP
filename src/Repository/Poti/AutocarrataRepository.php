@@ -100,10 +100,13 @@ final class AutocarrataRepository
         $sql = "
             SELECT p.*, a.targa, a.modello,
                    DATEDIFF(p.data_fine, p.data_inizio) + 1 AS giorni,
-                   -- il commerciale si salva per id e si mostra per nome:
-                   -- se cambia nome la prenotazione resta legata alla persona
+                   -- il commerciale si salva per id e si mostra per nome: se
+                   -- cambia nome la prenotazione resta legata alla persona.
+                   -- Sulle righe importate dal vecchio sistema non c'e' un
+                   -- utente, solo un nome scritto: si ripiega su quello.
                    COALESCE(NULLIF(TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))), ''),
-                            c.username) AS commerciale_nome
+                            c.username,
+                            p.commerciale_testo) AS commerciale_nome
             FROM   pn_prenotazioni p
             JOIN   pn_autocarrate  a ON a.id = p.autocarrata_id
             LEFT JOIN bb_users     c ON c.id = p.commerciale_user_id
