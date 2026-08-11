@@ -46,6 +46,25 @@ if (!empty($user->must_change_password) && $uri !== '/change-password') {
     exit;
 }
 
+// ── Societa' del gruppo attiva (multi-azienda) ───────────────────────────────
+// Il controllo sta qui e non nel login perche' i percorsi di accesso sono piu'
+// di uno (login normale, verifica IP, remember-me): cosi' valgono tutti.
+// Chi ha una sola societa' non se ne accorge: viene scelta da sola.
+$currentCompany = new \App\Service\CurrentCompany($connection);
+$GLOBALS['currentCompany'] = $currentCompany;
+
+// operai e clienti restano fuori: le loro rotte sono limitate e finirebbero
+// su un 403 invece che sulla pagina di scelta
+$sceltaSocietaEsclusa = in_array($user->type, ['worker', 'client'], true);
+
+if (!$sceltaSocietaEsclusa && !isset($_SESSION[\App\Service\CurrentCompany::SESSION_KEY])) {
+    $sceltaAutomatica = $currentCompany->autoSelectOnLogin((int)$user->id);
+    if (!$sceltaAutomatica && $uri !== '/select-company') {
+        header('Location: /select-company');
+        exit;
+    }
+}
+
 // ── Authorization services ────────────────────────────────────────────────────
 $authorization   = new AuthorizationService(new AccessProfileResolver());
 $capabilityService = new CapabilityService();

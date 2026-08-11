@@ -134,6 +134,25 @@ if (in_array($uri, ['/change-password', '/confirm-email'], true)) {
     $router->dispatch($request, $container);
 }
 
+// ── Societa' del gruppo (multi-azienda) ──────────────────────────────────────
+if (in_array($uri, ['/select-company', '/switch-company'], true)
+    || $uri === '/societa' || str_starts_with($uri, '/societa/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/select-company',   [GroupCompanyController::class, 'selectForm'])
+           ->post('/select-company',  [GroupCompanyController::class, 'select'])
+           ->post('/switch-company',  [GroupCompanyController::class, 'switch'])
+           ->get('/societa',          [GroupCompanyController::class, 'manage'])
+           ->post('/societa/salva',   [GroupCompanyController::class, 'save'])
+           ->post('/societa/utenti',  [GroupCompanyController::class, 'saveUsers']);
+
+    $router->dispatch($request, $container);
+}
+
 if ($uri === '/offers' || str_starts_with($uri, '/offers/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

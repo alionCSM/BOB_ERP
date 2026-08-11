@@ -1,0 +1,108 @@
+/*
+ * Selettore della societa' del gruppo in top bar.
+ * Prefisso gc- per restare fuori dagli stili generici del template.
+ */
+
+.gc-current {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 200px;
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    transition: background .15s, border-color .15s;
+}
+
+.gc-current:hover {
+    background: rgba(255, 255, 255, .12);
+    border-color: rgba(255, 255, 255, .45);
+}
+
+.gc-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, .25);
+}
+
+/* il codice societa' non deve spingere fuori la barra su schermi stretti */
+.gc-nome {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gc-chevron {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    opacity: .7;
+}
+
+/* ── Menu a tendina ────────────────────────────────────────────────────── */
+/* il menu e' in posizione assoluta: max-width in % non lo limiterebbe,
+   serve il viewport (stesso motivo del pannello job) */
+.gc-menu {
+    width: 280px;
+    max-width: calc(100vw - 24px);
+    padding: 6px;
+}
+
+.gc-menu-head {
+    padding: 8px 10px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #94a3b8;
+}
+
+.gc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 7px;
+    text-align: left;
+    font-size: 13px;
+    color: #1e293b;
+    cursor: pointer;
+    transition: background .12s;
+}
+
+.gc-item:hover { background: #f1f5f9; }
+.gc-item.is-active { background: #eff6ff; font-weight: 600; }
+
+.gc-item-nome {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gc-check {
+    flex: 0 0 auto;
+    width: 15px;
+    height: 15px;
+    color: #2563eb;
+}
+
+/* su telefono lascia spazio alle altre icone: resta solo il pallino */
+@media (max-width: 640px) {
+    .gc-current { max-width: none; padding: 6px 8px; }
+    .gc-nome    { display: none; }
+    .gc-chevron { width: 12px; height: 12px; }
+}
+
+.dark .gc-item { color: #e2e8f0; }
+.dark .gc-item:hover { background: rgba(255, 255, 255, .06); }
+.dark .gc-item.is-active { background: rgba(59, 130, 246, .15); }

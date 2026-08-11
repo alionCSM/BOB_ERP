@@ -49,6 +49,9 @@ final class LayoutDataProvider
             'notifications'      => $this->recentNotifications($userId),
             'vapidPublicKey'     => $this->config->vapidPublicKey(),
 
+            // ── Top-bar: societa' del gruppo ─────────────────────────────
+            ...$this->groupCompanies($userId),
+
             // ── CSRF / CSP ───────────────────────────────────────────────
             'csrfToken'          => csrf_token(),
             'cspNonce'           => csp_nonce(),
@@ -59,6 +62,33 @@ final class LayoutDataProvider
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Societa' del gruppo dell'utente e quella attiva.
+     *
+     * Il selettore in top bar compare solo a chi ne ha piu' di una: per tutti
+     * gli altri la barra resta identica a prima.
+     *
+     * @return array{groupCompanies: array, currentGroupCompany: ?array}
+     */
+    private function groupCompanies(int $userId): array
+    {
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        $lista   = $service->availableFor($userId);
+
+        $attiva = null;
+        foreach ($lista as $c) {
+            if ($c['id'] === $service->id()) {
+                $attiva = $c;
+                break;
+            }
+        }
+
+        return [
+            'groupCompanies'      => $lista,
+            'currentGroupCompany' => $attiva,
+        ];
+    }
 
     private function unreadCount(int $userId): int
     {

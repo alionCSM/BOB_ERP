@@ -9,6 +9,36 @@
         </ol>
     </nav>
 
+    {# Cambio societa' del gruppo: solo per chi ha accesso a piu' di una #}
+    {% if groupCompanies|length > 1 %}
+    <div class="intro-x dropdown gc-switch mr-4 sm:mr-6">
+        <div class="dropdown-toggle gc-current cursor-pointer" role="button"
+             aria-expanded="false" data-tw-toggle="dropdown" title="Cambia societa'">
+            <span class="gc-dot" style="background: {{ currentGroupCompany.colore ?? '#1e3a5f' }}"></span>
+            <span class="gc-nome">{{ currentGroupCompany.codice ?? 'Societa\'' }}</span>
+            <i data-lucide="chevron-down" class="gc-chevron"></i>
+        </div>
+        <div class="dropdown-menu">
+            <div class="dropdown-content gc-menu">
+                <div class="gc-menu-head">Societa' del gruppo</div>
+                {% for s in groupCompanies %}
+                    <form method="POST" action="/switch-company">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <input type="hidden" name="group_company_id" value="{{ s.id }}">
+                        <button type="submit" class="gc-item{{ currentGroupCompany and s.id == currentGroupCompany.id ? ' is-active' : '' }}">
+                            <span class="gc-dot" style="background: {{ s.colore }}"></span>
+                            <span class="gc-item-nome">{{ s.nome }}</span>
+                            {% if currentGroupCompany and s.id == currentGroupCompany.id %}
+                                <i data-lucide="check" class="gc-check"></i>
+                            {% endif %}
+                        </button>
+                    </form>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if not isCompanyScopedUser %}
     <div class="intro-x dropdown mr-4 sm:mr-6">
         <div class="dropdown-toggle notification cursor-pointer" role="button" aria-expanded="false" data-tw-toggle="dropdown">
@@ -136,6 +166,9 @@
                 <li><hr class="dropdown-divider border-white/[0.08]"></li>
                 <li><a href="/profile" class="dropdown-item hover:bg-white/5"><i data-lucide="user" class="w-4 h-4 mr-2"></i> Profilo</a></li>
                 <li><a href="/profile#password" class="dropdown-item hover:bg-white/5"><i data-lucide="lock" class="w-4 h-4 mr-2"></i> Cambia Password</a></li>
+                {% if currentUserId == 1 or user.canAccess('societa') %}
+                <li><a href="/societa" class="dropdown-item hover:bg-white/5"><i data-lucide="building-2" class="w-4 h-4 mr-2"></i> Societa' del gruppo</a></li>
+                {% endif %}
                 {% if currentUserId == 1 %}
                 <li><hr class="dropdown-divider border-white/[0.08]"></li>
                 <li class="px-3 py-2">

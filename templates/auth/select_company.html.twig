@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="it" class="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Scegli societa' - BOB</title>
+    <link rel="shortcut icon" href="/includes/template/dist/images/logo.png">
+    <link rel="stylesheet" href="/includes/template/dist/css/app.css">
+    <link rel="stylesheet" href="/assets/css/views/auth/select_company.css?v=1">
+</head>
+<body class="login">
+<div class="container sm:px-10">
+    <div class="block xl:grid grid-cols-2 gap-4">
+
+        <!-- LEFT -->
+        <div class="hidden xl:flex flex-col min-h-screen">
+            <a class="-intro-x flex items-center pt-5">
+                <img class="w-8" src="/includes/template/dist/images/logo.png" alt="">
+                <span class="text-white text-xl ml-3"> BOB</span>
+            </a>
+            <div class="my-auto">
+                <img class="-intro-x w-2/3 -mt-36" src="/includes/template/dist/images/csmontaggi_logo.png" alt="CS Montaggi">
+            </div>
+        </div>
+
+        <!-- SCELTA -->
+        <div class="h-screen xl:h-auto flex py-5 my-10">
+            <div class="my-auto mx-auto bg-white dark:bg-darkmode-600 px-8 py-8 rounded-md shadow-md w-full sm:w-3/4 lg:w-2/4">
+
+                <h2 class="font-bold text-2xl text-center mb-2">In quale societa' vuoi entrare?</h2>
+                <p class="text-slate-500 text-center mb-6">
+                    {% if nomeUtente %}Ciao {{ nomeUtente }}, hai{% else %}Hai{% endif %}
+                    accesso a piu' societa' del gruppo. Potrai cambiarla anche dopo, dalla barra in alto.
+                </p>
+
+                {% if errore %}
+                    <div class="alert alert-danger-soft mb-4">
+                        Societa' non valida. Scegline una dall'elenco.
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="/select-company" class="sc-list">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                    {% for s in societa %}
+                        <button type="submit" name="group_company_id" value="{{ s.id }}"
+                                class="sc-card{{ s.id == attivaId ? ' is-active' : '' }}">
+                            <span class="sc-badge" style="background: {{ s.colore }}">{{ s.codice }}</span>
+                            <span class="sc-info">
+                                <span class="sc-nome">{{ s.nome }}</span>
+                                {% if s.is_default %}<span class="sc-default">predefinita</span>{% endif %}
+                            </span>
+                            <span class="sc-freccia" aria-hidden="true">&rsaquo;</span>
+                        </button>
+                    {% endfor %}
+                </form>
+
+                <div class="text-center mt-6">
+                    <a href="/logout" class="text-slate-500 text-sm underline">Esci</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+<script src="/includes/template/dist/js/app.js"></script>
+</body>
+</html>

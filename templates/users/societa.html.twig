@@ -1,0 +1,193 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/users/societa.css?v=1">
+{% endblock %}
+
+{% block content %}
+<div class="sg-page">
+
+    <div class="sg-hero">
+        <div>
+            <h1 class="sg-title">Societa' del gruppo</h1>
+            <p class="sg-sub">
+                Aziende del gruppo, indipendenti fra loro. Ognuna ha i propri dati e i propri
+                utenti: non sono le aziende consorziate.
+            </p>
+        </div>
+        <button type="button" class="sg-btn sg-btn-primary" id="sg-nuova">
+            <i data-lucide="plus"></i> Nuova societa'
+        </button>
+    </div>
+
+    {% if salvato %}
+        <div class="sg-alert is-ok">Modifiche salvate.</div>
+    {% endif %}
+    {% if errore %}
+        <div class="sg-alert is-ko">{{ errore }}</div>
+    {% endif %}
+
+    <div class="sg-grid">
+
+        {# ── Elenco ──────────────────────────────────────────────────────── #}
+        <div class="sg-col-list">
+            {% for s in societa %}
+                <a href="/societa?id={{ s.id }}"
+                   class="sg-card{{ selezionata and s.id == selezionata.id ? ' is-active' : '' }}">
+                    <span class="sg-badge" style="background: {{ s.colore }}">{{ s.codice }}</span>
+                    <span class="sg-card-info">
+                        <span class="sg-card-nome">{{ s.nome }}</span>
+                        <span class="sg-card-meta">
+                            {{ s.utenti }} utent{{ s.utenti == 1 ? 'e' : 'i' }}
+                            {% if not s.attiva %}<span class="sg-off">non attiva</span>{% endif %}
+                        </span>
+                    </span>
+                </a>
+            {% else %}
+                <div class="sg-empty">Nessuna societa'.</div>
+            {% endfor %}
+        </div>
+
+        {# ── Dettaglio ───────────────────────────────────────────────────── #}
+        <div class="sg-col-det">
+            {% if selezionata %}
+                <div class="sg-box" id="sg-form-box">
+                    <div class="sg-box-head">Dati societa'</div>
+                    <form method="POST" action="/societa/salva" class="sg-form">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <input type="hidden" name="id" value="{{ selezionata.id }}">
+
+                        <label class="sg-field sg-col-2">
+                            <span>Nome</span>
+                            <input type="text" name="nome" value="{{ selezionata.nome }}" required maxlength="120">
+                        </label>
+
+                        <label class="sg-field">
+                            <span>Codice</span>
+                            <input type="text" name="codice" value="{{ selezionata.codice }}" required maxlength="20">
+                        </label>
+
+                        <label class="sg-field">
+                            <span>Colore</span>
+                            <input type="color" name="colore" value="{{ selezionata.colore }}">
+                        </label>
+
+                        <label class="sg-field">
+                            <span>Ordinamento</span>
+                            <input type="number" name="ordinamento" value="{{ selezionata.ordinamento }}">
+                        </label>
+
+                        <label class="sg-field sg-check">
+                            <input type="checkbox" name="attiva" value="1" {{ selezionata.attiva ? 'checked' : '' }}>
+                            <span>Attiva</span>
+                        </label>
+
+                        <label class="sg-field sg-col-2">
+                            <span>Moduli abilitati</span>
+                            <input type="text" name="moduli" value="{{ selezionata.moduli }}"
+                                   placeholder="vuoto = tutti i moduli">
+                            <small>Elenco separato da virgole. Lasciare vuoto per abilitarli tutti.</small>
+                        </label>
+
+                        <div class="sg-actions">
+                            <button class="sg-btn sg-btn-primary">Salva</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="sg-box">
+                    <div class="sg-box-head">
+                        Utenti di {{ selezionata.nome }}
+                        <span class="sg-hint">Chi e' selezionato puo' entrare in questa societa'.</span>
+                    </div>
+                    <form method="POST" action="/societa/utenti">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                        <input type="hidden" name="group_company_id" value="{{ selezionata.id }}">
+
+                        <div class="sg-users-tools">
+                            <input type="search" id="sg-cerca" class="sg-search" placeholder="Cerca utente…">
+                            <button type="button" class="sg-link" data-sg-all="1">Seleziona tutti</button>
+                            <button type="button" class="sg-link" data-sg-all="0">Deseleziona</button>
+                        </div>
+
+                        <div class="sg-users">
+                            {% for u in utenti %}
+                                <label class="sg-user" data-nome="{{ (u.username ~ ' ' ~ u.email)|lower }}">
+                                    <input type="checkbox" name="user_ids[]" value="{{ u.id }}"
+                                           {{ u.assegnato ? 'checked' : '' }}>
+                                    <span class="sg-user-info">
+                                        <span class="sg-user-nome">{{ u.username }}</span>
+                                        <span class="sg-user-mail">{{ u.email }}</span>
+                                    </span>
+                                    {% if u.is_default %}<span class="sg-tag">predefinita</span>{% endif %}
+                                </label>
+                            {% else %}
+                                <div class="sg-empty">Nessun utente interno.</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="sg-actions">
+                            <button class="sg-btn sg-btn-primary">Salva utenti</button>
+                        </div>
+                    </form>
+                </div>
+            {% else %}
+                <div class="sg-box"><div class="sg-empty">Seleziona una societa' dall'elenco.</div></div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── Nuova societa' ──────────────────────────────────────────────────── #}
+    <div class="sg-modal" id="sg-modal" hidden aria-hidden="true">
+        <div class="sg-modal-box">
+            <div class="sg-modal-head">
+                <span>Nuova societa'</span>
+                <button type="button" class="sg-modal-close" data-sg-close>&times;</button>
+            </div>
+            <form method="POST" action="/societa/salva" class="sg-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                <label class="sg-field sg-col-2">
+                    <span>Nome</span>
+                    <input type="text" name="nome" required maxlength="120" placeholder="Poti Noleggi Srl">
+                </label>
+
+                <label class="sg-field">
+                    <span>Codice</span>
+                    <input type="text" name="codice" required maxlength="20" placeholder="POTI">
+                </label>
+
+                <label class="sg-field">
+                    <span>Colore</span>
+                    <input type="color" name="colore" value="#0ea5e9">
+                </label>
+
+                <label class="sg-field">
+                    <span>Ordinamento</span>
+                    <input type="number" name="ordinamento" value="0">
+                </label>
+
+                <label class="sg-field sg-check">
+                    <input type="checkbox" name="attiva" value="1" checked>
+                    <span>Attiva</span>
+                </label>
+
+                <label class="sg-field sg-col-2">
+                    <span>Moduli abilitati</span>
+                    <input type="text" name="moduli" placeholder="vuoto = tutti i moduli">
+                </label>
+
+                <div class="sg-actions">
+                    <button type="button" class="sg-btn" data-sg-close>Annulla</button>
+                    <button class="sg-btn sg-btn-primary">Crea societa'</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/users/societa.js?v=1"></script>
+{% endblock %}
