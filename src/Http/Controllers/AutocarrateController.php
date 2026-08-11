@@ -132,6 +132,7 @@ final class AutocarrateController
         Response::view('poti/autocarrate/prenotazioni.html.twig', $request, [
             'prenotazioni' => $repo->prenotazioni($cid, $dal, $al, (int)($_GET['mezzo'] ?? 0) ?: null),
             'mezzi'        => $repo->mezzi($cid, true),
+            'commerciali'  => $repo->commerciali($cid),
             'stati'        => self::STATI_PREN,
             'dal'          => $dal,
             'al'           => $al,
@@ -196,6 +197,9 @@ final class AutocarrateController
             'stato'          => $stato,
             'tariffa_giorno' => $this->importo($_POST['tariffa_giorno'] ?? ''),
             'totale'         => $this->importo($_POST['totale'] ?? ''),
+            'contratto'      => trim((string)($_POST['contratto'] ?? '')),
+            'importo'        => $this->importo($_POST['importo'] ?? ''),
+            'commerciale_user_id' => (int)($_POST['commerciale_user_id'] ?? 0),
             'note'           => trim((string)($_POST['note'] ?? '')),
         ], (int)$this->utente($request)->id);
 

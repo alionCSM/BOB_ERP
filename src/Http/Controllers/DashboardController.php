@@ -443,6 +443,32 @@ final class DashboardController
                         'icon' => 'M3 21h18M6 21V8l12-5v18', 'href' => '/equipment/rentals'];
         }
 
+        if ($has('pn_autocarrate')) {
+            // i contatori si fermano alla societa' attiva: e' un modulo di
+            // Poti e non deve mescolarsi con i dati del Consorzio
+            $cid = ($GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($conn))->id();
+
+            $s = $conn->prepare("
+                SELECT COUNT(*) FROM pn_autocarrate
+                WHERE group_company_id = :cid AND stato = 'attiva'
+            ");
+            $s->execute([':cid' => $cid]);
+            $totali = (int)$s->fetchColumn();
+
+            $s = $conn->prepare("
+                SELECT COUNT(DISTINCT autocarrata_id) FROM pn_prenotazioni
+                WHERE group_company_id = :cid AND stato <> 'annullata'
+                  AND data_inizio <= :d1 AND data_fine >= :d2
+            ");
+            $s->execute([':cid' => $cid, ':d1' => $today, ':d2' => $today]);
+            $impegnate = (int)$s->fetchColumn();
+
+            $stats[] = ['num' => max(0, $totali - $impegnate), 'label' => 'Autocarrate libere', 'sub' => 'oggi', 'color' => '#16a34a', 'bg' => '#f0fdf4',
+                        'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1', 'href' => '/autocarrate'];
+            $stats[] = ['num' => $impegnate, 'label' => 'Autocarrate impegnate', 'sub' => 'oggi', 'color' => '#0369a1', 'bg' => '#f0f9ff',
+                        'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2', 'href' => '/autocarrate/prenotazioni'];
+        }
+
         if ($has('documents', 'document_alerts')) {
             $docCtrl    = new \App\Service\Documents\WorkerDocumentController($conn);
             $expired    = $docCtrl->getExpiredDocuments($user);

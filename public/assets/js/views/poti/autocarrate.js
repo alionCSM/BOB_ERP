@@ -60,11 +60,16 @@
                 campo('ac-p-stato').value   = d.stato || 'confermata';
                 campo('ac-p-note').value    = d.note || '';
 
+                campo('ac-p-contratto').value   = d.contratto || '';
+                campo('ac-p-commerciale').value = d.commerciale_user_id || '0';
+
                 // i campi prezzo esistono solo per chi puo' vederli
                 var t = campo('ac-p-tariffa');
                 if (t) t.value = d.tariffa_giorno || '';
                 var tot = campo('ac-p-totale');
                 if (tot) tot.value = d.totale || '';
+                var imp = campo('ac-p-importo');
+                if (imp) imp.value = d.importo || '';
 
                 var del = campo('ac-p-elimina');
                 if (del) {

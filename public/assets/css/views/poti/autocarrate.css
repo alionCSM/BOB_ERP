@@ -254,6 +254,9 @@
 
 .ac-tel { display: block; font-size: 11px; color: #94a3b8; }
 
+/* importo di contratto diverso dal totale calcolato: va notato */
+.ac-diff { color: #b45309; font-weight: 700; }
+
 .ac-empty { padding: 26px; text-align: center; font-size: 13px; color: #94a3b8; }
 
 /* ── Timeline ───────────────────────────────────────────────────────────── */

@@ -86,6 +86,48 @@ final class AutocarrataRepository
         return (int)$stmt->fetchColumn() > 0;
     }
 
+    /**
+     * Utenti selezionabili come commerciale.
+     *
+     * Sono quelli assegnati alla societa': mettere in elenco tutti gli utenti
+     * di BOB significherebbe proporre persone che con Poti non c'entrano.
+     * Se nessuno risulta assegnato si ripiega sugli utenti interni, cosi' il
+     * campo resta utilizzabile prima di aver sistemato le assegnazioni.
+     */
+    public function commerciali(int $companyId): array
+    {
+        $sql = "
+            SELECT u.id,
+                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                            u.username) AS nome
+            FROM   bb_users u
+            JOIN   bb_user_companies uc ON uc.user_id = u.id AND uc.group_company_id = :cid
+            WHERE  u.type NOT IN ('worker', 'client')
+            ORDER BY nome ASC
+        ";
+
+        try {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([':cid' => $companyId]);
+            $righe = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            if ($righe) {
+                return $righe;
+            }
+        } catch (\Throwable $e) {
+            error_log('[AutocarrataRepository] commerciali: ' . $e->getMessage());
+        }
+
+        $stmt = $this->conn->query("
+            SELECT u.id,
+                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
+                            u.username) AS nome
+            FROM   bb_users u
+            WHERE  u.type NOT IN ('worker', 'client')
+            ORDER BY nome ASC
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     // ── Prenotazioni ─────────────────────────────────────────────────────────
 
     /**
@@ -99,9 +141,14 @@ final class AutocarrataRepository
     {
         $sql = "
             SELECT p.*, a.targa, a.modello,
-                   DATEDIFF(p.data_fine, p.data_inizio) + 1 AS giorni
+                   DATEDIFF(p.data_fine, p.data_inizio) + 1 AS giorni,
+                   -- il commerciale si salva per id e si mostra per nome:
+                   -- se cambia nome la prenotazione resta legata alla persona
+                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))), ''),
+                            c.username) AS commerciale_nome
             FROM   pn_prenotazioni p
             JOIN   pn_autocarrate  a ON a.id = p.autocarrata_id
+            LEFT JOIN bb_users     c ON c.id = p.commerciale_user_id
             WHERE  p.group_company_id = :cid
               AND  p.stato <> 'annullata'
               AND  p.data_inizio <= :al
@@ -169,6 +216,9 @@ final class AutocarrataRepository
             ':tariffa'  => $d['tariffa_giorno'] !== '' ? $d['tariffa_giorno'] : null,
             ':totale'   => $d['totale'] !== '' ? $d['totale'] : null,
             ':note'     => $d['note'] !== '' ? $d['note'] : null,
+            ':contratto'=> $d['contratto'] !== '' ? $d['contratto'] : null,
+            ':importo'  => $d['importo'] !== '' ? $d['importo'] : null,
+            ':comm'     => $d['commerciale_user_id'] ?: null,
             ':cid'      => $companyId,
         ];
 
@@ -177,7 +227,8 @@ final class AutocarrataRepository
                 UPDATE pn_prenotazioni
                 SET autocarrata_id = :mid, cliente = :cliente, telefono = :telefono,
                     luogo = :luogo, data_inizio = :dal, data_fine = :al, stato = :stato,
-                    tariffa_giorno = :tariffa, totale = :totale, note = :note
+                    tariffa_giorno = :tariffa, totale = :totale, note = :note,
+                    contratto = :contratto, importo = :importo, commerciale_user_id = :comm
                 WHERE id = :id AND group_company_id = :cid
             ");
             $stmt->execute($p + [':id' => $id]);
@@ -187,9 +238,11 @@ final class AutocarrataRepository
         $stmt = $this->conn->prepare("
             INSERT INTO pn_prenotazioni
                 (group_company_id, autocarrata_id, cliente, telefono, luogo,
-                 data_inizio, data_fine, stato, tariffa_giorno, totale, note, created_by)
+                 data_inizio, data_fine, stato, tariffa_giorno, totale, note,
+                 contratto, importo, commerciale_user_id, created_by)
             VALUES (:cid, :mid, :cliente, :telefono, :luogo,
-                    :dal, :al, :stato, :tariffa, :totale, :note, :uid)
+                    :dal, :al, :stato, :tariffa, :totale, :note,
+                    :contratto, :importo, :comm, :uid)
         ");
         $stmt->execute($p + [':uid' => $userId]);
         return (int)$this->conn->lastInsertId();
