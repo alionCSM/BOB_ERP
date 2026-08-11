@@ -104,6 +104,22 @@ final class Config
     public function sqlSrvEncrypt(): bool   { return $this->get('SQLSRV_ENCRYPT', 'true') === 'true'; }
     public function sqlSrvTrustCert(): bool { return $this->get('SQLSRV_TRUST_CERT', 'true') === 'true'; }
 
+    // ── SQL Server — Business (TeamSystem), sola lettura ──────────────────────
+    // Sorgente separata da Yard: se le variabili BUSINESS_* non sono presenti
+    // si ricade su quelle di Yard (utile se i due database stanno sulla stessa
+    // istanza), tranne il nome del database che va sempre indicato.
+
+    public function businessConfigured(): bool { return $this->get('BUSINESS_DB', '') !== ''; }
+    public function businessHost(): string     { return $this->get('BUSINESS_HOST', '')  ?: $this->sqlSrvHost(); }
+    public function businessPort(): int        { return (int) ($this->get('BUSINESS_PORT', '') ?: (string)$this->sqlSrvPort()); }
+    public function businessDb(): string       { return $this->require('BUSINESS_DB'); }
+    public function businessUser(): string     { return $this->get('BUSINESS_USER', '')  ?: $this->sqlSrvUser(); }
+    public function businessPass(): string     { return $this->get('BUSINESS_PASS', '')  ?: $this->sqlSrvPass(); }
+    public function businessEncrypt(): bool    { return ($this->get('BUSINESS_ENCRYPT', '')    ?: ($this->sqlSrvEncrypt()   ? 'true' : 'false')) === 'true'; }
+    public function businessTrustCert(): bool  { return ($this->get('BUSINESS_TRUST_CERT', '') ?: ($this->sqlSrvTrustCert() ? 'true' : 'false')) === 'true'; }
+    /** Codice ditta usato nelle tabelle Business (colonna codditt). */
+    public function businessCodDitta(): string { return $this->get('BUSINESS_CODDITTA', 'CSM'); }
+
     // ── Mail ──────────────────────────────────────────────────────────────────
 
     public function mailHost(): string       { return $this->require('MAIL_HOST'); }

@@ -1,0 +1,211 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/report/fatturato.css?v=1">
+{% endblock %}
+
+{% macro delta(oggi, prima) %}
+    {% if prima is not empty and prima != 0 %}
+        {% set pct = ((oggi - prima) / prima * 100) %}
+        <span class="rp-delta {{ pct >= 0 ? 'is-up' : 'is-down' }}">
+            {{ pct >= 0 ? '▲' : '▼' }} {{ pct|abs|number_format(1, ',', '.') }}%
+        </span>
+    {% else %}
+        <span class="rp-delta is-none">—</span>
+    {% endif %}
+{% endmacro %}
+{% import _self as f %}
+
+{% block content %}
+<div class="rp-page">
+
+    {# ── Hero ── #}
+    <div class="rp-hero">
+        <div class="rp-hero-content">
+            <div class="rp-hero-left">
+                <div class="rp-hero-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/></svg>
+                </div>
+                <div>
+                    <h1 class="rp-hero-title">Andamento fatturato</h1>
+                    <p class="rp-hero-sub">Dati dal gestionale Business · per data documento</p>
+                </div>
+            </div>
+            <form method="GET" class="rp-year-form">
+                <label>Dal</label>
+                <select name="da_anno">
+                    {% for y in (aAnno - 9)..aAnno %}
+                        <option value="{{ y }}" {{ y == daAnno ? 'selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <label>al</label>
+                <select name="a_anno">
+                    {% for y in (aAnno - 9)..(aAnno + 1) %}
+                        <option value="{{ y }}" {{ y == aAnno ? 'selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">Mostra</button>
+            </form>
+        </div>
+    </div>
+
+    {% if errore %}
+        <div class="rp-alert">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div>
+                <strong>Dati non disponibili.</strong> {{ errore }}<br>
+                <small>I totali qui sotto sono a zero perché la lettura non è riuscita, non perché non ci sia stato fatturato.</small>
+            </div>
+        </div>
+    {% endif %}
+
+    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'incassato':0,'pagato':0} %}
+    {% set tPrec = totali[annoPrec] ?? null %}
+
+    {# ── Card principali ── #}
+    <div class="rp-cards">
+        <div class="rp-card is-in">
+            <div class="rp-card-lbl">Entrate {{ annoTop }}</div>
+            <div class="rp-card-val">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</div>
+            <div class="rp-card-foot">
+                {{ f.delta(tOggi.entrate, tPrec ? tPrec.entrate : null) }}
+                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.entrate : 0)|number_format(0, ',', '.') }}</span>
+            </div>
+        </div>
+        <div class="rp-card is-out">
+            <div class="rp-card-lbl">Uscite {{ annoTop }}</div>
+            <div class="rp-card-val">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</div>
+            <div class="rp-card-foot">
+                {{ f.delta(tOggi.uscite, tPrec ? tPrec.uscite : null) }}
+                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.uscite : 0)|number_format(0, ',', '.') }}</span>
+            </div>
+        </div>
+        <div class="rp-card is-saldo">
+            <div class="rp-card-lbl">Saldo {{ annoTop }}</div>
+            <div class="rp-card-val {{ tOggi.saldo < 0 ? 'is-neg' : '' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</div>
+            <div class="rp-card-foot">
+                {{ f.delta(tOggi.saldo, tPrec ? tPrec.saldo : null) }}
+                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.saldo : 0)|number_format(0, ',', '.') }}</span>
+            </div>
+        </div>
+    </div>
+
+    {# ── Grafico ── #}
+    <div class="rp-panel">
+        <div class="rp-panel-head">
+            <h3 class="rp-panel-title">Confronto mensile</h3>
+            <div class="rp-switch" id="rp-switch">
+                <button type="button" class="on" data-serie="entrate">Entrate</button>
+                <button type="button" data-serie="uscite">Uscite</button>
+                <button type="button" data-serie="saldo">Saldo</button>
+            </div>
+        </div>
+        <div class="rp-chart-wrap">
+            <canvas id="rp-chart"
+                    data-mesi='{{ mesi|json_encode }}'
+                    data-serie='{{ serie|json_encode }}'></canvas>
+        </div>
+    </div>
+
+    {# ── Tabella mensile ── #}
+    <div class="rp-panel">
+        <div class="rp-panel-head">
+            <h3 class="rp-panel-title">Dettaglio mensile {{ annoTop }}</h3>
+            <span class="rp-panel-note">Clicca un mese per vedere da quali causali arrivano i totali</span>
+        </div>
+        <div class="rp-table-wrap">
+            <table class="rp-table">
+                <thead>
+                    <tr>
+                        <th>Mese</th>
+                        <th class="right">Entrate</th>
+                        <th class="right">Uscite</th>
+                        <th class="right">Saldo</th>
+                        <th class="right">Entrate {{ annoPrec }}</th>
+                        <th class="right">Var.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% set sOggi = serie[annoTop] ?? null %}
+                {% set sPrec = serie[annoPrec] ?? null %}
+                {% for i in 0..11 %}
+                    {% set e  = sOggi ? sOggi.entrate[i] : 0 %}
+                    {% set u  = sOggi ? sOggi.uscite[i]  : 0 %}
+                    {% set s  = e - u %}
+                    {% set ep = sPrec ? sPrec.entrate[i] : 0 %}
+                    <tr class="rp-row" data-mese="{{ i + 1 }}" data-anno="{{ annoTop }}">
+                        <td class="rp-mese">{{ mesi[i] }}</td>
+                        <td class="right">€ {{ e|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-out">€ {{ u|number_format(0, ',', '.') }}</td>
+                        <td class="right {{ s < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ s|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ ep|number_format(0, ',', '.') }}</td>
+                        <td class="right">{{ f.delta(e, ep) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Totale</td>
+                        <td class="right">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</td>
+                        <td class="right">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</td>
+                        <td class="right {{ tOggi.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ (tPrec ? tPrec.entrate : 0)|number_format(0, ',', '.') }}</td>
+                        <td class="right">{{ f.delta(tOggi.entrate, tPrec ? tPrec.entrate : null) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    {# ── Confronto tra anni ── #}
+    <div class="rp-panel">
+        <div class="rp-panel-head">
+            <h3 class="rp-panel-title">Totali per anno</h3>
+        </div>
+        <div class="rp-table-wrap">
+            <table class="rp-table">
+                <thead>
+                    <tr>
+                        <th>Anno</th>
+                        <th class="right">Entrate</th>
+                        <th class="right">Uscite</th>
+                        <th class="right">Saldo</th>
+                        <th class="right">Già incassato</th>
+                        <th class="right">Già pagato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for y, t in totali|reverse(true) %}
+                    <tr>
+                        <td class="rp-mese">{{ y }}</td>
+                        <td class="right">€ {{ t.entrate|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-out">€ {{ t.uscite|number_format(0, ',', '.') }}</td>
+                        <td class="right {{ t.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ t.saldo|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.incassato|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.pagato|number_format(0, ',', '.') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{# Modale dettaglio causali — fuori da qualsiasi contenitore con transform #}
+<div id="rp-modal" class="rp-modal" aria-hidden="true" hidden>
+    <div class="rp-modal-box" role="dialog" aria-modal="true">
+        <div class="rp-modal-head">
+            <h3 class="rp-modal-title" id="rp-modal-title">Dettaglio</h3>
+            <button type="button" class="rp-modal-close" data-rp-close aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="rp-modal-body" id="rp-modal-body">
+            <div class="rp-loading">Caricamento…</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/report/fatturato.js?v=1"></script>
+{% endblock %}

@@ -49,6 +49,9 @@ final class LayoutDataProvider
             'notifications'      => $this->recentNotifications($userId),
             'vapidPublicKey'     => $this->config->vapidPublicKey(),
 
+            // ── Top-bar: societa' del gruppo ─────────────────────────────
+            ...$this->groupCompanies($userId),
+
             // ── CSRF / CSP ───────────────────────────────────────────────
             'csrfToken'          => csrf_token(),
             'cspNonce'           => csp_nonce(),
@@ -60,26 +63,117 @@ final class LayoutDataProvider
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+    /**
+     * Societa' del gruppo dell'utente e quella attiva.
+     *
+     * Il selettore in top bar compare solo a chi ne ha piu' di una: per tutti
+     * gli altri la barra resta identica a prima.
+     *
+     * @return array{groupCompanies: array, currentGroupCompany: ?array}
+     */
+    private function groupCompanies(int $userId): array
+    {
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        $lista   = $service->availableFor($userId);
+
+        $attiva = null;
+        foreach ($lista as $c) {
+            if ($c['id'] === $service->id()) {
+                $attiva = $c;
+                break;
+            }
+        }
+
+        // null = tutti i moduli abilitati (caso del Consorzio); altrimenti
+        // il menu mostra solo le voci della societa' in cui si sta lavorando
+        $moduli = null;
+        $dati   = $service->current();
+        if ($dati && !empty($dati['moduli'])) {
+            $moduli = array_filter(array_map('trim', explode(',', (string)$dati['moduli'])));
+        }
+
+        return [
+            'groupCompanies'      => $lista,
+            'currentGroupCompany' => $attiva,
+            'moduliSocieta'       => $moduli,
+        ];
+    }
+
+    /**
+     * Filtro sulla societa' attiva da aggiungere alle query sulle notifiche.
+     *
+     * Restituisce stringa vuota finche' la migration non e' stata applicata,
+     * cosi' le notifiche continuano a comparire invece di sparire tutte.
+     */
+    private function filtroSocietaNotifiche(): string
+    {
+        static $colonna = null;
+
+        if ($colonna === null) {
+            try {
+                $stmt    = $this->conn->query("SHOW COLUMNS FROM bb_notifications LIKE 'group_company_id'");
+                $colonna = (bool)($stmt && $stmt->fetch(PDO::FETCH_ASSOC));
+            } catch (\Throwable $e) {
+                $colonna = false;
+            }
+        }
+
+        return $colonna ? ' AND n.group_company_id = :cid' : '';
+    }
+
+    /** Parametri da unire alla query, coerenti con filtroSocietaNotifiche(). */
+    private function parametriSocieta(): array
+    {
+        if ($this->filtroSocietaNotifiche() === '') {
+            return [];
+        }
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        return [':cid' => $service->id()];
+    }
+
     private function unreadCount(int $userId): int
     {
         $stmt = $this->conn->prepare(
-            'SELECT COUNT(*) FROM bb_notifications WHERE user_id = :uid AND is_read = 0'
+            'SELECT COUNT(*) FROM bb_notifications n WHERE n.user_id = :uid AND n.is_read = 0'
+            . $this->filtroSocietaNotifiche()
         );
-        $stmt->execute([':uid' => $userId]);
+        $stmt->execute([':uid' => $userId] + $this->parametriSocieta());
         return (int) $stmt->fetchColumn();
     }
 
     private function hasHighPriority(int $userId): bool
     {
         $stmt = $this->conn->prepare(
-            "SELECT COUNT(*) FROM bb_notifications WHERE user_id = :uid AND is_read = 0 AND priority = 'high'"
+            "SELECT COUNT(*) FROM bb_notifications n
+             WHERE n.user_id = :uid AND n.is_read = 0 AND n.priority = 'high'"
+            . $this->filtroSocietaNotifiche()
         );
-        $stmt->execute([':uid' => $userId]);
+        $stmt->execute([':uid' => $userId] + $this->parametriSocieta());
         return ((int) $stmt->fetchColumn()) > 0;
     }
 
     private function recentNotifications(int $userId): array
     {
+        // Si vedono solo le notifiche della societa' in cui si sta lavorando:
+        // e' la stessa separazione che vale per menu e dashboard.
+        if ($this->filtroSocietaNotifiche() !== '') {
+            $stmt = $this->conn->prepare('
+                SELECT n.*, u.first_name, u.last_name, w.photo,
+                       g.codice AS societa_codice, g.colore AS societa_colore
+                FROM   bb_notifications n
+                LEFT JOIN bb_users           u ON n.created_by = u.id
+                LEFT JOIN bb_workers         w ON u.worker_id  = w.id
+                LEFT JOIN bb_group_companies g ON g.id = n.group_company_id
+                WHERE  n.user_id  = :uid
+                  AND  n.is_read  = 0'
+                . $this->filtroSocietaNotifiche() . '
+                ORDER  BY n.created_at DESC
+                LIMIT  10
+            ');
+            $stmt->execute([':uid' => $userId] + $this->parametriSocieta());
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
         $stmt = $this->conn->prepare('
             SELECT n.*, u.first_name, u.last_name, w.photo
             FROM   bb_notifications n

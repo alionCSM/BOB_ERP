@@ -1,0 +1,578 @@
+/*
+ * Poti Noleggi — autocarrate, prenotazioni e disponibilita'.
+ * Prefisso ac- per non toccare gli stili generici del template.
+ */
+
+.ac-page { padding: 4px 0 32px; }
+
+/* ── Intestazione ───────────────────────────────────────────────────────── */
+.ac-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+    background: linear-gradient(120deg, #0c4a6e 0%, #0369a1 100%);
+    border-radius: 12px;
+    color: #fff;
+}
+
+.ac-title { font-size: 20px; font-weight: 700; line-height: 1.2; }
+.ac-sub   { margin-top: 6px; font-size: 13px; color: rgba(255, 255, 255, .82); }
+
+.ac-hero-links { display: flex; gap: 9px; flex-wrap: wrap; }
+
+.ac-hero .ac-btn {
+    background: rgba(255, 255, 255, .12);
+    border-color: rgba(255, 255, 255, .35);
+    color: #fff;
+}
+.ac-hero .ac-btn:hover { background: rgba(255, 255, 255, .22); }
+
+.ac-hero .ac-btn-primary {
+    background: #fff;
+    border-color: #fff;
+    color: #0c4a6e;
+}
+.ac-hero .ac-btn-primary:hover { background: #e0f2fe; }
+
+/* ── Bottoni ────────────────────────────────────────────────────────────── */
+.ac-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 15px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+}
+.ac-btn:hover { background: #f1f5f9; }
+
+.ac-btn-primary { background: #0369a1; border-color: #0369a1; color: #fff; }
+.ac-btn-primary:hover { background: #075985; }
+
+.ac-btn-ko { border-color: #fecaca; color: #b91c1c; margin-right: auto; }
+.ac-btn-ko:hover { background: #fef2f2; }
+
+.ac-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: #2563eb;
+    font-size: 12px;
+    cursor: pointer;
+}
+.ac-link:hover { text-decoration: underline; }
+
+/* ── Avvisi ─────────────────────────────────────────────────────────────── */
+.ac-alert { padding: 11px 14px; margin-bottom: 14px; border-radius: 8px; font-size: 13px; }
+.ac-alert.is-ok { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.ac-alert.is-ko { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* ── Ricerca disponibilita' ─────────────────────────────────────────────── */
+.ac-filtri {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+/* ── Verifica disponibilita' ────────────────────────────────────────────── */
+.ac-check {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.ac-check-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    background: linear-gradient(120deg, #0c4a6e 0%, #0369a1 100%);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.ac-check-tile i { width: 20px; height: 20px; }
+
+.ac-check-campi {
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    flex: 1 1 auto;
+}
+
+@media (max-width: 620px) {
+    .ac-check-tile { width: 100%; justify-content: center; }
+}
+
+.ac-f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ac-f > span { font-size: 12px; font-weight: 600; color: #475569; }
+.ac-f small  { font-size: 11px; color: #94a3b8; }
+
+.ac-f input,
+.ac-f select,
+.ac-f textarea {
+    padding: 8px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 13px;
+    color: #1e293b;
+    background: #fff;
+    width: 100%;
+}
+
+.ac-f input:focus,
+.ac-f select:focus,
+.ac-f textarea:focus {
+    outline: none;
+    border-color: #0369a1;
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
+}
+
+.ac-f textarea { resize: vertical; font-family: inherit; }
+
+/* l'elenco mezzi resta spento finche' non ci sono le date */
+.ac-f select:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+/* esito della ricerca disponibilita' sotto l'elenco dei mezzi */
+.ac-avviso { font-size: 11px; color: #64748b; }
+.ac-avviso.is-ok { color: #16a34a; }
+.ac-avviso.is-ko { color: #b91c1c; font-weight: 600; }
+
+/* campo mostrato ma non modificabile (il commerciale) */
+.ac-fisso {
+    padding: 8px 11px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #475569;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Schede mezzo ───────────────────────────────────────────────────────── */
+.ac-mezzi {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.ac-mezzo {
+    padding: 13px 15px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #cbd5e1;
+    border-radius: 10px;
+}
+
+/* con la ricerca attiva il colore risponde subito alla domanda */
+.ac-mezzo.is-ok { border-left-color: #16a34a; }
+.ac-mezzo.is-ko { border-left-color: #dc2626; background: #fffafa; }
+
+.ac-mezzo-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ac-targa {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: #0f172a;
+}
+
+.ac-mezzo-mod { margin-top: 2px; font-size: 12px; color: #64748b; }
+
+.ac-specs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
+
+.ac-specs span {
+    padding: 2px 7px;
+    background: #f1f5f9;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.ac-libero { margin-top: 9px; font-size: 12px; font-weight: 600; color: #0369a1; }
+.ac-mezzo.is-ko .ac-libero { color: #b91c1c; }
+
+/* ── Stati ──────────────────────────────────────────────────────────────── */
+.ac-stato {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+.ac-stato-attiva        { background: #dcfce7; color: #166534; }
+.ac-stato-manutenzione  { background: #fef3c7; color: #92400e; }
+.ac-stato-dismessa      { background: #e2e8f0; color: #475569; }
+.ac-stato-confermata    { background: #dbeafe; color: #1e40af; }
+.ac-stato-annullata     { background: #fee2e2; color: #991b1b; }
+.ac-pag-pagata          { background: #dcfce7; color: #166534; }
+.ac-pag-da_pagare       { background: #fef3c7; color: #92400e; }
+
+/* ── Riquadri e tabelle ─────────────────────────────────────────────────── */
+.ac-box {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 18px;
+}
+
+.ac-box-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 18px;
+    background: #f8fafc;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ac-periodo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ac-periodo input {
+    padding: 6px 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* la tabella puo' essere piu' larga dello schermo: scorre dentro il suo
+   contenitore invece di far scorrere tutta la pagina */
+.ac-table-wrap { overflow-x: auto; }
+
+.ac-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+.ac-table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.ac-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.ac-table tbody tr:hover { background: #f8fafc; }
+.ac-table .right { text-align: right; }
+
+.ac-td-targa { font-weight: 700; letter-spacing: .03em; color: #0f172a; white-space: nowrap; }
+
+.ac-td-note {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ac-tel { display: block; font-size: 11px; color: #94a3b8; }
+
+/* importo di contratto diverso dal totale calcolato: va notato */
+.ac-diff { color: #b45309; font-weight: 700; }
+
+.ac-empty { padding: 26px; text-align: center; font-size: 13px; color: #94a3b8; }
+
+/* ── Timeline ───────────────────────────────────────────────────────────── */
+.ac-tl-wrap { overflow-x: auto; }
+
+.ac-tl { border-collapse: collapse; font-size: 12px; }
+
+/* solo righe orizzontali: le verticali su ogni giorno facevano rumore e
+   spezzavano visivamente le barre */
+.ac-tl td { border-bottom: 1px solid #f1f5f9; }
+.ac-tl thead th { border-bottom: 1px solid #e2e8f0; }
+
+/* la colonna del mezzo resta visibile mentre si scorrono i giorni */
+.ac-tl-mezzo {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 120px;
+    padding: 0 14px;
+    background: #fff;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    color: #0f172a;
+    white-space: nowrap;
+    border-right: 1px solid #e2e8f0;
+}
+
+.ac-tl thead .ac-tl-mezzo { background: #f8fafc; z-index: 3; }
+.ac-tl tbody tr:hover .ac-tl-mezzo { background: #f8fafc; }
+
+.ac-tl-g {
+    width: 34px;
+    padding: 7px 0;
+    text-align: center;
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.ac-tl-g.is-fest { background: #eef2f7; color: #94a3b8; }
+
+.ac-tl-wd { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+.ac-tl-n  { display: block; font-size: 13px; font-weight: 700; color: #334155; }
+
+/* niente padding laterale: e' cosi' che i giorni consecutivi si saldano
+   e l'impegno si legge come una barra sola */
+.ac-tl-c {
+    height: 40px;
+    padding: 6px 0;
+}
+
+.ac-tl-c.is-fest { background: #fafbfc; }
+.ac-tl tbody tr:hover td { background: #f8fafc; }
+.ac-tl tbody tr:hover .ac-tl-c.is-fest { background: #f1f5f9; }
+
+.ac-barra {
+    position: relative;   /* riferimento per il nome del cliente */
+    display: flex;
+    align-items: center;
+    height: 28px;
+    background: #cbd5e1;
+    box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .10);
+}
+
+.ac-barra.is-inizio {
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+    padding-left: 8px;
+}
+.ac-barra.is-fine {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+/* il nome del cliente parte dal primo giorno e sborda sui successivi:
+   la barra e' fatta di piu' celle, quindi il testo non puo' stare dentro
+   una sola senza essere tagliato */
+.ac-barra-txt {
+    position: absolute;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    pointer-events: none;
+}
+
+.ac-barra-confermata { background: #2563eb; }
+
+.ac-legenda {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 10px 18px;
+    border-top: 1px solid #eef2f7;
+    font-size: 11px;
+    color: #64748b;
+}
+
+.ac-legenda span { display: flex; align-items: center; gap: 6px; }
+.ac-legenda i { width: 18px; height: 12px; border-radius: 3px; box-shadow: none; }
+
+.ac-cal-oggi-esempio {
+    display: inline-block;
+    border: 1px solid #0369a1;
+    box-shadow: inset 0 0 0 1px #0369a1;
+}
+
+/* ── Calendario ─────────────────────────────────────────────────────────── */
+.ac-vista { display: flex; gap: 4px; }
+
+.ac-vista-b {
+    padding: 5px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+}
+.ac-vista-b.on { background: #0369a1; border-color: #0369a1; color: #fff; }
+
+.ac-cal {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 18px;
+}
+
+.ac-cal[hidden] { display: none; }
+
+.ac-cal-tit {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ac-cal-wd,
+.ac-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+}
+
+.ac-cal-wd span {
+    padding: 3px 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.ac-cal-c {
+    min-height: 62px;
+    padding: 3px;
+    border: 1px solid #eef2f7;
+    border-radius: 5px;
+    background: #fff;
+    overflow: hidden;
+}
+
+.ac-cal-c.is-vuota { border-color: transparent; background: transparent; }
+.ac-cal-c.is-fest  { background: #f8fafc; }
+.ac-cal-c.is-oggi  { border-color: #0369a1; box-shadow: inset 0 0 0 1px #0369a1; }
+
+.ac-cal-n { display: block; font-size: 10px; font-weight: 700; color: #64748b; }
+
+/* le targhe possono essere piu' larghe della casella: si troncano invece
+   di allargare la griglia */
+.ac-ev {
+    display: block;
+    margin-top: 2px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.ac-ev-confermata { background: #2563eb; }
+.ac-ev-annullata  { background: #cbd5e1; }
+
+.ac-ev-piu { display: block; margin-top: 2px; font-size: 9px; color: #94a3b8; }
+
+/* ── Modali ─────────────────────────────────────────────────────────────── */
+/* hidden come attributo: la modale non lampeggia prima che arrivi il CSS */
+.ac-modal[hidden] { display: none; }
+
+.ac-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, .45);
+}
+
+.ac-modal-box {
+    width: 720px;
+    max-width: 100%;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, .25);
+}
+
+.ac-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.ac-modal-close {
+    border: 0;
+    background: none;
+    font-size: 24px;
+    line-height: 1;
+    color: #94a3b8;
+    cursor: pointer;
+}
+.ac-modal-close:hover { color: #475569; }
+
+.ac-form {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    padding: 18px;
+}
+
+.ac-f-2 { grid-column: span 2; }
+.ac-f-4 { grid-column: 1 / -1; }
+
+@media (max-width: 700px) {
+    .ac-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ac-f-2  { grid-column: span 2; }
+}
+
+.ac-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 9px;
+}

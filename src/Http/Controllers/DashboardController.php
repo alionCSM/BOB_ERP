@@ -26,7 +26,13 @@ final class DashboardController
 
         $data = compact('username', 'name', 'role', 'pageTitle');
 
-        match ($role) {
+        // Le dashboard fisse (admin, documenti) sono fatte sui dati del
+        // Consorzio: dentro un'altra societa' mostrerebbero cantieri e
+        // documenti che li' non c'entrano. In quel caso si usa comunque
+        // quella dinamica, che si costruisce sui moduli della societa'.
+        $ruoloEffettivo = $this->societaLimitata() ? 'dinamica' : $role;
+
+        match ($ruoloEffettivo) {
             'admin'            => $data += $this->dataForAdmin($name),
             'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
             // tutti gli altri ruoli: dashboard dinamica costruita sui permessi
@@ -34,6 +40,18 @@ final class DashboardController
         };
 
         Response::view('dashboard/index.html.twig', $request, $data);
+    }
+
+    /**
+     * True se la societa' attiva ha un elenco di moduli, cioe' non e' il
+     * Consorzio che li ha tutti. Serve a capire se le dashboard fisse
+     * hanno ancora senso.
+     */
+    private function societaLimitata(): bool
+    {
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        $dati    = $service->current();
+        return $dati !== null && !empty($dati['moduli']);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -365,6 +383,16 @@ final class DashboardController
         $stmt = $conn->prepare("SELECT module FROM bb_user_permissions WHERE user_id = :uid AND allowed = 1");
         $stmt->execute([':uid' => $userId]);
         $mods = array_fill_keys($stmt->fetchAll(\PDO::FETCH_COLUMN), true);
+
+        // Le scorciatoie seguono la societa' in cui si sta lavorando: dentro
+        // Poti non devono comparire quelle del Consorzio. canAccess() applica
+        // gia' lo stesso filtro, qui i permessi si leggono direttamente.
+        $mods = array_filter(
+            $mods,
+            static fn(string $m): bool => $user->canAccess($m),
+            ARRAY_FILTER_USE_KEY
+        );
+
         $has  = static fn(string ...$m): bool => (bool)array_intersect($m, array_keys($mods));
 
         /* ── Scorciatoie: solo i moduli che l'utente puo' usare ── */
@@ -389,6 +417,7 @@ final class DashboardController
             [['documents'],                'Documenti Scaduti',   'Documenti operai e aziende',        '/documents/expired',  '#dc2626', '#fef2f2', 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M12 9h.01'],
             [['share'],                    'Doc Condivisi',       'Link di condivisione documenti',    '/share',              '#2563eb', '#eff6ff', 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71'],
             [['ai_chat'],                  'BOB AI',              'Chiedi ai dati in linguaggio naturale', '/ai/chat',        '#6366f1', '#f5f3ff', 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z'],
+            [['pn_autocarrate'],           'Autocarrate',         'Disponibilita\' e prenotazioni',     '/autocarrate',        '#0369a1', '#f0f9ff', 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6 0a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
         ];
 
         $shortcuts = [];
@@ -430,6 +459,32 @@ final class DashboardController
             ")->fetchColumn();
             $stats[] = ['num' => $n, 'label' => 'Mezzi a noleggio', 'sub' => 'attivi ora', 'color' => '#b45309', 'bg' => '#fffbeb',
                         'icon' => 'M3 21h18M6 21V8l12-5v18', 'href' => '/equipment/rentals'];
+        }
+
+        if ($has('pn_autocarrate')) {
+            // i contatori si fermano alla societa' attiva: e' un modulo di
+            // Poti e non deve mescolarsi con i dati del Consorzio
+            $cid = ($GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($conn))->id();
+
+            $s = $conn->prepare("
+                SELECT COUNT(*) FROM pn_autocarrate
+                WHERE group_company_id = :cid AND stato = 'attiva'
+            ");
+            $s->execute([':cid' => $cid]);
+            $totali = (int)$s->fetchColumn();
+
+            $s = $conn->prepare("
+                SELECT COUNT(DISTINCT autocarrata_id) FROM pn_prenotazioni
+                WHERE group_company_id = :cid AND stato <> 'annullata'
+                  AND data_inizio <= :d1 AND data_fine >= :d2
+            ");
+            $s->execute([':cid' => $cid, ':d1' => $today, ':d2' => $today]);
+            $impegnate = (int)$s->fetchColumn();
+
+            $stats[] = ['num' => max(0, $totali - $impegnate), 'label' => 'Autocarrate libere', 'sub' => 'oggi', 'color' => '#16a34a', 'bg' => '#f0fdf4',
+                        'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1', 'href' => '/autocarrate'];
+            $stats[] = ['num' => $impegnate, 'label' => 'Autocarrate impegnate', 'sub' => 'oggi', 'color' => '#0369a1', 'bg' => '#f0f9ff',
+                        'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2', 'href' => '/autocarrate/prenotazioni'];
         }
 
         if ($has('documents', 'document_alerts')) {

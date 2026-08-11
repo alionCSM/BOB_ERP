@@ -1,0 +1,243 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=8">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Prenotazioni</h1>
+            <p class="ac-sub">Impegni delle autocarrate, per periodo e per mezzo.</p>
+        </div>
+        <div class="ac-hero-links">
+            <button type="button" class="ac-btn ac-btn-primary" data-ac-nuovo>Nuova prenotazione</button>
+            <a href="/autocarrate" class="ac-btn">Disponibilita'</a>
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ac-alert is-ok">Modifiche salvate.</div>{% endif %}
+    {% if errore %}<div class="ac-alert is-ko">{{ errore }}</div>{% endif %}
+
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f">
+            <span>Dal</span>
+            <input type="date" name="dal" value="{{ dal }}">
+        </label>
+        <label class="ac-f">
+            <span>Al</span>
+            <input type="date" name="al" value="{{ al }}">
+        </label>
+        <label class="ac-f">
+            <span>Mezzo</span>
+            <select name="mezzo">
+                <option value="0">tutti</option>
+                {% for m in mezzi %}
+                    <option value="{{ m.id }}" {{ mezzoId == m.id ? 'selected' : '' }}>{{ m.targa }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Filtra</button>
+    </form>
+
+    <div class="ac-box">
+        <div class="ac-table-wrap">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Mezzo</th>
+                        <th>Cliente</th>
+                        <th>Luogo</th>
+                        <th>Dal</th>
+                        <th>Al</th>
+                        <th class="right">Giorni</th>
+                        <th>Contratto</th>
+                        <th class="right">Importo</th>
+                        <th>Commerciale</th>
+                        {% if canSeePrices %}
+                            <th class="right">Tariffa</th>
+                            <th class="right">Totale</th>
+                        {% endif %}
+                        <th>Stato</th>
+                        <th>Pagamento</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in prenotazioni %}
+                        <tr>
+                            <td class="ac-td-targa">{{ p.targa }}</td>
+                            <td>
+                                {{ p.cliente }}
+                                {% if p.telefono %}<span class="ac-tel">{{ p.telefono }}</span>{% endif %}
+                            </td>
+                            <td>{{ p.luogo ?: '—' }}</td>
+                            <td>{{ p.data_inizio|date('d/m/Y') }}</td>
+                            <td>{{ p.data_fine|date('d/m/Y') }}</td>
+                            <td class="right">{{ p.giorni }}</td>
+                            <td>{{ p.contratto ?: '—' }}</td>
+                            {# se l'importo di contratto non coincide col totale calcolato
+                               si evidenzia, perche' e' proprio il caso da guardare #}
+                            <td class="right{{ p.importo and p.totale and p.importo != p.totale ? ' ac-diff' : '' }}">
+                                {{ p.importo ? '€ ' ~ p.importo|number_format(2, ',', '.') : '—' }}
+                            </td>
+                            <td>{{ p.commerciale_nome ?: '—' }}</td>
+                            {% if canSeePrices %}
+                                <td class="right">{{ p.tariffa_giorno ? '€ ' ~ p.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
+                                <td class="right">{{ p.totale ? '€ ' ~ p.totale|number_format(2, ',', '.') : '—' }}</td>
+                            {% endif %}
+                            <td><span class="ac-stato ac-stato-{{ p.stato }}">{{ p.stato }}</span></td>
+                            <td>
+                                <span class="ac-stato ac-pag-{{ p.pagamento|default('da_pagare') }}">
+                                    {{ p.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
+                                </span>
+                            </td>
+                            <td class="right">
+                                <button type="button" class="ac-link"
+                                        data-ac-modifica="{{ p|json_encode|e('html_attr') }}">modifica</button>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="{{ canSeePrices ? 14 : 12 }}" class="ac-empty">
+                                Nessuna prenotazione nel periodo.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Modale prenotazione ─────────────────────────────────────────────── #}
+    <div class="ac-modal" id="ac-modal-pren" hidden aria-hidden="true">
+        <div class="ac-modal-box">
+            <div class="ac-modal-head">
+                <span id="ac-modal-tit">Nuova prenotazione</span>
+                <button type="button" class="ac-modal-close" data-ac-close>&times;</button>
+            </div>
+            <form method="POST" action="/autocarrate/prenotazioni/salva" class="ac-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="id" id="ac-p-id" value="">
+
+                {# Prima le date, poi il mezzo: l'elenco delle autocarrate si
+                   puo' restringere alle sole libere solo dopo aver saputo
+                   per quando serve. #}
+                <label class="ac-f">
+                    <span>Dal</span>
+                    <input type="date" name="data_inizio" id="ac-p-dal" required>
+                </label>
+
+                <label class="ac-f">
+                    <span>Al</span>
+                    <input type="date" name="data_fine" id="ac-p-al" required>
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Autocarrata</span>
+                    {# il blocco lo mette il JS: se non parte, il campo resta
+                       usabile e il controllo lo fa comunque il server #}
+                    <select name="autocarrata_id" id="ac-p-mezzo" required>
+                        {% for m in mezzi %}<option value="{{ m.id }}">{{ m.targa }} — {{ m.modello ?: 'senza modello' }}</option>{% endfor %}
+                    </select>
+                    <small class="ac-avviso" id="ac-p-avviso">Scegli prima le date.</small>
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Cliente</span>
+                    <input type="text" name="cliente" id="ac-p-cliente" required maxlength="160">
+                </label>
+
+                <label class="ac-f">
+                    <span>Telefono</span>
+                    <input type="text" name="telefono" id="ac-p-tel" maxlength="40">
+                </label>
+
+                <label class="ac-f">
+                    <span>Stato</span>
+                    <select name="stato" id="ac-p-stato">
+                        {% for s in stati %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                    </select>
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Luogo</span>
+                    <input type="text" name="luogo" id="ac-p-luogo" maxlength="200">
+                </label>
+
+                <label class="ac-f">
+                    <span>Contratto</span>
+                    <input type="text" name="contratto" id="ac-p-contratto" maxlength="100"
+                           placeholder="rif. contratto">
+                </label>
+
+                {# fuori dal blocco prezzi: l'importo di contratto serve a chi
+                   gestisce le prenotazioni anche senza il permesso prezzi #}
+                <label class="ac-f">
+                    <span>Importo contratto</span>
+                    <input type="text" name="importo" id="ac-p-importo" inputmode="decimal"
+                           placeholder="0,00">
+                </label>
+
+                <label class="ac-f">
+                    <span>Pagamento</span>
+                    <select name="pagamento" id="ac-p-pagamento">
+                        {% for p in pagamenti %}
+                            <option value="{{ p }}">{{ p == 'pagata' ? 'pagata' : 'da pagare' }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                {# il commerciale non si sceglie: e' chi registra la
+                   prenotazione, e resta quello anche se poi la corregge
+                   qualcun altro #}
+                <div class="ac-f">
+                    <span>Commerciale</span>
+                    <div class="ac-fisso" id="ac-p-commerciale" data-predefinito="{{ utenteNome }}">
+                        {{ utenteNome }}
+                    </div>
+                </div>
+
+                {% if canSeePrices %}
+                    <label class="ac-f">
+                        <span>Tariffa al giorno</span>
+                        <input type="text" name="tariffa_giorno" id="ac-p-tariffa" inputmode="decimal">
+                    </label>
+
+                    <label class="ac-f">
+                        <span>Totale</span>
+                        <input type="text" name="totale" id="ac-p-totale" inputmode="decimal">
+                        <small id="ac-p-calcolo"></small>
+                    </label>
+
+                {% endif %}
+
+                <label class="ac-f ac-f-4">
+                    <span>Note</span>
+                    <textarea name="note" id="ac-p-note" rows="3"></textarea>
+                </label>
+
+                <div class="ac-actions">
+                    <button type="button" class="ac-btn ac-btn-ko" id="ac-p-elimina" hidden>Elimina</button>
+                    <button type="button" class="ac-btn" data-ac-close>Annulla</button>
+                    <button class="ac-btn ac-btn-primary">Salva</button>
+                </div>
+            </form>
+
+            {# form separato: eliminare da dentro il form di salvataggio
+               manderebbe anche gli altri campi #}
+            <form method="POST" action="/autocarrate/prenotazioni/elimina" id="ac-form-elimina" hidden>
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="id" id="ac-del-id">
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/autocarrate.js?v=8"></script>
+{% endblock %}

@@ -503,8 +503,47 @@ class User {
         return $permissions;
     }
 
+    /**
+     * Moduli abilitati sulla societa' del gruppo attiva.
+     * null = nessun limite (caso del Consorzio, che li ha tutti).
+     *
+     * Statico perche' la societa' non cambia nel corso di una richiesta e
+     * canAccess() viene chiamato decine di volte per costruire il menu.
+     */
+    private static ?array $companyModules = null;
+    private static bool   $companyModulesLoaded = false;
+
+    private function companyAllows(string $module): bool
+    {
+        if (!self::$companyModulesLoaded) {
+            self::$companyModulesLoaded = true;
+            try {
+                $cid = (int)($_SESSION[\App\Service\CurrentCompany::SESSION_KEY] ?? 0);
+                if ($cid) {
+                    $stmt = $this->conn->prepare('SELECT moduli FROM bb_group_companies WHERE id = ?');
+                    $stmt->execute([$cid]);
+                    $moduli = $stmt->fetchColumn();
+                    if (!empty($moduli)) {
+                        self::$companyModules = array_filter(array_map('trim', explode(',', (string)$moduli)));
+                    }
+                }
+            } catch (\Throwable $e) {
+                // tabella non ancora creata: si continua senza limiti
+                self::$companyModules = null;
+            }
+        }
+
+        return self::$companyModules === null
+            || in_array($module, self::$companyModules, true);
+    }
+
     public function canAccess(string $module): bool
     {
+        // Il limite della societa' vale prima di tutto, superadmin compreso:
+        // dentro Poti non devono comparire i moduli del Consorzio, altrimenti
+        // il menu mescolerebbe societa' che devono restare separate.
+        if (!$this->companyAllows($module)) return false;
+
         // SuperAdmin (ID 1) → accesso totale
         if ($this->id == 1) return true;
 

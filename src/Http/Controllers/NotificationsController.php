@@ -10,17 +10,53 @@ final class NotificationsController
 
     // ── GET /notifications/unread ─────────────────────────────────────────────
 
+    /**
+     * Filtro sulla societa' attiva per le query sulle notifiche.
+     *
+     * Se la colonna non c'e' ancora (migration non applicata) torna vuoto,
+     * cosi' le notifiche restano visibili invece di sparire tutte.
+     *
+     * @return array{sql: string, args: array, presente: bool}
+     */
+    private function filtroSocieta(): array
+    {
+        static $presente = null;
+
+        if ($presente === null) {
+            try {
+                $stmt     = $this->conn->query("SHOW COLUMNS FROM bb_notifications LIKE 'group_company_id'");
+                $presente = (bool)($stmt && $stmt->fetch(\PDO::FETCH_ASSOC));
+            } catch (\Throwable $e) {
+                $presente = false;
+            }
+        }
+
+        if (!$presente) {
+            return ['sql' => '', 'args' => [], 'presente' => false];
+        }
+
+        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        return [
+            'sql'      => ' AND n.group_company_id = :cid',
+            'args'     => [':cid' => $service->id()],
+            'presente' => true,
+        ];
+    }
+
     public function unread(Request $request): never
     {
         try {
+            // il pallino e l'elenco seguono la societa' attiva, come il resto
+            $filtro = $this->filtroSocieta();
+
             $stmt = $this->conn->prepare('
-                SELECT id, title, message, link, category, priority, created_at
-                FROM bb_notifications
-                WHERE user_id = :uid AND is_read = 0
-                ORDER BY created_at DESC
+                SELECT n.id, n.title, n.message, n.link, n.category, n.priority, n.created_at
+                FROM bb_notifications n
+                WHERE n.user_id = :uid AND n.is_read = 0' . $filtro['sql'] . '
+                ORDER BY n.created_at DESC
                 LIMIT 20
             ');
-            $stmt->execute([':uid' => $request->user()->id]);
+            $stmt->execute([':uid' => $request->user()->id] + $filtro['args']);
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             Response::json(['success' => true, 'count' => count($rows), 'notifications' => $rows]);
@@ -40,29 +76,34 @@ final class NotificationsController
                 $hasReadAt = true;
             }
 
-            if ($hasReadAt) {
-                $stmt = $this->conn->prepare('
-                    SELECT n.id, n.title, n.message, n.link, n.created_at, n.read_at,
-                           COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
-                    FROM bb_notifications n
-                    LEFT JOIN bb_users u ON n.created_by = u.id
-                    WHERE n.user_id = :uid AND n.is_read = 1
-                    ORDER BY COALESCE(n.read_at, n.created_at) DESC
-                    LIMIT 50
-                ');
-            } else {
-                $stmt = $this->conn->prepare('
-                    SELECT n.id, n.title, n.message, n.link, n.created_at, NULL AS read_at,
-                           COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
-                    FROM bb_notifications n
-                    LEFT JOIN bb_users u ON n.created_by = u.id
-                    WHERE n.user_id = :uid AND n.is_read = 1
-                    ORDER BY n.created_at DESC
-                    LIMIT 50
-                ');
-            }
+            $filtro     = $this->filtroSocieta();
+            $hasSocieta = $filtro['presente'];
 
-            $stmt->execute([':uid' => $request->user()->id]);
+            $colSocieta  = $hasSocieta
+                ? ', g.codice AS societa_codice, g.colore AS societa_colore'
+                : ', NULL AS societa_codice, NULL AS societa_colore';
+            $joinSocieta = $hasSocieta
+                ? ' LEFT JOIN bb_group_companies g ON g.id = n.group_company_id'
+                : '';
+            // anche lo storico resta dentro la societa' in cui si sta lavorando
+            $filtroSocieta = $filtro['sql'];
+            $argSocieta    = $filtro['args'];
+
+            $letta  = $hasReadAt ? 'n.read_at' : 'NULL AS read_at';
+            $ordine = $hasReadAt ? 'COALESCE(n.read_at, n.created_at)' : 'n.created_at';
+
+            $stmt = $this->conn->prepare('
+                SELECT n.id, n.title, n.message, n.link, n.created_at, ' . $letta . ',
+                       COALESCE(CONCAT(u.first_name, " ", u.last_name), u.username, "Sistema") AS created_by_name
+                       ' . $colSocieta . '
+                FROM bb_notifications n
+                LEFT JOIN bb_users u ON n.created_by = u.id' . $joinSocieta . '
+                WHERE n.user_id = :uid AND n.is_read = 1' . $filtroSocieta . '
+                ORDER BY ' . $ordine . ' DESC
+                LIMIT 50
+            ');
+
+            $stmt->execute([':uid' => $request->user()->id] + $argSocieta);
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             Response::json(['success' => true, 'notifications' => $rows]);

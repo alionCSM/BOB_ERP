@@ -73,6 +73,20 @@
             </li>
             <li class="side-nav__devider my-6"></li>
 
+            {# ── POTI NOLEGGI — autocarrate
+                 canAccess tiene conto anche dei moduli della societa' attiva,
+                 quindi la voce sparisce da sola quando si entra nel Consorzio #}
+            {% if user.canAccess('pn_autocarrate') %}
+                {% set acActive = currentPath starts with '/autocarrate' %}
+                <li>
+                    <a href="/autocarrate" class="side-menu {{ acActive ? 'side-menu--active' : '' }}">
+                        <div class="side-menu__icon"><i data-lucide="truck"></i></div>
+                        <div class="side-menu__title">Autocarrate</div>
+                    </a>
+                </li>
+                <li class="side-nav__devider my-6"></li>
+            {% endif %}
+
             {# ── AI CHAT — permesso 'ai_chat' in bb_user_permissions
                  (gestibile da Utenti → Permessi; superadmin id 1 sempre) ── #}
             {% if user.canAccess('ai_chat') %}
@@ -203,7 +217,22 @@
                     <li><a href="/billing" class="side-menu {{ currentPath == '/billing' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="activity"></i></div><div class="side-menu__title">Cantieri Movimentati</div></a></li>
                     <li><a href="/billing/clients" class="side-menu {{ currentPath starts with '/billing/client' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="banknote"></i></div><div class="side-menu__title">Fatturazione Clienti</div></a></li>
                     <li><a href="/fatturazione/consorziate" class="side-menu {{ currentPath starts with '/fatturazione/consorziate' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="credit-card"></i></div><div class="side-menu__title">Pagamenti Consorziate</div></a></li>
+                    {# visibile solo a chi ha il permesso di direzione #}
+                    {% if user.canAccess('report_business') %}
+                        <li><a href="/report/fatturato" class="side-menu {{ currentPath starts with '/report/fatturato' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="trending-up"></i></div><div class="side-menu__title">Andamento Fatturato</div></a></li>
+                    {% endif %}
                 </ul>
+            </li>
+            <li class="side-nav__devider my-6"></li>
+        {% endif %}
+
+        {# ── DIREZIONE — per chi ha il report ma non la fatturazione ── #}
+        {% if user.canAccess('report_business') and not user.canAccess('billing') %}
+            <li>
+                <a href="/report/fatturato" class="side-menu {{ currentPath starts with '/report/fatturato' ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="trending-up"></i></div>
+                    <div class="side-menu__title">Andamento Fatturato</div>
+                </a>
             </li>
             <li class="side-nav__devider my-6"></li>
         {% endif %}
