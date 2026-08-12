@@ -170,8 +170,8 @@
 .ac-f-cerca { flex: 1 1 240px; }
 
 /* ── Riquadro degli importi ─────────────────────────────────────────────── */
-/* Tenuti insieme e spiegati: senza una didascalia non si capisce quale sia
-   il totale e quale la tariffa. */
+/* Tenuti insieme: senza una didascalia non si capisce quale sia il totale
+   e quale la tariffa. */
 .ac-soldi {
     border: 1px solid #e2e8f0;
     border-radius: 10px;
@@ -198,12 +198,6 @@
     .ac-soldi-campi { grid-template-columns: minmax(0, 1fr); }
 }
 
-.ac-soldi-nota {
-    margin-top: 10px;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #64748b;
-}
 
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {
