@@ -66,7 +66,6 @@ final class AutocarrateController
             'cercaAl'      => $cercaAl,
             'occupati'     => $occupati,
             'ricercaAttiva'=> (bool)($cercaDal && $cercaAl),
-            'canSeePrices' => $this->utente($request)->canSeePrices(),
         ]);
     }
 
@@ -131,8 +130,10 @@ final class AutocarrateController
         $dal = $this->data($_GET['dal'] ?? '', date('Y-m-01'));
         $al  = $this->data($_GET['al'] ?? '', date('Y-m-d', strtotime($dal . ' +2 months')));
 
+        $cerca = trim((string)($_GET['q'] ?? ''));
+
         Response::view('poti/autocarrate/prenotazioni.html.twig', $request, [
-            'prenotazioni' => $repo->prenotazioni($cid, $dal, $al, (int)($_GET['mezzo'] ?? 0) ?: null),
+            'prenotazioni' => $repo->prenotazioni($cid, $dal, $al, (int)($_GET['mezzo'] ?? 0) ?: null, $cerca),
             'mezzi'        => $repo->mezzi($cid, true),
             'stati'        => self::STATI_PREN,
             'pagamenti'    => self::PAGAMENTI,
@@ -140,7 +141,7 @@ final class AutocarrateController
             'dal'          => $dal,
             'al'           => $al,
             'mezzoId'      => (int)($_GET['mezzo'] ?? 0),
-            'canSeePrices' => $this->utente($request)->canSeePrices(),
+            'cerca'        => $cerca,
             'salvato'      => isset($_GET['salvato']),
             'errore'       => $_GET['errore'] ?? null,
         ]);
@@ -228,7 +229,6 @@ final class AutocarrateController
             'tariffa_giorno' => $this->importo($_POST['tariffa_giorno'] ?? ''),
             'totale'         => $this->importo($_POST['totale'] ?? ''),
             'contratto'      => trim((string)($_POST['contratto'] ?? '')),
-            'importo'        => $this->importo($_POST['importo'] ?? ''),
             'pagamento'      => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
                                 ? (string)$_POST['pagamento']
                                 : 'da_pagare',
@@ -295,9 +295,39 @@ final class AutocarrateController
     }
 
     /** Importo con la virgola accettata al posto del punto. */
+    /**
+     * Importo scritto all'italiana -> numero.
+     *
+     * Accetta 1.234,56 (punto per le migliaia, virgola per i decimali),
+     * 1234,56 e anche 1234.56 per chi digita all'inglese. Prima si
+     * sostituiva soltanto la virgola con il punto: "1.234,56" diventava
+     * "1.234.56", non era piu' un numero e l'importo veniva buttato via
+     * senza dire niente.
+     */
     private function importo(mixed $valore): string
     {
-        $v = str_replace(',', '.', trim((string)$valore));
+        $v = trim((string)$valore);
+        if ($v === '') {
+            return '';
+        }
+
+        // via simboli di valuta e spazi, compreso quello unificatore che
+        // arriva dal copia e incolla
+        $v = preg_replace('/[^0-9,.\-]/u', '', $v) ?? '';
+        if ($v === '') {
+            return '';
+        }
+
+        if (str_contains($v, ',')) {
+            // c'e' la virgola: e' lei il separatore decimale, quindi i punti
+            // rimasti sono migliaia
+            $v = str_replace('.', '', $v);
+            $v = str_replace(',', '.', $v);
+        } elseif (substr_count($v, '.') > 1) {
+            // piu' punti e nessuna virgola: sono tutti migliaia (1.234.567)
+            $v = str_replace('.', '', $v);
+        }
+
         return is_numeric($v) ? $v : '';
     }
 

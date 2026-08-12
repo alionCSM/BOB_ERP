@@ -166,6 +166,39 @@
 .ac-avviso.is-ok { color: #16a34a; }
 .ac-avviso.is-ko { color: #b91c1c; font-weight: 600; }
 
+/* la ricerca si prende lo spazio che avanza nella riga dei filtri */
+.ac-f-cerca { flex: 1 1 240px; }
+
+/* ── Riquadro degli importi ─────────────────────────────────────────────── */
+/* Tenuti insieme: senza una didascalia non si capisce quale sia il totale
+   e quale la tariffa. */
+.ac-soldi {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    background: #f8fafc;
+}
+
+.ac-soldi-tit {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+}
+
+.ac-soldi-campi {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 700px) {
+    .ac-soldi-campi { grid-template-columns: minmax(0, 1fr); }
+}
+
+
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {
     padding: 8px 11px;
@@ -311,8 +344,6 @@
 
 .ac-tel { display: block; font-size: 11px; color: #94a3b8; }
 
-/* importo di contratto diverso dal totale calcolato: va notato */
-.ac-diff { color: #b45309; font-weight: 700; }
 
 .ac-empty { padding: 26px; text-align: center; font-size: 13px; color: #94a3b8; }
 

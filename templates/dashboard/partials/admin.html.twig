@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="/assets/css/views/dashboard/partials/dashboard_admin.css">
+<link rel="stylesheet" href="/assets/css/views/dashboard/partials/dashboard_admin.css?v=2">
 
 <div class="da-page">
 
@@ -11,6 +11,35 @@
     </div>
 
     <!-- ── STAT CARDS ──────────────────────────── -->
+    {# Dentro una societa' diversa dal Consorzio queste card lasciano il posto
+       ai contatori di quella societa': utenti, cantieri, presenze e documenti
+       sono dati del Consorzio e li' non vorrebbero dire niente. Il resto della
+       pagina (stato sistema, risorse server, utenti online) riguarda la
+       macchina e resta uguale ovunque. #}
+    {% if statsSocieta is not null %}
+        <div class="da-stats">
+            {% for s in statsSocieta %}
+                <a class="da-stat" href="{{ s.href }}">
+                    <div class="da-stat-icon" style="background:{{ s.bg }};">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                             stroke="{{ s.color }}" stroke-width="2"><path d="{{ s.icon }}"/></svg>
+                    </div>
+                    <div>
+                        <div class="da-stat-value">{{ s.num }}</div>
+                        <div class="da-stat-label">{{ s.label }}</div>
+                        <div class="da-stat-sub">{{ s.sub }}</div>
+                    </div>
+                </a>
+            {% else %}
+                <div class="da-stat">
+                    <div>
+                        <div class="da-stat-label">Nessun contatore per questa societa'</div>
+                        <div class="da-stat-sub">compariranno con i suoi moduli</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
     <div class="da-stats">
         <div class="da-stat">
             <div class="da-stat-icon" style="background:#eff6ff;">
@@ -53,6 +82,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- ── SYSTEM STATUS + SERVER RESOURCES ──── -->
     <div class="da-grid-2">

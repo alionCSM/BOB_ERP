@@ -24,24 +24,14 @@ final class DashboardController
         $role      = $userInfo['role']       ?? '';
         $pageTitle = 'Dashboard';
 
-        // Le dashboard fisse (admin, documenti) sono fatte sui dati del
-        // Consorzio: dentro un'altra societa' mostrerebbero cantieri e
-        // documenti che li' non c'entrano. In quel caso si usa comunque
-        // quella dinamica, che si costruisce sui moduli della societa'.
-        $ruoloEffettivo = $this->societaLimitata() ? 'dinamica' : $role;
+        $data = compact('username', 'name', 'role', 'pageTitle');
 
-        // Il ruolo passato alla vista e' quello effettivo, non quello
-        // dell'utente: il template sceglie da li' quale dashboard disegnare,
-        // e se non coincide con i dati calcolati si ritrova a riempire
-        // riquadri per cui non ha ricevuto niente.
-        $data = [
-            'username'  => $username,
-            'name'      => $name,
-            'role'      => $ruoloEffettivo,
-            'pageTitle' => $pageTitle,
-        ];
+        // Chi arriva qui rimbalzato da una pagina di un'altra societa' deve
+        // capire perche', invece di ritrovarsi sulla dashboard senza motivo.
+        $data['fuoriSocieta']  = isset($_GET['fuori_societa']);
+        $data['societaAttiva'] = ($GLOBALS['currentCompany'] ?? null)?->current()['nome'] ?? '';
 
-        match ($ruoloEffettivo) {
+        match ($role) {
             'admin'            => $data += $this->dataForAdmin($name),
             'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
             // tutti gli altri ruoli: dashboard dinamica costruita sui permessi
@@ -49,6 +39,50 @@ final class DashboardController
         };
 
         Response::view('dashboard/index.html.twig', $request, $data);
+    }
+
+    /**
+     * Contatori delle autocarrate della societa' attiva.
+     *
+     * Sta in un metodo suo perche' lo usano sia la dashboard dinamica sia
+     * quella dell'admin, che dentro una societa' diversa dal Consorzio
+     * sostituisce con questi le proprie card.
+     */
+    private function statsAutocarrate(): array
+    {
+        $cid   = ($GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn))->id();
+        $oggi  = date('Y-m-d');
+
+        try {
+            $s = $this->conn->prepare("
+                SELECT COUNT(*) FROM pn_autocarrate
+                WHERE group_company_id = :cid AND stato = 'attiva'
+            ");
+            $s->execute([':cid' => $cid]);
+            $totali = (int)$s->fetchColumn();
+
+            $s = $this->conn->prepare("
+                SELECT COUNT(DISTINCT autocarrata_id) FROM pn_prenotazioni
+                WHERE group_company_id = :cid AND stato <> 'annullata'
+                  AND data_inizio <= :d1 AND data_fine >= :d2
+            ");
+            $s->execute([':cid' => $cid, ':d1' => $oggi, ':d2' => $oggi]);
+            $impegnate = (int)$s->fetchColumn();
+        } catch (\Throwable $e) {
+            // migration non ancora applicata: meglio nessuna card che una
+            // pagina che non si apre
+            error_log('[Dashboard] autocarrate: ' . $e->getMessage());
+            return [];
+        }
+
+        return [
+            ['num' => max(0, $totali - $impegnate), 'label' => 'Autocarrate libere', 'sub' => 'oggi',
+             'color' => '#16a34a', 'bg' => '#f0fdf4', 'href' => '/autocarrate',
+             'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1'],
+            ['num' => $impegnate, 'label' => 'Autocarrate impegnate', 'sub' => 'oggi',
+             'color' => '#0369a1', 'bg' => '#f0f9ff', 'href' => '/autocarrate/prenotazioni',
+             'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2'],
+        ];
     }
 
     /**
@@ -208,7 +242,14 @@ final class DashboardController
         @setlocale(LC_TIME, 'it_IT.UTF-8', 'it_IT', 'italian');
         $today = @strftime('%A %d %B %Y') ?: date('d/m/Y');
 
+        // Stato del sistema e risorse del server valgono per tutte le societa':
+        // sono la macchina, non i dati di una azienda. Le quattro card in alto
+        // invece sono del Consorzio, e dentro un'altra societa' lasciano il
+        // posto ai contatori di quella societa'.
+        $statsSocieta = $this->societaLimitata() ? $this->statsAutocarrate() : null;
+
         return compact(
+            'statsSocieta',
             'name', 'greeting', 'today',
             'totalUsers', 'activeUsers',
             'activeWorksites', 'totalWorksites',
@@ -471,29 +512,7 @@ final class DashboardController
         }
 
         if ($has('pn_autocarrate')) {
-            // i contatori si fermano alla societa' attiva: e' un modulo di
-            // Poti e non deve mescolarsi con i dati del Consorzio
-            $cid = ($GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($conn))->id();
-
-            $s = $conn->prepare("
-                SELECT COUNT(*) FROM pn_autocarrate
-                WHERE group_company_id = :cid AND stato = 'attiva'
-            ");
-            $s->execute([':cid' => $cid]);
-            $totali = (int)$s->fetchColumn();
-
-            $s = $conn->prepare("
-                SELECT COUNT(DISTINCT autocarrata_id) FROM pn_prenotazioni
-                WHERE group_company_id = :cid AND stato <> 'annullata'
-                  AND data_inizio <= :d1 AND data_fine >= :d2
-            ");
-            $s->execute([':cid' => $cid, ':d1' => $today, ':d2' => $today]);
-            $impegnate = (int)$s->fetchColumn();
-
-            $stats[] = ['num' => max(0, $totali - $impegnate), 'label' => 'Autocarrate libere', 'sub' => 'oggi', 'color' => '#16a34a', 'bg' => '#f0fdf4',
-                        'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1', 'href' => '/autocarrate'];
-            $stats[] = ['num' => $impegnate, 'label' => 'Autocarrate impegnate', 'sub' => 'oggi', 'color' => '#0369a1', 'bg' => '#f0f9ff',
-                        'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2', 'href' => '/autocarrate/prenotazioni'];
+            $stats = array_merge($stats, $this->statsAutocarrate());
         }
 
         if ($has('documents', 'document_alerts')) {

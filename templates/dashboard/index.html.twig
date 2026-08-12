@@ -1,6 +1,13 @@
 {% extends 'layout/base.html.twig' %}
 {% block content %}
 <div class="intro-y mt-8">
+    {% if fuoriSocieta %}
+        <div class="db-fuori-societa">
+            Quella pagina non fa parte di
+            <strong>{{ societaAttiva ?: 'questa societa\'' }}</strong>.
+            Per aprirla cambia societa' dalla barra in alto.
+        </div>
+    {% endif %}
     {% if role == 'admin' %}
         {% include 'dashboard/partials/admin.html.twig' %}
     {% elseif role == 'document_manager' %}

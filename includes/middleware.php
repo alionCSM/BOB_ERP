@@ -65,6 +65,21 @@ if (!$sceltaSocietaEsclusa && !isset($_SESSION[\App\Service\CurrentCompany::SESS
     }
 }
 
+// ── Confini fra societa': blocco delle rotte ─────────────────────────────────
+// Nascondere le voci di menu non basta: senza questo controllo basterebbe
+// scrivere l'indirizzo a mano per entrare nei moduli di un'altra societa'.
+// Vale per tutti, superadmin compreso.
+$datiSocieta   = $currentCompany->current();
+$moduliSocieta = null;
+if ($datiSocieta && !empty($datiSocieta['moduli'])) {
+    $moduliSocieta = array_filter(array_map('trim', explode(',', (string)$datiSocieta['moduli'])));
+}
+
+if ($moduliSocieta && !(new \App\Security\CompanyModuleGuard())->consente($uri, $moduliSocieta)) {
+    header('Location: /dashboard?fuori_societa=1');
+    exit;
+}
+
 // ── Authorization services ────────────────────────────────────────────────────
 $authorization   = new AuthorizationService(new AccessProfileResolver());
 $capabilityService = new CapabilityService();
