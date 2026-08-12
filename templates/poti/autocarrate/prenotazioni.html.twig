@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=8">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=9">
 {% endblock %}
 
 {% block content %}
@@ -39,7 +39,15 @@
                 {% endfor %}
             </select>
         </label>
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca</span>
+            <input type="search" name="q" value="{{ cerca }}"
+                   placeholder="cliente, luogo, targa, contratto, note…">
+        </label>
         <button class="ac-btn ac-btn-primary">Filtra</button>
+        {% if cerca or mezzoId %}
+            <a href="/autocarrate/prenotazioni?dal={{ dal }}&al={{ al }}" class="ac-link">azzera</a>
+        {% endif %}
     </form>
 
     <div class="ac-box">
@@ -54,14 +62,13 @@
                         <th>Al</th>
                         <th class="right">Giorni</th>
                         <th>Contratto</th>
-                        <th class="right">Importo</th>
+                        <th class="right" title="Prezzo di un giorno di noleggio">Tariffa/g</th>
+                        <th class="right" title="Giorni per tariffa: quanto verrebbe dal calcolo">Totale</th>
+                        <th class="right" title="Quanto e' scritto sul contratto">Importo</th>
                         <th>Commerciale</th>
-                        {% if canSeePrices %}
-                            <th class="right">Tariffa</th>
-                            <th class="right">Totale</th>
-                        {% endif %}
                         <th>Stato</th>
                         <th>Pagamento</th>
+                        <th>Note</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -78,22 +85,23 @@
                             <td>{{ p.data_fine|date('d/m/Y') }}</td>
                             <td class="right">{{ p.giorni }}</td>
                             <td>{{ p.contratto ?: '—' }}</td>
-                            {# se l'importo di contratto non coincide col totale calcolato
-                               si evidenzia, perche' e' proprio il caso da guardare #}
+                            <td class="right">{{ p.tariffa_giorno ? '€ ' ~ p.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
+                            <td class="right">{{ p.totale ? '€ ' ~ p.totale|number_format(2, ',', '.') : '—' }}</td>
+                            {# importo di contratto diverso dal totale calcolato: si
+                               evidenzia, perche' e' proprio il caso da guardare #}
                             <td class="right{{ p.importo and p.totale and p.importo != p.totale ? ' ac-diff' : '' }}">
                                 {{ p.importo ? '€ ' ~ p.importo|number_format(2, ',', '.') : '—' }}
                             </td>
                             <td>{{ p.commerciale_nome ?: '—' }}</td>
-                            {% if canSeePrices %}
-                                <td class="right">{{ p.tariffa_giorno ? '€ ' ~ p.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
-                                <td class="right">{{ p.totale ? '€ ' ~ p.totale|number_format(2, ',', '.') : '—' }}</td>
-                            {% endif %}
                             <td><span class="ac-stato ac-stato-{{ p.stato }}">{{ p.stato }}</span></td>
                             <td>
                                 <span class="ac-stato ac-pag-{{ p.pagamento|default('da_pagare') }}">
                                     {{ p.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
                                 </span>
                             </td>
+                            {# le note possono essere lunghe: si troncano e si leggono
+                               per intero passandoci sopra o aprendo la prenotazione #}
+                            <td class="ac-td-note" title="{{ p.note }}">{{ p.note ?: '—' }}</td>
                             <td class="right">
                                 <button type="button" class="ac-link"
                                         data-ac-modifica="{{ p|json_encode|e('html_attr') }}">modifica</button>
@@ -101,8 +109,8 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="{{ canSeePrices ? 14 : 12 }}" class="ac-empty">
-                                Nessuna prenotazione nel periodo.
+                            <td colspan="15" class="ac-empty">
+                                {{ cerca ? 'Nessuna prenotazione trovata.' : 'Nessuna prenotazione nel periodo.' }}
                             </td>
                         </tr>
                     {% endfor %}
@@ -173,13 +181,41 @@
                            placeholder="rif. contratto">
                 </label>
 
-                {# fuori dal blocco prezzi: l'importo di contratto serve a chi
-                   gestisce le prenotazioni anche senza il permesso prezzi #}
-                <label class="ac-f">
-                    <span>Importo contratto</span>
-                    <input type="text" name="importo" id="ac-p-importo" inputmode="decimal"
-                           placeholder="0,00">
-                </label>
+                {# I tre importi si vedono senza il permesso prezzi: chi gestisce
+                   le autocarrate deve poterli leggere e scrivere, altrimenti il
+                   modulo non serve a niente. #}
+                <div class="ac-f ac-f-4 ac-soldi">
+                    <div class="ac-soldi-tit">Importi</div>
+                    <div class="ac-soldi-campi">
+                        <label class="ac-f">
+                            <span>Tariffa al giorno</span>
+                            <input type="text" name="tariffa_giorno" id="ac-p-tariffa" inputmode="decimal"
+                                   placeholder="0,00">
+                            <small>quanto costa un giorno</small>
+                        </label>
+
+                        <label class="ac-f">
+                            <span>Totale calcolato</span>
+                            <input type="text" name="totale" id="ac-p-totale" inputmode="decimal"
+                                   placeholder="0,00">
+                            <small id="ac-p-calcolo">giorni per tariffa</small>
+                        </label>
+
+                        <label class="ac-f">
+                            <span>Importo contratto</span>
+                            <input type="text" name="importo" id="ac-p-importo" inputmode="decimal"
+                                   placeholder="0,00">
+                            <small>quanto e' scritto sul contratto</small>
+                        </label>
+                    </div>
+                    <div class="ac-soldi-nota">
+                        Il totale viene proposto da BOB moltiplicando i giorni per la tariffa, ma
+                        resta modificabile: trasporto e sconti il calcolo non li conosce. L'importo
+                        di contratto e' quello che avete pattuito davvero; se non coincide col
+                        totale, in elenco viene evidenziato.
+                        Si scrive all'italiana: <strong>1.234,56</strong>
+                    </div>
+                </div>
 
                 <label class="ac-f">
                     <span>Pagamento</span>
@@ -199,20 +235,6 @@
                         {{ utenteNome }}
                     </div>
                 </div>
-
-                {% if canSeePrices %}
-                    <label class="ac-f">
-                        <span>Tariffa al giorno</span>
-                        <input type="text" name="tariffa_giorno" id="ac-p-tariffa" inputmode="decimal">
-                    </label>
-
-                    <label class="ac-f">
-                        <span>Totale</span>
-                        <input type="text" name="totale" id="ac-p-totale" inputmode="decimal">
-                        <small id="ac-p-calcolo"></small>
-                    </label>
-
-                {% endif %}
 
                 <label class="ac-f ac-f-4">
                     <span>Note</span>
@@ -239,5 +261,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=8"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=9"></script>
 {% endblock %}

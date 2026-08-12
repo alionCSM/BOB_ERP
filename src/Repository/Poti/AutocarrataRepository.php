@@ -95,7 +95,7 @@ final class AutocarrataRepository
      * finisca: e' il confronto incrociato qui sotto, e vale sia per la
      * timeline sia per il controllo dei doppioni.
      */
-    public function prenotazioni(int $companyId, string $dal, string $al, ?int $mezzoId = null): array
+    public function prenotazioni(int $companyId, string $dal, string $al, ?int $mezzoId = null, string $cerca = ''): array
     {
         $sql = "
             SELECT p.*, a.targa, a.modello,
@@ -121,7 +121,18 @@ final class AutocarrataRepository
             $sql .= ' AND p.autocarrata_id = :mid';
             $args[':mid'] = $mezzoId;
         }
-        $sql .= ' ORDER BY a.targa ASC, p.data_inizio ASC';
+
+        // la ricerca guarda tutto quello che si ha in mano quando si cerca
+        // una prenotazione: chi, dove, quale mezzo, che contratto, le note
+        if ($cerca !== '') {
+            $sql .= " AND (p.cliente LIKE :q OR p.luogo LIKE :q OR p.contratto LIKE :q
+                           OR p.note LIKE :q OR p.telefono LIKE :q OR a.targa LIKE :q
+                           OR p.commerciale_testo LIKE :q)";
+            $args[':q'] = '%' . $cerca . '%';
+        }
+
+        // le piu' recenti in cima: e' quello che si guarda per prima cosa
+        $sql .= ' ORDER BY p.data_inizio DESC, a.targa ASC';
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($args);

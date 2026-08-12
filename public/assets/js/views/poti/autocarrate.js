@@ -101,13 +101,12 @@
                 var comm = campo('ac-p-commerciale');
                 if (comm) comm.textContent = d.commerciale_nome || '—';
 
-                campo('ac-p-importo').value = d.importo || '';
-
-                // tariffa e totale esistono solo per chi puo' vedere i prezzi
-                var t = campo('ac-p-tariffa');
-                if (t) t.value = d.tariffa_giorno || '';
-                var tot = campo('ac-p-totale');
-                if (tot) tot.value = d.totale || '';
+                // dal database arrivano con il punto decimale: si rimettono
+                // all'italiana, altrimenti si modifica un campo che mostra
+                // un formato diverso da quello che si e' scritto
+                campo('ac-p-importo').value = d.importo        ? euro(d.importo)        : '';
+                campo('ac-p-tariffa').value = d.tariffa_giorno ? euro(d.tariffa_giorno) : '';
+                campo('ac-p-totale').value  = d.totale         ? euro(d.totale)         : '';
 
                 var del = campo('ac-p-elimina');
                 if (del) {
@@ -154,14 +153,44 @@
         return Math.round((d2 - d1) / 86400000) + 1;
     }
 
+    /**
+     * Numero scritto all'italiana -> numero.
+     * Accetta 1.234,56 (punto migliaia, virgola decimali), 1234,56 e anche
+     * 1234.56. Sostituire solo la virgola col punto non basta: "1.234,56"
+     * diventerebbe "1.234.56", cioe' niente.
+     */
+    function numero(testo) {
+        var v = String(testo == null ? '' : testo).replace(/[^0-9,.-]/g, '');
+        if (!v) return NaN;
+        if (v.indexOf(',') !== -1) {
+            v = v.replace(/\./g, '').replace(',', '.');
+        } else if ((v.match(/\./g) || []).length > 1) {
+            v = v.replace(/\./g, '');
+        }
+        return parseFloat(v);
+    }
+
+    /** Numero -> testo all'italiana, con la virgola per i decimali. */
+    function euro(n) {
+        return (Number(n) || 0).toLocaleString('it-IT', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
     function aggiorna() {
         if (!tariffa || !calcolo) return;
         var gg = giorni();
-        var tar = parseFloat(String(tariffa.value).replace(',', '.'));
-        if (!gg || isNaN(tar)) { calcolo.textContent = ''; return; }
+        var tar = numero(tariffa.value);
+        if (!gg || isNaN(tar)) {
+            calcolo.textContent = 'giorni per tariffa';
+            return;
+        }
         var att = gg * tar;
-        calcolo.textContent = gg + ' gg × ' + tar.toFixed(2) + ' = ' + att.toFixed(2);
-        if (totale && !totale.value) totale.value = att.toFixed(2);
+        calcolo.textContent = gg + ' gg × ' + euro(tar) + ' = ' + euro(att);
+        // proposto solo se il totale e' ancora vuoto: se qualcuno l'ha
+        // scritto a mano (trasporto, sconti) non va sovrascritto
+        if (totale && !totale.value) totale.value = euro(att);
     }
 
     [tariffa, campo('ac-p-dal'), campo('ac-p-al')].forEach(function (el) {

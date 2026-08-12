@@ -166,6 +166,45 @@
 .ac-avviso.is-ok { color: #16a34a; }
 .ac-avviso.is-ko { color: #b91c1c; font-weight: 600; }
 
+/* la ricerca si prende lo spazio che avanza nella riga dei filtri */
+.ac-f-cerca { flex: 1 1 240px; }
+
+/* ── Riquadro degli importi ─────────────────────────────────────────────── */
+/* Tenuti insieme e spiegati: sono tre numeri simili e senza una didascalia
+   non si capisce quale sia quale. */
+.ac-soldi {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    background: #f8fafc;
+}
+
+.ac-soldi-tit {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+}
+
+.ac-soldi-campi {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 700px) {
+    .ac-soldi-campi { grid-template-columns: minmax(0, 1fr); }
+}
+
+.ac-soldi-nota {
+    margin-top: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {
     padding: 8px 11px;
