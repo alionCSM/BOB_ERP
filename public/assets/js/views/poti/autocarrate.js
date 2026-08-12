@@ -104,7 +104,6 @@
                 // dal database arrivano con il punto decimale: si rimettono
                 // all'italiana, altrimenti si modifica un campo che mostra
                 // un formato diverso da quello che si e' scritto
-                campo('ac-p-importo').value = d.importo        ? euro(d.importo)        : '';
                 campo('ac-p-tariffa').value = d.tariffa_giorno ? euro(d.tariffa_giorno) : '';
                 campo('ac-p-totale').value  = d.totale         ? euro(d.totale)         : '';
 

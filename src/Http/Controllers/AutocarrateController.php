@@ -229,7 +229,6 @@ final class AutocarrateController
             'tariffa_giorno' => $this->importo($_POST['tariffa_giorno'] ?? ''),
             'totale'         => $this->importo($_POST['totale'] ?? ''),
             'contratto'      => trim((string)($_POST['contratto'] ?? '')),
-            'importo'        => $this->importo($_POST['importo'] ?? ''),
             'pagamento'      => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
                                 ? (string)$_POST['pagamento']
                                 : 'da_pagare',

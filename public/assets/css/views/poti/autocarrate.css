@@ -170,8 +170,8 @@
 .ac-f-cerca { flex: 1 1 240px; }
 
 /* ── Riquadro degli importi ─────────────────────────────────────────────── */
-/* Tenuti insieme e spiegati: sono tre numeri simili e senza una didascalia
-   non si capisce quale sia quale. */
+/* Tenuti insieme e spiegati: senza una didascalia non si capisce quale sia
+   il totale e quale la tariffa. */
 .ac-soldi {
     border: 1px solid #e2e8f0;
     border-radius: 10px;
@@ -190,7 +190,7 @@
 
 .ac-soldi-campi {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -350,8 +350,6 @@
 
 .ac-tel { display: block; font-size: 11px; color: #94a3b8; }
 
-/* importo di contratto diverso dal totale calcolato: va notato */
-.ac-diff { color: #b45309; font-weight: 700; }
 
 .ac-empty { padding: 26px; text-align: center; font-size: 13px; color: #94a3b8; }
 

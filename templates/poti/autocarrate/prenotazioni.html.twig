@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=9">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=10">
 {% endblock %}
 
 {% block content %}
@@ -63,8 +63,7 @@
                         <th class="right">Giorni</th>
                         <th>Contratto</th>
                         <th class="right" title="Prezzo di un giorno di noleggio">Tariffa/g</th>
-                        <th class="right" title="Giorni per tariffa: quanto verrebbe dal calcolo">Totale</th>
-                        <th class="right" title="Quanto e' scritto sul contratto">Importo</th>
+                        <th class="right" title="Giorni per tariffa, correggibile a mano">Totale</th>
                         <th>Commerciale</th>
                         <th>Stato</th>
                         <th>Pagamento</th>
@@ -87,11 +86,6 @@
                             <td>{{ p.contratto ?: '—' }}</td>
                             <td class="right">{{ p.tariffa_giorno ? '€ ' ~ p.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
                             <td class="right">{{ p.totale ? '€ ' ~ p.totale|number_format(2, ',', '.') : '—' }}</td>
-                            {# importo di contratto diverso dal totale calcolato: si
-                               evidenzia, perche' e' proprio il caso da guardare #}
-                            <td class="right{{ p.importo and p.totale and p.importo != p.totale ? ' ac-diff' : '' }}">
-                                {{ p.importo ? '€ ' ~ p.importo|number_format(2, ',', '.') : '—' }}
-                            </td>
                             <td>{{ p.commerciale_nome ?: '—' }}</td>
                             <td><span class="ac-stato ac-stato-{{ p.stato }}">{{ p.stato }}</span></td>
                             <td>
@@ -109,7 +103,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="15" class="ac-empty">
+                            <td colspan="14" class="ac-empty">
                                 {{ cerca ? 'Nessuna prenotazione trovata.' : 'Nessuna prenotazione nel periodo.' }}
                             </td>
                         </tr>
@@ -195,25 +189,16 @@
                         </label>
 
                         <label class="ac-f">
-                            <span>Totale calcolato</span>
+                            <span>Totale</span>
                             <input type="text" name="totale" id="ac-p-totale" inputmode="decimal"
                                    placeholder="0,00">
                             <small id="ac-p-calcolo">giorni per tariffa</small>
                         </label>
-
-                        <label class="ac-f">
-                            <span>Importo contratto</span>
-                            <input type="text" name="importo" id="ac-p-importo" inputmode="decimal"
-                                   placeholder="0,00">
-                            <small>quanto e' scritto sul contratto</small>
-                        </label>
                     </div>
                     <div class="ac-soldi-nota">
-                        Il totale viene proposto da BOB moltiplicando i giorni per la tariffa, ma
-                        resta modificabile: trasporto e sconti il calcolo non li conosce. L'importo
-                        di contratto e' quello che avete pattuito davvero; se non coincide col
-                        totale, in elenco viene evidenziato.
-                        Si scrive all'italiana: <strong>1.234,56</strong>
+                        Il totale viene calcolato moltiplicando i giorni per la tariffa, ma resta
+                        modificabile: trasporto e sconti il calcolo non li conosce. Si scrive
+                        all'italiana: <strong>1.234,56</strong>
                     </div>
                 </div>
 
@@ -261,5 +246,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=9"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=10"></script>
 {% endblock %}

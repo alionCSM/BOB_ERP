@@ -181,7 +181,7 @@ WHERE NOT EXISTS (
 --     importo davvero a zero.
 INSERT INTO pn_prenotazioni
     (group_company_id, autocarrata_id, cliente, luogo, data_inizio, data_fine,
-     stato, importo, note, contratto, commerciale_testo, pagamento, origine_id)
+     stato, totale, note, contratto, commerciale_testo, pagamento, origine_id)
 SELECT
     @soc,
     a.id,
@@ -251,11 +251,11 @@ WHERE p1.group_company_id = @soc
   AND p1.stato <> 'annullata' AND p2.stato <> 'annullata'
 ORDER BY a.targa, p1.data_inizio;
 
--- 4.2 Righe importate senza importo, da ricontrollare a mano
+-- 4.2 Righe importate senza totale, da ricontrollare a mano
 SELECT p.id, p.origine_id, a.targa, p.cliente, p.data_inizio, p.data_fine
 FROM pn_prenotazioni p
 JOIN pn_autocarrate a ON a.id = p.autocarrata_id
-WHERE p.group_company_id = @soc AND p.origine_id IS NOT NULL AND p.importo IS NULL
+WHERE p.group_company_id = @soc AND p.origine_id IS NOT NULL AND p.totale IS NULL
 ORDER BY p.data_inizio DESC;
 
 -- 4.3 Se un valore di mov_mezzi.stato indica le annullate, si sistemano dopo
