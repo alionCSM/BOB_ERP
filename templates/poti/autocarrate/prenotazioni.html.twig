@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=12">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
 {% endblock %}
 
 {% block content %}
@@ -39,12 +39,14 @@
                 {% endfor %}
             </select>
         </label>
+        {# la ricerca filtra mentre si scrive: il pulsante serve solo a
+           periodo e mezzo, che vanno richiesti al server #}
         <label class="ac-f ac-f-cerca">
-            <span>Cerca</span>
+            <span>Cerca <small id="ac-conta"></small></span>
             <input type="search" name="q" value="{{ cerca }}"
                    placeholder="cliente, luogo, targa, contratto, note…">
         </label>
-        <button class="ac-btn ac-btn-primary">Filtra</button>
+        <button class="ac-btn ac-btn-primary">Filtra periodo</button>
         {% if cerca or mezzoId %}
             <a href="/autocarrate/prenotazioni?dal={{ dal }}&al={{ al }}" class="ac-link">azzera</a>
         {% endif %}
@@ -108,6 +110,11 @@
                             </td>
                         </tr>
                     {% endfor %}
+
+                    {# compare quando la ricerca dal vivo non lascia righe #}
+                    <tr id="ac-nessuno" style="display:none">
+                        <td colspan="14" class="ac-empty">Nessuna prenotazione corrisponde alla ricerca.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -241,5 +248,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=12"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=13"></script>
 {% endblock %}

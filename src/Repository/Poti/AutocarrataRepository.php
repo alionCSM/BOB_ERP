@@ -122,13 +122,22 @@ final class AutocarrataRepository
             $args[':mid'] = $mezzoId;
         }
 
-        // la ricerca guarda tutto quello che si ha in mano quando si cerca
-        // una prenotazione: chi, dove, quale mezzo, che contratto, le note
+        // La ricerca guarda tutto quello che si ha in mano quando si cerca una
+        // prenotazione: chi, dove, quale mezzo, che contratto, le note.
+        // Ogni campo ha il suo segnaposto: con le query preparate native di
+        // MySQL lo stesso nome non si puo' ripetere, e riusare :q ovunque
+        // faceva fallire la ricerca con "Invalid parameter number".
         if ($cerca !== '') {
-            $sql .= " AND (p.cliente LIKE :q OR p.luogo LIKE :q OR p.contratto LIKE :q
-                           OR p.note LIKE :q OR p.telefono LIKE :q OR a.targa LIKE :q
-                           OR p.commerciale_testo LIKE :q)";
-            $args[':q'] = '%' . $cerca . '%';
+            $campi = [
+                'p.cliente', 'p.luogo', 'p.contratto', 'p.note',
+                'p.telefono', 'a.targa', 'p.commerciale_testo',
+            ];
+            $pezzi = [];
+            foreach ($campi as $i => $campo) {
+                $pezzi[] = $campo . ' LIKE :q' . $i;
+                $args[':q' . $i] = '%' . $cerca . '%';
+            }
+            $sql .= ' AND (' . implode(' OR ', $pezzi) . ')';
         }
 
         // le piu' recenti in cima: e' quello che si guarda per prima cosa

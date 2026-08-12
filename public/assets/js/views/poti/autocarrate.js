@@ -21,6 +21,54 @@
         });
     });
 
+    // ── Ricerca dal vivo ────────────────────────────────────────────────────
+    // Le prenotazioni del periodo sono gia' tutte nella pagina, quindi si
+    // filtrano qui: risposta immediata e nessun ricaricamento. Il filtro
+    // lato server resta valido per i collegamenti che portano gia' una
+    // ricerca nell'indirizzo.
+    var ricerca = document.querySelector('.ac-filtri input[name="q"]');
+    var corpoTabella = document.querySelector('.ac-table tbody');
+
+    if (ricerca && corpoTabella) {
+        var righeTab = Array.prototype.filter.call(
+            corpoTabella.querySelectorAll('tr'),
+            function (r) { return !r.querySelector('.ac-empty'); }
+        );
+        var nessuno   = document.getElementById('ac-nessuno');
+        var contatore = document.getElementById('ac-conta');
+
+        var filtra = function () {
+            var q = ricerca.value.trim().toLowerCase();
+            var visibili = 0;
+
+            righeTab.forEach(function (r) {
+                // il testo della riga comprende gia' cliente, luogo, targa,
+                // contratto e note: non serve indicizzare i campi a mano
+                var ok = !q || r.textContent.toLowerCase().indexOf(q) !== -1;
+                // display invece dell'attributo hidden: sulle righe di
+                // tabella alcune regole CSS lo scavalcano
+                r.style.display = ok ? '' : 'none';
+                if (ok) visibili++;
+            });
+
+            if (nessuno) {
+                nessuno.style.display = (righeTab.length && !visibili) ? '' : 'none';
+            }
+            if (contatore) {
+                contatore.textContent = (q && visibili !== righeTab.length)
+                    ? visibili + ' di ' + righeTab.length
+                    : '';
+            }
+        };
+
+        ricerca.addEventListener('input', filtra);
+        // premere Invio non deve ricaricare: il filtro e' gia' applicato
+        ricerca.form && ricerca.form.addEventListener('submit', function (e) {
+            if (document.activeElement === ricerca) e.preventDefault();
+        });
+        if (ricerca.value) filtra();
+    }
+
     var modal = document.getElementById('ac-modal-mezzo') || document.getElementById('ac-modal-pren');
     if (!modal) return;
 
