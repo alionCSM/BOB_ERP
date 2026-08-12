@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=11">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=12">
 {% endblock %}
 
 {% block content %}
@@ -185,14 +185,14 @@
                             <span>Tariffa al giorno</span>
                             <input type="text" name="tariffa_giorno" id="ac-p-tariffa" inputmode="decimal"
                                    placeholder="0,00">
-                            <small>quanto costa un giorno</small>
                         </label>
 
                         <label class="ac-f">
                             <span>Totale</span>
                             <input type="text" name="totale" id="ac-p-totale" inputmode="decimal"
                                    placeholder="0,00">
-                            <small id="ac-p-calcolo">giorni per tariffa</small>
+                            {# resta vuoto finche' non c'e' un calcolo da mostrare #}
+                            <small id="ac-p-calcolo"></small>
                         </label>
                     </div>
                 </div>
@@ -241,5 +241,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/autocarrate.js?v=10"></script>
+<script src="/assets/js/views/poti/autocarrate.js?v=11"></script>
 {% endblock %}

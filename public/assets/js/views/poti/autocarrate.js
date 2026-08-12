@@ -182,7 +182,7 @@
         var gg = giorni();
         var tar = numero(tariffa.value);
         if (!gg || isNaN(tar)) {
-            calcolo.textContent = 'giorni per tariffa';
+            calcolo.textContent = '';
             return;
         }
         var att = gg * tar;
