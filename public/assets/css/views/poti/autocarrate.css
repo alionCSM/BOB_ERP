@@ -169,6 +169,14 @@
 /* la ricerca si prende lo spazio che avanza nella riga dei filtri */
 .ac-f-cerca { flex: 1 1 240px; }
 
+/* quante righe restano dopo la ricerca dal vivo */
+#ac-conta {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
 /* ── Riquadro degli importi ─────────────────────────────────────────────── */
 /* Tenuti insieme: senza una didascalia non si capisce quale sia il totale
    e quale la tariffa. */
