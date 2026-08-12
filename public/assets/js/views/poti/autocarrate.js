@@ -64,6 +64,9 @@
         if (id) id.value = '';
         var del = campo('ac-p-elimina');
         if (del) del.hidden = true;
+
+        // su una prenotazione nuova il totale torna a essere calcolato
+        totaleAMano = false;
     }
 
     // ── Nuovo ───────────────────────────────────────────────────────────────
@@ -116,6 +119,18 @@
                 // le date sono state impostate da codice, quindi l'evento
                 // change non scatta: l'elenco va aggiornato a mano
                 aggiornaMezzi();
+
+                // Un totale che coincide con giorni per tariffa era calcolato,
+                // e continua ad aggiornarsi; se e' diverso qualcuno l'aveva
+                // corretto apposta e va lasciato stare.
+                var ggSalvati  = giorni();
+                var tarSalvata = numero(campo('ac-p-tariffa').value);
+                var atteso     = (ggSalvati && !isNaN(tarSalvata))
+                    ? euro(ggSalvati * tarSalvata)
+                    : '';
+                totaleAMano = !!(campo('ac-p-totale').value
+                                 && campo('ac-p-totale').value !== atteso);
+                aggiorna();
             } else {
                 campo('ac-m-id').value      = d.id;
                 campo('ac-m-targa').value   = d.targa || '';
@@ -137,12 +152,20 @@
         if (e.key === 'Escape' && !modal.hidden) chiudi();
     });
 
-    // ── Totale suggerito ────────────────────────────────────────────────────
-    // proposto, non imposto: il totale resta modificabile a mano perche'
-    // spesso ci sono trasporto o sconti che la moltiplicazione non sa
+    // ── Totale ──────────────────────────────────────────────────────────────
+    // Si aggiorna mentre si scrive la tariffa o si cambiano le date, ma solo
+    // finche' nessuno l'ha corretto a mano: chi scrive un totale diverso
+    // (trasporto, sconti) non deve vederselo sovrascritto al tasto dopo.
     var tariffa = campo('ac-p-tariffa');
     var totale  = campo('ac-p-totale');
     var calcolo = campo('ac-p-calcolo');
+    var totaleAMano = false;
+
+    // il flag si alza solo qui: assegnare il valore da codice non scatena
+    // l'evento, quindi il ricalcolo automatico non si auto-disattiva
+    totale && totale.addEventListener('input', function () {
+        totaleAMano = true;
+    });
 
     function giorni() {
         var dal = campo('ac-p-dal'), al = campo('ac-p-al');
@@ -187,9 +210,7 @@
         }
         var att = gg * tar;
         calcolo.textContent = gg + ' gg × ' + euro(tar) + ' = ' + euro(att);
-        // proposto solo se il totale e' ancora vuoto: se qualcuno l'ha
-        // scritto a mano (trasporto, sconti) non va sovrascritto
-        if (totale && !totale.value) totale.value = euro(att);
+        if (totale && !totaleAMano) totale.value = euro(att);
     }
 
     [tariffa, campo('ac-p-dal'), campo('ac-p-al')].forEach(function (el) {
