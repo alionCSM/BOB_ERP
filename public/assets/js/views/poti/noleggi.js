@@ -126,6 +126,43 @@
         return Array.prototype.slice.call(contRighe.querySelectorAll('.nl-riga'));
     }
 
+    /**
+     * Campo macchina con ricerca.
+     *
+     * Le macchine sono tante e un elenco a tendina normale costringerebbe a
+     * scorrerlo: qui si scrive matricola o modello e l'elenco si restringe.
+     * Va inizializzato DOPO aver impostato il valore, altrimenti TomSelect
+     * legge il campo ancora vuoto e la riga risulta senza macchina.
+     */
+    function attivaRicerca(riga) {
+        var sel = riga.querySelector('[name="riga_macchina[]"]');
+        if (!sel || typeof TomSelect === 'undefined' || sel.tomselect) {
+            return;
+        }
+        new TomSelect(sel, {
+            // la voce contiene matricola, tipo e modello: cercando per uno
+            // qualsiasi dei tre si arriva alla macchina
+            searchField: ['text'],
+            maxOptions: 200,
+            placeholder: 'cerca matricola o modello…',
+            // il ricalcolo si aggancia qui e non solo alla delega degli
+            // eventi: TomSelect sostituisce il campo originale e non tutte
+            // le sue versioni fanno risalire il change
+            onChange: function () {
+                ricalcolaRiga(riga);
+                ricalcolaTotale();
+            }
+        });
+    }
+
+    /** Chiude il campo con ricerca prima di buttare via la riga. */
+    function spegniRicerca(riga) {
+        var sel = riga.querySelector('[name="riga_macchina[]"]');
+        if (sel && sel.tomselect) {
+            sel.tomselect.destroy();
+        }
+    }
+
     /** Totale di una riga: giorni per tariffa, se non e' stato scritto a mano. */
     function ricalcolaRiga(riga) {
         var dal  = riga.querySelector('[name="riga_dal[]"]');
@@ -186,6 +223,9 @@
             if (tot.value && tot.value !== atteso) tot.dataset.aMano = '1';
         }
 
+        // dopo aver messo il valore, mai prima
+        attivaRicerca(riga);
+
         aggiornaVuoto();
         return riga;
     }
@@ -213,6 +253,7 @@
         if (!riga) return;
 
         if (e.target.closest('[data-nl-togli]')) {
+            spegniRicerca(riga);
             riga.remove();
             aggiornaVuoto();
             ricalcolaTotale();
@@ -255,6 +296,10 @@
             .forEach(function (i) { i.value = ''; });
         modale.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
         campo('nl-id').value = '';
+
+        // le ricerche vanno chiuse prima di svuotare, altrimenti restano
+        // agganciate a campi che non esistono piu'
+        righe().forEach(spegniRicerca);
         contRighe.innerHTML = '';
         totaleAMano = false;
         if (calcolo) calcolo.textContent = '';

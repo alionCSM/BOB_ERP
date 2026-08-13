@@ -137,6 +137,27 @@
 
 .nl-togli { color: #b91c1c; }
 
+/* ── Campo macchina con ricerca (TomSelect) ─────────────────────────────── */
+/* La tendina deve stare sopra la modale, che ha z-index 60: senza questo
+   finirebbe dietro e non si vedrebbe cosa si sta scegliendo. */
+.nl-riga .ts-dropdown { z-index: 70; }
+
+/* stessa altezza e stesso bordo degli altri campi della riga */
+.nl-riga .ts-control {
+    min-height: 36px;
+    padding: 5px 9px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.nl-riga .ts-control:focus-within {
+    border-color: #0369a1;
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
+}
+
+.nl-riga .ts-dropdown .active { background: #e0f2fe; }
+
 .nl-righe-vuoto {
     padding: 14px;
     text-align: center;
