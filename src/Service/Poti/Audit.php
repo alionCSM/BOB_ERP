@@ -24,8 +24,21 @@ final class Audit
     private const IGNORATI = ['created_at', 'created_by', 'group_company_id', 'id',
                               'origine_id', 'eliminato_at', 'eliminato_da'];
 
+    /**
+     * Campi che contengono un id e vanno mostrati per nome.
+     * Un confronto "autocarrata_id 3 → 7" non dice niente a chi legge.
+     */
+    private const RIFERIMENTI = [
+        'autocarrata_id'      => 'autocarrate',
+        'macchina_id'         => 'macchine',
+        'commerciale_user_id' => 'utenti',
+    ];
+
     /** Etichette leggibili al posto dei nomi delle colonne. */
     private const NOMI = [
+        'autocarrata_id'      => 'Autocarrata',
+        'macchina_id'         => 'Mezzo',
+        'commerciale_user_id' => 'Commerciale',
         'targa'            => 'Targa',
         'matricola'        => 'Matricola',
         'tipo'             => 'Tipo',
@@ -141,10 +154,17 @@ final class Audit
             return [];
         }
 
+        // i nomi si caricano una volta sola per tutta la pagina, non una
+        // query per ogni id incontrato nei confronti
+        $mappe = $this->mappeNomi($companyId);
+
         foreach ($righe as &$r) {
             $prima = $r['dati_prima'] ? json_decode($r['dati_prima'], true) : null;
             $dopo  = $r['dati_dopo']  ? json_decode($r['dati_dopo'],  true) : null;
-            $r['cambi'] = self::differenze($prima, $dopo);
+            $r['cambi'] = self::differenze($prima, $dopo, $mappe);
+
+            // riassunto per la testata: che riga e' e quante cose sono cambiate
+            $r['dettaglio'] = self::dettaglio($prima ?? $dopo ?? []);
         }
         return $righe;
     }
@@ -183,7 +203,7 @@ final class Audit
      *
      * @return array<int, array{campo:string, prima:string, dopo:string}>
      */
-    public static function differenze(?array $prima, ?array $dopo): array
+    public static function differenze(?array $prima, ?array $dopo, array $mappe = []): array
     {
         $chiavi = array_unique(array_merge(
             array_keys($prima ?? []),
@@ -200,6 +220,13 @@ final class Audit
 
             if ($a === $b) {
                 continue;
+            }
+
+            // gli id diventano nomi: targa, matricola, nome del commerciale
+            if (isset(self::RIFERIMENTI[$k])) {
+                $mappa = $mappe[self::RIFERIMENTI[$k]] ?? [];
+                $a = $mappa[$a] ?? ($a === '—' ? '—' : $a);
+                $b = $mappa[$b] ?? ($b === '—' ? '—' : $b);
             }
             $out[] = [
                 'campo' => self::NOMI[$k] ?? $k,
@@ -233,6 +260,79 @@ final class Audit
             return $pezzi ? implode(', ', $pezzi) : '—';
         }
         return (string)$v;
+    }
+
+    /**
+     * Nomi da usare al posto degli id, caricati in blocco.
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function mappeNomi(int $companyId): array
+    {
+        $mappe = ['autocarrate' => [], 'macchine' => [], 'utenti' => []];
+
+        $letture = [
+            'autocarrate' => 'SELECT id, targa AS nome FROM pn_autocarrate WHERE group_company_id = :cid',
+            'macchine'    => 'SELECT id, matricola AS nome FROM pn_macchine WHERE group_company_id = :cid',
+        ];
+
+        foreach ($letture as $chiave => $sql) {
+            try {
+                $stmt = $this->conn->prepare($sql);
+                $stmt->execute([':cid' => $companyId]);
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $mappe[$chiave][(string)$r['id']] = (string)$r['nome'];
+                }
+            } catch (\Throwable $e) {
+                // tabella non ancora presente: si mostrano gli id, senza rompere
+                error_log('[Audit Poti] mappe ' . $chiave . ': ' . $e->getMessage());
+            }
+        }
+
+        try {
+            $stmt = $this->conn->query("
+                SELECT id,
+                       COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''),
+                                username) AS nome
+                FROM bb_users
+            ");
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $mappe['utenti'][(string)$r['id']] = (string)$r['nome'];
+            }
+        } catch (\Throwable $e) {
+            error_log('[Audit Poti] mappe utenti: ' . $e->getMessage());
+        }
+
+        return $mappe;
+    }
+
+    /**
+     * Riga di riepilogo mostrata in testata: cliente, periodo, luogo.
+     * Serve a capire di cosa si parla senza aprire il confronto.
+     */
+    private static function dettaglio(array $dati): string
+    {
+        $pezzi = [];
+
+        if (!empty($dati['data_inizio']) && !empty($dati['data_fine'])) {
+            $pezzi[] = date('d/m/Y', strtotime((string)$dati['data_inizio']))
+                     . ' → ' . date('d/m/Y', strtotime((string)$dati['data_fine']));
+        }
+        if (!empty($dati['luogo'])) {
+            $pezzi[] = (string)$dati['luogo'];
+        }
+        if (!empty($dati['contratto'])) {
+            $pezzi[] = 'contratto ' . $dati['contratto'];
+        }
+        if (!empty($dati['modello'])) {
+            $pezzi[] = (string)$dati['modello'];
+        }
+        if (!empty($dati['righe']) && is_array($dati['righe'])) {
+            $n = count($dati['righe']);
+            $pezzi[] = $n . ($n === 1 ? ' mezzo' : ' mezzi');
+        }
+
+        return implode(' · ', $pezzi);
     }
 
     private function nomeUtente(?int $userId): ?string

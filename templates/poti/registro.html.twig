@@ -2,15 +2,25 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
-<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=1">
+<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=2">
 {% endblock %}
+
+{% macro iniziali(nome) %}
+    {%- set parti = (nome|default('?'))|trim|split(' ') -%}
+    {%- if parti|length > 1 -%}
+        {{ (parti[0]|first ~ parti[1]|first)|upper }}
+    {%- else -%}
+        {{ (nome|default('?'))|slice(0, 2)|upper }}
+    {%- endif -%}
+{% endmacro %}
+{% import _self as f %}
 
 {% block content %}
 <div class="ac-page">
 
     <div class="ac-hero">
         <div>
-            <h1 class="ac-title">Registro modifiche — {{ sezione }}</h1>
+            <h1 class="ac-title">Registro — {{ sezione }}</h1>
             <p class="ac-sub">Chi ha creato, modificato o eliminato, e cosa e' cambiato.</p>
         </div>
         <div class="ac-hero-links">
@@ -19,8 +29,20 @@
     </div>
 
     {% if ripristinato %}
-        <div class="ac-alert is-ok">Ripristinato.</div>
+        <div class="ac-alert is-ok">Ripristinato: la riga e' tornata nell'elenco.</div>
     {% endif %}
+
+    {# i conteggi arrivano gia' fatti dal controller: sommarli qui vorrebbe
+       dire usare set dentro un ciclo, che in Twig non si comporta come ci
+       si aspetta #}
+    <div class="rg-riepilogo">
+        {% for azione, n in conteggi %}
+            <div class="rg-kpi rg-kpi-{{ azione }}">
+                <span class="rg-kpi-n">{{ n }}</span>
+                <span class="rg-kpi-l">{{ azione }}</span>
+            </div>
+        {% endfor %}
+    </div>
 
     <form method="GET" class="ac-filtri">
         <label class="ac-f">
@@ -57,44 +79,78 @@
         {% endif %}
     </form>
 
+    {# Raggruppato per giorno: si legge come un diario, e si trova subito
+       "cosa e' successo martedi'" invece di scorrere una lista piatta.
+       Il confronto e' con la voce precedente e non con una variabile che
+       cresce nel ciclo, che in Twig non si conserva fra un giro e l'altro. #}
     <div class="rg-elenco">
         {% for v in voci %}
+            {% set giorno = v.created_at|date('Y-m-d') %}
+            {% set giornoPrima = loop.index0 > 0
+                 ? voci[loop.index0 - 1].created_at|date('Y-m-d') : '' %}
+            {% if giorno != giornoPrima %}
+                <div class="rg-giorno">
+                    {{ v.created_at|date('d/m/Y') }}
+                    <span>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][v.created_at|date('N')] }}</span>
+                </div>
+            {% endif %}
+
             <div class="rg-voce rg-{{ v.azione }}">
                 <div class="rg-testa">
-                    <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
-                    <span class="rg-entita">{{ v.entita }}</span>
-                    {% if v.etichetta %}<span class="rg-etichetta">{{ v.etichetta }}</span>{% endif %}
-                    <span class="rg-quando">{{ v.created_at|date('d/m/Y H:i') }}</span>
-                    <span class="rg-chi">{{ v.user_nome ?: 'sistema' }}</span>
+                    <div class="rg-chi-box" title="{{ v.user_nome ?: 'sistema' }}">
+                        <span class="rg-avatar">{{ f.iniziali(v.user_nome ?: 'SI') }}</span>
+                    </div>
 
-                    {# il ripristino compare solo sulle eliminazioni di cio' che
-                       si puo' rimettere indietro: le macchine non si eliminano,
-                       si mettono fuori servizio #}
-                    {% if v.azione == 'eliminato' and v.entita in ['prenotazione', 'noleggio'] %}
-                        <form method="POST" action="{{ urlRipristina }}" class="rg-ripristina"
-                              onsubmit="return confirm('Rimettere indietro questa riga?')">
-                            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                            <input type="hidden" name="id" value="{{ v.entita_id }}">
-                            <button class="ac-link">ripristina</button>
-                        </form>
-                    {% endif %}
+                    <div class="rg-titolo">
+                        <div class="rg-riga1">
+                            <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
+                            <span class="rg-entita">{{ v.entita }}</span>
+                            {% if v.etichetta %}
+                                <span class="rg-etichetta">{{ v.etichetta }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="rg-riga2">
+                            <span class="rg-chi">{{ v.user_nome ?: 'sistema' }}</span>
+                            <span class="rg-punto">·</span>
+                            <span>{{ v.created_at|date('H:i') }}</span>
+                            {% if v.dettaglio %}
+                                <span class="rg-punto">·</span>
+                                <span class="rg-dettaglio">{{ v.dettaglio }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="rg-azioni">
+                        {% if v.cambi %}
+                            <span class="rg-conta">{{ v.cambi|length }}
+                                {{ v.cambi|length == 1 ? 'campo' : 'campi' }}</span>
+                        {% endif %}
+
+                        {# il ripristino compare solo sulle eliminazioni di cio' che
+                           si puo' rimettere indietro: i mezzi non si eliminano,
+                           si mettono fuori servizio #}
+                        {% if v.azione == 'eliminato' and v.entita in ['prenotazione', 'noleggio'] %}
+                            <form method="POST" action="{{ urlRipristina }}"
+                                  onsubmit="return confirm('Rimettere questa riga nell\'elenco?')">
+                                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                                <input type="hidden" name="id" value="{{ v.entita_id }}">
+                                <button class="ac-btn rg-btn-ripristina">Ripristina</button>
+                            </form>
+                        {% endif %}
+                    </div>
                 </div>
 
                 {% if v.cambi %}
-                    <table class="rg-cambi">
-                        <tbody>
-                            {% for c in v.cambi %}
-                                <tr>
-                                    <td class="rg-campo">{{ c.campo }}</td>
-                                    <td class="rg-prima">{{ c.prima }}</td>
-                                    <td class="rg-freccia">→</td>
-                                    <td class="rg-dopo">{{ c.dopo }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                {% else %}
-                    <div class="rg-nulla">Nessun campo modificato.</div>
+                    <div class="rg-cambi">
+                        {% for c in v.cambi %}
+                            <div class="rg-cambio">
+                                <span class="rg-campo">{{ c.campo }}</span>
+                                <span class="rg-prima">{{ c.prima }}</span>
+                                <span class="rg-freccia">→</span>
+                                <span class="rg-dopo">{{ c.dopo }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
                 {% endif %}
             </div>
         {% else %}

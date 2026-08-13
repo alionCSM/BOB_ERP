@@ -317,11 +317,24 @@ final class AutocarrateController
             'al'     => VistaImpegni::data($_GET['al'] ?? '', ''),
         ];
 
+        $voci = $audit->voci($cid, $entita, $filtri);
+
+        // conteggio per tipo di operazione: fatto qui perche' sommarlo nel
+        // template richiederebbe un set dentro un ciclo, che in Twig non si
+        // conserva da un giro all'altro
+        $conteggi = ['creato' => 0, 'modificato' => 0, 'eliminato' => 0, 'ripristinato' => 0];
+        foreach ($voci as $v) {
+            if (isset($conteggi[$v['azione']])) {
+                $conteggi[$v['azione']]++;
+            }
+        }
+
         Response::view('poti/registro.html.twig', $request, [
+            'conteggi'     => $conteggi,
             'sezione'      => 'Autocarrate',
             'tornaA'       => '/autocarrate/prenotazioni',
             'urlRipristina'=> '/autocarrate/ripristina',
-            'voci'         => $audit->voci($cid, $entita, $filtri),
+            'voci'         => $voci,
             'utenti'       => $audit->utenti($cid, $entita),
             'filtri'       => $filtri,
             'ripristinato' => isset($_GET['ripristinato']),
