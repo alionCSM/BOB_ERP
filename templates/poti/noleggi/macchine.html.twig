@@ -11,11 +11,11 @@
 
     <div class="ac-hero">
         <div>
-            <h1 class="ac-title">Macchine</h1>
+            <h1 class="ac-title">Mezzi sollevamento</h1>
             <p class="ac-sub">Piattaforme, carrelli elevatori, telescopici: tipo, matricola e caratteristiche.</p>
         </div>
         <div class="ac-hero-links">
-            <button type="button" class="ac-btn ac-btn-primary" data-ac-nuovo>Nuova macchina</button>
+            <button type="button" class="ac-btn ac-btn-primary" data-ac-nuovo>Nuovo mezzo</button>
             <a href="/noleggi" class="ac-btn">Disponibilita'</a>
             <a href="/noleggi/elenco" class="ac-btn">Noleggi</a>
         </div>
@@ -55,18 +55,18 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="ac-empty">Nessuna macchina registrata.</td></tr>
+                        <tr><td colspan="8" class="ac-empty">Nessun mezzo registrato.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 
-    {# ── Modale macchina ─────────────────────────────────────────────────── #}
+    {# ── Modale mezzo ────────────────────────────────────────────────────── #}
     <div class="ac-modal" id="ac-modal-mezzo" hidden aria-hidden="true">
         <div class="ac-modal-box">
             <div class="ac-modal-head">
-                <span id="ac-modal-tit">Nuova macchina</span>
+                <span id="ac-modal-tit">Nuovo mezzo</span>
                 <button type="button" class="ac-modal-close" data-ac-close>&times;</button>
             </div>
             <form method="POST" action="/noleggi/macchine/salva" class="ac-form">

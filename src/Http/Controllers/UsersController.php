@@ -1376,7 +1376,7 @@ final class UsersController
                         'color' => '#0369a1',
                     ],
                     'pn_noleggi' => [
-                        'label' => 'Macchine e noleggi',
+                        'label' => 'Mezzi sollevamento e noleggi',
                         'icon'  => 'M3 21h18M6 21V8l12-5v18M10 12h4M10 16h4',
                         'color' => '#7c3aed',
                     ],

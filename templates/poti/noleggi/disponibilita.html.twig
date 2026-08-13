@@ -9,12 +9,12 @@
 
     <div class="ac-hero">
         <div>
-            <h1 class="ac-title">Disponibilita' macchine</h1>
-            <p class="ac-sub">Quali sono libere, quali impegnate e da quando tornano disponibili.</p>
+            <h1 class="ac-title">Disponibilita' mezzi sollevamento</h1>
+            <p class="ac-sub">Quali sono liberi, quali impegnati e da quando tornano disponibili.</p>
         </div>
         <div class="ac-hero-links">
             <a href="/noleggi/elenco" class="ac-btn">Noleggi</a>
-            <a href="/noleggi/macchine" class="ac-btn">Macchine</a>
+            <a href="/noleggi/macchine" class="ac-btn">Mezzi</a>
         </div>
     </div>
 
@@ -50,12 +50,12 @@
         </div>
     </form>
 
-    {# ── Schede macchina ─────────────────────────────────────────────────── #}
+    {# ── Schede mezzo ────────────────────────────────────────────────────── #}
     <div class="ac-mezzi">
         {% for m in macchine %}
-            {% set occupata = ricercaAttiva and occupate[m.id] is defined %}
-            {% set libera   = liberaDal[m.id] is defined and liberaDal[m.id] %}
-            <div class="ac-mezzo{{ ricercaAttiva ? (occupata ? ' is-ko' : ' is-ok') : '' }}">
+            {% set occupato = ricercaAttiva and occupate[m.id] is defined %}
+            {% set libero   = liberaDal[m.id] is defined and liberaDal[m.id] %}
+            <div class="ac-mezzo{{ ricercaAttiva ? (occupato ? ' is-ko' : ' is-ok') : '' }}">
                 <div class="ac-mezzo-top">
                     <span class="ac-targa">{{ m.matricola }}</span>
                     {% if m.stato != 'attiva' %}
@@ -69,17 +69,17 @@
                 </div>
                 <div class="ac-libero">
                     {% if ricercaAttiva %}
-                        {{ occupata ? 'Occupata nel periodo' : 'Libera nel periodo' }}
-                    {% elseif libera %}
-                        Libera dal {{ liberaDal[m.id]|date('d/m/Y') }}
+                        {{ occupato ? 'Occupato nel periodo' : 'Libero nel periodo' }}
+                    {% elseif libero %}
+                        Libero dal {{ liberaDal[m.id]|date('d/m/Y') }}
                     {% else %}
-                        Libera adesso
+                        Libero adesso
                     {% endif %}
                 </div>
             </div>
         {% else %}
             <div class="ac-empty">
-                Nessuna macchina registrata. <a href="/noleggi/macchine">Aggiungine una</a>.
+                Nessun mezzo registrato. <a href="/noleggi/macchine">Aggiungine uno</a>.
             </div>
         {% endfor %}
     </div>
@@ -144,7 +144,7 @@
             <table class="ac-tl">
                 <thead>
                     <tr>
-                        <th class="ac-tl-mezzo">Macchina</th>
+                        <th class="ac-tl-mezzo">Mezzo</th>
                         {% for g in giorni %}
                             <th class="ac-tl-g{{ g.festivo ? ' is-fest' : '' }}">
                                 <span class="ac-tl-wd">{{ g.wd }}</span>

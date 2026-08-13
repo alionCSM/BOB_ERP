@@ -13,12 +13,12 @@
     <div class="ac-hero">
         <div>
             <h1 class="ac-title">Noleggi</h1>
-            <p class="ac-sub">Un noleggio puo' contenere piu' macchine, ognuna con il suo periodo.</p>
+            <p class="ac-sub">Un noleggio puo' contenere piu' mezzi, ognuno con il suo periodo.</p>
         </div>
         <div class="ac-hero-links">
             <button type="button" class="ac-btn ac-btn-primary" data-nl-nuovo>Nuovo noleggio</button>
             <a href="/noleggi" class="ac-btn">Disponibilita'</a>
-            <a href="/noleggi/macchine" class="ac-btn">Macchine</a>
+            <a href="/noleggi/macchine" class="ac-btn">Mezzi</a>
             <a href="/noleggi/registro" class="ac-btn">Registro</a>
         </div>
     </div>
@@ -88,7 +88,7 @@
                                 <td class="right nl-tot">{{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}</td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="6" class="ac-empty">Nessuna macchina.</td></tr>
+                            <tr><td colspan="6" class="ac-empty">Nessun mezzo.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -161,17 +161,17 @@
                     </select>
                 </label>
 
-                {# ── Macchine del noleggio ──────────────────────────────── #}
+                {# ── Mezzi del noleggio ─────────────────────────────────── #}
                 <div class="ac-f-4 nl-righe-box">
                     <div class="nl-righe-head">
-                        <span>Macchine</span>
-                        <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi macchina</button>
+                        <span>Mezzi</span>
+                        <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi mezzo</button>
                     </div>
 
                     <div class="nl-righe-lista" id="nl-righe"></div>
 
                     <div class="nl-righe-vuoto" id="nl-righe-vuoto">
-                        Nessuna macchina: aggiungine almeno una.
+                        Nessun mezzo: aggiungine almeno uno.
                     </div>
                 </div>
 
@@ -226,11 +226,11 @@
     <template id="nl-riga-modello">
         <div class="nl-riga">
             <label class="ac-f nl-riga-macchina">
-                <span>Macchina</span>
+                <span>Mezzo</span>
                 <select name="riga_macchina[]">
                     <option value="">— scegli —</option>
                     {# nel testo stanno matricola, tipo e modello: la ricerca
-                       guarda il testo della voce, quindi si trova la macchina
+                       guarda il testo della voce, quindi si trova il mezzo
                        scrivendo uno qualsiasi dei tre #}
                     {% for m in macchine %}
                         <option value="{{ m.id }}">{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
@@ -262,7 +262,7 @@
                 {# copia il periodo di questa riga su tutte le altre: nella
                    maggior parte dei noleggi le macchine vanno e tornano
                    insieme, e riscrivere le date ogni volta e' inutile #}
-                <button type="button" class="ac-link" data-nl-copia title="Copia queste date sulle altre macchine">
+                <button type="button" class="ac-link" data-nl-copia title="Copia queste date sugli altri mezzi">
                     copia periodo
                 </button>
                 <button type="button" class="ac-link nl-togli" data-nl-togli>togli</button>

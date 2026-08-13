@@ -112,7 +112,7 @@ final class NoleggiController
 
         $righe = $this->righeDalForm();
         if (!$righe) {
-            $this->tornaConErrore('Serve almeno una macchina con le sue date');
+            $this->tornaConErrore('Serve almeno un mezzo con le sue date');
         }
 
         // Il doppio impegno si blocca qui, riga per riga: senza questo
@@ -130,8 +130,8 @@ final class NoleggiController
                 if ($scontri) {
                     $m = $repo->macchina($cid, (int)$r['macchina_id']);
                     $this->tornaConErrore(sprintf(
-                        '%s gia\' impegnata dal %s al %s per %s',
-                        $m['matricola'] ?? 'Macchina',
+                        '%s gia\' impegnato dal %s al %s per %s',
+                        $m['matricola'] ?? 'Mezzo',
                         date('d/m/Y', strtotime($scontri[0]['data_inizio'])),
                         date('d/m/Y', strtotime($scontri[0]['data_fine'])),
                         $scontri[0]['cliente']
@@ -226,7 +226,7 @@ final class NoleggiController
         ];
 
         Response::view('poti/registro.html.twig', $request, [
-            'sezione'      => 'Macchine',
+            'sezione'      => 'Mezzi sollevamento',
             'tornaA'       => '/noleggi/elenco',
             'urlRipristina'=> '/noleggi/ripristina',
             'voci'         => $audit->voci($cid, $entita, $filtri),

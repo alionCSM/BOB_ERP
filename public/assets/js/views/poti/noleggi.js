@@ -77,7 +77,7 @@
                     .forEach(function (i) { i.value = ''; });
                 modaleMacchina.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
                 campo('ac-m-id').value = '';
-                apriM('Nuova macchina');
+                apriM('Nuovo mezzo');
             });
         });
 
@@ -94,7 +94,7 @@
                 campo('ac-m-portata').value   = d.portata_kg || '';
                 campo('ac-m-stato').value     = d.stato || 'attiva';
                 campo('ac-m-note').value      = d.note || '';
-                apriM('Macchina ' + (d.matricola || ''));
+                apriM('Mezzo ' + (d.matricola || ''));
             });
         });
 
