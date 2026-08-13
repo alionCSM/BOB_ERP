@@ -1,6 +1,6 @@
 /*
  * Registro modifiche dei moduli Poti. Prefisso rg-.
- * Estende autocarrate.css per intestazione, filtri e bottoni.
+ * Estende autocarrate.css per intestazione, filtri, tabella e modale.
  */
 
 /* ── Riepilogo in cima ──────────────────────────────────────────────────── */
@@ -30,93 +30,21 @@
 .rg-kpi-eliminato    { border-left-color: #dc2626; }
 .rg-kpi-ripristinato { border-left-color: #b45309; }
 
-/* ── Giornata ───────────────────────────────────────────────────────────── */
-.rg-giorno {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin: 18px 0 8px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1e293b;
-}
+/* ── Tabella ────────────────────────────────────────────────────────────── */
+.rg-riga { cursor: pointer; }
 
-.rg-giorno span { font-size: 11px; font-weight: 500; color: #94a3b8; text-transform: uppercase; }
+/* la striscia a sinistra dice il tipo di operazione a colpo d'occhio */
+.rg-riga td:first-child { border-left: 3px solid transparent; }
+.rg-creato       td:first-child { border-left-color: #16a34a; }
+.rg-modificato   td:first-child { border-left-color: #0369a1; }
+.rg-eliminato    td:first-child { border-left-color: #dc2626; }
+.rg-ripristinato td:first-child { border-left-color: #b45309; }
 
-/* ── Voce ───────────────────────────────────────────────────────────────── */
-.rg-elenco { display: flex; flex-direction: column; }
-
-.rg-voce {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    /* la striscia a sinistra dice il tipo di operazione a colpo d'occhio,
-       senza dover leggere l'etichetta */
-    border-left: 3px solid #cbd5e1;
-    border-radius: 10px;
-    margin-bottom: 8px;
-    overflow: hidden;
-    transition: box-shadow .15s;
-}
-
-.rg-voce:hover { box-shadow: 0 3px 12px rgba(15, 23, 42, .07); }
-
-.rg-creato       { border-left-color: #16a34a; }
-.rg-modificato   { border-left-color: #0369a1; }
-.rg-eliminato    { border-left-color: #dc2626; }
-.rg-ripristinato { border-left-color: #b45309; }
-
-.rg-testa {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 11px 16px;
-}
-
-/* iniziali al posto di una foto: si riconosce chi ha operato senza
-   caricare immagini e senza allungare la riga */
-.rg-avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: #eef2f7;
-    color: #475569;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .02em;
-    flex: 0 0 auto;
-}
-
-.rg-eliminato .rg-avatar { background: #fee2e2; color: #991b1b; }
-.rg-creato    .rg-avatar { background: #dcfce7; color: #166534; }
-
-.rg-titolo { flex: 1 1 auto; min-width: 0; }
-
-.rg-riga1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-
-.rg-riga2 {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-top: 3px;
-    font-size: 11.5px;
-    color: #94a3b8;
-}
-
-.rg-punto { color: #cbd5e1; }
-.rg-chi   { font-weight: 600; color: #64748b; }
-
-.rg-dettaglio {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+.rg-quando { white-space: nowrap; }
+.rg-quando span { display: block; font-size: 11px; color: #94a3b8; }
 
 .rg-azione {
+    display: inline-block;
     padding: 2px 8px;
     border-radius: 5px;
     font-size: 10px;
@@ -130,43 +58,73 @@
 .rg-badge-eliminato    { background: #fee2e2; color: #991b1b; }
 .rg-badge-ripristinato { background: #fef3c7; color: #92400e; }
 
-.rg-entita { font-size: 12px; color: #64748b; text-transform: capitalize; }
+.rg-entita    { text-transform: capitalize; color: #64748b; }
+.rg-etichetta { font-weight: 700; color: #0f172a; white-space: nowrap; }
 
-.rg-etichetta {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: #0f172a;
-    min-width: 0;
+/* il riepilogo puo' essere lungo: si tronca e si legge per intero nella
+   modale o passandoci sopra */
+.rg-dettaglio {
+    max-width: 280px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: #64748b;
 }
 
-.rg-azioni {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-left: auto;
-    flex: 0 0 auto;
-}
-
-.rg-conta {
-    padding: 2px 8px;
+.rg-conta-badge {
+    display: inline-block;
+    min-width: 22px;
+    padding: 2px 7px;
     background: #f1f5f9;
     border-radius: 20px;
     font-size: 11px;
+    font-weight: 600;
     color: #64748b;
-    white-space: nowrap;
 }
 
-.rg-btn-ripristina { padding: 5px 12px; font-size: 12px; }
+#rg-conta {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+}
 
-/* ── Confronto prima / dopo ─────────────────────────────────────────────── */
-.rg-cambi {
-    padding: 4px 16px 12px 62px;   /* allineato al testo, non all'avatar */
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+/* ── Modale del dettaglio ───────────────────────────────────────────────── */
+.rg-modal-box { width: 720px; }
+
+.rg-modal-corpo { padding: 18px; }
+
+.rg-scheda {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.rg-voce-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.rg-voce-dato span {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #94a3b8;
+}
+
+.rg-voce-dato strong {
+    font-size: 13px;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.rg-cambi-tit {
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
 }
 
 .rg-cambio {
@@ -174,6 +132,8 @@
     grid-template-columns: 150px minmax(0, 1fr) 20px minmax(0, 1fr);
     gap: 8px;
     align-items: baseline;
+    padding: 6px 0;
+    border-top: 1px solid #f8fafc;
     font-size: 12.5px;
 }
 
@@ -195,6 +155,11 @@
     word-break: break-word;
 }
 
+.rg-nulla { font-size: 12px; color: #94a3b8; }
+
+.rg-modal-piede { padding: 0 18px 18px; }
+.rg-modal-piede form { margin: 0; margin-right: auto; }
+
 .rg-limite {
     margin-top: 12px;
     padding: 10px 14px;
@@ -206,10 +171,8 @@
 }
 
 @media (max-width: 760px) {
-    .rg-cambi { padding-left: 16px; }
     .rg-cambio { grid-template-columns: minmax(0, 1fr); gap: 2px; }
     .rg-freccia { display: none; }
     .rg-prima::after { content: ' →'; color: #cbd5e1; }
-    .rg-azioni { margin-left: 0; }
-    .rg-testa { flex-wrap: wrap; }
+    .rg-dettaglio { max-width: 160px; }
 }

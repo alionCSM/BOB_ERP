@@ -165,6 +165,19 @@ final class Audit
 
             // riassunto per la testata: che riga e' e quante cose sono cambiate
             $r['dettaglio'] = self::dettaglio($prima ?? $dopo ?? []);
+
+            // il JSON grezzo non serve alla pagina e la appesantirebbe:
+            // ogni riga finisce in un attributo HTML per aprire il dettaglio
+            unset($r['dati_prima'], $r['dati_dopo']);
+
+            // testo su cui lavora la ricerca dal vivo, preparato qui una
+            // volta invece che ricostruirlo a ogni battuta nel browser
+            $cerca = [$r['azione'], $r['entita'], $r['etichetta'] ?? '',
+                      $r['user_nome'] ?? '', $r['dettaglio']];
+            foreach ($r['cambi'] as $c) {
+                $cerca[] = $c['campo'] . ' ' . $c['prima'] . ' ' . $c['dopo'];
+            }
+            $r['testo_ricerca'] = mb_strtolower(implode(' ', $cerca));
         }
         return $righe;
     }

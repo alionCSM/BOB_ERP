@@ -2,18 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
-<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=3">
 {% endblock %}
-
-{% macro iniziali(nome) %}
-    {%- set parti = (nome|default('?'))|trim|split(' ') -%}
-    {%- if parti|length > 1 -%}
-        {{ (parti[0]|first ~ parti[1]|first)|upper }}
-    {%- else -%}
-        {{ (nome|default('?'))|slice(0, 2)|upper }}
-    {%- endif -%}
-{% endmacro %}
-{% import _self as f %}
 
 {% block content %}
 <div class="ac-page">
@@ -21,7 +11,6 @@
     <div class="ac-hero">
         <div>
             <h1 class="ac-title">Registro — {{ sezione }}</h1>
-            <p class="ac-sub">Chi ha creato, modificato o eliminato, e cosa e' cambiato.</p>
         </div>
         <div class="ac-hero-links">
             <a href="{{ tornaA }}" class="ac-btn">Torna all'elenco</a>
@@ -73,89 +62,72 @@
                 {% endfor %}
             </select>
         </label>
+
+        {# la ricerca filtra mentre si scrive: il pulsante serve a periodo,
+           azione e utente, che vanno richiesti al server #}
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca <small id="rg-conta"></small></span>
+            <input type="search" id="rg-cerca"
+                   placeholder="targa, cliente, utente, valore modificato…">
+        </label>
+
         <button class="ac-btn ac-btn-primary">Filtra</button>
         {% if filtri.azione or filtri.utente or filtri.dal or filtri.al %}
             <a href="?" class="ac-link">azzera</a>
         {% endif %}
     </form>
 
-    {# Raggruppato per giorno: si legge come un diario, e si trova subito
-       "cosa e' successo martedi'" invece di scorrere una lista piatta.
-       Il confronto e' con la voce precedente e non con una variabile che
-       cresce nel ciclo, che in Twig non si conserva fra un giro e l'altro. #}
-    <div class="rg-elenco">
-        {% for v in voci %}
-            {% set giorno = v.created_at|date('Y-m-d') %}
-            {% set giornoPrima = loop.index0 > 0
-                 ? voci[loop.index0 - 1].created_at|date('Y-m-d') : '' %}
-            {% if giorno != giornoPrima %}
-                <div class="rg-giorno">
-                    {{ v.created_at|date('d/m/Y') }}
-                    <span>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][v.created_at|date('N')] }}</span>
-                </div>
-            {% endif %}
+    <div class="ac-box">
+        <div class="ac-table-wrap">
+            <table class="ac-table rg-tabella">
+                <thead>
+                    <tr>
+                        <th>Quando</th>
+                        <th>Azione</th>
+                        <th>Tipo</th>
+                        <th>Riga</th>
+                        <th>Utente</th>
+                        <th>Dettaglio</th>
+                        <th class="right">Campi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# ogni riga porta con se' i propri dati: cliccandola si
+                       apre il dettaglio senza tornare al server #}
+                    {% for v in voci %}
+                        <tr class="rg-riga rg-{{ v.azione }}"
+                            data-rg-testo="{{ v.testo_ricerca }}"
+                            data-rg="{{ v|json_encode|e('html_attr') }}">
+                            <td class="rg-quando">
+                                {{ v.created_at|date('d/m/Y') }}
+                                <span>{{ v.created_at|date('H:i') }}</span>
+                            </td>
+                            <td>
+                                <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
+                            </td>
+                            <td class="rg-entita">{{ v.entita }}</td>
+                            <td class="rg-etichetta">{{ v.etichetta ?: '—' }}</td>
+                            <td>{{ v.user_nome ?: 'sistema' }}</td>
+                            <td class="rg-dettaglio" title="{{ v.dettaglio }}">{{ v.dettaglio ?: '—' }}</td>
+                            <td class="right">
+                                {% if v.cambi|length %}
+                                    <span class="rg-conta-badge">{{ v.cambi|length }}</span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="ac-empty">Nessuna operazione registrata.</td></tr>
+                    {% endfor %}
 
-            <div class="rg-voce rg-{{ v.azione }}">
-                <div class="rg-testa">
-                    <div class="rg-chi-box" title="{{ v.user_nome ?: 'sistema' }}">
-                        <span class="rg-avatar">{{ f.iniziali(v.user_nome ?: 'SI') }}</span>
-                    </div>
-
-                    <div class="rg-titolo">
-                        <div class="rg-riga1">
-                            <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
-                            <span class="rg-entita">{{ v.entita }}</span>
-                            {% if v.etichetta %}
-                                <span class="rg-etichetta">{{ v.etichetta }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="rg-riga2">
-                            <span class="rg-chi">{{ v.user_nome ?: 'sistema' }}</span>
-                            <span class="rg-punto">·</span>
-                            <span>{{ v.created_at|date('H:i') }}</span>
-                            {% if v.dettaglio %}
-                                <span class="rg-punto">·</span>
-                                <span class="rg-dettaglio">{{ v.dettaglio }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="rg-azioni">
-                        {% if v.cambi %}
-                            <span class="rg-conta">{{ v.cambi|length }}
-                                {{ v.cambi|length == 1 ? 'campo' : 'campi' }}</span>
-                        {% endif %}
-
-                        {# il ripristino compare solo sulle eliminazioni di cio' che
-                           si puo' rimettere indietro: i mezzi non si eliminano,
-                           si mettono fuori servizio #}
-                        {% if v.azione == 'eliminato' and v.entita in ['prenotazione', 'noleggio'] %}
-                            <form method="POST" action="{{ urlRipristina }}"
-                                  onsubmit="return confirm('Rimettere questa riga nell\'elenco?')">
-                                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                                <input type="hidden" name="id" value="{{ v.entita_id }}">
-                                <button class="ac-btn rg-btn-ripristina">Ripristina</button>
-                            </form>
-                        {% endif %}
-                    </div>
-                </div>
-
-                {% if v.cambi %}
-                    <div class="rg-cambi">
-                        {% for c in v.cambi %}
-                            <div class="rg-cambio">
-                                <span class="rg-campo">{{ c.campo }}</span>
-                                <span class="rg-prima">{{ c.prima }}</span>
-                                <span class="rg-freccia">→</span>
-                                <span class="rg-dopo">{{ c.dopo }}</span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-        {% else %}
-            <div class="ac-box"><div class="ac-empty">Nessuna operazione registrata.</div></div>
-        {% endfor %}
+                    {# compare quando la ricerca dal vivo non lascia righe #}
+                    <tr id="rg-nessuno" style="display:none">
+                        <td colspan="7" class="ac-empty">Nessuna operazione corrisponde alla ricerca.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     {% if voci|length == 500 %}
@@ -164,5 +136,37 @@
         </div>
     {% endif %}
 
+    {# ── Dettaglio dell'operazione ───────────────────────────────────────── #}
+    <div class="ac-modal" id="rg-modal" hidden aria-hidden="true">
+        <div class="ac-modal-box rg-modal-box">
+            <div class="ac-modal-head">
+                <span id="rg-modal-tit">Dettaglio</span>
+                <button type="button" class="ac-modal-close" data-rg-close>&times;</button>
+            </div>
+
+            <div class="rg-modal-corpo">
+                <div class="rg-scheda" id="rg-scheda"></div>
+                <div class="rg-cambi" id="rg-modal-cambi"></div>
+            </div>
+
+            <div class="ac-actions rg-modal-piede">
+                {# il ripristino compare solo sulle eliminazioni di cio' che si
+                   puo' rimettere indietro: i mezzi non si eliminano, si
+                   mettono fuori servizio #}
+                <form method="POST" action="{{ urlRipristina }}" id="rg-form-ripristina" hidden
+                      onsubmit="return confirm('Rimettere questa riga nell\'elenco?')">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                    <input type="hidden" name="id" id="rg-rip-id">
+                    <button class="ac-btn ac-btn-primary">Ripristina</button>
+                </form>
+                <button type="button" class="ac-btn" data-rg-close>Chiudi</button>
+            </div>
+        </div>
+    </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/registro.js?v=1"></script>
 {% endblock %}
