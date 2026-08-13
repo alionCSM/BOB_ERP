@@ -128,6 +128,7 @@ final class MacchinaRepository
             FROM   pn_noleggi n
             LEFT JOIN bb_users u ON u.id = n.commerciale_user_id
             WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  n.data_inizio <= :al
               AND  n.data_fine   >= :dal
@@ -294,29 +295,29 @@ final class MacchinaRepository
         }
     }
 
-    public function eliminaNoleggio(int $companyId, int $id): void
+    /**
+     * Eliminazione logica: testata e righe restano dove sono e spariscono
+     * dalle letture. Le righe non si toccano di proposito: servono intatte
+     * se il noleggio va ripristinato.
+     */
+    public function eliminaNoleggio(int $companyId, int $id, ?int $userId): void
     {
-        $this->conn->beginTransaction();
-        try {
-            // le righe prima: senza foreign key nessuno le cancella da solo
-            // e resterebbero attaccate a una testata che non c'e' piu'
-            $del = $this->conn->prepare("
-                DELETE r FROM pn_noleggi_righe r
-                JOIN pn_noleggi n ON n.id = r.noleggio_id
-                WHERE n.id = :id AND n.group_company_id = :cid
-            ");
-            $del->execute([':id' => $id, ':cid' => $companyId]);
+        $stmt = $this->conn->prepare("
+            UPDATE pn_noleggi
+            SET eliminato_at = NOW(), eliminato_da = :uid
+            WHERE id = :id AND group_company_id = :cid
+        ");
+        $stmt->execute([':id' => $id, ':cid' => $companyId, ':uid' => $userId]);
+    }
 
-            $del = $this->conn->prepare(
-                'DELETE FROM pn_noleggi WHERE id = :id AND group_company_id = :cid'
-            );
-            $del->execute([':id' => $id, ':cid' => $companyId]);
-
-            $this->conn->commit();
-        } catch (\Throwable $e) {
-            $this->conn->rollBack();
-            throw $e;
-        }
+    public function ripristinaNoleggio(int $companyId, int $id): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE pn_noleggi
+            SET eliminato_at = NULL, eliminato_da = NULL
+            WHERE id = :id AND group_company_id = :cid
+        ");
+        $stmt->execute([':id' => $id, ':cid' => $companyId]);
     }
 
     // ── Disponibilita' ───────────────────────────────────────────────────────
@@ -333,6 +334,7 @@ final class MacchinaRepository
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
             WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_inizio <= :al
               AND  r.data_fine   >= :dal
@@ -371,6 +373,7 @@ final class MacchinaRepository
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
             WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.macchina_id = :mid
               AND  r.data_inizio <= :al
@@ -403,6 +406,7 @@ final class MacchinaRepository
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
             WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_fine >= :da
             ORDER BY r.macchina_id ASC, r.data_inizio ASC
@@ -440,6 +444,7 @@ final class MacchinaRepository
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
             JOIN   pn_macchine m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_inizio <= :al
               AND  r.data_fine   >= :dal

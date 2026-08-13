@@ -1,0 +1,112 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
+<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=1">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Registro modifiche — {{ sezione }}</h1>
+            <p class="ac-sub">Chi ha creato, modificato o eliminato, e cosa e' cambiato.</p>
+        </div>
+        <div class="ac-hero-links">
+            <a href="{{ tornaA }}" class="ac-btn">Torna all'elenco</a>
+        </div>
+    </div>
+
+    {% if ripristinato %}
+        <div class="ac-alert is-ok">Ripristinato.</div>
+    {% endif %}
+
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f">
+            <span>Dal</span>
+            <input type="date" name="dal" value="{{ filtri.dal }}">
+        </label>
+        <label class="ac-f">
+            <span>Al</span>
+            <input type="date" name="al" value="{{ filtri.al }}">
+        </label>
+        <label class="ac-f">
+            <span>Azione</span>
+            <select name="azione">
+                <option value="">tutte</option>
+                {% for a in ['creato', 'modificato', 'eliminato', 'ripristinato'] %}
+                    <option value="{{ a }}" {{ filtri.azione == a ? 'selected' : '' }}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Utente</span>
+            <select name="utente">
+                <option value="0">tutti</option>
+                {% for u in utenti %}
+                    <option value="{{ u.user_id }}" {{ filtri.utente == u.user_id ? 'selected' : '' }}>
+                        {{ u.user_nome ?: ('utente ' ~ u.user_id) }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Filtra</button>
+        {% if filtri.azione or filtri.utente or filtri.dal or filtri.al %}
+            <a href="?" class="ac-link">azzera</a>
+        {% endif %}
+    </form>
+
+    <div class="rg-elenco">
+        {% for v in voci %}
+            <div class="rg-voce rg-{{ v.azione }}">
+                <div class="rg-testa">
+                    <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
+                    <span class="rg-entita">{{ v.entita }}</span>
+                    {% if v.etichetta %}<span class="rg-etichetta">{{ v.etichetta }}</span>{% endif %}
+                    <span class="rg-quando">{{ v.created_at|date('d/m/Y H:i') }}</span>
+                    <span class="rg-chi">{{ v.user_nome ?: 'sistema' }}</span>
+
+                    {# il ripristino compare solo sulle eliminazioni di cio' che
+                       si puo' rimettere indietro: le macchine non si eliminano,
+                       si mettono fuori servizio #}
+                    {% if v.azione == 'eliminato' and v.entita in ['prenotazione', 'noleggio'] %}
+                        <form method="POST" action="{{ urlRipristina }}" class="rg-ripristina"
+                              onsubmit="return confirm('Rimettere indietro questa riga?')">
+                            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                            <input type="hidden" name="id" value="{{ v.entita_id }}">
+                            <button class="ac-link">ripristina</button>
+                        </form>
+                    {% endif %}
+                </div>
+
+                {% if v.cambi %}
+                    <table class="rg-cambi">
+                        <tbody>
+                            {% for c in v.cambi %}
+                                <tr>
+                                    <td class="rg-campo">{{ c.campo }}</td>
+                                    <td class="rg-prima">{{ c.prima }}</td>
+                                    <td class="rg-freccia">→</td>
+                                    <td class="rg-dopo">{{ c.dopo }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="rg-nulla">Nessun campo modificato.</div>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="ac-box"><div class="ac-empty">Nessuna operazione registrata.</div></div>
+        {% endfor %}
+    </div>
+
+    {% if voci|length == 500 %}
+        <div class="rg-limite">
+            Mostrate le 500 operazioni piu' recenti: restringi il periodo per vedere le precedenti.
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -148,7 +148,9 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
            ->get('/autocarrate/prenotazioni',          [AutocarrateController::class, 'prenotazioni'])
            ->get('/autocarrate/prenotazioni/occupati', [AutocarrateController::class, 'occupati'])
            ->post('/autocarrate/prenotazioni/salva',   [AutocarrateController::class, 'salvaPrenotazione'])
-           ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione']);
+           ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione'])
+           ->get('/autocarrate/registro',              [AutocarrateController::class, 'registro'])
+           ->post('/autocarrate/ripristina',           [AutocarrateController::class, 'ripristina']);
 
     $router->dispatch($request, $container);
 }
@@ -167,7 +169,9 @@ if ($uri === '/noleggi' || str_starts_with($uri, '/noleggi/')) {
            ->post('/noleggi/salva',          [NoleggiController::class, 'salva'])
            ->post('/noleggi/elimina',        [NoleggiController::class, 'elimina'])
            ->get('/noleggi/macchine',        [NoleggiController::class, 'macchine'])
-           ->post('/noleggi/macchine/salva', [NoleggiController::class, 'salvaMacchina']);
+           ->post('/noleggi/macchine/salva', [NoleggiController::class, 'salvaMacchina'])
+           ->get('/noleggi/registro',        [NoleggiController::class, 'registro'])
+           ->post('/noleggi/ripristina',     [NoleggiController::class, 'ripristina']);
 
     $router->dispatch($request, $container);
 }

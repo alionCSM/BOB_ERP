@@ -111,6 +111,7 @@ final class AutocarrataRepository
             JOIN   pn_autocarrate  a ON a.id = p.autocarrata_id
             LEFT JOIN bb_users     c ON c.id = p.commerciale_user_id
             WHERE  p.group_company_id = :cid
+              AND  p.eliminato_at IS NULL
               AND  p.stato <> 'annullata'
               AND  p.data_inizio <= :al
               AND  p.data_fine   >= :dal
@@ -168,6 +169,7 @@ final class AutocarrataRepository
             FROM   pn_prenotazioni
             WHERE  group_company_id = :cid
               AND  autocarrata_id = :mid
+              AND  eliminato_at IS NULL
               AND  stato <> 'annullata'
               AND  data_inizio <= :al
               AND  data_fine   >= :dal
@@ -198,6 +200,7 @@ final class AutocarrataRepository
             SELECT autocarrata_id, cliente, data_fine
             FROM   pn_prenotazioni
             WHERE  group_company_id = :cid
+              AND  eliminato_at IS NULL
               AND  stato <> 'annullata'
               AND  data_inizio <= :al
               AND  data_fine   >= :dal
@@ -275,11 +278,28 @@ final class AutocarrataRepository
         return (int)$this->conn->lastInsertId();
     }
 
-    public function eliminaPrenotazione(int $companyId, int $id): void
+    /**
+     * Eliminazione logica: la riga resta in tabella e sparisce dalle
+     * letture. Una prenotazione cancellata per sbaglio, altrimenti, non
+     * tornerebbe piu' indietro.
+     */
+    public function eliminaPrenotazione(int $companyId, int $id, ?int $userId): void
     {
-        $stmt = $this->conn->prepare(
-            'DELETE FROM pn_prenotazioni WHERE id = :id AND group_company_id = :cid'
-        );
+        $stmt = $this->conn->prepare("
+            UPDATE pn_prenotazioni
+            SET eliminato_at = NOW(), eliminato_da = :uid
+            WHERE id = :id AND group_company_id = :cid
+        ");
+        $stmt->execute([':id' => $id, ':cid' => $companyId, ':uid' => $userId]);
+    }
+
+    public function ripristinaPrenotazione(int $companyId, int $id): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE pn_prenotazioni
+            SET eliminato_at = NULL, eliminato_da = NULL
+            WHERE id = :id AND group_company_id = :cid
+        ");
         $stmt->execute([':id' => $id, ':cid' => $companyId]);
     }
 
@@ -298,6 +318,7 @@ final class AutocarrataRepository
             SELECT autocarrata_id, data_inizio, data_fine
             FROM   pn_prenotazioni
             WHERE  group_company_id = :cid
+              AND  eliminato_at IS NULL
               AND  stato <> 'annullata'
               AND  data_fine >= :da
             ORDER BY autocarrata_id ASC, data_inizio ASC

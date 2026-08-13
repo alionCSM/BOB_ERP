@@ -6,6 +6,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Repository\Poti\MacchinaRepository;
 use App\Service\CurrentCompany;
+use App\Service\Poti\Audit;
 use App\Service\Poti\VistaImpegni;
 
 /**
@@ -139,7 +140,10 @@ final class NoleggiController
             }
         }
 
-        $repo->salvaNoleggio($cid, $id, [
+        // lo stato precedente si legge prima di scrivere: dopo non c'e' piu'
+        $prima = $id ? $repo->noleggio($cid, $id) : null;
+
+        $nuovoId = $repo->salvaNoleggio($cid, $id, [
             'cliente'   => $cliente,
             'telefono'  => trim((string)($_POST['telefono'] ?? '')),
             'luogo'     => trim((string)($_POST['luogo'] ?? '')),
@@ -152,6 +156,12 @@ final class NoleggiController
             'note'      => trim((string)($_POST['note'] ?? '')),
         ], $righe, (int)$this->utente($request)->id);
 
+        (new Audit($this->conn))->registra(
+            $cid, 'noleggio', $nuovoId, $id ? 'modificato' : 'creato',
+            $prima, $repo->noleggio($cid, $nuovoId),
+            (int)$this->utente($request)->id, $cliente
+        );
+
         Response::redirect('/noleggi/elenco?salvato=1');
     }
 
@@ -160,11 +170,70 @@ final class NoleggiController
     public function elimina(Request $request): void
     {
         $this->assertAccess($request);
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id) {
-            (new MacchinaRepository($this->conn))->eliminaNoleggio($this->companyId(), $id);
+        $id   = (int)($_POST['id'] ?? 0);
+        $cid  = $this->companyId();
+        $repo = new MacchinaRepository($this->conn);
+
+        if ($id && ($prima = $repo->noleggio($cid, $id))) {
+            $repo->eliminaNoleggio($cid, $id, (int)$this->utente($request)->id);
+
+            // lo stato completo, righe comprese, finisce nel registro: e' da
+            // li' che si rimette indietro un noleggio tolto per sbaglio
+            (new Audit($this->conn))->registra(
+                $cid, 'noleggio', $id, 'eliminato',
+                $prima, null,
+                (int)$this->utente($request)->id, (string)$prima['cliente']
+            );
         }
         Response::redirect('/noleggi/elenco?salvato=1');
+    }
+
+    // ── POST /noleggi/ripristina ─────────────────────────────────────────────
+
+    public function ripristina(Request $request): void
+    {
+        $this->assertAccess($request);
+        $id   = (int)($_POST['id'] ?? 0);
+        $cid  = $this->companyId();
+        $repo = new MacchinaRepository($this->conn);
+
+        if ($id) {
+            $repo->ripristinaNoleggio($cid, $id);
+            $dopo = $repo->noleggio($cid, $id);
+            (new Audit($this->conn))->registra(
+                $cid, 'noleggio', $id, 'ripristinato',
+                null, $dopo,
+                (int)$this->utente($request)->id, (string)($dopo['cliente'] ?? '')
+            );
+        }
+        Response::redirect('/noleggi/registro?ripristinato=1');
+    }
+
+    // ── GET /noleggi/registro ────────────────────────────────────────────────
+
+    public function registro(Request $request): void
+    {
+        $this->assertAccess($request);
+        $audit  = new Audit($this->conn);
+        $cid    = $this->companyId();
+        $entita = ['macchina', 'noleggio'];
+
+        $filtri = [
+            'azione' => trim((string)($_GET['azione'] ?? '')),
+            'utente' => (int)($_GET['utente'] ?? 0),
+            'dal'    => VistaImpegni::data($_GET['dal'] ?? '', ''),
+            'al'     => VistaImpegni::data($_GET['al'] ?? '', ''),
+        ];
+
+        Response::view('poti/registro.html.twig', $request, [
+            'sezione'      => 'Macchine',
+            'tornaA'       => '/noleggi/elenco',
+            'urlRipristina'=> '/noleggi/ripristina',
+            'voci'         => $audit->voci($cid, $entita, $filtri),
+            'utenti'       => $audit->utenti($cid, $entita),
+            'filtri'       => $filtri,
+            'ripristinato' => isset($_GET['ripristinato']),
+        ]);
     }
 
     // ── GET /noleggi/occupate ────────────────────────────────────────────────
@@ -230,7 +299,9 @@ final class NoleggiController
         $stato = in_array($_POST['stato'] ?? '', self::STATI_MACCHINA, true)
             ? (string)$_POST['stato'] : 'attiva';
 
-        $repo->salvaMacchina($cid, $id, [
+        $prima = $id ? $repo->macchina($cid, $id) : null;
+
+        $nuovoId = $repo->salvaMacchina($cid, $id, [
             'tipo'          => $tipo,
             'matricola'     => $matricola,
             'modello'       => trim((string)($_POST['modello'] ?? '')),
@@ -239,6 +310,12 @@ final class NoleggiController
             'note'          => trim((string)($_POST['note'] ?? '')),
             'stato'         => $stato,
         ]);
+
+        (new Audit($this->conn))->registra(
+            $cid, 'macchina', $nuovoId, $id ? 'modificato' : 'creato',
+            $prima, $repo->macchina($cid, $nuovoId),
+            (int)$this->utente($request)->id, $matricola
+        );
 
         Response::redirect('/noleggi/macchine?salvato=1');
     }
