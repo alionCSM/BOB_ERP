@@ -6,6 +6,8 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Repository\Poti\AutocarrataRepository;
 use App\Service\CurrentCompany;
+use App\Service\Poti\Audit;
+use App\Service\Poti\VistaImpegni;
 
 /**
  * Poti Noleggi — autocarrate, prenotazioni e disponibilita'.
@@ -107,7 +109,10 @@ final class AutocarrateController
             $stato = 'attiva';
         }
 
-        $repo->salvaMezzo($cid, $id, [
+        // lo stato precedente si legge prima di scrivere: dopo non c'e' piu'
+        $prima = $id ? $repo->mezzo($cid, $id) : null;
+
+        $nuovoId = $repo->salvaMezzo($cid, $id, [
             'targa'         => $targa,
             'modello'       => trim((string)($_POST['modello'] ?? '')),
             'altezza_max_m' => trim((string)($_POST['altezza_max_m'] ?? '')),
@@ -115,6 +120,12 @@ final class AutocarrateController
             'note'          => trim((string)($_POST['note'] ?? '')),
             'stato'         => $stato,
         ]);
+
+        (new Audit($this->conn))->registra(
+            $cid, 'autocarrata', $nuovoId, $id ? 'modificato' : 'creato',
+            $prima, $repo->mezzo($cid, $nuovoId),
+            (int)$this->utente($request)->id, $targa
+        );
 
         Response::redirect('/autocarrate/mezzi?salvato=1');
     }
@@ -218,7 +229,9 @@ final class AutocarrateController
             }
         }
 
-        $repo->salvaPrenotazione($cid, $id, [
+        $prima = $id ? $repo->prenotazione($cid, $id) : null;
+
+        $nuovoId = $repo->salvaPrenotazione($cid, $id, [
             'autocarrata_id' => $mezzoId,
             'cliente'        => $cliente,
             'telefono'       => trim((string)($_POST['telefono'] ?? '')),
@@ -235,6 +248,12 @@ final class AutocarrateController
             'note'           => trim((string)($_POST['note'] ?? '')),
         ], (int)$this->utente($request)->id);
 
+        (new Audit($this->conn))->registra(
+            $cid, 'prenotazione', $nuovoId, $id ? 'modificato' : 'creato',
+            $prima, $repo->prenotazione($cid, $nuovoId),
+            (int)$this->utente($request)->id, $cliente
+        );
+
         Response::redirect('/autocarrate/prenotazioni?salvato=1');
     }
 
@@ -243,11 +262,83 @@ final class AutocarrateController
     public function eliminaPrenotazione(Request $request): void
     {
         $this->assertAccess($request);
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id) {
-            (new AutocarrataRepository($this->conn))->eliminaPrenotazione($this->companyId(), $id);
+        $id   = (int)($_POST['id'] ?? 0);
+        $cid  = $this->companyId();
+        $repo = new AutocarrataRepository($this->conn);
+
+        if ($id && ($prima = $repo->prenotazione($cid, $id))) {
+            $repo->eliminaPrenotazione($cid, $id, (int)$this->utente($request)->id);
+
+            // lo stato completo finisce nel registro: e' da li' che si
+            // rimette indietro una prenotazione tolta per sbaglio
+            (new Audit($this->conn))->registra(
+                $cid, 'prenotazione', $id, 'eliminato',
+                $prima, null,
+                (int)$this->utente($request)->id, (string)$prima['cliente']
+            );
         }
         Response::redirect('/autocarrate/prenotazioni?salvato=1');
+    }
+
+    // ── POST /autocarrate/ripristina ─────────────────────────────────────────
+
+    public function ripristina(Request $request): void
+    {
+        $this->assertAccess($request);
+        $id   = (int)($_POST['id'] ?? 0);
+        $cid  = $this->companyId();
+        $repo = new AutocarrataRepository($this->conn);
+
+        if ($id) {
+            $repo->ripristinaPrenotazione($cid, $id);
+            $dopo = $repo->prenotazione($cid, $id);
+            (new Audit($this->conn))->registra(
+                $cid, 'prenotazione', $id, 'ripristinato',
+                null, $dopo,
+                (int)$this->utente($request)->id, (string)($dopo['cliente'] ?? '')
+            );
+        }
+        Response::redirect('/autocarrate/registro?ripristinato=1');
+    }
+
+    // ── GET /autocarrate/registro ────────────────────────────────────────────
+
+    public function registro(Request $request): void
+    {
+        $this->assertAccess($request);
+        $audit = new Audit($this->conn);
+        $cid   = $this->companyId();
+        $entita = ['autocarrata', 'prenotazione'];
+
+        $filtri = [
+            'azione' => trim((string)($_GET['azione'] ?? '')),
+            'utente' => (int)($_GET['utente'] ?? 0),
+            'dal'    => VistaImpegni::data($_GET['dal'] ?? '', ''),
+            'al'     => VistaImpegni::data($_GET['al'] ?? '', ''),
+        ];
+
+        $voci = $audit->voci($cid, $entita, $filtri);
+
+        // conteggio per tipo di operazione: fatto qui perche' sommarlo nel
+        // template richiederebbe un set dentro un ciclo, che in Twig non si
+        // conserva da un giro all'altro
+        $conteggi = ['creato' => 0, 'modificato' => 0, 'eliminato' => 0, 'ripristinato' => 0];
+        foreach ($voci as $v) {
+            if (isset($conteggi[$v['azione']])) {
+                $conteggi[$v['azione']]++;
+            }
+        }
+
+        Response::view('poti/registro.html.twig', $request, [
+            'conteggi'     => $conteggi,
+            'sezione'      => 'Autocarrate',
+            'tornaA'       => '/autocarrate/prenotazioni',
+            'urlRipristina'=> '/autocarrate/ripristina',
+            'voci'         => $voci,
+            'utenti'       => $audit->utenti($cid, $entita),
+            'filtri'       => $filtri,
+            'ripristinato' => isset($_GET['ripristinato']),
+        ]);
     }
 
     // ── Supporto ─────────────────────────────────────────────────────────────

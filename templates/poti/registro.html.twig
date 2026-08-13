@@ -1,0 +1,172 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
+<link rel="stylesheet" href="/assets/css/views/poti/registro.css?v=3">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Registro — {{ sezione }}</h1>
+        </div>
+        <div class="ac-hero-links">
+            <a href="{{ tornaA }}" class="ac-btn">Torna all'elenco</a>
+        </div>
+    </div>
+
+    {% if ripristinato %}
+        <div class="ac-alert is-ok">Ripristinato: la riga e' tornata nell'elenco.</div>
+    {% endif %}
+
+    {# i conteggi arrivano gia' fatti dal controller: sommarli qui vorrebbe
+       dire usare set dentro un ciclo, che in Twig non si comporta come ci
+       si aspetta #}
+    <div class="rg-riepilogo">
+        {% for azione, n in conteggi %}
+            <div class="rg-kpi rg-kpi-{{ azione }}">
+                <span class="rg-kpi-n">{{ n }}</span>
+                <span class="rg-kpi-l">{{ azione }}</span>
+            </div>
+        {% endfor %}
+    </div>
+
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f">
+            <span>Dal</span>
+            <input type="date" name="dal" value="{{ filtri.dal }}">
+        </label>
+        <label class="ac-f">
+            <span>Al</span>
+            <input type="date" name="al" value="{{ filtri.al }}">
+        </label>
+        <label class="ac-f">
+            <span>Azione</span>
+            <select name="azione">
+                <option value="">tutte</option>
+                {% for a in ['creato', 'modificato', 'eliminato', 'ripristinato'] %}
+                    <option value="{{ a }}" {{ filtri.azione == a ? 'selected' : '' }}>{{ a }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Utente</span>
+            <select name="utente">
+                <option value="0">tutti</option>
+                {% for u in utenti %}
+                    <option value="{{ u.user_id }}" {{ filtri.utente == u.user_id ? 'selected' : '' }}>
+                        {{ u.user_nome ?: ('utente ' ~ u.user_id) }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        {# la ricerca filtra mentre si scrive: il pulsante serve a periodo,
+           azione e utente, che vanno richiesti al server #}
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca <small id="rg-conta"></small></span>
+            <input type="search" id="rg-cerca"
+                   placeholder="targa, cliente, utente, valore modificato…">
+        </label>
+
+        <button class="ac-btn ac-btn-primary">Filtra</button>
+        {% if filtri.azione or filtri.utente or filtri.dal or filtri.al %}
+            <a href="?" class="ac-link">azzera</a>
+        {% endif %}
+    </form>
+
+    <div class="ac-box">
+        <div class="ac-table-wrap">
+            <table class="ac-table rg-tabella">
+                <thead>
+                    <tr>
+                        <th>Quando</th>
+                        <th>Azione</th>
+                        <th>Tipo</th>
+                        <th>Riga</th>
+                        <th>Utente</th>
+                        <th>Dettaglio</th>
+                        <th class="right">Campi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# ogni riga porta con se' i propri dati: cliccandola si
+                       apre il dettaglio senza tornare al server #}
+                    {% for v in voci %}
+                        <tr class="rg-riga rg-{{ v.azione }}"
+                            data-rg-testo="{{ v.testo_ricerca }}"
+                            data-rg="{{ v|json_encode|e('html_attr') }}">
+                            <td class="rg-quando">
+                                {{ v.created_at|date('d/m/Y') }}
+                                <span>{{ v.created_at|date('H:i') }}</span>
+                            </td>
+                            <td>
+                                <span class="rg-azione rg-badge-{{ v.azione }}">{{ v.azione }}</span>
+                            </td>
+                            <td class="rg-entita">{{ v.entita }}</td>
+                            <td class="rg-etichetta">{{ v.etichetta ?: '—' }}</td>
+                            <td>{{ v.user_nome ?: 'sistema' }}</td>
+                            <td class="rg-dettaglio" title="{{ v.dettaglio }}">{{ v.dettaglio ?: '—' }}</td>
+                            <td class="right">
+                                {% if v.cambi|length %}
+                                    <span class="rg-conta-badge">{{ v.cambi|length }}</span>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="7" class="ac-empty">Nessuna operazione registrata.</td></tr>
+                    {% endfor %}
+
+                    {# compare quando la ricerca dal vivo non lascia righe #}
+                    <tr id="rg-nessuno" style="display:none">
+                        <td colspan="7" class="ac-empty">Nessuna operazione corrisponde alla ricerca.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if voci|length == 500 %}
+        <div class="rg-limite">
+            Mostrate le 500 operazioni piu' recenti: restringi il periodo per vedere le precedenti.
+        </div>
+    {% endif %}
+
+    {# ── Dettaglio dell'operazione ───────────────────────────────────────── #}
+    <div class="ac-modal" id="rg-modal" hidden aria-hidden="true">
+        <div class="ac-modal-box rg-modal-box">
+            <div class="ac-modal-head">
+                <span id="rg-modal-tit">Dettaglio</span>
+                <button type="button" class="ac-modal-close" data-rg-close>&times;</button>
+            </div>
+
+            <div class="rg-modal-corpo">
+                <div class="rg-scheda" id="rg-scheda"></div>
+                <div class="rg-cambi" id="rg-modal-cambi"></div>
+            </div>
+
+            <div class="ac-actions rg-modal-piede">
+                {# il ripristino compare solo sulle eliminazioni di cio' che si
+                   puo' rimettere indietro: i mezzi non si eliminano, si
+                   mettono fuori servizio #}
+                <form method="POST" action="{{ urlRipristina }}" id="rg-form-ripristina" hidden
+                      onsubmit="return confirm('Rimettere questa riga nell\'elenco?')">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                    <input type="hidden" name="id" id="rg-rip-id">
+                    <button class="ac-btn ac-btn-primary">Ripristina</button>
+                </form>
+                <button type="button" class="ac-btn" data-rg-close>Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/registro.js?v=1"></script>
+{% endblock %}

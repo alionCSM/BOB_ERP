@@ -56,6 +56,7 @@ final class CompanyModuleGuard
     private const MODULO_PER_ROTTA = [
         '/fatturazione/consorziate' => 'billing',
         '/autocarrate'              => 'pn_autocarrate',
+        '/noleggi'                  => 'pn_noleggi',
         '/report/fatturato'         => 'report_business',
         '/report'                   => 'report_business',
         '/offers'                   => 'offers',

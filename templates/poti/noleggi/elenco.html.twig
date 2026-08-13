@@ -1,0 +1,280 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=2">
+{# stessa versione usata nelle altre pagine di BOB #}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Noleggi</h1>
+            <p class="ac-sub">Un noleggio puo' contenere piu' mezzi, ognuno con il suo periodo.</p>
+        </div>
+        <div class="ac-hero-links">
+            <button type="button" class="ac-btn ac-btn-primary" data-nl-nuovo>Nuovo noleggio</button>
+            <a href="/noleggi" class="ac-btn">Disponibilita'</a>
+            <a href="/noleggi/macchine" class="ac-btn">Mezzi</a>
+            <a href="/noleggi/registro" class="ac-btn">Registro</a>
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ac-alert is-ok">Modifiche salvate.</div>{% endif %}
+    {% if errore %}<div class="ac-alert is-ko">{{ errore }}</div>{% endif %}
+
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f">
+            <span>Dal</span>
+            <input type="date" name="dal" value="{{ dal }}">
+        </label>
+        <label class="ac-f">
+            <span>Al</span>
+            <input type="date" name="al" value="{{ al }}">
+        </label>
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca <small id="nl-conta"></small></span>
+            <input type="search" name="q" value="{{ cerca }}" id="nl-cerca"
+                   placeholder="cliente, luogo, contratto, note…">
+        </label>
+        <button class="ac-btn ac-btn-primary">Filtra periodo</button>
+        {% if cerca %}
+            <a href="/noleggi/elenco?dal={{ dal }}&al={{ al }}" class="ac-link">azzera</a>
+        {% endif %}
+    </form>
+
+    {# Una scheda per noleggio invece di una tabella: le macchine sono piu' di
+       una e in tabella diventerebbero righe ripetute con cliente e date
+       duplicati a ogni riga. #}
+    <div class="nl-elenco" id="nl-elenco">
+        {% for n in noleggi %}
+            <div class="nl-card" data-nl-testo="{{ (n.cliente ~ ' ' ~ (n.luogo ?: '') ~ ' ' ~ (n.contratto ?: '') ~ ' ' ~ (n.note ?: ''))|lower }}">
+                <div class="nl-card-head">
+                    <div class="nl-cliente">
+                        {{ n.cliente }}
+                        {% if n.telefono %}<span class="ac-tel">{{ n.telefono }}</span>{% endif %}
+                    </div>
+                    <div class="nl-badge">
+                        <span class="ac-stato ac-stato-{{ n.stato == 'confermato' ? 'confermata' : 'annullata' }}">{{ n.stato }}</span>
+                        <span class="ac-stato ac-pag-{{ n.pagamento }}">
+                            {{ n.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
+                        </span>
+                        <button type="button" class="ac-link"
+                                data-nl-modifica="{{ n|json_encode|e('html_attr') }}">modifica</button>
+                    </div>
+                </div>
+
+                <div class="nl-meta">
+                    {% if n.luogo %}<span>{{ n.luogo }}</span>{% endif %}
+                    {% if n.data_inizio %}
+                        <span>{{ n.data_inizio|date('d/m/Y') }} → {{ n.data_fine|date('d/m/Y') }}</span>
+                    {% endif %}
+                    {% if n.contratto %}<span>contratto {{ n.contratto }}</span>{% endif %}
+                    {% if n.commerciale_nome %}<span>{{ n.commerciale_nome }}</span>{% endif %}
+                </div>
+
+                <table class="nl-righe">
+                    <tbody>
+                        {% for r in n.righe %}
+                            <tr>
+                                <td class="nl-matr">{{ r.matricola }}</td>
+                                <td class="nl-tipo">{{ r.tipo }}</td>
+                                <td>{{ r.data_inizio|date('d/m/Y') }} → {{ r.data_fine|date('d/m/Y') }}</td>
+                                <td class="right">{{ r.giorni }} gg</td>
+                                <td class="right">{{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
+                                <td class="right nl-tot">{{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="6" class="ac-empty">Nessun mezzo.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div class="nl-piede">
+                    {% if n.note %}<div class="nl-note">{{ n.note }}</div>{% endif %}
+                    <div class="nl-totali">
+                        {% if n.trasporto %}
+                            <span>trasporto € {{ n.trasporto|number_format(2, ',', '.') }}</span>
+                        {% endif %}
+                        <strong>totale € {{ n.totale ? n.totale|number_format(2, ',', '.') : '0,00' }}</strong>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="ac-box"><div class="ac-empty">Nessun noleggio nel periodo.</div></div>
+        {% endfor %}
+
+        {# compare quando la ricerca dal vivo non lascia schede #}
+        <div class="ac-box" id="nl-nessuno" style="display:none">
+            <div class="ac-empty">Nessun noleggio corrisponde alla ricerca.</div>
+        </div>
+    </div>
+
+    {# ── Modale noleggio ─────────────────────────────────────────────────── #}
+    <div class="ac-modal" id="nl-modal" hidden aria-hidden="true">
+        <div class="ac-modal-box nl-modal-box">
+            <div class="ac-modal-head">
+                <span id="nl-modal-tit">Nuovo noleggio</span>
+                <button type="button" class="ac-modal-close" data-nl-close>&times;</button>
+            </div>
+
+            <form method="POST" action="/noleggi/salva" class="ac-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="id" id="nl-id" value="">
+
+                <label class="ac-f ac-f-2">
+                    <span>Cliente</span>
+                    <input type="text" name="cliente" id="nl-cliente" required maxlength="160">
+                </label>
+
+                <label class="ac-f">
+                    <span>Telefono</span>
+                    <input type="text" name="telefono" id="nl-telefono" maxlength="40">
+                </label>
+
+                <label class="ac-f">
+                    <span>Contratto</span>
+                    <input type="text" name="contratto" id="nl-contratto" maxlength="100">
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Luogo</span>
+                    <input type="text" name="luogo" id="nl-luogo" maxlength="200">
+                </label>
+
+                <label class="ac-f">
+                    <span>Stato</span>
+                    <select name="stato" id="nl-stato">
+                        {% for s in stati %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                    </select>
+                </label>
+
+                <label class="ac-f">
+                    <span>Pagamento</span>
+                    <select name="pagamento" id="nl-pagamento">
+                        {% for p in pagamenti %}
+                            <option value="{{ p }}">{{ p == 'pagata' ? 'pagata' : 'da pagare' }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                {# ── Mezzi del noleggio ─────────────────────────────────── #}
+                <div class="ac-f-4 nl-righe-box">
+                    <div class="nl-righe-head">
+                        <span>Mezzi</span>
+                        <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi mezzo</button>
+                    </div>
+
+                    <div class="nl-righe-lista" id="nl-righe"></div>
+
+                    <div class="nl-righe-vuoto" id="nl-righe-vuoto">
+                        Nessun mezzo: aggiungine almeno uno.
+                    </div>
+                </div>
+
+                {# ── Importi ────────────────────────────────────────────── #}
+                <div class="ac-f ac-f-4 ac-soldi">
+                    <div class="ac-soldi-tit">Importi</div>
+                    <div class="ac-soldi-campi">
+                        <label class="ac-f">
+                            <span>Trasporto</span>
+                            <input type="text" name="trasporto" id="nl-trasporto" inputmode="decimal"
+                                   placeholder="0,00">
+                        </label>
+
+                        <label class="ac-f">
+                            <span>Totale</span>
+                            <input type="text" name="totale" id="nl-totale" inputmode="decimal"
+                                   placeholder="0,00">
+                            <small id="nl-calcolo"></small>
+                        </label>
+                    </div>
+                </div>
+
+                <label class="ac-f ac-f-4">
+                    <span>Note</span>
+                    <textarea name="note" id="nl-note" rows="3"></textarea>
+                </label>
+
+                <div class="ac-f">
+                    <span>Commerciale</span>
+                    <div class="ac-fisso" id="nl-commerciale" data-predefinito="{{ utenteNome }}">
+                        {{ utenteNome }}
+                    </div>
+                </div>
+
+                <div class="ac-actions">
+                    <button type="button" class="ac-btn ac-btn-ko" id="nl-elimina" hidden>Elimina</button>
+                    <button type="button" class="ac-btn" data-nl-close>Annulla</button>
+                    <button class="ac-btn ac-btn-primary">Salva</button>
+                </div>
+            </form>
+
+            {# form separato: eliminare da dentro quello di salvataggio
+               manderebbe anche tutti gli altri campi #}
+            <form method="POST" action="/noleggi/elimina" id="nl-form-elimina" hidden>
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="id" id="nl-del-id">
+            </form>
+        </div>
+    </div>
+
+    {# modello di riga, clonato dal JS #}
+    <template id="nl-riga-modello">
+        <div class="nl-riga">
+            <label class="ac-f nl-riga-macchina">
+                <span>Mezzo</span>
+                <select name="riga_macchina[]">
+                    <option value="">— scegli —</option>
+                    {# nel testo stanno matricola, tipo e modello: la ricerca
+                       guarda il testo della voce, quindi si trova il mezzo
+                       scrivendo uno qualsiasi dei tre #}
+                    {% for m in macchine %}
+                        <option value="{{ m.id }}">{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="ac-f">
+                <span>Dal</span>
+                <input type="date" name="riga_dal[]">
+            </label>
+
+            <label class="ac-f">
+                <span>Al</span>
+                <input type="date" name="riga_al[]">
+            </label>
+
+            <label class="ac-f">
+                <span>Tariffa/g</span>
+                <input type="text" name="riga_tariffa[]" inputmode="decimal" placeholder="0,00">
+            </label>
+
+            <label class="ac-f">
+                <span>Totale</span>
+                <input type="text" name="riga_totale[]" inputmode="decimal" placeholder="0,00">
+            </label>
+
+            <div class="nl-riga-azioni">
+                {# copia il periodo di questa riga su tutte le altre: nella
+                   maggior parte dei noleggi le macchine vanno e tornano
+                   insieme, e riscrivere le date ogni volta e' inutile #}
+                <button type="button" class="ac-link" data-nl-copia title="Copia queste date sugli altri mezzi">
+                    copia periodo
+                </button>
+                <button type="button" class="ac-link nl-togli" data-nl-togli>togli</button>
+            </div>
+        </div>
+    </template>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# TomSelect prima: noleggi.js lo usa appena aggiunge una riga #}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=2"></script>
+{% endblock %}

@@ -1,0 +1,178 @@
+/*
+ * Registro modifiche dei moduli Poti. Prefisso rg-.
+ * Estende autocarrate.css per intestazione, filtri, tabella e modale.
+ */
+
+/* ── Riepilogo in cima ──────────────────────────────────────────────────── */
+.rg-riepilogo {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.rg-kpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #cbd5e1;
+    border-radius: 10px;
+}
+
+.rg-kpi-n { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1; }
+.rg-kpi-l { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; }
+
+.rg-kpi-creato       { border-left-color: #16a34a; }
+.rg-kpi-modificato   { border-left-color: #0369a1; }
+.rg-kpi-eliminato    { border-left-color: #dc2626; }
+.rg-kpi-ripristinato { border-left-color: #b45309; }
+
+/* ── Tabella ────────────────────────────────────────────────────────────── */
+.rg-riga { cursor: pointer; }
+
+/* la striscia a sinistra dice il tipo di operazione a colpo d'occhio */
+.rg-riga td:first-child { border-left: 3px solid transparent; }
+.rg-creato       td:first-child { border-left-color: #16a34a; }
+.rg-modificato   td:first-child { border-left-color: #0369a1; }
+.rg-eliminato    td:first-child { border-left-color: #dc2626; }
+.rg-ripristinato td:first-child { border-left-color: #b45309; }
+
+.rg-quando { white-space: nowrap; }
+.rg-quando span { display: block; font-size: 11px; color: #94a3b8; }
+
+.rg-azione {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.rg-badge-creato       { background: #dcfce7; color: #166534; }
+.rg-badge-modificato   { background: #dbeafe; color: #1e40af; }
+.rg-badge-eliminato    { background: #fee2e2; color: #991b1b; }
+.rg-badge-ripristinato { background: #fef3c7; color: #92400e; }
+
+.rg-entita    { text-transform: capitalize; color: #64748b; }
+.rg-etichetta { font-weight: 700; color: #0f172a; white-space: nowrap; }
+
+/* il riepilogo puo' essere lungo: si tronca e si legge per intero nella
+   modale o passandoci sopra */
+.rg-dettaglio {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #64748b;
+}
+
+.rg-conta-badge {
+    display: inline-block;
+    min-width: 22px;
+    padding: 2px 7px;
+    background: #f1f5f9;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+#rg-conta {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+/* ── Modale del dettaglio ───────────────────────────────────────────────── */
+.rg-modal-box { width: 720px; }
+
+.rg-modal-corpo { padding: 18px; }
+
+.rg-scheda {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.rg-voce-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.rg-voce-dato span {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #94a3b8;
+}
+
+.rg-voce-dato strong {
+    font-size: 13px;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.rg-cambi-tit {
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+}
+
+.rg-cambio {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 20px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-top: 1px solid #f8fafc;
+    font-size: 12.5px;
+}
+
+.rg-campo { font-weight: 600; color: #64748b; }
+
+/* il valore precedente barrato e quello nuovo in evidenza: si legge in un
+   colpo d'occhio cosa e' stato cambiato */
+.rg-prima {
+    color: #b0b8c4;
+    text-decoration: line-through;
+    word-break: break-word;
+}
+
+.rg-freccia { color: #cbd5e1; text-align: center; }
+
+.rg-dopo {
+    color: #0f172a;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.rg-nulla { font-size: 12px; color: #94a3b8; }
+
+.rg-modal-piede { padding: 0 18px 18px; }
+.rg-modal-piede form { margin: 0; margin-right: auto; }
+
+.rg-limite {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #92400e;
+}
+
+@media (max-width: 760px) {
+    .rg-cambio { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .rg-freccia { display: none; }
+    .rg-prima::after { content: ' →'; color: #cbd5e1; }
+    .rg-dettaglio { max-width: 160px; }
+}

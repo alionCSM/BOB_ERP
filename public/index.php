@@ -148,7 +148,30 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
            ->get('/autocarrate/prenotazioni',          [AutocarrateController::class, 'prenotazioni'])
            ->get('/autocarrate/prenotazioni/occupati', [AutocarrateController::class, 'occupati'])
            ->post('/autocarrate/prenotazioni/salva',   [AutocarrateController::class, 'salvaPrenotazione'])
-           ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione']);
+           ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione'])
+           ->get('/autocarrate/registro',              [AutocarrateController::class, 'registro'])
+           ->post('/autocarrate/ripristina',           [AutocarrateController::class, 'ripristina']);
+
+    $router->dispatch($request, $container);
+}
+
+// ── Poti Noleggi — macchine (piattaforme, carrelli, telescopici, ...) ────────
+if ($uri === '/noleggi' || str_starts_with($uri, '/noleggi/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/noleggi',                 [NoleggiController::class, 'index'])
+           ->get('/noleggi/elenco',          [NoleggiController::class, 'elenco'])
+           ->get('/noleggi/occupate',        [NoleggiController::class, 'occupate'])
+           ->post('/noleggi/salva',          [NoleggiController::class, 'salva'])
+           ->post('/noleggi/elimina',        [NoleggiController::class, 'elimina'])
+           ->get('/noleggi/macchine',        [NoleggiController::class, 'macchine'])
+           ->post('/noleggi/macchine/salva', [NoleggiController::class, 'salvaMacchina'])
+           ->get('/noleggi/registro',        [NoleggiController::class, 'registro'])
+           ->post('/noleggi/ripristina',     [NoleggiController::class, 'ripristina']);
 
     $router->dispatch($request, $container);
 }
