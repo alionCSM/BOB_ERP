@@ -1,0 +1,145 @@
+/*
+ * Poti Noleggi — macchine. Estende autocarrate.css con quello che serve
+ * ai noleggi a piu' macchine: schede al posto della tabella e righe nella
+ * maschera. Prefisso nl-.
+ */
+
+/* ── Elenco a schede ────────────────────────────────────────────────────── */
+/* Una tabella ripeterebbe cliente, luogo e date su ogni macchina; con la
+   scheda quelli stanno scritti una volta sola in testa. */
+.nl-elenco { display: flex; flex-direction: column; gap: 14px; }
+
+.nl-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.nl-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 13px 18px;
+    background: #f8fafc;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.nl-cliente {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    min-width: 0;
+}
+
+.nl-badge { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.nl-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 18px 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* ── Righe della scheda ─────────────────────────────────────────────────── */
+.nl-righe { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+
+.nl-righe td {
+    padding: 7px 18px;
+    border-top: 1px solid #f1f5f9;
+    color: #334155;
+}
+
+.nl-righe .right { text-align: right; }
+.nl-matr { font-weight: 700; letter-spacing: .03em; color: #0f172a; white-space: nowrap; }
+.nl-tipo { color: #64748b; }
+.nl-tot  { font-weight: 600; }
+
+.nl-piede {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 11px 18px;
+    border-top: 1px solid #eef2f7;
+    background: #fcfdfe;
+}
+
+.nl-note { font-size: 12px; color: #64748b; max-width: 640px; }
+
+.nl-totali {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    margin-left: auto;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.nl-totali strong { font-size: 15px; color: #0f172a; }
+
+/* ── Righe nella maschera ───────────────────────────────────────────────── */
+.nl-modal-box { width: 900px; }
+
+.nl-righe-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px;
+    background: #f8fafc;
+}
+
+.nl-righe-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+}
+
+.nl-righe-lista { display: flex; flex-direction: column; gap: 10px; }
+
+/* la macchina si prende piu' spazio degli altri campi: il suo testo e' il
+   piu' lungo e in una colonna stretta verrebbe troncato subito */
+.nl-riga {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto;
+    gap: 10px;
+    align-items: end;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+@media (max-width: 900px) {
+    .nl-riga { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .nl-riga-macchina { grid-column: span 2; }
+    .nl-riga-azioni { grid-column: span 2; }
+}
+
+.nl-riga-azioni {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 8px;
+    white-space: nowrap;
+}
+
+.nl-togli { color: #b91c1c; }
+
+.nl-righe-vuoto {
+    padding: 14px;
+    text-align: center;
+    font-size: 12px;
+    color: #94a3b8;
+}

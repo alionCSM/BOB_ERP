@@ -87,6 +87,19 @@
                 <li class="side-nav__devider my-6"></li>
             {% endif %}
 
+            {# ── POTI NOLEGGI — macchine (piattaforme, carrelli, telescopici) #}
+            {% if user.canAccess('pn_noleggi') %}
+                {% set nolActive = currentPath starts with '/noleggi' %}
+                <li>
+                    <a href="/noleggi" class="side-menu {{ nolActive ? 'side-menu--active' : '' }}">
+                        {# forklift non c'e' nel bundle Lucide del template #}
+                        <div class="side-menu__icon"><i data-lucide="hard-hat"></i></div>
+                        <div class="side-menu__title">Macchine</div>
+                    </a>
+                </li>
+                <li class="side-nav__devider my-6"></li>
+            {% endif %}
+
             {# ── AI CHAT — permesso 'ai_chat' in bb_user_permissions
                  (gestibile da Utenti → Permessi; superadmin id 1 sempre) ── #}
             {% if user.canAccess('ai_chat') %}

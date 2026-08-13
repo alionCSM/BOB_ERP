@@ -1,0 +1,134 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+{# stessi stili delle autocarrate: le due sezioni si assomigliano e tenerne
+   due copie vorrebbe dire vederle divergere al primo ritocco #}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Macchine</h1>
+            <p class="ac-sub">Piattaforme, carrelli elevatori, telescopici: tipo, matricola e caratteristiche.</p>
+        </div>
+        <div class="ac-hero-links">
+            <button type="button" class="ac-btn ac-btn-primary" data-ac-nuovo>Nuova macchina</button>
+            <a href="/noleggi" class="ac-btn">Disponibilita'</a>
+            <a href="/noleggi/elenco" class="ac-btn">Noleggi</a>
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ac-alert is-ok">Modifiche salvate.</div>{% endif %}
+    {% if errore %}<div class="ac-alert is-ko">{{ errore }}</div>{% endif %}
+
+    <div class="ac-box">
+        <div class="ac-table-wrap">
+            <table class="ac-table">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Matricola</th>
+                        <th>Modello</th>
+                        <th class="right">Altezza</th>
+                        <th class="right">Portata</th>
+                        <th>Stato</th>
+                        <th>Note</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in macchine %}
+                        <tr>
+                            <td>{{ m.tipo }}</td>
+                            <td class="ac-td-targa">{{ m.matricola }}</td>
+                            <td>{{ m.modello ?: '—' }}</td>
+                            <td class="right">{{ m.altezza_max_m ? m.altezza_max_m|number_format(2, ',', '.') ~ ' m' : '—' }}</td>
+                            <td class="right">{{ m.portata_kg ? m.portata_kg ~ ' kg' : '—' }}</td>
+                            <td><span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span></td>
+                            <td class="ac-td-note" title="{{ m.note }}">{{ m.note ?: '—' }}</td>
+                            <td class="right">
+                                <button type="button" class="ac-link"
+                                        data-ac-modifica="{{ m|json_encode|e('html_attr') }}">modifica</button>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="ac-empty">Nessuna macchina registrata.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ── Modale macchina ─────────────────────────────────────────────────── #}
+    <div class="ac-modal" id="ac-modal-mezzo" hidden aria-hidden="true">
+        <div class="ac-modal-box">
+            <div class="ac-modal-head">
+                <span id="ac-modal-tit">Nuova macchina</span>
+                <button type="button" class="ac-modal-close" data-ac-close>&times;</button>
+            </div>
+            <form method="POST" action="/noleggi/macchine/salva" class="ac-form">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="id" id="ac-m-id" value="">
+
+                {# elenco libero con i tipi gia' usati: cresce da solo e non
+                   serve configurarlo da un'altra parte #}
+                <label class="ac-f ac-f-2">
+                    <span>Tipo</span>
+                    <input type="text" name="tipo" id="ac-m-tipo" list="ac-tipi" required maxlength="60"
+                           placeholder="Piattaforma, Carrello elevatore, Telescopico…">
+                    <datalist id="ac-tipi">
+                        {% for t in tipi %}<option value="{{ t }}">{% endfor %}
+                    </datalist>
+                </label>
+
+                <label class="ac-f">
+                    <span>Matricola</span>
+                    <input type="text" name="matricola" id="ac-m-matricola" required maxlength="40">
+                </label>
+
+                <label class="ac-f">
+                    <span>Stato</span>
+                    <select name="stato" id="ac-m-stato">
+                        {% for s in stati %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+                    </select>
+                </label>
+
+                <label class="ac-f ac-f-2">
+                    <span>Modello</span>
+                    <input type="text" name="modello" id="ac-m-modello" maxlength="120">
+                </label>
+
+                <label class="ac-f">
+                    <span>Altezza max (m)</span>
+                    <input type="text" name="altezza_max_m" id="ac-m-altezza" inputmode="decimal"
+                           placeholder="0,00">
+                </label>
+
+                <label class="ac-f">
+                    <span>Portata (kg)</span>
+                    <input type="number" name="portata_kg" id="ac-m-portata" min="0">
+                </label>
+
+                <label class="ac-f ac-f-4">
+                    <span>Note</span>
+                    <textarea name="note" id="ac-m-note" rows="3"
+                              placeholder="Alimentazione, larghezza, particolarita'…"></textarea>
+                </label>
+
+                <div class="ac-actions">
+                    <button type="button" class="ac-btn" data-ac-close>Annulla</button>
+                    <button class="ac-btn ac-btn-primary">Salva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/noleggi.js?v=1"></script>
+{% endblock %}

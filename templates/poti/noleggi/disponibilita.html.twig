@@ -1,0 +1,185 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=13">
+{% endblock %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Disponibilita' macchine</h1>
+            <p class="ac-sub">Quali sono libere, quali impegnate e da quando tornano disponibili.</p>
+        </div>
+        <div class="ac-hero-links">
+            <a href="/noleggi/elenco" class="ac-btn">Noleggi</a>
+            <a href="/noleggi/macchine" class="ac-btn">Macchine</a>
+        </div>
+    </div>
+
+    <form method="GET" class="ac-check">
+        <div class="ac-check-tile">
+            <i data-lucide="calendar"></i>
+            <span>Verifica disponibilita'</span>
+        </div>
+        <div class="ac-check-campi">
+            <label class="ac-f">
+                <span>dal</span>
+                <input type="date" name="cerca_dal" value="{{ cercaDal }}">
+            </label>
+            <label class="ac-f">
+                <span>al</span>
+                <input type="date" name="cerca_al" value="{{ cercaAl }}">
+            </label>
+            <label class="ac-f">
+                <span>tipo</span>
+                <select name="tipo">
+                    <option value="">tutti</option>
+                    {% for t in tipi %}
+                        <option value="{{ t }}" {{ tipo == t ? 'selected' : '' }}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <input type="hidden" name="dal" value="{{ dal }}">
+            <input type="hidden" name="al" value="{{ al }}">
+            <button class="ac-btn ac-btn-primary">Verifica</button>
+            {% if ricercaAttiva or tipo %}
+                <a href="/noleggi" class="ac-link">azzera</a>
+            {% endif %}
+        </div>
+    </form>
+
+    {# ── Schede macchina ─────────────────────────────────────────────────── #}
+    <div class="ac-mezzi">
+        {% for m in macchine %}
+            {% set occupata = ricercaAttiva and occupate[m.id] is defined %}
+            {% set libera   = liberaDal[m.id] is defined and liberaDal[m.id] %}
+            <div class="ac-mezzo{{ ricercaAttiva ? (occupata ? ' is-ko' : ' is-ok') : '' }}">
+                <div class="ac-mezzo-top">
+                    <span class="ac-targa">{{ m.matricola }}</span>
+                    {% if m.stato != 'attiva' %}
+                        <span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span>
+                    {% endif %}
+                </div>
+                <div class="ac-mezzo-mod">{{ m.tipo }}{{ m.modello ? ' — ' ~ m.modello : '' }}</div>
+                <div class="ac-specs">
+                    {% if m.altezza_max_m %}<span>{{ m.altezza_max_m|number_format(2, ',', '.') }} m</span>{% endif %}
+                    {% if m.portata_kg %}<span>{{ m.portata_kg }} kg</span>{% endif %}
+                </div>
+                <div class="ac-libero">
+                    {% if ricercaAttiva %}
+                        {{ occupata ? 'Occupata nel periodo' : 'Libera nel periodo' }}
+                    {% elseif libera %}
+                        Libera dal {{ liberaDal[m.id]|date('d/m/Y') }}
+                    {% else %}
+                        Libera adesso
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <div class="ac-empty">
+                Nessuna macchina registrata. <a href="/noleggi/macchine">Aggiungine una</a>.
+            </div>
+        {% endfor %}
+    </div>
+
+    {# ── Impegni: calendario e timeline ──────────────────────────────────── #}
+    {% if macchine %}
+    <div class="ac-box">
+        <div class="ac-box-head">
+            <span>Impegni</span>
+            <div class="ac-vista">
+                <button type="button" class="ac-vista-b on" data-ac-vista="calendario">Calendario</button>
+                <button type="button" class="ac-vista-b" data-ac-vista="timeline">Timeline</button>
+            </div>
+            <form method="GET" class="ac-periodo">
+                <input type="date" name="dal" value="{{ dal }}">
+                <span>→</span>
+                <input type="date" name="al" value="{{ al }}">
+                <input type="hidden" name="cerca_dal" value="{{ cercaDal }}">
+                <input type="hidden" name="cerca_al" value="{{ cercaAl }}">
+                <input type="hidden" name="tipo" value="{{ tipo }}">
+                <button class="ac-btn">Mostra</button>
+            </form>
+        </div>
+
+        <div class="ac-cal" id="ac-vista-calendario">
+            {% for mese in calendario %}
+                <div class="ac-cal-mese">
+                    <div class="ac-cal-tit">{{ mese.titolo }}</div>
+                    <div class="ac-cal-wd">
+                        {% for d in ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'] %}
+                            <span>{{ d }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="ac-cal-grid">
+                        {% for c in mese.celle %}
+                            {% if c.vuota %}
+                                <div class="ac-cal-c is-vuota"></div>
+                            {% else %}
+                                <div class="ac-cal-c{{ c.festivo ? ' is-fest' : '' }}{{ c.oggi ? ' is-oggi' : '' }}">
+                                    <span class="ac-cal-n">{{ c.g }}</span>
+                                    {% for e in c.eventi|slice(0, 3) %}
+                                        <span class="ac-ev ac-ev-confermata"
+                                              title="{{ e.etichetta }} — {{ e.cliente }}{{ e.luogo ? ' — ' ~ e.luogo : '' }}">
+                                            {{ e.etichetta }}
+                                        </span>
+                                    {% endfor %}
+                                    {% if c.eventi|length > 3 %}
+                                        <span class="ac-ev-piu">+{{ c.eventi|length - 3 }}</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="ac-empty">Nessun mese nel periodo scelto.</div>
+            {% endfor %}
+        </div>
+
+        {# scorre in orizzontale: il periodo puo' essere piu' largo dello schermo #}
+        <div class="ac-tl-wrap" id="ac-vista-timeline" hidden>
+            <table class="ac-tl">
+                <thead>
+                    <tr>
+                        <th class="ac-tl-mezzo">Macchina</th>
+                        {% for g in giorni %}
+                            <th class="ac-tl-g{{ g.festivo ? ' is-fest' : '' }}">
+                                <span class="ac-tl-wd">{{ g.wd }}</span>
+                                <span class="ac-tl-n">{{ g.g }}</span>
+                            </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in macchine %}
+                        <tr>
+                            <th class="ac-tl-mezzo">{{ m.matricola }}</th>
+                            {% set righeMacchina = griglia[m.id]|default({}) %}
+                            {% for g in giorni %}
+                                {% set cella = righeMacchina[g.iso]|default(null) %}
+                                <td class="ac-tl-c{{ g.festivo ? ' is-fest' : '' }}">
+                                    {% if cella %}
+                                        <span class="ac-barra ac-barra-confermata{{ cella.inizio ? ' is-inizio' : '' }}{{ cella.fine ? ' is-fine' : '' }}"
+                                              title="{{ cella.testo }}">
+                                            {% if cella.inizio %}<span class="ac-barra-txt">{{ cella.cliente }}</span>{% endif %}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/poti/noleggi.js?v=1"></script>
+{% endblock %}

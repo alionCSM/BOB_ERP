@@ -153,6 +153,25 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
     $router->dispatch($request, $container);
 }
 
+// ── Poti Noleggi — macchine (piattaforme, carrelli, telescopici, ...) ────────
+if ($uri === '/noleggi' || str_starts_with($uri, '/noleggi/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/noleggi',                 [NoleggiController::class, 'index'])
+           ->get('/noleggi/elenco',          [NoleggiController::class, 'elenco'])
+           ->get('/noleggi/occupate',        [NoleggiController::class, 'occupate'])
+           ->post('/noleggi/salva',          [NoleggiController::class, 'salva'])
+           ->post('/noleggi/elimina',        [NoleggiController::class, 'elimina'])
+           ->get('/noleggi/macchine',        [NoleggiController::class, 'macchine'])
+           ->post('/noleggi/macchine/salva', [NoleggiController::class, 'salvaMacchina']);
+
+    $router->dispatch($request, $container);
+}
+
 // ── Societa' del gruppo (multi-azienda) ──────────────────────────────────────
 if (in_array($uri, ['/select-company', '/switch-company'], true)
     || $uri === '/societa' || str_starts_with($uri, '/societa/')) {
