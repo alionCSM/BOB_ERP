@@ -369,13 +369,26 @@ final class DashboardController
         // canAccess() applica gia' il filtro della societa' attiva.
         $statsSocieta = null;
         if ($this->societaLimitata()) {
-            $statsSocieta = $this->contatoriModuli(
+            // Gli utenti sono di BOB, non di una societa': l'amministratore
+            // deve vederli sempre, come lo stato del sistema e le risorse
+            // del server qui sotto. Restano fuori dal filtro dei moduli.
+            $statsSocieta = [[
+                'num'   => (int)$totalUsers,
+                'label' => 'Utenti registrati',
+                'sub'   => $activeUsers . ' attivi',
+                'color' => '#2563eb',
+                'bg'    => '#eff6ff',
+                'href'  => '/users',
+                'icon'  => 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0',
+            ]];
+
+            $statsSocieta = array_merge($statsSocieta, $this->contatoriModuli(
                 static fn(string ...$m): bool => (bool)array_filter(
                     $m,
                     static fn(string $modulo): bool => $user->canAccess($modulo)
                 ),
                 $user
-            );
+            ));
         }
 
         return compact(
