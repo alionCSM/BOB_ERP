@@ -32,7 +32,7 @@ final class DashboardController
         $data['societaAttiva'] = ($GLOBALS['currentCompany'] ?? null)?->current()['nome'] ?? '';
 
         match ($role) {
-            'admin'            => $data += $this->dataForAdmin($name),
+            'admin'            => $data += $this->dataForAdmin($name, $user),
             'document_manager' => $data += $this->dataForDocuments($userId, $name, $user),
             // tutti gli altri ruoli: dashboard dinamica costruita sui permessi
             default            => $data += $this->dataForDynamic($userId, $name, $user),
@@ -85,6 +85,82 @@ final class DashboardController
         ];
     }
 
+    /**
+     * Contatori dei moduli, uno solo per tutte le dashboard.
+     *
+     * Prima esistevano due elenchi: uno nella dashboard dinamica e uno
+     * fisso per le societa' diverse dal Consorzio, che mostrava sempre e
+     * solo le autocarrate. Da qui invece i contatori seguono i moduli
+     * davvero abilitati, quali che siano.
+     *
+     * @param callable $has funzione che dice se un modulo e' utilizzabile
+     */
+    private function contatoriModuli(callable $has, \App\Domain\User $user): array
+    {
+        $conn  = $this->conn;
+        $stats = [];
+        $today = date('Y-m-d');
+
+
+        if ($has('worksites')) {
+            $n = (int)$conn->query("SELECT COUNT(*) FROM bb_worksites WHERE status = 'In corso' AND is_draft = 0")->fetchColumn();
+            $stats[] = ['num' => $n, 'label' => 'Cantieri attivi', 'sub' => 'in corso', 'color' => '#ea580c', 'bg' => '#fff7ed',
+                        'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5', 'href' => '/worksites'];
+        }
+
+        if ($has('attendance', 'presenze')) {
+            $s = $conn->prepare("
+                SELECT (SELECT COUNT(*) FROM bb_presenze WHERE data = :d1)
+                     + (SELECT COALESCE(SUM(quantita),0) FROM bb_presenze_consorziate WHERE data_presenza = :d2)
+            ");
+            $s->execute([':d1' => $today, ':d2' => $today]);
+            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Presenze oggi', 'sub' => 'nostri + consorziate', 'color' => '#0ea5e9', 'bg' => '#f0f9ff',
+                        'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'href' => '/attendance'];
+
+            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi WHERE data_inizio <= :d1 AND data_fine >= :d2");
+            $s->execute([':d1' => $today, ':d2' => $today]);
+            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie e permessi', 'color' => '#b45309', 'bg' => '#fffbeb',
+                        'icon' => 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z', 'href' => '/attendance/leaves'];
+        }
+
+        if ($has('equipment')) {
+            $n = (int)$conn->query("
+                SELECT COALESCE(SUM(quantita),0) FROM bb_worksite_lifting
+                WHERE stato IN ('Attivo','attivo') AND tipo_noleggio <> 'Una Tantum'
+            ")->fetchColumn();
+            $stats[] = ['num' => $n, 'label' => 'Mezzi a noleggio', 'sub' => 'attivi ora', 'color' => '#b45309', 'bg' => '#fffbeb',
+                        'icon' => 'M3 21h18M6 21V8l12-5v18', 'href' => '/equipment/rentals'];
+        }
+
+        if ($has('pn_autocarrate')) {
+            $stats = array_merge($stats, $this->statsAutocarrate());
+        }
+
+        if ($has('pn_noleggi')) {
+            $stats = array_merge($stats, $this->statsMacchine());
+        }
+
+        if ($has('documents', 'document_alerts')) {
+            $docCtrl    = new \App\Service\Documents\WorkerDocumentController($conn);
+            $expired    = $docCtrl->getExpiredDocuments($user);
+            $expiring30 = $docCtrl->getExpiringDocuments($user, 30);
+            $stats[] = ['num' => count($expired['workerDocs']) + count($expired['companyDocs']), 'label' => 'Documenti scaduti', 'sub' => 'operai + aziende', 'color' => '#dc2626', 'bg' => '#fef2f2',
+                        'icon' => 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M12 9h.01', 'href' => '/documents/expired'];
+            $stats[] = ['num' => count($expiring30['workerDocs']) + count($expiring30['companyDocs']), 'label' => 'Scadono in 30gg', 'sub' => 'da monitorare', 'color' => '#d97706', 'bg' => '#fffbeb',
+                        'icon' => 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01', 'href' => '/documents/expiring'];
+        }
+
+        if ($has('billing') && $user->canSeePrices()) {
+            $row = $conn->query("
+                SELECT COUNT(*) AS n, COALESCE(SUM(totale_imponibile),0) AS tot
+                FROM bb_billing WHERE emessa = 0
+            ")->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $stats[] = ['num' => (int)($row['n'] ?? 0), 'label' => 'Fatture da emettere', 'sub' => '€ ' . number_format((float)($row['tot'] ?? 0), 0, ',', '.'), 'color' => '#16a34a', 'bg' => '#f0fdf4',
+                        'icon' => 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z', 'href' => '/billing'];
+        }
+
+        return $stats;
+    }
     /** Contatori delle macchine a noleggio della societa' attiva. */
     private function statsMacchine(): array
     {
@@ -141,7 +217,7 @@ final class DashboardController
     // Admin dashboard data
     // ──────────────────────────────────────────────────────────────
 
-    private function dataForAdmin(string $name): array
+    private function dataForAdmin(string $name, \App\Domain\User $user): array
     {
         $conn = $this->conn;
 
@@ -286,7 +362,21 @@ final class DashboardController
         // sono la macchina, non i dati di una azienda. Le quattro card in alto
         // invece sono del Consorzio, e dentro un'altra societa' lasciano il
         // posto ai contatori di quella societa'.
-        $statsSocieta = $this->societaLimitata() ? $this->statsAutocarrate() : null;
+        // I contatori seguono i moduli della societa' in cui si sta lavorando,
+        // presi dallo stesso elenco della dashboard dinamica. Prima erano
+        // fissi sulle autocarrate: dentro il Consorzio comparivano le loro
+        // card a zero, che non c'entrano niente con CSM.
+        // canAccess() applica gia' il filtro della societa' attiva.
+        $statsSocieta = null;
+        if ($this->societaLimitata()) {
+            $statsSocieta = $this->contatoriModuli(
+                static fn(string ...$m): bool => (bool)array_filter(
+                    $m,
+                    static fn(string $modulo): bool => $user->canAccess($modulo)
+                ),
+                $user
+            );
+        }
 
         return compact(
             'statsSocieta',
@@ -518,66 +608,8 @@ final class DashboardController
             }
         }
 
-        /* ── Contatori: solo per i moduli permessi ── */
-        $stats = [];
-        $today = date('Y-m-d');
-
-        if ($has('worksites')) {
-            $n = (int)$conn->query("SELECT COUNT(*) FROM bb_worksites WHERE status = 'In corso' AND is_draft = 0")->fetchColumn();
-            $stats[] = ['num' => $n, 'label' => 'Cantieri attivi', 'sub' => 'in corso', 'color' => '#ea580c', 'bg' => '#fff7ed',
-                        'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5', 'href' => '/worksites'];
-        }
-
-        if ($has('attendance', 'presenze')) {
-            $s = $conn->prepare("
-                SELECT (SELECT COUNT(*) FROM bb_presenze WHERE data = :d1)
-                     + (SELECT COALESCE(SUM(quantita),0) FROM bb_presenze_consorziate WHERE data_presenza = :d2)
-            ");
-            $s->execute([':d1' => $today, ':d2' => $today]);
-            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Presenze oggi', 'sub' => 'nostri + consorziate', 'color' => '#0ea5e9', 'bg' => '#f0f9ff',
-                        'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'href' => '/attendance'];
-
-            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi WHERE data_inizio <= :d1 AND data_fine >= :d2");
-            $s->execute([':d1' => $today, ':d2' => $today]);
-            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie e permessi', 'color' => '#b45309', 'bg' => '#fffbeb',
-                        'icon' => 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z', 'href' => '/attendance/leaves'];
-        }
-
-        if ($has('equipment')) {
-            $n = (int)$conn->query("
-                SELECT COALESCE(SUM(quantita),0) FROM bb_worksite_lifting
-                WHERE stato IN ('Attivo','attivo') AND tipo_noleggio <> 'Una Tantum'
-            ")->fetchColumn();
-            $stats[] = ['num' => $n, 'label' => 'Mezzi a noleggio', 'sub' => 'attivi ora', 'color' => '#b45309', 'bg' => '#fffbeb',
-                        'icon' => 'M3 21h18M6 21V8l12-5v18', 'href' => '/equipment/rentals'];
-        }
-
-        if ($has('pn_autocarrate')) {
-            $stats = array_merge($stats, $this->statsAutocarrate());
-        }
-
-        if ($has('pn_noleggi')) {
-            $stats = array_merge($stats, $this->statsMacchine());
-        }
-
-        if ($has('documents', 'document_alerts')) {
-            $docCtrl    = new \App\Service\Documents\WorkerDocumentController($conn);
-            $expired    = $docCtrl->getExpiredDocuments($user);
-            $expiring30 = $docCtrl->getExpiringDocuments($user, 30);
-            $stats[] = ['num' => count($expired['workerDocs']) + count($expired['companyDocs']), 'label' => 'Documenti scaduti', 'sub' => 'operai + aziende', 'color' => '#dc2626', 'bg' => '#fef2f2',
-                        'icon' => 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M12 9h.01', 'href' => '/documents/expired'];
-            $stats[] = ['num' => count($expiring30['workerDocs']) + count($expiring30['companyDocs']), 'label' => 'Scadono in 30gg', 'sub' => 'da monitorare', 'color' => '#d97706', 'bg' => '#fffbeb',
-                        'icon' => 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01', 'href' => '/documents/expiring'];
-        }
-
-        if ($has('billing') && $user->canSeePrices()) {
-            $row = $conn->query("
-                SELECT COUNT(*) AS n, COALESCE(SUM(totale_imponibile),0) AS tot
-                FROM bb_billing WHERE emessa = 0
-            ")->fetch(\PDO::FETCH_ASSOC) ?: [];
-            $stats[] = ['num' => (int)($row['n'] ?? 0), 'label' => 'Fatture da emettere', 'sub' => '€ ' . number_format((float)($row['tot'] ?? 0), 0, ',', '.'), 'color' => '#16a34a', 'bg' => '#f0fdf4',
-                        'icon' => 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z', 'href' => '/billing'];
-        }
+        /* ── Contatori: dallo stesso elenco usato da tutte le dashboard ── */
+        $stats = $this->contatoriModuli($has, $user);
 
         /* ── Notifiche recenti ── */
         $recentNotifications = [];
