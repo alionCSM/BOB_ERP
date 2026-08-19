@@ -1223,17 +1223,17 @@ final class FieldwireController
         try {
             $ws = $this->worksiteRepo->findById($worksiteId);
             $wsName = $ws['name'] ?? ('Cantiere #' . $worksiteId);
-            $stmt = $this->conn->prepare("
-                INSERT INTO bb_notifications (user_id, title, message, link, category, priority, created_by, is_read, created_at)
-                VALUES (:uid, :title, :msg, :link, 'bob_zone', 'normal', :cb, 0, NOW())
-            ");
-            $stmt->execute([
-                ':uid'   => $assigneeUserId,
-                ':title' => 'Nuovo task assegnato — BOB Zone',
-                ':msg'   => 'Ti è stato assegnato "' . mb_substr($taskName, 0, 120) . '" nel cantiere ' . $wsName,
-                ':link'  => '/worksites/' . $worksiteId . '/zone',
-                ':cb'    => $byUserId ?: null,
-            ]);
+            // NotificationService: notifica in-app + push FCM (app Android)
+            (new \App\Service\Notifications\NotificationService($this->conn, $this->config))
+                ->create(
+                    $assigneeUserId,
+                    'Nuovo task assegnato — BOB Zone',
+                    'Ti è stato assegnato "' . mb_substr($taskName, 0, 120) . '" nel cantiere ' . $wsName,
+                    '/worksites/' . $worksiteId . '/zone',
+                    'bob_zone',
+                    'normal',
+                    $byUserId ?: null
+                );
         } catch (\Throwable $e) {
             error_log('[FW notifyAssignee] ' . $e->getMessage());
         }

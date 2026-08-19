@@ -153,6 +153,15 @@ final class Config
 
     public function vapidPublicKey(): string { return $this->get('VAPID_PUBLIC_KEY', ''); }
 
+    /**
+     * FCM (app Android). Il service account non va nel .env: si indica un
+     * FILE JSON sul server (FCM_SERVICE_ACCOUNT_FILE) o, in alternativa, la
+     * stringa JSON stessa (FCM_SERVICE_ACCOUNT_JSON). Senza nessuna delle due
+     * la push e' disattivata e BOB funziona normalmente.
+     */
+    public function fcmServiceAccountFile(): string  { return $this->get('FCM_SERVICE_ACCOUNT_FILE', ''); }
+    public function fcmServiceAccountJson(): string  { return $this->get('FCM_SERVICE_ACCOUNT_JSON', ''); }
+
     // ── AI / Ollama ───────────────────────────────────────────────────────────
 
     public function ollamaUrl(): string   { return $this->get('OLLAMA_URL', ''); }

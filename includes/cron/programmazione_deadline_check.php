@@ -54,12 +54,10 @@ function getUsersWithPerm(PDO $conn, string $module): array {
 
 function sendToUsers(PDO $conn, array $userIds, string $title, string $msg, string $category): void {
     if (empty($userIds)) return;
-    $ins = $conn->prepare("
-        INSERT INTO bb_notifications (user_id, title, message, link, category, priority, created_by, is_read, created_at)
-        VALUES (:uid, :title, :msg, '/programmazione', :cat, 'high', 0, 0, NOW())
-    ");
+    // NotificationService: notifica in-app + push FCM (app Android)
+    $service = new \App\Service\Notifications\NotificationService($conn, new \App\Infrastructure\Config());
     foreach ($userIds as $uid) {
-        $ins->execute([':uid' => $uid, ':title' => $title, ':msg' => $msg, ':cat' => $category]);
+        $service->create((int)$uid, $title, $msg, '/programmazione', $category, 'high', 0);
     }
 }
 

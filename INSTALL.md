@@ -241,6 +241,16 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:admin@csmontaggi.it
 
+# ── Push app Android / FCM (opzionale) ───────────────────────────
+# Senza service account la push e' disattivata (BOB funziona uguale).
+# 1) Firebase Console: crea un progetto, aggiungi un'app Android
+#    (package it.csmontaggi.bob), scarica il service account (file JSON).
+# 2) Metti il file fuori dal repo, es. /etc/bob/fcm-service-account.json
+#    (permessi 600, leggibile da www-data).
+FCM_SERVICE_ACCOUNT_FILE=
+# In alternativa al file, la stringa JSON completa (meno pulita):
+FCM_SERVICE_ACCOUNT_JSON=
+
 # ── Varie ───────────────────────────────────────────────────────
 ATTESTATO_URL=https://docs.csmontaggi.it
 ```

@@ -636,6 +636,40 @@ if (str_starts_with($uri, '/notifications/')) {
     $router->dispatch($request, $container);
 }
 
+// ── BOB Mobile API (app Android) — rotte pubbliche /api/v1/auth ─────────────
+if (in_array($uri, ['/api/v1/auth/login', '/api/v1/auth/verify'], true)) {
+    require_once APP_ROOT . '/includes/bootstrap.php';
+
+    $db         = new \App\Infrastructure\Database();
+    $connection = $db->connect();
+    $container  = \App\Infrastructure\ContainerFactory::build($connection);
+    $request    = new \App\Http\Request();
+    $router     = new \App\Http\Router();
+
+    $router->post('/api/v1/auth/login',  [ApiV1Controller::class, 'login'])
+           ->post('/api/v1/auth/verify', [ApiV1Controller::class, 'verify']);
+
+    $router->dispatch($request, $container);
+}
+
+// ── BOB Mobile API (app Android) — rotte protette /api/v1 (Bearer token) ─────
+if (str_starts_with($uri, '/api/v1/')) {
+    require_once APP_ROOT . '/includes/api_v1_middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->post('/api/v1/auth/logout',              [ApiV1Controller::class, 'logout'])
+           ->get('/api/v1/me',                        [ApiV1Controller::class, 'me'])
+           ->get('/api/v1/notifications',             [ApiV1Controller::class, 'notifications'])
+           ->post('/api/v1/notifications/{id}/read',  [ApiV1Controller::class, 'markRead'])
+           ->post('/api/v1/devices/fcm',              [ApiV1Controller::class, 'registerDevice'])
+           ->post('/api/v1/switch-company',           [ApiV1Controller::class, 'switchCompany']);
+
+    $router->dispatch($request, $container);
+}
+
 if (str_starts_with($uri, '/api/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);

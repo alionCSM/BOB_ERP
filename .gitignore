@@ -3,3 +3,6 @@
 .env.*
 uploads/
 storage/cache/
+
+# Manuale utente: generato, non va versionato
+/docs/manuale_utente_bob.*
