@@ -425,20 +425,21 @@ final class ProgrammazioneController
         $userIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
         if (empty($userIds)) return;
 
-        $ins = $this->conn->prepare("
-            INSERT INTO bb_notifications (user_id, title, message, link, category, priority, created_by, is_read, created_at)
-            VALUES (:uid, :title, :msg, :link, :cat, :pri, :cb, 0, NOW())
-        ");
+        // NotificationService: notifica in-app + push FCM (app Android)
+        $notifService = new \App\Service\Notifications\NotificationService(
+            $this->conn,
+            new \App\Infrastructure\Config()
+        );
         foreach ($userIds as $uid) {
-            $ins->execute([
-                ':uid'   => $uid,
-                ':title' => $title,
-                ':msg'   => $message,
-                ':link'  => $link,
-                ':cat'   => $category,
-                ':pri'   => $priority,
-                ':cb'    => $excludeUserId,
-            ]);
+            $notifService->create(
+                (int)$uid,
+                $title,
+                $message,
+                (string)$link,
+                (string)$category,
+                (string)$priority,
+                (int)$excludeUserId
+            );
         }
     }
 

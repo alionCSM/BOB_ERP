@@ -542,16 +542,17 @@ final class WorksitesController
                         $assignedByName = $auth['username'];
                         $linkToTask     = "/worksites/{$worksite_id}#tasks";
 
-                        $notifStmt = $this->conn->prepare(
-                            "INSERT INTO bb_notifications (user_id, title, message, created_by)
-                             VALUES (:user_id, :title, :message, :created_by)"
-                        );
-                        $notifStmt->execute([
-                            ':user_id'    => $userId,
-                            ':title'      => 'Nuovo Task Assegnato',
-                            ':message'    => 'Ti è stato assegnato il task: "' . $title . '" nel cantiere ' . $worksite->getName(),
-                            ':created_by' => $assignedById,
-                        ]);
+                        // NotificationService: notifica in-app + push FCM (app Android)
+                        (new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config()))
+                            ->create(
+                                (int)$userId,
+                                'Nuovo Task Assegnato',
+                                'Ti è stato assegnato il task: "' . $title . '" nel cantiere ' . $worksite->getName(),
+                                $linkToTask,
+                                'worksite',
+                                'normal',
+                                (int)$assignedById
+                            );
                     }
                 }
 
@@ -1416,23 +1417,23 @@ final class WorksitesController
                 $worksiteId = (int)$wsIdStmt->fetchColumn();
             }
 
-            $notifStmt = $this->conn->prepare("
-                INSERT INTO bb_notifications (user_id, title, message, link, created_by, is_read, created_at)
-                VALUES (:uid, :title, :message, :link, :created_by, 0, NOW())
-            ");
             $docCount = count($documentIds);
             $message  = $docCount === 1
                 ? "Un disegno è stato condiviso con te per il cantiere {$worksiteName}"
                 : "{$docCount} disegni sono stati condivisi con te per il cantiere {$worksiteName}";
-            $link = $worksiteId > 0 ? "/worksites/{$worksiteId}?tab=disegni" : null;
+            $link = $worksiteId > 0 ? "/worksites/{$worksiteId}?tab=disegni" : '';
+            // NotificationService: notifica in-app + push FCM (app Android)
+            $notifService = new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config());
             foreach ($userIds as $uid) {
-                $notifStmt->execute([
-                    ':uid'        => $uid,
-                    ':title'      => 'Nuovi disegni condivisi',
-                    ':message'    => $message,
-                    ':link'       => $link,
-                    ':created_by' => (int)$auth['user_id'],
-                ]);
+                $notifService->create(
+                    (int)$uid,
+                    'Nuovi disegni condivisi',
+                    $message,
+                    $link,
+                    'disegni',
+                    'normal',
+                    (int)$auth['user_id']
+                );
             }
         }
 
