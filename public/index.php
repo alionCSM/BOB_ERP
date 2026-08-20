@@ -664,8 +664,11 @@ if (str_starts_with($uri, '/api/v1/')) {
            ->get('/api/v1/me',                        [ApiV1Controller::class, 'me'])
            ->get('/api/v1/notifications',             [ApiV1Controller::class, 'notifications'])
            ->post('/api/v1/notifications/{id}/read',  [ApiV1Controller::class, 'markRead'])
-           ->post('/api/v1/devices/fcm',              [ApiV1Controller::class, 'registerDevice'])
-           ->post('/api/v1/switch-company',           [ApiV1Controller::class, 'switchCompany']);
+            ->post('/api/v1/devices/fcm',              [ApiV1Controller::class, 'registerDevice'])
+           ->post('/api/v1/switch-company',           [ApiV1Controller::class, 'switchCompany'])
+            ->get('/api/v1/dashboard',                 [ApiV1Controller::class, 'dashboard'])
+            ->post('/api/v1/cron/run',                 [ApiV1Controller::class, 'cronRun'])
+            ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory']);
 
     $router->dispatch($request, $container);
 }
