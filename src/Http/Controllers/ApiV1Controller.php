@@ -25,6 +25,9 @@ use App\Service\Mailer;
  *   POST /api/v1/notifications/{id}/read    (Bearer)
  *   POST /api/v1/devices/fcm                (Bearer)
  *   POST /api/v1/switch-company             (Bearer)
+ *   GET  /api/v1/dashboard                  (Bearer)
+ *   POST /api/v1/cron/run                   (Bearer, admin)
+ *   GET  /api/v1/cron/history?job=xxx       (Bearer, admin)
  */
 final class ApiV1Controller
 {
@@ -272,6 +275,132 @@ final class ApiV1Controller
         Response::json(['success' => true, 'marked' => $stmt->rowCount() > 0]);
     }
 
+    // ── DASHBOARD (Bearer) ───────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/dashboard — pagina principale dell'app.
+     *
+     * Specchia la dashboard web (DashboardController) in JSON: stesse
+     * verifiche, stessi numeri, senza il layer Twig.
+     *
+     *   admin  → stato sistema + risorse server + job schedulati
+     *   altri  → contatori moduli + scorciatoie (dashboard dinamica)
+     *
+     * Le query sono ricalcate dai controller web a proposito: l'app e' un
+     * client in piu' e non deve toccare il codice del sito.
+     */
+    public function dashboard(Request $request): never
+    {
+        $user = $request->user();
+        $role = (string)($user->role ?? '');
+
+        if ($role === 'admin') {
+            Response::json([
+                'success' => true,
+                'variant' => 'admin',
+                'system'  => $this->systemStatusData(),
+                'server'  => $this->serverResourcesData(),
+                'cron'    => $this->cronData(),
+            ]);
+        }
+
+        Response::json([
+            'success'   => true,
+            'variant'   => 'dynamic',
+            'stats'     => $this->dynamicStats($user),
+            'shortcuts' => $this->dynamicShortcuts($user),
+        ]);
+    }
+
+    /** POST /api/v1/cron/run — {job} avvio manuale (stesse regole del web) */
+    public function cronRun(Request $request): never
+    {
+        $user = $request->user();
+        // avvio manuale: fa girare codice server-side, solo chi amministra
+        if ((string)($user->role ?? '') !== 'admin' && (int)$user->id !== 1) {
+            Response::json(['success' => false, 'message' => 'Accesso negato'], 403);
+        }
+
+        $body = $this->jsonBody();
+        $job  = (string)($body['job'] ?? '');
+        if (!isset(\App\Service\CronRun::JOBS[$job])) {
+            Response::json(['success' => false, 'message' => 'Job sconosciuto'], 400);
+        }
+
+        $script = APP_ROOT . '/' . \App\Service\CronRun::JOBS[$job]['script'];
+        if (!is_file($script)) {
+            Response::json(['success' => false, 'message' => 'Script non trovato sul server'], 500);
+        }
+
+        // gia' in esecuzione? (stesso controllo del web)
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) FROM bb_cron_runs
+                WHERE job = :j AND status = 'running'
+                  AND started_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
+            ");
+            $stmt->execute([':j' => $job]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                Response::json(['success' => false, 'message' => 'Job gia\' in esecuzione'], 409);
+            }
+        } catch (\Throwable $e) {
+            // tabella assente: si prosegue comunque
+        }
+
+        $cmd = 'php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+        @shell_exec($cmd);
+
+        AuditLogger::log($this->conn, $user, 'api_cron_run', 'job', null, $job, ['source' => 'app']);
+
+        Response::json(['success' => true, 'message' => 'Job avviato']);
+    }
+
+    /** GET /api/v1/cron/history?job=xxx — ultime esecuzioni (solo admin) */
+    public function cronHistory(Request $request): never
+    {
+        $user = $request->user();
+        if ((string)($user->role ?? '') !== 'admin' && (int)$user->id !== 1) {
+            Response::json(['success' => false, 'message' => 'Accesso negato'], 403);
+        }
+
+        $job = (string)($_GET['job'] ?? '');
+        if (!isset(\App\Service\CronRun::JOBS[$job])) {
+            Response::json(['success' => false, 'message' => 'Job sconosciuto'], 400);
+        }
+        $meta = \App\Service\CronRun::JOBS[$job];
+
+        $runs = [];
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT status, started_at, duration_ms, message
+                FROM bb_cron_runs
+                WHERE job = :j
+                ORDER BY id DESC
+                LIMIT 20
+            ");
+            $stmt->execute([':j' => $job]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $runs[] = [
+                    'status'    => $r['status'],
+                    'data'      => $r['started_at'] ? date('d/m/Y', strtotime($r['started_at'])) : null,
+                    'ora'       => $r['started_at'] ? date('H:i:s', strtotime($r['started_at'])) : null,
+                    'durata_ms' => $r['duration_ms'] !== null ? (int)$r['duration_ms'] : null,
+                    'message'   => $r['message'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log('[ApiV1 cronHistory] ' . $e->getMessage());
+        }
+
+        Response::json([
+            'success' => true,
+            'job'     => $job,
+            'label'   => $meta['label'],
+            'descr'   => $meta['descr'],
+            'runs'    => $runs,
+        ]);
+    }
+
     // ── DISPOSITIVO / SOCIETA' ───────────────────────────────────────────────
 
     /** POST /api/v1/devices/fcm — registra/aggiorna il token FCM del telefono */
@@ -345,6 +474,381 @@ final class ApiV1Controller
             'active_company_id'       => $this->currentCompany()->id(),
             'needs_company_selection' => false,
         ]);
+    }
+
+    // ── DATI DASHBOARD (ricalcati dal web) ───────────────────────────────────
+
+    /**
+     * Stato del sistema: stessi controlli della dashboard admin web
+     * (database, email, storage cloud NFS).
+     */
+    private function systemStatusData(): array
+    {
+        $conn = $this->conn;
+
+        $dbStatus = 'Online';
+        try { $conn->query('SELECT 1'); } catch (\Exception $e) { $dbStatus = 'Offline'; }
+
+        $mailStatus = 'Non configurato';
+        if (!empty($_ENV['MAIL_HOST']) && !empty($_ENV['MAIL_PORT'])) {
+            $sock = @fsockopen($_ENV['MAIL_HOST'], (int)$_ENV['MAIL_PORT'], $errno, $errstr, 2);
+            if ($sock) {
+                $mailStatus = 'Operativo';
+                fclose($sock);
+            } else {
+                $mailStatus = 'Non raggiungibile';
+            }
+        }
+
+        $storage     = ['status' => 'N/D', 'latency_ms' => null, 'percent' => null, 'used_gb' => null, 'total_gb' => null];
+        $storagePath = $_ENV['CLOUD_ROOT'] ?? null;
+        if ($storagePath && is_dir($storagePath)) {
+            $start   = microtime(true);
+            $files   = @scandir($storagePath);
+            $latency = (int)round((microtime(true) - $start) * 1000);
+
+            if ($files === false) {
+                $storage['status'] = 'NFS non accessibile';
+            } else {
+                $testFile = $storagePath . '/.healthcheck';
+                $writeOk  = @file_put_contents($testFile, 'test') !== false;
+                if ($writeOk) {
+                    @unlink($testFile);
+                }
+                $storage['status']     = $writeOk ? 'Online' : 'Sola lettura';
+                $storage['latency_ms'] = $latency;
+
+                $cloudTotal = @disk_total_space($storagePath);
+                $cloudFree  = @disk_free_space($storagePath);
+                if ($cloudTotal > 0) {
+                    $cloudUsed    = $cloudTotal - $cloudFree;
+                    $storage['percent']  = (int)round(($cloudUsed / $cloudTotal) * 100);
+                    $storage['used_gb']  = round($cloudUsed  / 1073741824, 1);
+                    $storage['total_gb'] = round($cloudTotal / 1073741824, 1);
+                }
+            }
+        }
+
+        return [
+            'db'      => $dbStatus,
+            'mail'    => $mailStatus,
+            'storage' => $storage,
+        ];
+    }
+
+    /**
+     * Risorse del server: stesse letture della dashboard admin web
+     * (disco, RAM, load, PHP).
+     */
+    private function serverResourcesData(): array
+    {
+        $diskTotal = disk_total_space(__DIR__);
+        $diskFree  = disk_free_space(__DIR__);
+        $diskUsed  = $diskTotal - $diskFree;
+
+        $load    = sys_getloadavg();
+        $cpuLoad = $load ? round($load[0], 2) : null;
+
+        $memInfo  = @file_get_contents('/proc/meminfo') ?: '';
+        preg_match('/MemTotal:\s+(\d+)/',     $memInfo, $total);
+        preg_match('/MemAvailable:\s+(\d+)/', $memInfo, $avail);
+        $memTotal = isset($total[1]) ? (int)$total[1] * 1024 : 0;
+        $memAvail = isset($avail[1]) ? (int)$avail[1] * 1024 : 0;
+
+        return [
+            'disk' => [
+                'percent'  => $diskTotal > 0 ? (int)round(($diskUsed / $diskTotal) * 100) : 0,
+                'used_gb'  => round($diskUsed  / 1073741824, 1),
+                'total_gb' => round($diskTotal / 1073741824, 1),
+            ],
+            'ram' => [
+                'percent'  => $memTotal > 0 ? (int)round((($memTotal - $memAvail) / $memTotal) * 100) : 0,
+                'used_gb'  => $memTotal > 0 ? round(($memTotal - $memAvail) / 1073741824, 1) : 0.0,
+                'total_gb' => round($memTotal / 1073741824, 1),
+            ],
+            'cpu' => ['load' => $cpuLoad],
+            'php' => [
+                'memory_limit' => (string)ini_get('memory_limit'),
+                'memory_usage' => round(memory_get_usage(true) / 1024 / 1024, 1) . ' MB',
+            ],
+        ];
+    }
+
+    /**
+     * Job schedulati: stessi dati di /services/cron-status web (pannello
+     * "Servizi" della top bar), da bb_cron_runs e registro CronRun::JOBS.
+     */
+    private function cronData(): array
+    {
+        $today = date('Y-m-d');
+        $runs  = [];
+        $lastEver = [];
+
+        try {
+            // ultima esecuzione di oggi per ciascun job
+            $stmt = $this->conn->prepare("
+                SELECT r.job, r.status, r.started_at, r.duration_ms, r.message
+                FROM bb_cron_runs r
+                JOIN (
+                    SELECT job, MAX(id) AS max_id
+                    FROM bb_cron_runs
+                    WHERE DATE(started_at) = :d
+                    GROUP BY job
+                ) last ON last.max_id = r.id
+            ");
+            $stmt->execute([':d' => $today]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $runs[$row['job']] = $row;
+            }
+
+            // ultima esecuzione in assoluto, per i job non partiti oggi
+            $stmtPrev = $this->conn->prepare("
+                SELECT r.job, r.started_at
+                FROM bb_cron_runs r
+                JOIN (SELECT job, MAX(id) AS max_id FROM bb_cron_runs GROUP BY job) last
+                  ON last.max_id = r.id
+            ");
+            $stmtPrev->execute();
+            foreach ($stmtPrev->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $lastEver[$row['job']] = $row;
+            }
+        } catch (\Throwable $e) {
+            // tabella non ancora creata (migration da applicare): tutto "mai"
+            error_log('[ApiV1 cronData] ' . $e->getMessage());
+        }
+
+        $jobs = [];
+        foreach (\App\Service\CronRun::JOBS as $key => $meta) {
+            $r    = $runs[$key] ?? null;
+            $prev = $lastEver[$key] ?? null;
+
+            $jobs[] = [
+                'job'       => $key,
+                'label'     => $meta['label'],
+                'descr'     => $meta['descr'],
+                'status'    => $r['status'] ?? 'mai',
+                'ora'       => ($r && $r['started_at']) ? date('H:i', strtotime($r['started_at'])) : null,
+                'durata_ms' => ($r && $r['duration_ms'] !== null) ? (int)$r['duration_ms'] : null,
+                'message'   => $r['message'] ?? null,
+                'ultima'    => (!$r && $prev && !empty($prev['started_at']))
+                                   ? date('d/m/Y H:i', strtotime($prev['started_at']))
+                                   : null,
+            ];
+        }
+
+        return ['date' => date('d/m/Y'), 'jobs' => $jobs];
+    }
+
+    /**
+     * Moduli concessi all'utente, filtrati dalla societa' attiva
+     * (stessa logica della dashboard dinamica web).
+     *
+     * @return array<string,bool>
+     */
+    private function modulePermissions(User $user): array
+    {
+        $stmt = $this->conn->prepare('SELECT module FROM bb_user_permissions WHERE user_id = :uid AND allowed = 1');
+        $stmt->execute([':uid' => (int)$user->id]);
+        $mods = array_fill_keys($stmt->fetchAll(\PDO::FETCH_COLUMN), true);
+
+        return array_filter(
+            $mods,
+            static fn(string $m): bool => $user->canAccess($m),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    /**
+     * Dashboard dinamica: contatori dei moduli utilizzabili.
+     * Stesse query di DashboardController::contatoriModuli web.
+     */
+    private function dynamicStats(User $user): array
+    {
+        $conn  = $this->conn;
+        $stats = [];
+        $today = date('Y-m-d');
+        $mods  = $this->modulePermissions($user);
+        $has   = static fn(string ...$m): bool => (bool)array_intersect($m, array_keys($mods));
+
+        if ($has('worksites')) {
+            $n = (int)$conn->query("SELECT COUNT(*) FROM bb_worksites WHERE status = 'In corso' AND is_draft = 0")->fetchColumn();
+            $stats[] = ['num' => $n, 'label' => 'Cantieri attivi', 'sub' => 'in corso', 'color' => '#ea580c', 'bg' => '#fff7ed',
+                        'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5', 'href' => '/worksites'];
+        }
+
+        if ($has('attendance', 'presenze')) {
+            $s = $conn->prepare("
+                SELECT (SELECT COUNT(*) FROM bb_presenze WHERE data = :d1)
+                     + (SELECT COALESCE(SUM(quantita),0) FROM bb_presenze_consorziate WHERE data_presenza = :d2)
+            ");
+            $s->execute([':d1' => $today, ':d2' => $today]);
+            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Presenze oggi', 'sub' => 'nostri + consorziate', 'color' => '#0ea5e9', 'bg' => '#f0f9ff',
+                        'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'href' => '/attendance'];
+
+            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi WHERE data_inizio <= :d1 AND data_fine >= :d2");
+            $s->execute([':d1' => $today, ':d2' => $today]);
+            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie e permessi', 'color' => '#b45309', 'bg' => '#fffbeb',
+                        'icon' => 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z', 'href' => '/attendance/leaves'];
+        }
+
+        if ($has('equipment')) {
+            $n = (int)$conn->query("
+                SELECT COALESCE(SUM(quantita),0) FROM bb_worksite_lifting
+                WHERE stato IN ('Attivo','attivo') AND tipo_noleggio <> 'Una Tantum'
+            ")->fetchColumn();
+            $stats[] = ['num' => $n, 'label' => 'Mezzi a noleggio', 'sub' => 'attivi ora', 'color' => '#b45309', 'bg' => '#fffbeb',
+                        'icon' => 'M3 21h18M6 21V8l12-5v18', 'href' => '/equipment/rentals'];
+        }
+
+        if ($has('pn_autocarrate')) {
+            $stats = array_merge($stats, $this->statsAutocarrateData());
+        }
+
+        if ($has('pn_noleggi')) {
+            $stats = array_merge($stats, $this->statsMacchineData());
+        }
+
+        if ($has('documents', 'document_alerts')) {
+            try {
+                $docCtrl    = new \App\Service\Documents\WorkerDocumentController($conn);
+                $expired    = $docCtrl->getExpiredDocuments($user);
+                $expiring30 = $docCtrl->getExpiringDocuments($user, 30);
+                $stats[] = ['num' => count($expired['workerDocs']) + count($expired['companyDocs']), 'label' => 'Documenti scaduti', 'sub' => 'operai + aziende', 'color' => '#dc2626', 'bg' => '#fef2f2',
+                            'icon' => 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M12 9h.01', 'href' => '/documents/expired'];
+                $stats[] = ['num' => count($expiring30['workerDocs']) + count($expiring30['companyDocs']), 'label' => 'Scadono in 30gg', 'sub' => 'da monitorare', 'color' => '#d97706', 'bg' => '#fffbeb',
+                            'icon' => 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01', 'href' => '/documents/expiring'];
+            } catch (\Throwable $e) {
+                error_log('[ApiV1 dynamicStats] documenti: ' . $e->getMessage());
+            }
+        }
+
+        if ($has('billing') && $user->canSeePrices()) {
+            $row = $conn->query("
+                SELECT COUNT(*) AS n, COALESCE(SUM(totale_imponibile),0) AS tot
+                FROM bb_billing WHERE emessa = 0
+            ")->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $stats[] = ['num' => (int)($row['n'] ?? 0), 'label' => 'Fatture da emettere',
+                        'sub' => '€ ' . number_format((float)($row['tot'] ?? 0), 0, ',', '.'), 'color' => '#16a34a', 'bg' => '#f0fdf4',
+                        'icon' => 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z', 'href' => '/billing'];
+        }
+
+        return $stats;
+    }
+
+    /** Contatori autocarrate (stessi di DashboardController web). */
+    private function statsAutocarrateData(): array
+    {
+        $cid  = (int)$this->currentCompany()->id();
+        $oggi = date('Y-m-d');
+
+        try {
+            $s = $this->conn->prepare("
+                SELECT COUNT(*) FROM pn_autocarrate
+                WHERE group_company_id = :cid AND stato = 'attiva'
+            ");
+            $s->execute([':cid' => $cid]);
+            $totali = (int)$s->fetchColumn();
+
+            $s = $this->conn->prepare("
+                SELECT COUNT(DISTINCT autocarrata_id) FROM pn_prenotazioni
+                WHERE group_company_id = :cid AND stato <> 'annullata'
+                  AND data_inizio <= :d1 AND data_fine >= :d2
+            ");
+            $s->execute([':cid' => $cid, ':d1' => $oggi, ':d2' => $oggi]);
+            $impegnate = (int)$s->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('[ApiV1 statsAutocarrate] ' . $e->getMessage());
+            return [];
+        }
+
+        return [
+            ['num' => max(0, $totali - $impegnate), 'label' => 'Autocarrate libere', 'sub' => 'oggi',
+             'color' => '#16a34a', 'bg' => '#f0fdf4', 'href' => '/autocarrate',
+             'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1'],
+            ['num' => $impegnate, 'label' => 'Autocarrate impegnate', 'sub' => 'oggi',
+             'color' => '#0369a1', 'bg' => '#f0f9ff', 'href' => '/autocarrate/prenotazioni',
+             'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2'],
+        ];
+    }
+
+    /** Contatori mezzi a noleggio (stessi di DashboardController web). */
+    private function statsMacchineData(): array
+    {
+        $cid  = (int)$this->currentCompany()->id();
+        $oggi = date('Y-m-d');
+
+        try {
+            $s = $this->conn->prepare("
+                SELECT COUNT(*) FROM pn_macchine
+                WHERE group_company_id = :cid AND stato = 'attiva'
+            ");
+            $s->execute([':cid' => $cid]);
+            $totali = (int)$s->fetchColumn();
+
+            $s = $this->conn->prepare("
+                SELECT COUNT(DISTINCT r.macchina_id)
+                FROM   pn_noleggi_righe r
+                JOIN   pn_noleggi n ON n.id = r.noleggio_id
+                WHERE  n.group_company_id = :cid AND n.stato <> 'annullato'
+                  AND  r.data_inizio <= :d1 AND r.data_fine >= :d2
+            ");
+            $s->execute([':cid' => $cid, ':d1' => $oggi, ':d2' => $oggi]);
+            $impegnate = (int)$s->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log('[ApiV1 statsMacchine] ' . $e->getMessage());
+            return [];
+        }
+
+        return [
+            ['num' => max(0, $totali - $impegnate), 'label' => 'Mezzi liberi', 'sub' => 'oggi',
+             'color' => '#16a34a', 'bg' => '#f0fdf4', 'href' => '/noleggi',
+             'icon' => 'M3 21h18M6 21V8l12-5v18M10 12h4'],
+            ['num' => $impegnate, 'label' => 'Mezzi a noleggio', 'sub' => 'oggi',
+             'color' => '#7c3aed', 'bg' => '#f5f3ff', 'href' => '/noleggi/elenco',
+             'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2'],
+        ];
+    }
+
+    /**
+     * Dashboard dinamica: scorciatoie dei moduli utilizzabili.
+     * Stesso catalogo della dashboard web (href aperti nel browser).
+     */
+    private function dynamicShortcuts(User $user): array
+    {
+        $mods = $this->modulePermissions($user);
+        $has  = static fn(string ...$m): bool => (bool)array_intersect($m, array_keys($mods));
+
+        $catalog = [
+            [['worksites'],              'Cantieri',          'Elenco e gestione cantieri',    '/worksites',          '#ea580c', '#fff7ed', 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1'],
+            [['worksites_drafts'],       'Cantieri in Bozza', 'Bozze da completare e attivare','/worksites/drafts',   '#dc2626', '#fef2f2', 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
+            [['attendance','presenze'],  'Presenze',          'Cerca e inserisci presenze',    '/attendance',         '#0ea5e9', '#f0f9ff', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
+            [['attendance','presenze'],  'Ferie e Permessi',  'Registra le assenze',           '/attendance/leaves',  '#38bdf8', '#f0f9ff', 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z'],
+            [['pianificazione'],         'Squadre',           'Pianificazione squadre',        '/pianificazione',     '#3b82f6', '#eff6ff', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
+            [['programmazione'],         'Programmazione',    'Programma settimanale',         '/programmazione',     '#f59e0b', '#fffbeb', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
+            [['equipment'],              'Noleggio Mezzi',    'Mezzi di sollevamento a noleggio','/equipment/rentals', '#b45309', '#fffbeb', 'M3 21h18M6 21V8l12-5v18M10 12h4'],
+            [['fleet_view','fleet_manage'],'Flotta',          'Auto aziendali e assegnazioni', '/fleet',              '#0369a1', '#f0f9ff', 'M9 17a2 2 0 11-4 0 2 2 0 114 0zm0 0h6m4 0a2 2 0 11-4 0 2 2 0 114 0zM7 9h10l2 4H5l2-4z'],
+            [['bookings'],               'Prenotazioni',      'Alloggi e strutture',           '/bookings',           '#0d9488', '#f0fdfa', 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
+            [['billing'],                'Fatturazione',      'Bozze e fatture cantieri',      '/billing',            '#16a34a', '#f0fdf4', 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z'],
+            [['offers'],                 'Offerte',           'Preventivi e revisioni',        '/offers',             '#059669', '#ecfdf5', 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z'],
+            [['clients'],                'Clienti',           'Anagrafica committenti',        '/clients',            '#0891b2', '#f0f9ff', 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
+            [['companies'],              'Aziende',           'Aziende e consorziate',         '/companies',          '#7c3aed', '#f5f3ff', 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5'],
+            [['ordini'],                 'Ordini Consorziate','Ordini verso consorziate',      '/ordini',             '#1d4ed8', '#eff6ff', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2m-6 9l2 2 4-4'],
+            [['ordini_aziende'],         'Ordini Aziende',    'Ordini verso aziende',          '/ordini-aziende',     '#0d9488', '#f0fdfa', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2'],
+            [['tickets'],                'Bigliettini Pasto', 'Buoni pasto operai',            '/tickets',            '#059669', '#ecfdf5', 'M15 5H9V3h6v2zm4 4H5a2 2 0 00-2 2v1h18v-1a2 2 0 00-2-2zM3 14v5a2 2 0 002 2h14a2 2 0 002-2v-5H3z'],
+            [['documents'],              'Documenti Scaduti', 'Documenti operai e aziende',    '/documents/expired',  '#dc2626', '#fef2f2', 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M12 18v-6M12 9h.01'],
+            [['share'],                  'Doc Condivisi',     'Link di condivisione documenti','/share',              '#2563eb', '#eff6ff', 'M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71'],
+            [['ai_chat'],                'BOB AI',            'Chiedi ai dati in linguaggio naturale','/ai/chat',       '#6366f1', '#f5f3ff', 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z'],
+            [['pn_autocarrate'],         'Autocarrate',       'Disponibilita\' e prenotazioni','/autocarrate',        '#0369a1', '#f0f9ff', 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6 0a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
+            [['pn_noleggi'],             'Mezzi sollevamento','Piattaforme, carrelli, telescopici','/noleggi',         '#7c3aed', '#f5f3ff', 'M3 21h18M6 21V8l12-5v18M9 12h4M10 16h4'],
+        ];
+
+        $shortcuts = [];
+        foreach ($catalog as [$perms, $label, $sub, $href, $color, $bg, $icon]) {
+            if ($has(...$perms)) {
+                $shortcuts[] = compact('label', 'sub', 'href', 'color', 'bg', 'icon');
+            }
+        }
+        return $shortcuts;
     }
 
     // ── HELPER ───────────────────────────────────────────────────────────────
