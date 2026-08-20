@@ -1,0 +1,253 @@
+/*
+ * Poti — la giornata dei tecnici. Prefisso gi-.
+ *
+ * Pensata per il telefono: i tecnici la aprono in officina, quindi righe
+ * alte, testo leggibile e pulsanti grandi abbastanza da centrarli con il
+ * guanto. Estende autocarrate.css per intestazione, card e badge.
+ */
+
+/* ── Navigazione fra i giorni ───────────────────────────────────────────── */
+.gi-giorni {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+}
+
+.gi-nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+}
+.gi-nav:hover { background: #f1f5f9; }
+.gi-nav.is-oggi { background: #0369a1; border-color: #0369a1; color: #fff; }
+
+.gi-data {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    text-transform: capitalize;
+}
+
+.gi-giorni input[type="date"] {
+    padding: 9px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* ── Blocchi ────────────────────────────────────────────────────────────── */
+.gi-blocco { margin-bottom: 22px; }
+
+.gi-titolo {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+}
+
+.gi-conta {
+    padding: 1px 8px;
+    border-radius: 20px;
+    background: #e2e8f0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.gi-punto { width: 9px; height: 9px; border-radius: 50%; }
+.gi-punto-escono   { background: #16a34a; }
+.gi-punto-rientri  { background: #0369a1; }
+.gi-punto-ritardo  { background: #dc2626; }
+.gi-punto-fuori    { background: #94a3b8; }
+
+/* ── Riga ───────────────────────────────────────────────────────────────── */
+.gi-riga {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 9px;
+    overflow: hidden;
+}
+
+/* la striscia dice a colpo d'occhio di che blocco fa parte la riga */
+.gi-striscia { width: 4px; flex: 0 0 auto; }
+.gi-escono  .gi-striscia { background: #16a34a; }
+.gi-rientri .gi-striscia { background: #0369a1; }
+.gi-ritardo .gi-striscia { background: #dc2626; }
+.gi-fuori   .gi-striscia { background: #cbd5e1; }
+
+.gi-ritardo { background: #fffafa; border-color: #fecaca; }
+
+.gi-corpo { flex: 1 1 auto; min-width: 0; padding: 13px 15px; }
+
+.gi-testa {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.gi-mezzo {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: .03em;
+    color: #0f172a;
+}
+
+.gi-modello { font-size: 12px; color: #64748b; }
+
+.gi-cliente {
+    margin-top: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.gi-dati {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+/* il telefono e' un link: in officina si chiama, non si copia a mano */
+.gi-tel {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    color: #0369a1;
+}
+
+.gi-badge {
+    display: flex;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+}
+
+.gi-b {
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.gi-b-ok    { background: #dcfce7; color: #166534; }
+.gi-b-ko    { background: #fee2e2; color: #991b1b; }
+.gi-b-attesa{ background: #fef3c7; color: #92400e; }
+.gi-b-info  { background: #e0f2fe; color: #075985; }
+
+/* ── Azioni ─────────────────────────────────────────────────────────────── */
+.gi-azioni {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.gi-azioni form { margin: 0; }
+
+/* pulsanti alti 40px: si centrano anche con i guanti */
+.gi-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 40px;
+    padding: 0 15px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.gi-btn:hover { background: #f1f5f9; }
+
+.gi-btn-fatto {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: #fff;
+}
+.gi-btn-fatto:hover { background: #15803d; }
+
+.gi-btn-annulla {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #64748b;
+}
+
+.gi-fatto-il { font-size: 11px; color: #64748b; align-self: center; }
+
+/* ── Prossimi giorni ────────────────────────────────────────────────────── */
+.gi-prossimi { margin-top: 26px; }
+
+.gi-giorno-tit {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 14px 0 7px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    text-transform: capitalize;
+}
+.gi-giorno-tit span { font-size: 11px; font-weight: 500; color: #94a3b8; text-transform: none; }
+
+.gi-prossima {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 9px 14px;
+    background: #fff;
+    border: 1px solid #eef2f7;
+    border-radius: 9px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.gi-prossima .gi-mezzo { font-size: 13px; }
+.gi-prossima-cliente { color: #334155; }
+.gi-prossima-luogo { color: #94a3b8; font-size: 12px; }
+
+.gi-vuoto {
+    padding: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: #94a3b8;
+    background: #fff;
+    border: 1px dashed #e2e8f0;
+    border-radius: 10px;
+}
+
+@media (max-width: 560px) {
+    .gi-azioni .gi-btn { flex: 1 1 auto; justify-content: center; }
+    .gi-data { width: 100%; order: -1; margin-bottom: 4px; }
+}

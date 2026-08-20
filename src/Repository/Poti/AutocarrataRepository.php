@@ -246,6 +246,7 @@ final class AutocarrataRepository
             ':note'     => $d['note'] !== '' ? $d['note'] : null,
             ':contratto'=> $d['contratto'] !== '' ? $d['contratto'] : null,
             ':pag'      => $d['pagamento'],
+            ':firmato'  => !empty($d['contratto_firmato']) ? 1 : 0,
             ':cid'      => $companyId,
         ];
 
@@ -258,7 +259,8 @@ final class AutocarrataRepository
                 SET autocarrata_id = :mid, cliente = :cliente, telefono = :telefono,
                     luogo = :luogo, data_inizio = :dal, data_fine = :al, stato = :stato,
                     tariffa_giorno = :tariffa, totale = :totale, note = :note,
-                    contratto = :contratto, pagamento = :pag
+                    contratto = :contratto, pagamento = :pag,
+                    contratto_firmato = :firmato
                 WHERE id = :id AND group_company_id = :cid
             ");
             $stmt->execute($p + [':id' => $id]);
@@ -269,10 +271,10 @@ final class AutocarrataRepository
             INSERT INTO pn_prenotazioni
                 (group_company_id, autocarrata_id, cliente, telefono, luogo,
                  data_inizio, data_fine, stato, tariffa_giorno, totale, note,
-                 contratto, commerciale_user_id, pagamento, created_by)
+                 contratto, commerciale_user_id, pagamento, contratto_firmato, created_by)
             VALUES (:cid, :mid, :cliente, :telefono, :luogo,
                     :dal, :al, :stato, :tariffa, :totale, :note,
-                    :contratto, :comm, :pag, :uid)
+                    :contratto, :comm, :pag, :firmato, :uid)
         ");
         $stmt->execute($p + [':uid' => $userId, ':comm' => $userId]);
         return (int)$this->conn->lastInsertId();
@@ -348,5 +350,129 @@ final class AutocarrataRepository
         }
 
         return $out;
+    }
+
+    // ── Giornata (vista tecnici) ─────────────────────────────────────────────
+
+    /**
+     * Cosa succede in un giorno: consegne, rientri, mezzi fuori e ritardi.
+     *
+     * Una query sola e classificazione in PHP: le stesse righe servono a piu'
+     * gruppi (un noleggio di un giorno solo esce E rientra), e con quattro
+     * query separate le si leggerebbe quattro volte.
+     *
+     * @return array{escono:array, rientrano:array, fuori:array, ritardo:array}
+     */
+    public function giornata(int $companyId, string $data): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT p.*, a.targa, a.modello,
+                   DATEDIFF(p.data_fine, p.data_inizio) + 1 AS giorni,
+                   COALESCE(NULLIF(TRIM(CONCAT(COALESCE(c.first_name, ''), ' ', COALESCE(c.last_name, ''))), ''),
+                            c.username, p.commerciale_testo) AS commerciale_nome
+            FROM   pn_prenotazioni p
+            JOIN   pn_autocarrate  a ON a.id = p.autocarrata_id
+            LEFT JOIN bb_users     c ON c.id = p.commerciale_user_id
+            WHERE  p.group_company_id = :cid
+              AND  p.eliminato_at IS NULL
+              AND  p.stato <> 'annullata'
+              AND  (
+                    (p.data_inizio <= :d1 AND p.data_fine >= :d2)
+                    OR (p.data_fine < :d3 AND p.rientrato_at IS NULL
+                        AND p.data_fine >= DATE_SUB(:d4, INTERVAL 60 DAY))
+                   )
+            ORDER BY a.targa ASC
+        ");
+        $stmt->execute([
+            ':cid' => $companyId,
+            ':d1' => $data, ':d2' => $data, ':d3' => $data, ':d4' => $data,
+        ]);
+
+        $out = ['escono' => [], 'rientrano' => [], 'fuori' => [], 'ritardo' => []];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $inizio = (string)$r['data_inizio'];
+            $fine   = (string)$r['data_fine'];
+
+            if ($fine < $data && empty($r['rientrato_at'])) {
+                $out['ritardo'][] = $r;
+                continue;
+            }
+            if ($inizio === $data) {
+                $out['escono'][] = $r;
+            }
+            if ($fine === $data) {
+                $out['rientrano'][] = $r;
+            }
+            if ($inizio < $data && $fine > $data) {
+                $out['fuori'][] = $r;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Consegne previste nei giorni successivi, per preparare i mezzi.
+     * Raggruppate per data, cosi' il template non deve ordinarle.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public function prossimeConsegne(int $companyId, string $dal, int $giorni = 14): array
+    {
+        $al = date('Y-m-d', strtotime($dal . ' +' . $giorni . ' days'));
+
+        $stmt = $this->conn->prepare("
+            SELECT p.*, a.targa, a.modello,
+                   DATEDIFF(p.data_fine, p.data_inizio) + 1 AS giorni
+            FROM   pn_prenotazioni p
+            JOIN   pn_autocarrate  a ON a.id = p.autocarrata_id
+            WHERE  p.group_company_id = :cid
+              AND  p.eliminato_at IS NULL
+              AND  p.stato <> 'annullata'
+              AND  p.data_inizio > :dal
+              AND  p.data_inizio <= :al
+            ORDER BY p.data_inizio ASC, a.targa ASC
+        ");
+        $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(string)$r['data_inizio']][] = $r;
+        }
+        return $out;
+    }
+
+    /**
+     * Segna la consegna o il rientro.
+     *
+     * Il campo si azzera se era gia' valorizzato: un tocco per sbaglio si
+     * annulla con un altro tocco, senza dover chiamare l'ufficio.
+     */
+    public function segnaMomento(int $companyId, int $id, string $campo, ?int $userId): void
+    {
+        if (!in_array($campo, ['consegnato', 'rientrato'], true)) {
+            return;
+        }
+        $quando = $campo . '_at';
+        $chi    = $campo . '_da';
+
+        $stmt = $this->conn->prepare("
+            UPDATE pn_prenotazioni
+            SET    {$quando} = CASE WHEN {$quando} IS NULL THEN NOW() ELSE NULL END,
+                   {$chi}    = CASE WHEN {$quando} IS NULL THEN :uid ELSE NULL END
+            WHERE  id = :id AND group_company_id = :cid AND eliminato_at IS NULL
+        ");
+        $stmt->execute([':id' => $id, ':cid' => $companyId, ':uid' => $userId]);
+    }
+
+    /** Spunta o toglie la firma del contratto. */
+    public function segnaContrattoFirmato(int $companyId, int $id, bool $firmato): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE pn_prenotazioni
+            SET    contratto_firmato = :f
+            WHERE  id = :id AND group_company_id = :cid AND eliminato_at IS NULL
+        ");
+        $stmt->execute([':id' => $id, ':cid' => $companyId, ':f' => $firmato ? 1 : 0]);
     }
 }

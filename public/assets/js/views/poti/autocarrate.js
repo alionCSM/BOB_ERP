@@ -108,6 +108,9 @@
         var av = campo('ac-p-avviso');
         if (av) { av.textContent = ''; av.className = 'ac-avviso'; }
 
+        var firma = campo('ac-p-firmato');
+        if (firma) firma.checked = false;
+
         var id = campo(isPren ? 'ac-p-id' : 'ac-m-id');
         if (id) id.value = '';
         var del = campo('ac-p-elimina');
@@ -145,6 +148,7 @@
                 campo('ac-p-note').value    = d.note || '';
 
                 campo('ac-p-contratto').value = d.contratto || '';
+                campo('ac-p-firmato').checked = !!Number(d.contratto_firmato);
                 campo('ac-p-pagamento').value = d.pagamento || 'da_pagare';
 
                 // in modifica si mostra chi l'aveva registrata, non chi sta

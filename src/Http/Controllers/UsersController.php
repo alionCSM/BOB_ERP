@@ -1375,6 +1375,16 @@ final class UsersController
                         'icon'  => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6 0a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0',
                         'color' => '#0369a1',
                     ],
+                    'pn_autocarrate_giornata' => [
+                        'label' => 'Autocarrate — giornata (tecnici)',
+                        'icon'  => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+                        'color' => '#0ea5e9',
+                    ],
+                    'pn_noleggi_giornata' => [
+                        'label' => 'Mezzi sollevamento — giornata (tecnici)',
+                        'icon'  => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+                        'color' => '#8b5cf6',
+                    ],
                     'pn_noleggi' => [
                         'label' => 'Mezzi sollevamento e noleggi',
                         'icon'  => 'M3 21h18M6 21V8l12-5v18M10 12h4M10 16h4',

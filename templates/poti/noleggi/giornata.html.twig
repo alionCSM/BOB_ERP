@@ -1,0 +1,177 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+<link rel="stylesheet" href="/assets/css/views/poti/giornata.css?v=1">
+{% endblock %}
+
+{#
+  Riga della giornata: qui l'unita' e' la singola macchina del noleggio, non
+  il noleggio intero, perche' ogni macchina parte e torna per conto suo.
+  Consegna e rientro riguardano la riga, la firma riguarda il noleggio.
+#}
+{% macro riga(r, classe, data, csrf) %}
+    <div class="gi-riga gi-{{ classe }}">
+        <div class="gi-striscia"></div>
+        <div class="gi-corpo">
+            <div class="gi-testa">
+                <span class="gi-mezzo">{{ r.matricola }}</span>
+                <span class="gi-modello">{{ r.tipo }}{{ r.modello ? ' · ' ~ r.modello : '' }}</span>
+            </div>
+
+            <div class="gi-cliente">{{ r.cliente }}</div>
+
+            <div class="gi-dati">
+                {% if r.telefono %}
+                    <a class="gi-tel" href="tel:{{ r.telefono|replace({' ': ''}) }}">{{ r.telefono }}</a>
+                {% endif %}
+                {% if r.luogo %}<span>{{ r.luogo }}</span>{% endif %}
+                <span>{{ r.data_inizio|date('d/m') }} - {{ r.data_fine|date('d/m') }} ({{ r.giorni }} gg)</span>
+            </div>
+
+            <div class="gi-badge">
+                <span class="gi-b {{ r.pagamento == 'pagata' ? 'gi-b-ok' : 'gi-b-attesa' }}">
+                    {{ r.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
+                </span>
+                <span class="gi-b {{ r.contratto_firmato ? 'gi-b-ok' : 'gi-b-ko' }}">
+                    {{ r.contratto_firmato ? 'contratto firmato' : 'contratto da firmare' }}
+                </span>
+                {% if r.contratto %}<span class="gi-b gi-b-info">{{ r.contratto }}</span>{% endif %}
+                {% if r.consegnato_at %}
+                    <span class="gi-b gi-b-info">uscita {{ r.consegnato_at|date('d/m H:i') }}</span>
+                {% endif %}
+                {% if r.rientrato_at %}
+                    <span class="gi-b gi-b-info">rientro {{ r.rientrato_at|date('d/m H:i') }}</span>
+                {% endif %}
+            </div>
+
+            {% if r.note %}<div class="gi-dati"><span>{{ r.note }}</span></div>{% endif %}
+
+            <div class="gi-azioni">
+                <form method="POST" action="/noleggi/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="riga_id" value="{{ r.id }}">
+                    <input type="hidden" name="noleggio_id" value="{{ r.noleggio_id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="consegnato">
+                    <button class="gi-btn {{ r.consegnato_at ? 'gi-btn-annulla' : 'gi-btn-fatto' }}">
+                        {{ r.consegnato_at ? 'Annulla uscita' : 'Segna uscita' }}
+                    </button>
+                </form>
+
+                <form method="POST" action="/noleggi/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="riga_id" value="{{ r.id }}">
+                    <input type="hidden" name="noleggio_id" value="{{ r.noleggio_id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="rientrato">
+                    <button class="gi-btn {{ r.rientrato_at ? 'gi-btn-annulla' : '' }}">
+                        {{ r.rientrato_at ? 'Annulla rientro' : 'Segna rientro' }}
+                    </button>
+                </form>
+
+                <form method="POST" action="/noleggi/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="noleggio_id" value="{{ r.noleggio_id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="firma">
+                    <button class="gi-btn">
+                        {{ r.contratto_firmato ? 'Togli firma' : 'Contratto firmato' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+{% import _self as g %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Giornata mezzi sollevamento</h1>
+            <p class="ac-sub">Cosa esce, cosa rientra e cosa e' ancora fuori.</p>
+        </div>
+        <div class="ac-hero-links">
+            {% if user.canAccess('pn_noleggi') %}
+                <a href="/noleggi" class="ac-btn">Disponibilita'</a>
+                <a href="/noleggi/elenco" class="ac-btn">Noleggi</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ac-alert is-ok">Segnato.</div>{% endif %}
+
+    {% include 'poti/_giornata_testa.html.twig' with {'base': '/noleggi/giornata'} %}
+
+    {% if giornata.ritardo %}
+        <div class="gi-blocco">
+            <div class="gi-titolo">
+                <span class="gi-punto gi-punto-ritardo"></span>
+                Doveva rientrare
+                <span class="gi-conta">{{ giornata.ritardo|length }}</span>
+            </div>
+            {% for r in giornata.ritardo %}{{ g.riga(r, 'ritardo', data, csrfToken) }}{% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="gi-blocco">
+        <div class="gi-titolo">
+            <span class="gi-punto gi-punto-escono"></span>
+            Escono
+            <span class="gi-conta">{{ giornata.escono|length }}</span>
+        </div>
+        {% for r in giornata.escono %}
+            {{ g.riga(r, 'escono', data, csrfToken) }}
+        {% else %}
+            <div class="gi-vuoto">Nessuna consegna in questa giornata.</div>
+        {% endfor %}
+    </div>
+
+    <div class="gi-blocco">
+        <div class="gi-titolo">
+            <span class="gi-punto gi-punto-rientri"></span>
+            Rientrano
+            <span class="gi-conta">{{ giornata.rientrano|length }}</span>
+        </div>
+        {% for r in giornata.rientrano %}
+            {{ g.riga(r, 'rientri', data, csrfToken) }}
+        {% else %}
+            <div class="gi-vuoto">Nessun rientro in questa giornata.</div>
+        {% endfor %}
+    </div>
+
+    {% if giornata.fuori %}
+        <div class="gi-blocco">
+            <div class="gi-titolo">
+                <span class="gi-punto gi-punto-fuori"></span>
+                Fuori
+                <span class="gi-conta">{{ giornata.fuori|length }}</span>
+            </div>
+            {% for r in giornata.fuori %}{{ g.riga(r, 'fuori', data, csrfToken) }}{% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="gi-prossimi">
+        <div class="gi-titolo">Prossime consegne</div>
+        {% for giorno, righe in prossime %}
+            <div class="gi-giorno-tit">
+                {{ giorno|date('d/m/Y') }}
+                <span>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][giorno|date('N')] }}</span>
+            </div>
+            {% for r in righe %}
+                <div class="gi-prossima">
+                    <span class="gi-mezzo">{{ r.matricola }}</span>
+                    <span class="gi-prossima-cliente">{{ r.cliente }}</span>
+                    {% if r.luogo %}<span class="gi-prossima-luogo">{{ r.luogo }}</span>{% endif %}
+                    <span class="gi-prossima-luogo">{{ r.giorni }} gg</span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="gi-vuoto">Niente in partenza nei prossimi 14 giorni.</div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

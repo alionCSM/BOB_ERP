@@ -234,6 +234,7 @@ final class MacchinaRepository
             ':trasporto' => $d['trasporto'] !== '' ? $d['trasporto'] : null,
             ':totale'    => $d['totale'] !== '' ? $d['totale'] : null,
             ':pag'       => $d['pagamento'],
+            ':firmato'   => !empty($d['contratto_firmato']) ? 1 : 0,
             ':note'      => $d['note'] !== '' ? $d['note'] : null,
             ':cid'       => $companyId,
         ];
@@ -246,7 +247,7 @@ final class MacchinaRepository
                     SET cliente = :cliente, telefono = :telefono, luogo = :luogo,
                         contratto = :contratto, data_inizio = :dal, data_fine = :al,
                         stato = :stato, trasporto = :trasporto, totale = :totale,
-                        pagamento = :pag, note = :note
+                        pagamento = :pag, note = :note, contratto_firmato = :firmato
                     WHERE id = :id AND group_company_id = :cid
                 ");
                 $stmt->execute($p + [':id' => $id]);
@@ -261,10 +262,10 @@ final class MacchinaRepository
                     INSERT INTO pn_noleggi
                         (group_company_id, cliente, telefono, luogo, contratto,
                          data_inizio, data_fine, stato, trasporto, totale,
-                         pagamento, note, commerciale_user_id, created_by)
+                         pagamento, note, contratto_firmato, commerciale_user_id, created_by)
                     VALUES (:cid, :cliente, :telefono, :luogo, :contratto,
                             :dal, :al, :stato, :trasporto, :totale,
-                            :pag, :note, :comm, :uid)
+                            :pag, :note, :firmato, :comm, :uid)
                 ");
                 $stmt->execute($p + [':comm' => $userId, ':uid' => $userId]);
                 $noleggioId = (int)$this->conn->lastInsertId();
@@ -452,5 +453,132 @@ final class MacchinaRepository
         ");
         $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ── Giornata (vista tecnici) ─────────────────────────────────────────────
+
+    /**
+     * Cosa succede in un giorno, riga per riga.
+     *
+     * Qui l'unita' e' la RIGA e non il noleggio: in un noleggio con tre
+     * macchine puo' uscirne una oggi e le altre domani, e al tecnico serve
+     * sapere quale.
+     *
+     * @return array{escono:array, rientrano:array, fuori:array, ritardo:array}
+     */
+    public function giornata(int $companyId, string $data): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT r.*, m.matricola, m.tipo, m.modello,
+                   DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
+                   n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
+                   n.contratto, n.contratto_firmato, n.pagamento, n.note AS note_noleggio
+            FROM   pn_noleggi_righe r
+            JOIN   pn_noleggi   n ON n.id = r.noleggio_id
+            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
+              AND  n.stato <> 'annullato'
+              AND  (
+                    (r.data_inizio <= :d1 AND r.data_fine >= :d2)
+                    OR (r.data_fine < :d3 AND r.rientrato_at IS NULL
+                        AND r.data_fine >= DATE_SUB(:d4, INTERVAL 60 DAY))
+                   )
+            ORDER BY m.tipo ASC, m.matricola ASC
+        ");
+        $stmt->execute([
+            ':cid' => $companyId,
+            ':d1' => $data, ':d2' => $data, ':d3' => $data, ':d4' => $data,
+        ]);
+
+        $out = ['escono' => [], 'rientrano' => [], 'fuori' => [], 'ritardo' => []];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $inizio = (string)$r['data_inizio'];
+            $fine   = (string)$r['data_fine'];
+
+            if ($fine < $data && empty($r['rientrato_at'])) {
+                $out['ritardo'][] = $r;
+                continue;
+            }
+            if ($inizio === $data) {
+                $out['escono'][] = $r;
+            }
+            if ($fine === $data) {
+                $out['rientrano'][] = $r;
+            }
+            if ($inizio < $data && $fine > $data) {
+                $out['fuori'][] = $r;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Consegne previste nei giorni successivi, per preparare le macchine.
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public function prossimeConsegne(int $companyId, string $dal, int $giorni = 14): array
+    {
+        $al = date('Y-m-d', strtotime($dal . ' +' . $giorni . ' days'));
+
+        $stmt = $this->conn->prepare("
+            SELECT r.*, m.matricola, m.tipo, m.modello,
+                   DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
+                   n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
+                   n.contratto, n.contratto_firmato, n.pagamento
+            FROM   pn_noleggi_righe r
+            JOIN   pn_noleggi   n ON n.id = r.noleggio_id
+            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            WHERE  n.group_company_id = :cid
+              AND  n.eliminato_at IS NULL
+              AND  n.stato <> 'annullato'
+              AND  r.data_inizio > :dal
+              AND  r.data_inizio <= :al
+            ORDER BY r.data_inizio ASC, m.matricola ASC
+        ");
+        $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(string)$r['data_inizio']][] = $r;
+        }
+        return $out;
+    }
+
+    /**
+     * Segna consegna o rientro di una riga.
+     *
+     * Il controllo sulla societa' passa dalla testata: la riga da sola non
+     * sa a quale societa' appartiene, e senza la JOIN si potrebbe toccare
+     * la riga di un'altra azienda conoscendone l'id.
+     */
+    public function segnaMomento(int $companyId, int $rigaId, string $campo, ?int $userId): void
+    {
+        if (!in_array($campo, ['consegnato', 'rientrato'], true)) {
+            return;
+        }
+        $quando = $campo . '_at';
+        $chi    = $campo . '_da';
+
+        $stmt = $this->conn->prepare("
+            UPDATE pn_noleggi_righe r
+            JOIN   pn_noleggi n ON n.id = r.noleggio_id
+            SET    r.{$quando} = CASE WHEN r.{$quando} IS NULL THEN NOW() ELSE NULL END,
+                   r.{$chi}    = CASE WHEN r.{$quando} IS NULL THEN :uid ELSE NULL END
+            WHERE  r.id = :id AND n.group_company_id = :cid AND n.eliminato_at IS NULL
+        ");
+        $stmt->execute([':id' => $rigaId, ':cid' => $companyId, ':uid' => $userId]);
+    }
+
+    /** Spunta o toglie la firma del contratto (e' del noleggio, non della riga). */
+    public function segnaContrattoFirmato(int $companyId, int $noleggioId, bool $firmato): void
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE pn_noleggi
+            SET    contratto_firmato = :f
+            WHERE  id = :id AND group_company_id = :cid AND eliminato_at IS NULL
+        ");
+        $stmt->execute([':id' => $noleggioId, ':cid' => $companyId, ':f' => $firmato ? 1 : 0]);
     }
 }

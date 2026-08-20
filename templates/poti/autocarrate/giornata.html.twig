@@ -1,0 +1,178 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+<link rel="stylesheet" href="/assets/css/views/poti/giornata.css?v=1">
+{% endblock %}
+
+{#
+  Riga della giornata. Non mostra importi: al tecnico serve sapere se e'
+  pagato, non quanto.
+#}
+{% macro riga(p, classe, data, csrf) %}
+    <div class="gi-riga gi-{{ classe }}">
+        <div class="gi-striscia"></div>
+        <div class="gi-corpo">
+            <div class="gi-testa">
+                <span class="gi-mezzo">{{ p.targa }}</span>
+                {% if p.modello %}<span class="gi-modello">{{ p.modello }}</span>{% endif %}
+            </div>
+
+            <div class="gi-cliente">{{ p.cliente }}</div>
+
+            <div class="gi-dati">
+                {% if p.telefono %}
+                    <a class="gi-tel" href="tel:{{ p.telefono|replace({' ': ''}) }}">{{ p.telefono }}</a>
+                {% endif %}
+                {% if p.luogo %}<span>{{ p.luogo }}</span>{% endif %}
+                <span>{{ p.data_inizio|date('d/m') }} - {{ p.data_fine|date('d/m') }} ({{ p.giorni }} gg)</span>
+            </div>
+
+            <div class="gi-badge">
+                <span class="gi-b {{ p.pagamento == 'pagata' ? 'gi-b-ok' : 'gi-b-attesa' }}">
+                    {{ p.pagamento == 'pagata' ? 'pagata' : 'da pagare' }}
+                </span>
+                <span class="gi-b {{ p.contratto_firmato ? 'gi-b-ok' : 'gi-b-ko' }}">
+                    {{ p.contratto_firmato ? 'contratto firmato' : 'contratto da firmare' }}
+                </span>
+                {% if p.contratto %}<span class="gi-b gi-b-info">{{ p.contratto }}</span>{% endif %}
+                {% if p.consegnato_at %}
+                    <span class="gi-b gi-b-info">uscita {{ p.consegnato_at|date('d/m H:i') }}</span>
+                {% endif %}
+                {% if p.rientrato_at %}
+                    <span class="gi-b gi-b-info">rientro {{ p.rientrato_at|date('d/m H:i') }}</span>
+                {% endif %}
+            </div>
+
+            {% if p.note %}<div class="gi-dati"><span>{{ p.note }}</span></div>{% endif %}
+
+            <div class="gi-azioni">
+                {# un solo endpoint per le tre azioni: cambia solo "cosa" #}
+                <form method="POST" action="/autocarrate/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="id" value="{{ p.id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="consegnato">
+                    <button class="gi-btn {{ p.consegnato_at ? 'gi-btn-annulla' : 'gi-btn-fatto' }}">
+                        {{ p.consegnato_at ? 'Annulla uscita' : 'Segna uscita' }}
+                    </button>
+                </form>
+
+                <form method="POST" action="/autocarrate/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="id" value="{{ p.id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="rientrato">
+                    <button class="gi-btn {{ p.rientrato_at ? 'gi-btn-annulla' : '' }}">
+                        {{ p.rientrato_at ? 'Annulla rientro' : 'Segna rientro' }}
+                    </button>
+                </form>
+
+                <form method="POST" action="/autocarrate/giornata/segna">
+                    <input type="hidden" name="_csrf" value="{{ csrf }}">
+                    <input type="hidden" name="id" value="{{ p.id }}">
+                    <input type="hidden" name="data" value="{{ data }}">
+                    <input type="hidden" name="cosa" value="firma">
+                    <button class="gi-btn">
+                        {{ p.contratto_firmato ? 'Togli firma' : 'Contratto firmato' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endmacro %}
+{% import _self as g %}
+
+{% block content %}
+<div class="ac-page">
+
+    <div class="ac-hero">
+        <div>
+            <h1 class="ac-title">Giornata autocarrate</h1>
+            <p class="ac-sub">Cosa esce, cosa rientra e cosa e' ancora fuori.</p>
+        </div>
+        <div class="ac-hero-links">
+            {% if user.canAccess('pn_autocarrate') %}
+                <a href="/autocarrate" class="ac-btn">Disponibilita'</a>
+                <a href="/autocarrate/prenotazioni" class="ac-btn">Prenotazioni</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ac-alert is-ok">Segnato.</div>{% endif %}
+
+    {% include 'poti/_giornata_testa.html.twig' with {'base': '/autocarrate/giornata'} %}
+
+    {# In ritardo per primo: e' l'unico blocco su cui bisogna fare qualcosa
+       subito, gli altri si guardano e basta. #}
+    {% if giornata.ritardo %}
+        <div class="gi-blocco">
+            <div class="gi-titolo">
+                <span class="gi-punto gi-punto-ritardo"></span>
+                Doveva rientrare
+                <span class="gi-conta">{{ giornata.ritardo|length }}</span>
+            </div>
+            {% for p in giornata.ritardo %}{{ g.riga(p, 'ritardo', data, csrfToken) }}{% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="gi-blocco">
+        <div class="gi-titolo">
+            <span class="gi-punto gi-punto-escono"></span>
+            Escono
+            <span class="gi-conta">{{ giornata.escono|length }}</span>
+        </div>
+        {% for p in giornata.escono %}
+            {{ g.riga(p, 'escono', data, csrfToken) }}
+        {% else %}
+            <div class="gi-vuoto">Nessuna consegna in questa giornata.</div>
+        {% endfor %}
+    </div>
+
+    <div class="gi-blocco">
+        <div class="gi-titolo">
+            <span class="gi-punto gi-punto-rientri"></span>
+            Rientrano
+            <span class="gi-conta">{{ giornata.rientrano|length }}</span>
+        </div>
+        {% for p in giornata.rientrano %}
+            {{ g.riga(p, 'rientri', data, csrfToken) }}
+        {% else %}
+            <div class="gi-vuoto">Nessun rientro in questa giornata.</div>
+        {% endfor %}
+    </div>
+
+    {% if giornata.fuori %}
+        <div class="gi-blocco">
+            <div class="gi-titolo">
+                <span class="gi-punto gi-punto-fuori"></span>
+                Fuori
+                <span class="gi-conta">{{ giornata.fuori|length }}</span>
+            </div>
+            {% for p in giornata.fuori %}{{ g.riga(p, 'fuori', data, csrfToken) }}{% endfor %}
+        </div>
+    {% endif %}
+
+    {# Serve a preparare i mezzi: si vede cosa parte nei prossimi giorni. #}
+    <div class="gi-prossimi">
+        <div class="gi-titolo">Prossime consegne</div>
+        {% for giorno, righe in prossime %}
+            <div class="gi-giorno-tit">
+                {{ giorno|date('d/m/Y') }}
+                <span>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][giorno|date('N')] }}</span>
+            </div>
+            {% for p in righe %}
+                <div class="gi-prossima">
+                    <span class="gi-mezzo">{{ p.targa }}</span>
+                    <span class="gi-prossima-cliente">{{ p.cliente }}</span>
+                    {% if p.luogo %}<span class="gi-prossima-luogo">{{ p.luogo }}</span>{% endif %}
+                    <span class="gi-prossima-luogo">{{ p.giorni }} gg</span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="gi-vuoto">Niente in partenza nei prossimi 14 giorni.</div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

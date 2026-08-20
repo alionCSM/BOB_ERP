@@ -1,0 +1,15 @@
+{#
+  Navigazione fra i giorni, uguale per autocarrate e mezzi: e' la parte che
+  si tocca piu' spesso, e due copie divergerebbero al primo ritocco.
+  Attese: base (url della pagina), data, ieri, domani, oggi.
+#}
+<form method="GET" action="{{ base }}" class="gi-giorni">
+    <div class="gi-data">
+        {{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][data|date('N')] }}
+        {{ data|date('d/m/Y') }}{% if data == oggi %} — oggi{% endif %}
+    </div>
+    <a href="{{ base }}?data={{ ieri }}" class="gi-nav">‹ Ieri</a>
+    <a href="{{ base }}" class="gi-nav{{ data == oggi ? ' is-oggi' : '' }}">Oggi</a>
+    <a href="{{ base }}?data={{ domani }}" class="gi-nav">Domani ›</a>
+    <input type="date" name="data" value="{{ data }}" onchange="this.form.submit()">
+</form>
