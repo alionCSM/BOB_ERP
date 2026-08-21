@@ -176,6 +176,10 @@
                 {% if currentUserId == 1 or user.canAccess('societa') %}
                 <li><a href="/societa" class="dropdown-item hover:bg-white/5"><i data-lucide="building" class="w-4 h-4 mr-2"></i> Societa' del gruppo</a></li>
                 {% endif %}
+                {# stesso accesso della pagina: superadmin o chi gestisce gli utenti #}
+                {% if currentUserId == 1 or user.canAccess('users') %}
+                <li><a href="/app" class="dropdown-item hover:bg-white/5"><i data-lucide="smartphone" class="w-4 h-4 mr-2"></i> App Android</a></li>
+                {% endif %}
                 {% if currentUserId == 1 %}
                 <li><hr class="dropdown-divider border-white/[0.08]"></li>
                 <li class="px-3 py-2">

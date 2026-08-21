@@ -1,0 +1,239 @@
+/*
+ * Pubblicazione dell'app Android. Prefisso ap-.
+ * Pagina d'ufficio: si apre da desktop, poche volte, quindi conta la
+ * chiarezza piu' della densita'.
+ */
+
+.ap-page { max-width: 1000px; color: #0f172a; padding-bottom: 40px; }
+
+.ap-testata { padding: 20px 0 16px; }
+.ap-testata h1 { margin: 0; font-size: 23px; font-weight: 800; letter-spacing: -.02em; }
+.ap-testata p { margin: 5px 0 0; font-size: 14px; color: #64748b; }
+
+.ap-avviso {
+    padding: 11px 15px;
+    margin-bottom: 14px;
+    border-radius: 9px;
+    font-size: 13.5px;
+    font-weight: 600;
+}
+.ap-avviso.is-ok { background: #dcfce7; border: 1px solid #bbf7d0; color: #166534; }
+.ap-avviso.is-ko { background: #fee2e2; border: 1px solid #fecaca; color: #991b1b; }
+
+/* ── Versione in distribuzione ──────────────────────────────────────────── */
+.ap-corrente {
+    padding: 16px 18px;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, #0f2942, #1e3a5f);
+    border-radius: 12px;
+    color: #fff;
+}
+
+.ap-corrente-tit {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #9fc0dd;
+    margin-bottom: 12px;
+}
+.ap-corrente-tit b { font-size: 20px; font-weight: 800; color: #fff; text-transform: none; letter-spacing: -.01em; }
+
+.ap-vc {
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, .12);
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #cfe0f0;
+}
+
+.ap-obb {
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #b45309;
+    color: #fff;
+    font-size: 10.5px;
+    letter-spacing: .04em;
+}
+
+.ap-link { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ap-link > span {
+    flex: 0 0 auto;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #cfe0f0;
+}
+.ap-link input {
+    flex: 1 1 320px;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, .2);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+}
+
+.ap-corrente .ap-btn {
+    border-color: rgba(255, 255, 255, .22);
+    background: rgba(255, 255, 255, .1);
+    color: #fff;
+}
+.ap-corrente .ap-btn:hover { background: rgba(255, 255, 255, .2); }
+
+.ap-nota { margin: 11px 0 0; font-size: 12px; line-height: 1.5; color: #9fc0dd; }
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+.ap-form, .ap-storico {
+    padding: 18px;
+    margin-bottom: 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.ap-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.ap-form-tit {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #475569;
+}
+
+.ap-f { display: flex; flex-direction: column; gap: 5px; }
+.ap-f-largo { grid-column: 1 / -1; }
+.ap-f > span { font-size: 13px; font-weight: 600; color: #334155; }
+.ap-f small { font-size: 11.5px; color: #94a3b8; }
+
+.ap-f input[type="text"],
+.ap-f input[type="number"],
+.ap-f input[type="file"],
+.ap-f textarea {
+    padding: 9px 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #0f172a;
+    background: #fff;
+}
+.ap-f textarea { resize: vertical; }
+
+.ap-check { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 9px; }
+.ap-check input { width: 17px; height: 17px; }
+.ap-check span { font-size: 13.5px; color: #334155; }
+
+.ap-azioni { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+
+/* ── Pulsanti ───────────────────────────────────────────────────────────── */
+.ap-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 16px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: #fff;
+    color: #334155;
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+.ap-btn:hover { background: #f1f5f9; }
+
+.ap-btn-primary {
+    border-color: #1e3a5f;
+    background: #1e3a5f;
+    color: #fff;
+}
+.ap-btn-primary:hover { background: #16304e; }
+
+/* ── Storico ────────────────────────────────────────────────────────────── */
+.ap-tabella-wrap { overflow-x: auto; }
+
+.ap-tabella { width: 100%; border-collapse: collapse; margin-top: 10px; }
+
+.ap-tabella th {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.ap-tabella td {
+    padding: 10px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 13.5px;
+    vertical-align: middle;
+}
+
+.ap-tabella tr.is-spenta { opacity: .55; }
+
+.ap-vc-cella { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+
+.ap-note-cella {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #64748b;
+}
+
+.ap-stato {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.ap-stato.is-on  { background: #dcfce7; color: #166534; }
+.ap-stato.is-off { background: #f1f5f9; color: #64748b; }
+.ap-stato.is-obb { background: #fef3c7; color: #92400e; }
+
+.ap-azioni-cella { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.ap-azioni-cella form { margin: 0; }
+
+.ap-mini {
+    border: 0;
+    background: none;
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #1d4ed8;
+    text-decoration: none;
+    cursor: pointer;
+}
+.ap-mini:hover { background: #eff6ff; }
+.ap-mini.is-ko { color: #b91c1c; }
+.ap-mini.is-ko:hover { background: #fef2f2; }
+
+.ap-vuoto { padding: 26px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+@media (max-width: 700px) {
+    .ap-form { grid-template-columns: 1fr; }
+    .ap-link input { flex-basis: 100%; }
+}

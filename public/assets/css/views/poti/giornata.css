@@ -1,10 +1,15 @@
 /*
  * Poti — la giornata dei tecnici. Prefisso gi-.
  *
- * Pensata per il telefono, in officina, spesso coi guanti: poche cose per
- * schermata, testo grande, un solo pulsante ovvio per scheda e aree da
- * toccare mai sotto i 44px. Funziona anche da desktop, dove le schede si
- * mettono in due colonne.
+ * E' una board, non un elenco: una colonna per momento della giornata, da
+ * sinistra a destra nell'ordine in cui le cose succedono. Prima era una
+ * lista unica in verticale con schede larghe e mezze vuote, e per sapere
+ * quante autocarrate uscivano bisognava scorrere fino al blocco giusto.
+ *
+ * Le schede sono strette e dense di proposito: in una giornata piena se ne
+ * devono vedere sei o sette per colonna senza scorrere. Le aree da toccare
+ * restano comunque grandi, perche' in officina si usa il telefono e spesso
+ * coi guanti; sul telefono le colonne si scorrono di lato una alla volta.
  *
  * Non dipende da autocarrate.css: e' una pagina a se', e legarla ai fogli
  * di stile delle pagine d'ufficio significava vederla cambiare a ogni
@@ -12,92 +17,82 @@
  */
 
 /* il filtro nasconde con l'attributo hidden: senza questa riga le regole
-   display:flex qui sotto vincerebbero e il "nessun risultato" resterebbe
-   sempre a schermo */
+   display: qui sotto vincerebbero e i nascosti resterebbero a schermo */
 .gi-page [hidden] { display: none !important; }
 
 .gi-page {
+    --gi-scuro:  #0f2942;
     --gi-blu:    #0369a1;
-    --gi-verde:  #16a34a;
-    --gi-rosso:  #dc2626;
-    --gi-ambra:  #d97706;
+    --gi-verde:  #15803d;
+    --gi-rosso:  #b91c1c;
+    --gi-ambra:  #b45309;
     --gi-grigio: #94a3b8;
-    --gi-bordo:  #e2e8f0;
+    --gi-bordo:  #dbe3ec;
     --gi-testo:  #0f172a;
     --gi-tenue:  #64748b;
+    --gi-fondo:  #f4f6f9;
 
-    max-width: 1180px;
-    margin: 0 auto;
-    padding: 0 4px 60px;
     color: var(--gi-testo);
+    padding-bottom: 40px;
 }
 
-/* ── Intestazione ───────────────────────────────────────────────────────── */
-.gi-hero {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 22px 4px 18px;
-}
-
-.gi-hero h1 {
-    margin: 0;
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -.02em;
-}
-
-.gi-hero p {
-    margin: 5px 0 0;
-    font-size: 14px;
-    color: var(--gi-tenue);
-}
-
-.gi-hero-link { display: flex; gap: 8px; flex-wrap: wrap; }
-
-.gi-hero-link a {
-    display: inline-flex;
-    align-items: center;
-    height: 38px;
-    padding: 0 14px;
-    border: 1px solid var(--gi-bordo);
-    border-radius: 9px;
-    background: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-    text-decoration: none;
-}
-.gi-hero-link a:hover { background: #f1f5f9; }
-
-/* ── Barra del giorno ───────────────────────────────────────────────────── */
-/* resta appesa in alto: scorrendo un elenco lungo si deve poter cambiare
-   giorno o cercare senza risalire tutto */
-.gi-barra {
+/* ── Testata ────────────────────────────────────────────────────────────── */
+/* un pezzo solo, scuro: titolo, giorno e ricerca stavano in tre riquadri
+   bianchi diversi e la pagina sembrava non cominciare mai */
+.gi-testata {
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 30;
+    padding: 14px 18px 12px;
+    margin-bottom: 14px;
+    background: var(--gi-scuro);
+    border-radius: 12px;
+    color: #fff;
+}
+
+.gi-testata-alto {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 11px;
+}
+
+.gi-testata h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+}
+
+.gi-link { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.gi-link a {
+    display: inline-flex;
+    align-items: center;
+    height: 30px;
+    padding: 0 11px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .1);
+    color: #dbeafe;
+    font-size: 12.5px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.gi-link a:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+
+.gi-testata-basso {
+    display: flex;
+    align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    align-items: center;
-    padding: 10px;
-    margin-bottom: 14px;
-    background: rgba(255, 255, 255, .92);
-    backdrop-filter: blur(8px);
-    border: 1px solid var(--gi-bordo);
-    border-radius: 14px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 }
 
 .gi-giorni {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex: 1 1 auto;
-    min-width: 0;
+    gap: 6px;
     margin: 0;
 }
 
@@ -105,554 +100,529 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     flex: 0 0 auto;
-    border: 1px solid #cbd5e1;
-    border-radius: 11px;
-    background: #fff;
-    color: #334155;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .1);
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    text-decoration: none;
 }
-.gi-freccia:hover { background: #f1f5f9; }
-.gi-freccia svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.gi-freccia:hover { background: rgba(255, 255, 255, .2); color: #fff; }
 
 .gi-data {
-    display: flex;
+    display: inline-flex;
     align-items: baseline;
-    gap: 8px;
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 0 4px;
+    gap: 7px;
+    padding: 0 8px;
+    font-size: 13.5px;
+    color: #c7d7e8;
+    white-space: nowrap;
 }
+.gi-data b { font-size: 15px; font-weight: 700; color: #fff; text-transform: capitalize; }
 
-.gi-data-gg {
-    font-size: 16px;
-    font-weight: 800;
-    text-transform: capitalize;
-    letter-spacing: -.01em;
-}
-
-.gi-data-n { font-size: 14px; color: var(--gi-tenue); font-weight: 600; }
-
-.gi-oggi-pill {
-    padding: 2px 9px;
+.gi-oggi {
+    padding: 1px 7px;
     border-radius: 20px;
-    background: var(--gi-blu);
+    background: #2563eb;
     color: #fff;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 800;
+    font-style: normal;
     text-transform: uppercase;
     letter-spacing: .06em;
 }
 
-.gi-torna-oggi {
-    padding: 0 12px;
-    height: 36px;
+.gi-torna {
+    height: 32px;
     display: inline-flex;
     align-items: center;
-    border-radius: 9px;
-    background: #eff6ff;
-    color: #1d4ed8;
-    font-size: 13px;
+    padding: 0 11px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .1);
+    color: #dbeafe;
+    font-size: 12.5px;
     font-weight: 700;
     text-decoration: none;
 }
 
-.gi-giorni input[type="date"] {
-    height: 44px;
-    padding: 0 11px;
-    border: 1px solid #cbd5e1;
-    border-radius: 11px;
-    font-size: 13px;
-    color: #334155;
-    background: #fff;
-}
-
+.gi-giorni input[type="date"],
 .gi-vai {
-    height: 44px;
-    padding: 0 16px;
-    flex: 0 0 auto;
-    border: 1px solid #cbd5e1;
-    border-radius: 11px;
-    background: #fff;
-    color: #334155;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
+    height: 38px;
+    padding: 0 11px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+    font-size: 12.5px;
+    font-family: inherit;
 }
-.gi-vai:hover { background: #f1f5f9; }
+.gi-vai { font-weight: 700; cursor: pointer; padding: 0 15px; }
+.gi-vai:hover { background: rgba(255, 255, 255, .18); }
+/* l'icona del calendario e' nera su fondo scuro: si schiarisce */
+.gi-giorni input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.7); }
 
 .gi-cerca {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 1 1 240px;
-    height: 44px;
-    padding: 0 13px;
-    border: 1px solid #cbd5e1;
-    border-radius: 11px;
-    background: #fff;
+    flex: 1 1 220px;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .08);
 }
-.gi-cerca:focus-within { border-color: var(--gi-blu); box-shadow: 0 0 0 3px rgba(3, 105, 161, .12); }
-.gi-cerca svg { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: var(--gi-grigio); stroke-width: 2.2; stroke-linecap: round; }
-
+.gi-cerca:focus-within { border-color: #60a5fa; background: rgba(255, 255, 255, .14); }
+.gi-cerca svg { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: #93b4d4; stroke-width: 2.2; stroke-linecap: round; }
 .gi-cerca input {
     flex: 1 1 auto;
     min-width: 0;
     border: 0;
     outline: 0;
-    font-size: 15px;
     background: transparent;
-    color: var(--gi-testo);
-}
-
-/* ── Riepilogo e filtri ─────────────────────────────────────────────────── */
-.gi-riepilogo {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: stretch;
-    margin-bottom: 20px;
-}
-
-.gi-avanzamento {
-    flex: 1 1 260px;
-    padding: 15px 18px;
-    background: linear-gradient(135deg, #0f2942, #1e3a5f);
-    border-radius: 14px;
     color: #fff;
+    font-size: 14px;
 }
-.gi-avanzamento.is-finita { background: linear-gradient(135deg, #14532d, #16a34a); }
+.gi-cerca input::placeholder { color: #8fadc9; }
 
-.gi-avanzamento-testa {
+/* ── Avanzamento ────────────────────────────────────────────────────────── */
+.gi-avanz {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
+    align-items: center;
     gap: 12px;
-    margin-bottom: 11px;
+    padding: 9px 15px;
+    margin-bottom: 12px;
+    background: #fff;
+    border: 1px solid var(--gi-bordo);
+    border-left: 4px solid var(--gi-blu);
+    border-radius: 9px;
 }
+.gi-avanz.is-finita { border-left-color: var(--gi-verde); background: #f4fdf7; }
 
-.gi-avanzamento-n {
-    font-size: 30px;
+.gi-avanz-n {
+    font-size: 17px;
     font-weight: 800;
-    line-height: 1;
-    letter-spacing: -.03em;
+    letter-spacing: -.02em;
+    white-space: nowrap;
 }
-.gi-avanzamento-n small { font-size: 16px; font-weight: 600; opacity: .6; }
+.gi-avanz-lb { font-size: 13px; color: var(--gi-tenue); white-space: nowrap; }
 
-.gi-avanzamento-lb {
-    font-size: 12.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    opacity: .85;
-    text-align: right;
-}
-
-.gi-barra-avanzamento {
-    height: 7px;
+.gi-avanz-barra {
+    flex: 1 1 auto;
+    min-width: 60px;
+    height: 5px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, .18);
+    background: #e8eef5;
     overflow: hidden;
 }
-.gi-barra-avanzamento span {
+.gi-avanz-barra i {
     display: block;
     height: 100%;
     border-radius: 20px;
-    background: #fff;
+    background: var(--gi-blu);
     transition: width .3s ease;
 }
+.gi-avanz.is-finita .gi-avanz-barra i { background: var(--gi-verde); }
 
-.gi-filtri {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    flex: 2 1 420px;
+/* ── Board ──────────────────────────────────────────────────────────────── */
+.gi-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
 }
 
-/* le caselle contano E filtrano: un tocco e restano solo quelle righe */
-.gi-filtro {
-    flex: 1 1 96px;
-    min-height: 70px;
-    padding: 10px 12px;
+.gi-col {
+    background: var(--gi-fondo);
     border: 1px solid var(--gi-bordo);
-    border-radius: 13px;
-    background: #fff;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color .15s, box-shadow .15s, background .15s;
-}
-.gi-filtro:hover { background: #f8fafc; }
-
-.gi-filtro.is-on {
-    border-color: var(--gi-testo);
-    box-shadow: 0 0 0 2px rgba(15, 23, 42, .1);
+    border-radius: 11px;
+    overflow: hidden;
 }
 
-.gi-filtro-n {
-    display: block;
-    font-size: 24px;
-    font-weight: 800;
-    line-height: 1.1;
-    letter-spacing: -.03em;
-}
-
-.gi-filtro-lb {
-    display: block;
-    margin-top: 3px;
-    font-size: 11.5px;
-    font-weight: 700;
-    color: var(--gi-tenue);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-}
-
-.gi-f-ritardo   .gi-filtro-n { color: var(--gi-rosso); }
-.gi-f-escono    .gi-filtro-n { color: var(--gi-verde); }
-.gi-f-rientrano .gi-filtro-n { color: var(--gi-blu); }
-.gi-f-fuori     .gi-filtro-n { color: var(--gi-grigio); }
-
-/* ── Blocchi ────────────────────────────────────────────────────────────── */
-.gi-blocco { margin-bottom: 26px; }
-
-.gi-blocco-tit {
+.gi-col-testa {
     display: flex;
     align-items: center;
-    gap: 9px;
-    margin: 0 0 11px;
-    font-size: 12.5px;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--gi-bordo);
+    background: #fff;
+}
+
+.gi-col-tit {
+    font-size: 11.5px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: .06em;
+    letter-spacing: .05em;
     color: #475569;
 }
 
-.gi-punto { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-.gi-p-ritardo   { background: var(--gi-rosso); }
-.gi-p-escono    { background: var(--gi-verde); }
-.gi-p-rientrano { background: var(--gi-blu); }
-.gi-p-fuori     { background: var(--gi-grigio); }
-.gi-p-prossime  { background: #7c3aed; }
-
-.gi-conta {
-    padding: 1px 8px;
+.gi-col-n {
+    min-width: 22px;
+    padding: 1px 7px;
     border-radius: 20px;
-    background: #e2e8f0;
-    font-size: 11px;
+    background: #e8eef5;
+    font-size: 12px;
     font-weight: 800;
+    text-align: center;
     color: #475569;
+}
+
+/* ogni colonna ha il suo colore: si capisce dove si e' anche scorrendo di
+   lato sul telefono, senza rileggere il titolo */
+.gi-col-ritardo   .gi-col-testa { box-shadow: inset 0 3px 0 var(--gi-rosso); }
+.gi-col-escono    .gi-col-testa { box-shadow: inset 0 3px 0 var(--gi-verde); }
+.gi-col-rientrano .gi-col-testa { box-shadow: inset 0 3px 0 var(--gi-blu); }
+.gi-col-fuori     .gi-col-testa { box-shadow: inset 0 3px 0 var(--gi-grigio); }
+
+.gi-col-ritardo   .gi-col-n { background: #fee2e2; color: #991b1b; }
+.gi-col-escono    .gi-col-n { background: #dcfce7; color: #166534; }
+.gi-col-rientrano .gi-col-n { background: #dbeafe; color: #1e40af; }
+
+.gi-col.is-vuota { opacity: .6; }
+
+.gi-col-corpo { padding: 9px; display: flex; flex-direction: column; gap: 8px; }
+
+.gi-col-niente {
+    margin: 0;
+    padding: 14px 4px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--gi-grigio);
 }
 
 /* ── Scheda ─────────────────────────────────────────────────────────────── */
 .gi-card {
-    position: relative;
-    padding: 15px 16px 14px 19px;
-    margin-bottom: 10px;
+    padding: 10px 11px;
     background: #fff;
     border: 1px solid var(--gi-bordo);
-    border-radius: 14px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    border-radius: 9px;
+}
+.gi-card.is-fatta { background: #fbfdfc; border-color: #cfe9da; }
+
+/* mentre la richiesta e' in volo la scheda non risponde: due tocchi rapidi
+   segnavano e subito annullavano */
+.gi-card.is-attesa { opacity: .5; pointer-events: none; }
+
+.gi-riga1 { display: flex; align-items: center; gap: 7px; }
+
+/* la targa e' il dato che si cerca per primo: monospaziata, si legge a colpo
+   d'occhio anche in mezzo a dieci schede */
+.gi-targa {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    word-break: break-all;
 }
 
-/* la striscia colorata dice a colpo d'occhio di che blocco e' la scheda */
-.gi-card::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 12px;
-    bottom: 12px;
-    width: 4px;
-    border-radius: 0 4px 4px 0;
-}
-.gi-ritardo::before   { background: var(--gi-rosso); }
-.gi-escono::before    { background: var(--gi-verde); }
-.gi-rientrano::before { background: var(--gi-blu); }
-.gi-fuori::before     { background: #cbd5e1; }
-
-.gi-ritardo { border-color: #fecaca; background: #fffbfb; }
-
-/* fatta: resta leggibile ma smette di chiedere attenzione */
-.gi-card.is-fatta { background: #fafdfb; border-color: #d1fae5; }
-.gi-card.is-fatta .gi-mezzo-box { opacity: .75; }
-
-.gi-card-main { display: flex; gap: 14px; align-items: flex-start; }
-
-/* targa/matricola: il dato che il tecnico cerca per primo */
-.gi-mezzo-box {
+.gi-spunta {
+    display: inline-flex;
     flex: 0 0 auto;
-    min-width: 104px;
-    max-width: 150px;
-    padding: 8px 11px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    text-align: center;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--gi-verde);
 }
+.gi-spunta svg { width: 11px; height: 11px; fill: none; stroke: #fff; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
 
-.gi-mezzo {
-    display: block;
-    font-size: 17px;
-    font-weight: 800;
-    letter-spacing: .04em;
-    line-height: 1.2;
-    word-break: break-word;
+/* chiamare e' l'azione piu' frequente dopo segnare: resta a portata di
+   pollice, in alto a destra sulla scheda */
+.gi-tel {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: #1d4ed8;
 }
+.gi-tel:hover { background: #dbeafe; }
+.gi-tel svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
 .gi-sotto {
-    display: block;
-    margin-top: 2px;
+    margin-top: 1px;
     font-size: 11px;
-    font-weight: 600;
-    color: var(--gi-tenue);
+    color: var(--gi-grigio);
     line-height: 1.3;
 }
 
-.gi-info { flex: 1 1 auto; min-width: 0; }
-
 .gi-cliente {
-    font-size: 17px;
+    margin-top: 5px;
+    font-size: 14px;
     font-weight: 700;
     line-height: 1.25;
-    letter-spacing: -.01em;
 }
 
 .gi-meta {
     display: flex;
-    gap: 6px 16px;
+    gap: 4px 9px;
     flex-wrap: wrap;
-    margin-top: 6px;
-}
-
-.gi-meta-v {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 13px;
+    margin-top: 3px;
+    font-size: 12px;
     color: var(--gi-tenue);
 }
-.gi-meta-v svg { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: var(--gi-grigio); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.gi-luogo { font-weight: 600; }
+.gi-periodo { white-space: nowrap; }
 
-/* chiamare e' l'azione piu' frequente dopo segnare: merita un pulsante */
-.gi-chiama {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    height: 38px;
-    margin-top: 9px;
-    padding: 0 14px;
-    border-radius: 10px;
-    background: #eff6ff;
-    color: #1d4ed8;
-    font-size: 14px;
-    font-weight: 700;
-    text-decoration: none;
-}
-.gi-chiama:hover { background: #dbeafe; }
-.gi-chiama svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+/* pallini invece di etichette: in colonna stretta "contratto da firmare"
+   occuperebbe due righe da solo */
+.gi-stati { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
 
-.gi-stati { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-
-.gi-tag {
-    padding: 3px 9px;
-    border-radius: 6px;
-    font-size: 11.5px;
-    font-weight: 700;
-}
-.gi-tag.is-ok     { background: #dcfce7; color: #166534; }
-.gi-tag.is-ko     { background: #fee2e2; color: #991b1b; }
-.gi-tag.is-attesa { background: #fef3c7; color: #92400e; }
-.gi-tag.is-info   { background: #e0f2fe; color: #075985; }
-.gi-tag.is-fatto  { background: #f1f5f9; color: #475569; }
-
-.gi-note {
-    margin-top: 9px;
-    padding: 8px 11px;
-    background: #f8fafc;
-    border-left: 3px solid #cbd5e1;
-    border-radius: 0 7px 7px 0;
-    font-size: 13px;
-    color: #475569;
-    line-height: 1.45;
-}
-
-/* ── Azioni ─────────────────────────────────────────────────────────────── */
-.gi-azioni {
-    display: flex;
-    gap: 9px;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-top: 13px;
-    padding-top: 12px;
-    border-top: 1px dashed #e8edf3;
-}
-
-.gi-form { margin: 0; }
-
-/* il pulsante grande e' UNO: quello che serve in questo blocco */
-.gi-primaria {
+.gi-dot {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 48px;
-    padding: 0 22px;
+    width: 21px;
+    height: 21px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+}
+.gi-dot.is-ok     { background: #dcfce7; color: #166534; }
+.gi-dot.is-ko     { background: #fee2e2; color: #991b1b; }
+.gi-dot.is-attesa { background: #fef3c7; color: #92400e; }
+
+.gi-rif, .gi-ora {
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: #eef2f7;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+}
+.gi-ora { background: #e0f2fe; color: #075985; }
+
+.gi-note {
+    margin-top: 7px;
+    padding: 6px 8px;
+    background: var(--gi-fondo);
+    border-left: 2px solid #cbd5e1;
+    border-radius: 0 5px 5px 0;
+    font-size: 11.5px;
+    color: #475569;
+    line-height: 1.4;
+}
+
+/* ── Azioni ─────────────────────────────────────────────────────────────── */
+.gi-azioni { display: flex; gap: 6px; align-items: stretch; margin-top: 9px; }
+
+.gi-form { margin: 0; display: flex; flex: 1 1 auto; min-width: 0; }
+
+/* uno solo grande, quello che serve in questa colonna: prima erano tre
+   pulsanti identici e bisognava leggerli tutti per capire quale premere */
+.gi-vai-btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+    padding: 0 10px;
     border: 0;
-    border-radius: 11px;
+    border-radius: 8px;
     background: var(--gi-verde);
     color: #fff;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 700;
+    font-family: inherit;
     cursor: pointer;
+    line-height: 1.2;
 }
-.gi-primaria:hover { filter: brightness(.94); }
-.gi-rientrano .gi-primaria { background: var(--gi-blu); }
-.gi-ritardo   .gi-primaria { background: var(--gi-rosso); }
+.gi-vai-btn:hover { filter: brightness(1.1); }
+.gi-col-rientrano .gi-vai-btn { background: var(--gi-blu); }
+.gi-col-ritardo   .gi-vai-btn { background: var(--gi-rosso); }
 
-.gi-primaria.is-fatta {
+.gi-vai-btn.is-fatta {
     background: #fff;
     border: 1px solid #bbf7d0;
-    color: #15803d;
-}
-.gi-primaria.is-fatta:hover { background: #f0fdf4; filter: none; }
-.gi-primaria svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-
-.gi-primaria-annulla {
-    padding-left: 9px;
-    margin-left: 3px;
-    border-left: 1px solid #d1fae5;
+    color: var(--gi-verde);
+    font-weight: 600;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--gi-tenue);
-    text-transform: lowercase;
 }
+.gi-vai-btn.is-fatta:hover { background: #f0fdf4; filter: none; }
 
-.gi-secondarie { display: flex; gap: 8px; flex-wrap: wrap; }
+/* le altre azioni dietro il "···": ci sono, ma non chiedono attenzione */
+.gi-altro { position: relative; flex: 0 0 auto; }
 
-.gi-secondaria {
-    display: inline-flex;
+.gi-altro summary {
+    display: flex;
     align-items: center;
-    min-height: 44px;
-    padding: 0 15px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
+    justify-content: center;
+    width: 40px;
+    min-height: 40px;
+    border: 1px solid var(--gi-bordo);
+    border-radius: 8px;
     background: #fff;
-    color: #475569;
-    font-size: 13.5px;
-    font-weight: 600;
+    color: var(--gi-tenue);
+    font-size: 15px;
+    font-weight: 800;
     cursor: pointer;
+    list-style: none;
+    user-select: none;
 }
-.gi-secondaria:hover { background: #f1f5f9; }
+.gi-altro summary::-webkit-details-marker { display: none; }
+.gi-altro summary:hover { background: #f1f5f9; }
+.gi-altro[open] summary { background: #f1f5f9; border-color: #cbd5e1; }
 
-/* mentre la richiesta e' in volo la scheda non risponde: due tocchi rapidi
-   segnavano e subito annullavano */
-.gi-card.is-attesa { opacity: .55; pointer-events: none; }
-
-/* ── Vuoti e avvisi ─────────────────────────────────────────────────────── */
-.gi-vuoto {
+.gi-altro-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 5px);
+    z-index: 10;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    padding: 34px 20px;
+    gap: 3px;
+    min-width: 168px;
+    padding: 5px;
     background: #fff;
-    border: 1px dashed var(--gi-bordo);
-    border-radius: 14px;
-    text-align: center;
-    color: var(--gi-tenue);
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, .14);
 }
-.gi-vuoto strong { font-size: 15px; color: #334155; }
-.gi-vuoto span { font-size: 13px; }
-.gi-vuoto svg { width: 30px; height: 30px; margin-bottom: 4px; fill: none; stroke: #cbd5e1; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
+.gi-altro-menu button {
+    width: 100%;
+    min-height: 38px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.gi-altro-menu button:hover { background: #f1f5f9; }
+
+/* ── Avvisi ─────────────────────────────────────────────────────────────── */
 .gi-avviso {
-    padding: 11px 15px;
-    margin-bottom: 14px;
+    padding: 9px 14px;
+    margin-bottom: 12px;
     background: #dcfce7;
     border: 1px solid #bbf7d0;
-    border-radius: 10px;
-    font-size: 13.5px;
+    border-radius: 8px;
+    font-size: 13px;
     font-weight: 600;
     color: #166534;
 }
 
 /* ── Prossime partenze ──────────────────────────────────────────────────── */
-.gi-prossime { margin-top: 34px; }
+/* richiudibile: e' un promemoria, non il lavoro di oggi */
+.gi-prossime {
+    margin-top: 18px;
+    background: #fff;
+    border: 1px solid var(--gi-bordo);
+    border-radius: 11px;
+}
 
-.gi-giorno { margin-bottom: 14px; }
+.gi-prossime summary {
+    padding: 11px 15px;
+    font-size: 11.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #475569;
+    cursor: pointer;
+}
+
+.gi-prossime-corpo {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    padding: 0 15px 15px;
+}
 
 .gi-giorno-tit {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 13px;
+    gap: 6px;
+    margin-bottom: 5px;
+    font-size: 12.5px;
+    color: var(--gi-grigio);
 }
-.gi-giorno-tit strong { font-size: 14px; font-weight: 800; }
-.gi-giorno-tit span { color: var(--gi-grigio); text-transform: capitalize; }
+.gi-giorno-tit b { font-size: 13px; color: var(--gi-testo); }
+.gi-giorno-tit i {
+    font-style: normal;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 20px;
+    background: #eef2f7;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+}
 
 .gi-prossima {
     display: flex;
     align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-    margin-bottom: 5px;
-    background: #fff;
-    border: 1px solid #eef2f7;
-    border-radius: 10px;
-    font-size: 13.5px;
-}
-
-.gi-mezzo-mini {
-    font-weight: 800;
-    letter-spacing: .03em;
-    padding: 2px 8px;
-    background: #f1f5f9;
-    border-radius: 6px;
+    gap: 7px;
+    padding: 6px 9px;
+    margin-bottom: 4px;
+    background: var(--gi-fondo);
+    border-radius: 7px;
     font-size: 12.5px;
 }
 
-.gi-prossima-cliente { font-weight: 600; color: #334155; }
-.gi-prossima-luogo   { color: var(--gi-grigio); font-size: 12.5px; }
-.gi-prossima-gg      { margin-left: auto; color: var(--gi-tenue); font-size: 12.5px; font-weight: 600; }
+.gi-targa-mini {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    flex: 0 0 auto;
+}
+.gi-prossima-cliente { flex: 1 1 auto; min-width: 0; font-weight: 600; color: #334155;
+                       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gi-prossima-luogo { color: var(--gi-grigio); font-size: 11.5px; }
+.gi-prossima-gg { color: var(--gi-tenue); font-size: 11.5px; font-weight: 700; }
 
-/* ── Schermi larghi: due colonne ────────────────────────────────────────── */
-@media (min-width: 900px) {
-    .gi-blocco {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        align-items: start;
-    }
-    .gi-blocco-tit { grid-column: 1 / -1; margin-bottom: 0; }
-    .gi-blocco > .gi-card { margin-bottom: 0; }
+/* ── Schermi medi: due colonne per riga ─────────────────────────────────── */
+@media (max-width: 1100px) {
+    .gi-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ── Telefono ───────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-    .gi-hero { padding-top: 14px; }
-    .gi-hero h1 { font-size: 21px; }
+/* ── Telefono: una colonna alla volta, si scorre di lato ────────────────── */
+@media (max-width: 700px) {
+    .gi-testata { border-radius: 0; margin: 0 -12px 12px; padding: 12px 12px 10px; }
+    .gi-testata h1 { font-size: 16px; }
+    .gi-cerca { flex-basis: 100%; order: 3; }
+    .gi-giorni { flex: 1 1 auto; }
+    .gi-giorni input[type="date"] { flex: 1 1 auto; min-width: 0; }
 
-    .gi-barra { padding: 9px; border-radius: 12px; }
-    .gi-data { order: -1; width: 100%; justify-content: center; }
-    .gi-cerca { flex-basis: 100%; }
+    /* scorrimento orizzontale con aggancio: una colonna riempie lo schermo
+       e si passa alla successiva con una strisciata, come le storie */
+    .gi-board {
+        display: flex;
+        grid-template-columns: none;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        margin: 0 -12px;
+        padding: 0 12px;
+        gap: 8px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .gi-board::-webkit-scrollbar { display: none; }
 
-    .gi-avanzamento { flex-basis: 100%; }
-    .gi-filtro { flex: 1 1 calc(50% - 4px); }
+    .gi-col {
+        flex: 0 0 88%;
+        scroll-snap-align: start;
+    }
+    .gi-col.is-vuota { flex-basis: 46%; }
 
-    .gi-card-main { flex-direction: column; gap: 10px; }
-    .gi-mezzo-box { min-width: 0; max-width: none; width: 100%; text-align: left; }
-    .gi-mezzo { font-size: 19px; }
-
-    /* a tutta larghezza: si centrano senza guardare */
-    .gi-primaria { width: 100%; }
-    .gi-secondarie { width: 100%; }
-    .gi-secondaria { flex: 1 1 auto; justify-content: center; }
+    .gi-col-testa { position: sticky; top: 0; z-index: 2; }
 }
 
 /* ── Stampa: l'elenco da appendere in officina ──────────────────────────── */
 @media print {
-    .gi-barra, .gi-filtri, .gi-azioni, .gi-hero-link, .gi-chiama { display: none !important; }
-    .gi-card { break-inside: avoid; box-shadow: none; }
-    .gi-page { padding: 0; }
+    .gi-testata, .gi-azioni, .gi-tel { display: none !important; }
+    .gi-board { display: block; }
+    .gi-col { break-inside: avoid; margin-bottom: 10px; }
+    .gi-card { break-inside: avoid; }
 }

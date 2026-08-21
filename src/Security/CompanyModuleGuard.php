@@ -42,6 +42,7 @@ final class CompanyModuleGuard
         '/select-company',
         '/switch-company',
         '/societa',
+        '/app',
         '/notifications',
         '/api',
         '/services',

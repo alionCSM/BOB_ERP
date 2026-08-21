@@ -1,79 +1,58 @@
 {#
-  Il corpo della giornata: riepilogo, filtri e le schede.
+  Il corpo della giornata: la board a colonne.
 
-  E' la parte che cambia quando il tecnico segna un'uscita o un rientro, ed
-  e' anche l'unica cosa che il server rimanda dopo un tocco (?frammento=1):
+  Una colonna per momento della giornata, da sinistra a destra nell'ordine
+  in cui le cose succedono: chi doveva rientrare, chi esce, chi rientra, chi
+  resta fuori. Prima era un elenco unico in verticale, e per sapere quante
+  autocarrate uscivano bisognava scorrere fino al blocco giusto.
+
+  E' anche l'unica cosa che il server rimanda dopo un tocco (?frammento=1):
   ricaricare l'intera pagina — menu, barra in alto, prossime partenze — per
-  cambiare una riga sarebbe sprecato su un telefono in officina.
+  cambiare una scheda sarebbe sprecato su un telefono in officina.
 
   Attese: blocchi, riepilogo, data, azione, csrfToken.
 #}
 {% import 'poti/_giornata_scheda.html.twig' as g %}
 
-{# ── Riepilogo: quanto lavoro c'e' e quanto ne resta ─────────────────────── #}
-<div class="gi-riepilogo">
-    <div class="gi-avanzamento{{ riepilogo.movimenti > 0 and riepilogo.mancanti == 0 ? ' is-finita' : '' }}">
-        <div class="gi-avanzamento-testa">
-            <span class="gi-avanzamento-n">{{ riepilogo.fatti }}<small>/{{ riepilogo.movimenti }}</small></span>
-            <span class="gi-avanzamento-lb">
-                {% if riepilogo.movimenti == 0 %}
-                    Nessun movimento
-                {% elseif riepilogo.mancanti == 0 %}
-                    Giornata completata
-                {% else %}
-                    {{ riepilogo.mancanti }} da segnare
-                {% endif %}
-            </span>
-        </div>
-        <div class="gi-barra-avanzamento">
-            <span style="width: {{ riepilogo.percentuale }}%"></span>
-        </div>
-    </div>
-
-    {# Le caselle contano e filtrano: si tocca "Escono" e restano solo quelle.
-       Sul telefono e' molto piu' pratico di scorrere tutto l'elenco. #}
-    <div class="gi-filtri" role="group" aria-label="Filtra la giornata">
-        <button type="button" class="gi-filtro is-on" data-gi-filtro="tutti">
-            <span class="gi-filtro-n">{{ riepilogo.totale }}</span>
-            <span class="gi-filtro-lb">Tutti</span>
-        </button>
-        {% for chiave, b in blocchi %}
-            {% if b.schede|length %}
-                <button type="button" class="gi-filtro gi-f-{{ chiave }}" data-gi-filtro="{{ chiave }}">
-                    <span class="gi-filtro-n">{{ b.schede|length }}</span>
-                    <span class="gi-filtro-lb">{{ b.etichetta }}</span>
-                </button>
-            {% endif %}
-        {% endfor %}
-    </div>
+{# L'avanzamento sta qui e non nella barra in alto perche' cambia a ogni
+   tocco: e' l'unica parte del riepilogo che si muove, ed e' anche l'unica
+   che il tecnico guarda per sapere se ha finito. #}
+<div class="gi-avanz{{ riepilogo.movimenti > 0 and riepilogo.mancanti == 0 ? ' is-finita' : '' }}">
+    <span class="gi-avanz-n">{{ riepilogo.fatti }}/{{ riepilogo.movimenti }}</span>
+    <span class="gi-avanz-lb">
+        {% if riepilogo.movimenti == 0 %}
+            nessun movimento oggi
+        {% elseif riepilogo.mancanti == 0 %}
+            giornata completata
+        {% else %}
+            {{ riepilogo.mancanti }} da segnare
+        {% endif %}
+    </span>
+    <span class="gi-avanz-barra"><i style="width: {{ riepilogo.percentuale }}%"></i></span>
 </div>
 
-{# ── I blocchi ───────────────────────────────────────────────────────────── #}
-<div id="gi-lista">
+{# Le intestazioni contano e filtrano insieme: sul telefono le colonne si
+   scorrono di lato, e toccare un titolo porta dritti a quella. #}
+<div class="gi-board" id="gi-board">
     {% for chiave, b in blocchi %}
-        {% if b.schede|length %}
-            <section class="gi-blocco" data-gi-blocco-sez="{{ chiave }}">
-                <h2 class="gi-blocco-tit">
-                    <span class="gi-punto gi-p-{{ chiave }}"></span>
-                    {{ b.etichetta }}
-                    <span class="gi-conta">{{ b.schede|length }}</span>
-                </h2>
+        <section class="gi-col gi-col-{{ chiave }}{{ b.schede|length ? '' : ' is-vuota' }}"
+                 data-gi-col="{{ chiave }}">
+            <header class="gi-col-testa">
+                <span class="gi-col-tit">{{ b.etichetta }}</span>
+                <span class="gi-col-n">{{ b.schede|length }}</span>
+            </header>
+
+            <div class="gi-col-corpo">
                 {% for s in b.schede %}{{ g.scheda(s, data, azione, csrfToken) }}{% endfor %}
-            </section>
-        {% endif %}
+
+                {% if b.schede|length == 0 %}
+                    <p class="gi-col-niente">—</p>
+                {% endif %}
+
+                {# compare quando la ricerca dal vivo non lascia niente in
+                   questa colonna, ma qualcosa c'era #}
+                <p class="gi-col-niente gi-col-cercato" hidden>nessuna corrispondenza</p>
+            </div>
+        </section>
     {% endfor %}
-
-    {% if riepilogo.totale == 0 %}
-        <div class="gi-vuoto">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            <strong>Giornata libera</strong>
-            <span>Nessun mezzo esce o rientra in questa data.</span>
-        </div>
-    {% endif %}
-
-    {# compare quando la ricerca dal vivo non lascia niente #}
-    <div class="gi-vuoto" id="gi-nessuno" hidden>
-        <strong>Nessun risultato</strong>
-        <span>Prova con un'altra targa, cliente o paese.</span>
-    </div>
 </div>
