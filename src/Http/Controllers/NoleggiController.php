@@ -7,6 +7,7 @@ use App\Http\Response;
 use App\Repository\Poti\MacchinaRepository;
 use App\Service\CurrentCompany;
 use App\Service\Poti\Audit;
+use App\Service\Poti\Giornata;
 use App\Service\Poti\VistaImpegni;
 
 /**
@@ -447,16 +448,47 @@ final class NoleggiController
         $cid  = $this->companyId();
 
         $data = VistaImpegni::data($_GET['data'] ?? '', date('Y-m-d'));
+        $user = $this->utente($request);
 
-        Response::view('poti/noleggi/giornata.html.twig', $request, [
-            'data'     => $data,
-            'ieri'     => date('Y-m-d', strtotime($data . ' -1 day')),
-            'domani'   => date('Y-m-d', strtotime($data . ' +1 day')),
-            'oggi'     => date('Y-m-d'),
-            'giornata' => $repo->giornata($cid, $data),
-            'prossime' => $repo->prossimeConsegne($cid, $data, 14),
-            'salvato'  => isset($_GET['salvato']),
-        ]);
+        // Stessa pagina delle autocarrate: qui l'unita' e' la singola
+        // macchina del noleggio, ma la scheda che ne esce e' identica.
+        $blocchi = Giornata::blocchi($repo->giornata($cid, $data), Giornata::MACCHINA);
+
+        $collegamenti = [];
+        if ($user->canAccess('pn_noleggi')) {
+            $collegamenti = [
+                ['href' => '/noleggi', 'label' => "Disponibilita'"],
+                ['href' => '/noleggi/elenco', 'label' => 'Noleggi'],
+                ['href' => '/noleggi/macchine', 'label' => 'Mezzi'],
+            ];
+        }
+
+        $vista = [
+            'titolo'       => 'Giornata mezzi sollevamento',
+            'sottotitolo'  => "Cosa esce, cosa rientra e cosa e' ancora fuori.",
+            'base'         => '/noleggi/giornata',
+            'azione'       => '/noleggi/giornata/segna',
+            'collegamenti' => $collegamenti,
+            'data'         => $data,
+            'ieri'         => date('Y-m-d', strtotime($data . ' -1 day')),
+            'domani'       => date('Y-m-d', strtotime($data . ' +1 day')),
+            'oggi'         => date('Y-m-d'),
+            'blocchi'      => $blocchi,
+            'riepilogo'    => Giornata::riepilogo($blocchi),
+            'prossime'     => Giornata::prossime(
+                $repo->prossimeConsegne($cid, $data, 14), Giornata::MACCHINA
+            ),
+            'salvato'      => isset($_GET['salvato']),
+        ];
+
+        // Dopo un tocco la pagina chiede solo il pezzo che cambia: riepilogo
+        // e schede. Rimandare tutto — menu, barra, prossime partenze — per
+        // aggiornare una riga sarebbe sprecato su un telefono in officina.
+        if (isset($_GET['frammento'])) {
+            Response::view('poti/_giornata_corpo.html.twig', $request, $vista);
+        }
+
+        Response::view('poti/giornata.html.twig', $request, $vista);
     }
 
     // ── POST /noleggi/giornata/segna ─────────────────────────────────────────
@@ -490,6 +522,12 @@ final class NoleggiController
                 $prima, $repo->noleggio($cid, $noleggioId),
                 (int)$this->utente($request)->id, (string)$prima['cliente']
             );
+        }
+
+        // come nelle autocarrate: il tocco arriva via AJAX e la pagina si
+        // aggiorna sul posto, senza far ripartire l'elenco da capo
+        if ($request->isAjax()) {
+            Response::json(['ok' => $prima !== null]);
         }
 
         Response::redirect('/noleggi/giornata?data=' . $data . '&salvato=1');
