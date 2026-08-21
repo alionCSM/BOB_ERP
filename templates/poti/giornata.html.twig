@@ -14,59 +14,49 @@
 #}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/giornata.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/poti/giornata.css?v=3">
 {% endblock %}
 
 {% block content %}
 <div class="gi-page">
 
-    <header class="gi-hero">
-        <div class="gi-hero-testo">
+    {# ── Testata: titolo, giorno e ricerca in un pezzo solo ───────────────── #}
+    <div class="gi-testata">
+        <div class="gi-testata-alto">
             <h1>{{ titolo }}</h1>
-            <p>{{ sottotitolo }}</p>
+            {% if collegamenti %}
+                <nav class="gi-link">
+                    {% for c in collegamenti %}<a href="{{ c.href }}">{{ c.label }}</a>{% endfor %}
+                </nav>
+            {% endif %}
         </div>
-        {% if collegamenti %}
-            <nav class="gi-hero-link">
-                {% for c in collegamenti %}
-                    <a href="{{ c.href }}">{{ c.label }}</a>
-                {% endfor %}
-            </nav>
-        {% endif %}
-    </header>
 
-    {# ── Barra del giorno: resta appesa in alto mentre si scorre ──────────── #}
-    <div class="gi-barra" id="gi-barra">
-        <form method="GET" action="{{ base }}" class="gi-giorni">
-            <a href="{{ base }}?data={{ ieri }}" class="gi-freccia" aria-label="Giorno precedente">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-            </a>
+        <div class="gi-testata-basso">
+            <form method="GET" action="{{ base }}" class="gi-giorni">
+                <a href="{{ base }}?data={{ ieri }}" class="gi-freccia" aria-label="Giorno precedente">‹</a>
 
-            <div class="gi-data">
-                <span class="gi-data-gg">
-                    {{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][data|date('N')] }}
+                <span class="gi-data">
+                    <b>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][data|date('N')] }}</b>
+                    {{ data|date('d/m/Y') }}
+                    {% if data == oggi %}<i class="gi-oggi">oggi</i>{% endif %}
                 </span>
-                <span class="gi-data-n">{{ data|date('d/m/Y') }}</span>
-                {% if data == oggi %}<span class="gi-oggi-pill">oggi</span>{% endif %}
-            </div>
 
-            <a href="{{ base }}?data={{ domani }}" class="gi-freccia" aria-label="Giorno successivo">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
-            </a>
+                <a href="{{ base }}?data={{ domani }}" class="gi-freccia" aria-label="Giorno successivo">›</a>
 
-            {% if data != oggi %}<a href="{{ base }}" class="gi-torna-oggi">Torna a oggi</a>{% endif %}
+                {% if data != oggi %}<a href="{{ base }}" class="gi-torna">oggi</a>{% endif %}
 
-            <input type="date" name="data" value="{{ data }}"
-                   aria-label="Scegli il giorno">
-            {# il pulsante resta visibile: senza JS il campo data da solo non
-               manda niente, e sembrerebbe che non funzioni #}
-            <button class="gi-vai">Vai</button>
-        </form>
+                <input type="date" name="data" value="{{ data }}" aria-label="Scegli il giorno">
+                {# resta visibile: senza JS il campo data da solo non manda
+                   niente, e sembrerebbe che non funzioni #}
+                <button class="gi-vai">Vai</button>
+            </form>
 
-        <label class="gi-cerca">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input type="search" id="gi-cerca" placeholder="Cerca targa, cliente, paese…"
-                   autocomplete="off" aria-label="Cerca nella giornata">
-        </label>
+            <label class="gi-cerca">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input type="search" id="gi-cerca" placeholder="Cerca targa, cliente, paese…"
+                       autocomplete="off" aria-label="Cerca nella giornata">
+            </label>
+        </div>
     </div>
 
     {% if salvato %}<div class="gi-avviso">Segnato.</div>{% endif %}
@@ -77,37 +67,34 @@
     </div>
 
     {# ── Prossime partenze: serve a preparare i mezzi in anticipo ─────────── #}
-    <section class="gi-prossime">
-        <h2 class="gi-blocco-tit">
-            <span class="gi-punto gi-p-prossime"></span>
-            Prossime partenze
-        </h2>
-        {% for giorno, righe in prossime %}
-            <div class="gi-giorno">
-                <div class="gi-giorno-tit">
-                    <strong>{{ giorno|date('d/m') }}</strong>
-                    <span>{{ ['','lunedi','martedi','mercoledi','giovedi','venerdi','sabato','domenica'][giorno|date('N')] }}</span>
-                    <span class="gi-conta">{{ righe|length }}</span>
-                </div>
-                {% for p in righe %}
-                    <div class="gi-prossima">
-                        <span class="gi-mezzo-mini">{{ p.mezzo }}</span>
-                        <span class="gi-prossima-cliente">{{ p.cliente }}</span>
-                        {% if p.luogo %}<span class="gi-prossima-luogo">{{ p.luogo }}</span>{% endif %}
-                        <span class="gi-prossima-gg">{{ p.giorni }} gg</span>
+    <details class="gi-prossime"{% if prossime %} open{% endif %}>
+        <summary>Prossime partenze</summary>
+        <div class="gi-prossime-corpo">
+            {% for giorno, righe in prossime %}
+                <div class="gi-giorno">
+                    <div class="gi-giorno-tit">
+                        <b>{{ giorno|date('d/m') }}</b>
+                        <span>{{ ['','lun','mar','mer','gio','ven','sab','dom'][giorno|date('N')] }}</span>
+                        <i>{{ righe|length }}</i>
                     </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="gi-vuoto">
-                <span>Niente in partenza nei prossimi 14 giorni.</span>
-            </div>
-        {% endfor %}
-    </section>
+                    {% for p in righe %}
+                        <div class="gi-prossima">
+                            <span class="gi-targa-mini">{{ p.mezzo }}</span>
+                            <span class="gi-prossima-cliente">{{ p.cliente }}</span>
+                            {% if p.luogo %}<span class="gi-prossima-luogo">{{ p.luogo }}</span>{% endif %}
+                            <span class="gi-prossima-gg">{{ p.giorni }}gg</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="gi-col-niente">Niente in partenza nei prossimi 14 giorni.</p>
+            {% endfor %}
+        </div>
+    </details>
 
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/giornata.js?v=2"></script>
+<script src="/assets/js/views/poti/giornata.js?v=3"></script>
 {% endblock %}
