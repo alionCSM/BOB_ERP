@@ -1,16 +1,15 @@
 {% extends 'layout/base.html.twig' %}
 
-{# Data provided by UsersController::permissionsEdit()
-   Variables: target (object with .id, .username, .permissions),
-              groups (nested structure: groupKey → {label, icon, color, perms: {key → {label, icon, color}}}),
-              modules (flat key→{label,icon,color}), activeCount, message
-   TODO: controller must move POST handling, User object instantiation,
-         savePermissions call, and AuditLogger call out of the old view into
-         a dedicated permissionsUpdate() action, then pass the read-only
-         variables above to this template. #}
+{# Dati da UsersController::permissionsEdit()
+   target (.id, .username, .permissions), groups (gruppo → {label, icon,
+   color, perms}), modules (piatto), activeCount, message,
+   societa (id → nome), societaId, moduliSocieta.
+
+   I permessi valgono PER SOCIETA': si configura una societa' alla volta,
+   e compaiono solo i moduli che quella societa' ha abilitato. #}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/users/permissions_edit.css">
+<link rel="stylesheet" href="/assets/css/views/users/permissions_edit.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -40,6 +39,25 @@
         </div>
     </div>
 
+    {# Una societa' alla volta: cambiarla ricarica la pagina con i suoi moduli
+       e i permessi che l'utente ha li' dentro. #}
+    <form method="GET" class="pe-societa">
+        <label for="pe-societa-sel">Permessi in</label>
+        <select name="societa" id="pe-societa-sel" onchange="this.form.submit()">
+            {% for id, nome in societa %}
+                <option value="{{ id }}" {{ id == societaId ? 'selected' : '' }}>{{ nome }}</option>
+            {% endfor %}
+        </select>
+        <span class="pe-societa-nota">
+            {% if moduliSocieta is null %}
+                tutti i moduli abilitati
+            {% else %}
+                {{ moduliSocieta|length }} moduli abilitati su questa societa'
+            {% endif %}
+        </span>
+        <noscript><button type="submit">Cambia</button></noscript>
+    </form>
+
     {% if message %}
         <div class="pe-toast">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -48,6 +66,10 @@
     {% endif %}
 
     <form method="POST">
+        {# la societa' viaggia col salvataggio: senza, si scriverebbero i
+           permessi su quella sbagliata #}
+        <input type="hidden" name="group_company_id" value="{{ societaId }}">
+
         {% for groupKey, group in groups %}
             {% set groupActiveCount = 0 %}
             {% for k, m in group.perms %}
@@ -91,6 +113,11 @@
                         {% endfor %}
                     </div>
                 </div>
+            </div>
+        {% else %}
+            <div class="pe-vuoto">
+                Questa societa' non ha nessun modulo abilitato: prima si
+                scelgono da <a href="/societa">Societa' del gruppo</a>.
             </div>
         {% endfor %}
 

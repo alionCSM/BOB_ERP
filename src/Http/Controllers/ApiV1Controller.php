@@ -647,9 +647,7 @@ final class ApiV1Controller
      */
     private function modulePermissions(User $user): array
     {
-        $stmt = $this->conn->prepare('SELECT module FROM bb_user_permissions WHERE user_id = :uid AND allowed = 1');
-        $stmt->execute([':uid' => (int)$user->id]);
-        $mods = array_fill_keys($stmt->fetchAll(\PDO::FETCH_COLUMN), true);
+        $mods = array_filter($user->getPermissions());
 
         return array_filter(
             $mods,

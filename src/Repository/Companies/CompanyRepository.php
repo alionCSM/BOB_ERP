@@ -291,15 +291,42 @@ class CompanyRepository implements CompanyRepositoryInterface
         return (int)$this->conn->lastInsertId();
     }
 
+    /**
+     * Permessi degli utenti-azienda (portale consorziate).
+     *
+     * I permessi ora stanno per societa' del gruppo: si scrivono li' e poi
+     * si rifa' il riassunto in bb_user_permissions. Questi utenti non sono
+     * assegnati a nessuna societa', quindi valgono nel Consorzio, che e' la
+     * stessa regola che applica CurrentCompany al login.
+     */
     public function clearUserPermissions(int $userId): void
     {
-        $this->conn->prepare('DELETE FROM bb_user_permissions WHERE user_id = :uid')->execute([':uid' => $userId]);
+        $this->conn->prepare('DELETE FROM bb_user_company_permissions WHERE user_id = :uid')
+                   ->execute([':uid' => $userId]);
+        $this->conn->prepare('DELETE FROM bb_user_permissions WHERE user_id = :uid')
+                   ->execute([':uid' => $userId]);
     }
 
     public function addUserPermission(int $userId, string $module, int $allowed): void
     {
-        $stmt = $this->conn->prepare('INSERT INTO bb_user_permissions (user_id, module, allowed) VALUES (:uid, :module, :allowed)');
-        $stmt->execute([':uid' => $userId, ':module' => $module, ':allowed' => $allowed]);
+        $stmt = $this->conn->prepare('
+            INSERT INTO bb_user_company_permissions (user_id, group_company_id, module, allowed)
+            SELECT :uid, c.id, :module, :allowed
+            FROM   bb_group_companies c
+            WHERE  c.id = :consorzio
+                OR EXISTS (SELECT 1 FROM bb_user_companies uc
+                           WHERE uc.user_id = :uid2 AND uc.group_company_id = c.id)
+            ON DUPLICATE KEY UPDATE allowed = VALUES(allowed)
+        ');
+        $stmt->execute([
+            ':uid'       => $userId,
+            ':uid2'      => $userId,
+            ':module'    => $module,
+            ':allowed'   => $allowed,
+            ':consorzio' => \App\Service\CurrentCompany::CONSORZIO_ID,
+        ]);
+
+        (new \App\Security\AccessControl($this->conn))->aggiornaProiezione($userId);
     }
 
     public function addUserCompanyAccess(int $userId, int $companyId): void

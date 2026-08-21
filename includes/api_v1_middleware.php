@@ -99,3 +99,8 @@ if (!$skipSelection && !isset($_SESSION[\App\Service\CurrentCompany::SESSION_KEY
         }
     }
 }
+
+// I permessi sono per societa': ApiAuthMiddleware li ha caricati prima che la
+// societa' fosse applicata, quindi vanno riletti adesso (stesso passaggio del
+// middleware web).
+$user->loadPermissions();

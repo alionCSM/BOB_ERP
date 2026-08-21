@@ -40,11 +40,12 @@ final class GroupCompanyRepository
     /** Crea o aggiorna una societa'. Ritorna l'id. */
     public function save(?int $id, array $dati): int
     {
+        // i moduli non stanno piu' qui: sono righe in bb_company_modules,
+        // scritte da AccessControl::salvaModuliSocieta()
         $params = [
             ':nome'        => $dati['nome'],
             ':codice'      => $dati['codice'],
             ':colore'      => $dati['colore'],
-            ':moduli'      => $dati['moduli'] !== '' ? $dati['moduli'] : null,
             ':attiva'      => $dati['attiva'] ? 1 : 0,
             ':ordinamento' => $dati['ordinamento'],
         ];
@@ -53,7 +54,7 @@ final class GroupCompanyRepository
             $stmt = $this->conn->prepare("
                 UPDATE bb_group_companies
                 SET nome = :nome, codice = :codice, colore = :colore,
-                    moduli = :moduli, attiva = :attiva, ordinamento = :ordinamento
+                    attiva = :attiva, ordinamento = :ordinamento
                 WHERE id = :id
             ");
             $stmt->execute($params + [':id' => $id]);
@@ -61,8 +62,8 @@ final class GroupCompanyRepository
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO bb_group_companies (nome, codice, colore, moduli, attiva, ordinamento)
-            VALUES (:nome, :codice, :colore, :moduli, :attiva, :ordinamento)
+            INSERT INTO bb_group_companies (nome, codice, colore, attiva, ordinamento)
+            VALUES (:nome, :codice, :colore, :attiva, :ordinamento)
         ");
         $stmt->execute($params);
         return (int)$this->conn->lastInsertId();
@@ -126,6 +127,15 @@ final class GroupCompanyRepository
         } catch (\Throwable $e) {
             $this->conn->rollBack();
             throw $e;
+        }
+
+        // Chi entra adesso in questa societa' e non ha ancora permessi qui si
+        // porta dietro quelli che ha altrove. Senza, entrerebbe e troverebbe
+        // un BOB vuoto, e chi lo ha assegnato penserebbe a un guasto.
+        // I permessi si affinano poi da Utenti → Permessi, societa' per societa'.
+        $access = new \App\Security\AccessControl($this->conn);
+        foreach (array_unique($userIds) as $uid) {
+            $access->ereditaPermessi((int)$uid, $companyId);
         }
     }
 

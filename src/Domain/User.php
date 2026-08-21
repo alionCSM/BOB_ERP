@@ -487,91 +487,62 @@ class User {
         }
         return false;
     }
+    /** Permessi nella societa' attiva. @return array<string,bool> */
     public function getPermissions(): array
     {
-        $stmt = $this->conn->prepare("
-        SELECT module, allowed 
-        FROM bb_user_permissions 
-        WHERE user_id = :uid
-    ");
-        $stmt->execute([':uid' => $this->id]);
-
-        $permissions = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $permissions[$row['module']] = $row['allowed'] == 1;
-        }
-        return $permissions;
+        return $this->accessControl()->permessi((int)$this->id, $this->societaAttiva());
     }
 
     /**
-     * Moduli abilitati sulla societa' del gruppo attiva.
-     * null = nessun limite (caso del Consorzio, che li ha tutti).
-     *
-     * Statico perche' la societa' non cambia nel corso di una richiesta e
-     * canAccess() viene chiamato decine di volte per costruire il menu.
+     * Controllo accessi: la regola sta tutta in AccessControl, qui c'e' solo
+     * la scorciatoia comoda da chiamare (anche da Twig, per il menu).
      */
-    private static ?array $companyModules = null;
-    private static bool   $companyModulesLoaded = false;
-
-    private function companyAllows(string $module): bool
+    private function accessControl(): \App\Security\AccessControl
     {
-        if (!self::$companyModulesLoaded) {
-            self::$companyModulesLoaded = true;
-            try {
-                $cid = (int)($_SESSION[\App\Service\CurrentCompany::SESSION_KEY] ?? 0);
-                if ($cid) {
-                    $stmt = $this->conn->prepare('SELECT moduli FROM bb_group_companies WHERE id = ?');
-                    $stmt->execute([$cid]);
-                    $moduli = $stmt->fetchColumn();
-                    if (!empty($moduli)) {
-                        self::$companyModules = array_filter(array_map('trim', explode(',', (string)$moduli)));
-                    }
-                }
-            } catch (\Throwable $e) {
-                // tabella non ancora creata: si continua senza limiti
-                self::$companyModules = null;
-            }
-        }
+        return new \App\Security\AccessControl($this->conn);
+    }
 
-        return self::$companyModules === null
-            || in_array($module, self::$companyModules, true);
+    /**
+     * Societa' in cui questo utente sta lavorando.
+     * 0 fuori da una richiesta web (cron, mail): li' i permessi valgono
+     * come somma di tutte le societa'. Vedi AccessControl::permessi().
+     */
+    private function societaAttiva(): int
+    {
+        return \App\Security\AccessControl::societaAttiva();
     }
 
     public function canAccess(string $module): bool
     {
-        // Il limite della societa' vale prima di tutto, superadmin compreso:
-        // dentro Poti non devono comparire i moduli del Consorzio, altrimenti
-        // il menu mescolerebbe societa' che devono restare separate.
-        if (!$this->companyAllows($module)) return false;
-
-        // SuperAdmin (ID 1) → accesso totale
-        if ($this->id == 1) return true;
-
-        // Lazy-load: chiamabile anche da Twig (menu) prima che i permessi
-        // siano stati caricati esplicitamente.
-        if (empty($this->permissions)) {
-            $this->loadPermissions();
-        }
-
-        return !empty($this->permissions[$module]);
+        // Due domande in una: la societa' ha il modulo, e l'utente il
+        // permesso li' dentro. La prima vale anche per il superadmin.
+        return $this->accessControl()->puo(
+            (int)$this->id,
+            $this->societaAttiva(),
+            $module
+        );
     }
 
     /**
      * Centralised "can this user see prezzi/costi/importi?" check.
      *
-     * Backed by the `view_prices` permission in bb_user_permissions.
-     * Superadmin (id 1) bypasses the permission table.
+     * Permesso `view_prices`, come tutti gli altri: vale nella societa' in
+     * cui si sta lavorando. Superadmin (id 1) lo ha sempre.
      */
     public function canSeePrices(): bool
     {
         if ((int)$this->id === 1) {
             return true;
         }
-        // Lazy-load if needed
-        if (empty($this->permissions)) {
-            $this->loadPermissions();
-        }
-        return !empty($this->permissions['view_prices']);
+        // Solo il permesso, senza il filtro dei moduli della societa':
+        // "vede i prezzi" e' un tratto della persona, non una pagina da
+        // abilitare, e non ha senso che sparisca perche' la societa' non ha
+        // quella voce spuntata.
+        // Non si passa da $this->permissions: possono essere state caricate
+        // prima che la societa' fosse scelta.
+        return !empty(
+            $this->accessControl()->permessi((int)$this->id, $this->societaAttiva())['view_prices']
+        );
     }
 
     /**
@@ -598,36 +569,27 @@ class User {
     }
 
 
-    public function savePermissions(array $data): void
+    /**
+     * Salva i permessi dell'utente in una societa'.
+     *
+     * La societa' e' obbligatoria: un permesso senza societa' non vuol dire
+     * niente, ed e' esattamente l'ambiguita' che rendeva impossibile avere
+     * lo stesso utente impiegato in una societa' e tecnico in un'altra.
+     *
+     * @param array<string,mixed> $data modulo => vero/falso
+     */
+    public function savePermissions(array $data, int $companyId): void
     {
-        // Rimuovi permessi esistenti
-        $del = $this->conn->prepare("DELETE FROM bb_user_permissions WHERE user_id = :uid");
-        $del->execute([':uid' => $this->id]);
-
-        // Inserisci nuovi
-        $ins = $this->conn->prepare("
-        INSERT INTO bb_user_permissions (user_id, module, allowed)
-        VALUES (:uid, :module, :allowed)
-    ");
-
-        foreach ($data as $module => $allowed) {
-            $ins->execute([
-                ':uid'     => $this->id,
-                ':module'  => $module,
-                ':allowed' => $allowed ? 1 : 0
-            ]);
-        }
+        $this->accessControl()->salvaPermessi((int)$this->id, $companyId, $data);
     }
 
-    public function loadPermissions() {
-        $sql = "SELECT module, allowed FROM bb_user_permissions WHERE user_id = :uid";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute([':uid' => $this->id]);
-
-        $this->permissions = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $this->permissions[$row['module']] = (bool)$row['allowed'];
-        }
+    /** Permessi nella societa' indicata (se omessa, quella attiva). */
+    public function loadPermissions(?int $companyId = null): void
+    {
+        $this->permissions = $this->accessControl()->permessi(
+            (int)$this->id,
+            $companyId ?? $this->societaAttiva()
+        );
     }
 
 

@@ -65,17 +65,18 @@ if (!$sceltaSocietaEsclusa && !isset($_SESSION[\App\Service\CurrentCompany::SESS
     }
 }
 
+// I permessi sono per societa': AuthMiddleware li ha caricati prima che la
+// societa' fosse scelta, quindi vanno riletti adesso che si sa dove siamo.
+$user->loadPermissions();
+
 // ── Confini fra societa': blocco delle rotte ─────────────────────────────────
 // Nascondere le voci di menu non basta: senza questo controllo basterebbe
 // scrivere l'indirizzo a mano per entrare nei moduli di un'altra societa'.
 // Vale per tutti, superadmin compreso.
-$datiSocieta   = $currentCompany->current();
-$moduliSocieta = null;
-if ($datiSocieta && !empty($datiSocieta['moduli'])) {
-    $moduliSocieta = array_filter(array_map('trim', explode(',', (string)$datiSocieta['moduli'])));
-}
+$moduliSocieta = (new \App\Security\AccessControl($connection))
+    ->moduliSocieta($currentCompany->id());
 
-if ($moduliSocieta && !(new \App\Security\CompanyModuleGuard())->consente($uri, $moduliSocieta)) {
+if ($moduliSocieta !== null && !(new \App\Security\CompanyModuleGuard())->consente($uri, $moduliSocieta)) {
     header('Location: /dashboard?fuori_societa=1');
     exit;
 }

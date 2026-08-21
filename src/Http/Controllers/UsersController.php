@@ -892,7 +892,23 @@ final class UsersController
             Response::redirect('/users/permissions');
         }
 
-        $groups  = self::buildPermissionGroups();
+        $access = new \App\Security\AccessControl($this->conn);
+        $target = new \User($this->conn, $targetId);
+
+        // ── Societa' su cui si stanno configurando i permessi ──────────────
+        // I permessi valgono per societa': lo stesso utente puo' stare in
+        // ufficio da una parte ed essere un tecnico dall'altra. Senza questa
+        // scelta, dargli un modulo qui glielo darebbe ovunque.
+        $societa = $this->societaConfigurabili($targetId);
+        $societaId = (int)($_POST['group_company_id'] ?? $_GET['societa'] ?? 0);
+        if (!$societaId || !isset($societa[$societaId])) {
+            $societaId = (int)array_key_first($societa);
+        }
+
+        // Solo i moduli abilitati su quella societa': mostrare gli altri
+        // vorrebbe dire far spuntare permessi che poi non hanno effetto.
+        $moduliSocieta = $access->moduliSocieta($societaId);
+        $groups  = $this->gruppiPerSocieta($moduliSocieta);
         $modules = [];
         foreach ($groups as $g) {
             foreach ($g['perms'] as $key => $mod) {
@@ -900,24 +916,26 @@ final class UsersController
             }
         }
 
-        $target = new \User($this->conn, $targetId);
-        $target->loadPermissions();
-
+        $target->loadPermissions($societaId);
         $message = '';
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $perms = [];
+            // si riparte dai permessi gia' presenti: se un modulo non e'
+            // abilitato sulla societa' non compare nel form, e non deve
+            // essere spento solo perche' non e' stato spuntato
+            $perms = $target->permissions;
             foreach ($modules as $key => $mod) {
                 $perms[$key] = isset($_POST['perm_' . $key]) ? 1 : 0;
             }
-            $target->savePermissions($perms);
+            $target->savePermissions($perms, $societaId);
             AuditLogger::log(
                 $this->conn, $request->user(), 'permission_change', 'user', (int)$target->id,
                 $target->username ?? (string)$target->id,
-                ['granted' => array_keys(array_filter($perms))]
+                ['societa' => $societa[$societaId] ?? $societaId,
+                 'granted' => array_keys(array_filter($perms))]
             );
-            $target->loadPermissions();
-            $message = 'Permessi aggiornati!';
+            $target->loadPermissions($societaId);
+            $message = 'Permessi aggiornati per ' . ($societa[$societaId] ?? 'la societa\'') . '!';
         }
 
         $activeCount = 0;
@@ -926,8 +944,74 @@ final class UsersController
         }
 
         Response::view('users/permissions_edit.html.twig', $request, compact(
-            'target', 'groups', 'modules', 'activeCount', 'message'
+            'target', 'groups', 'modules', 'activeCount', 'message',
+            'societa', 'societaId', 'moduliSocieta'
         ));
+    }
+
+    /**
+     * Societa' su cui ha senso configurare questo utente: quelle a cui e'
+     * assegnato. Chi non ne ha lavora nel Consorzio, come al login.
+     *
+     * @return array<int,string> id => nome
+     */
+    private function societaConfigurabili(int $userId): array
+    {
+        $out = [];
+        try {
+            $stmt = $this->conn->prepare('
+                SELECT c.id, c.nome
+                FROM   bb_user_companies uc
+                JOIN   bb_group_companies c ON c.id = uc.group_company_id
+                WHERE  uc.user_id = :uid
+                ORDER BY c.ordinamento ASC, c.nome ASC
+            ');
+            $stmt->execute([':uid' => $userId]);
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $out[(int)$r['id']] = (string)$r['nome'];
+            }
+
+            if (!$out) {
+                $stmt = $this->conn->prepare('SELECT nome FROM bb_group_companies WHERE id = :id');
+                $stmt->execute([':id' => \App\Service\CurrentCompany::CONSORZIO_ID]);
+                $out[\App\Service\CurrentCompany::CONSORZIO_ID] =
+                    (string)($stmt->fetchColumn() ?: 'Consorzio');
+            }
+        } catch (\Throwable $e) {
+            error_log('[UsersController] societaConfigurabili: ' . $e->getMessage());
+            $out[\App\Service\CurrentCompany::CONSORZIO_ID] = 'Consorzio';
+        }
+        return $out;
+    }
+
+    /**
+     * Il registro dei moduli ridotto a quelli abilitati su una societa'.
+     *
+     * @param string[]|null $moduliSocieta null = tutti
+     */
+    private function gruppiPerSocieta(?array $moduliSocieta): array
+    {
+        $gruppi = self::buildPermissionGroups();
+        if ($moduliSocieta === null) {
+            return $gruppi;
+        }
+
+        // view_prices non e' una pagina ma un tratto della persona ("vede i
+        // prezzi"): resta configurabile ovunque, altrimenti su una societa'
+        // che non lo ha fra i moduli non lo si potrebbe piu' togliere ne' dare
+        $sempre = ['view_prices'];
+
+        $out = [];
+        foreach ($gruppi as $chiave => $g) {
+            $g['perms'] = array_intersect_key(
+                $g['perms'],
+                array_flip(array_merge($moduliSocieta, $sempre))
+            );
+            if ($g['perms']) {
+                $out[$chiave] = $g;
+            }
+        }
+        return $out;
     }
 
     // ── GET|POST /users/bob/create ────────────────────────────────────────────

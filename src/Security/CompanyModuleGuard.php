@@ -83,12 +83,17 @@ final class CompanyModuleGuard
     /**
      * L'indirizzo e' consentito nella societa' attiva?
      *
-     * @param string[]|null $moduliSocieta null = nessun limite (il Consorzio,
-     *                                     che ha tutti i moduli)
+     * @param string[]|null $moduliSocieta null = nessun limite (societa' con
+     *                                     il flag "tutti i moduli").
+     *                                     L'elenco vuoto significa davvero
+     *                                     nessun modulo, non "tutti": e' la
+     *                                     confusione che c'era prima, quando
+     *                                     una societa' senza moduli spuntati
+     *                                     risultava aperta su tutto.
      */
     public function consente(string $uri, ?array $moduliSocieta): bool
     {
-        if ($moduliSocieta === null || $moduliSocieta === []) {
+        if ($moduliSocieta === null) {
             return true;
         }
 
