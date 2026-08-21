@@ -37,7 +37,7 @@ final class Giornata
     public static function blocchi(array $giornata, string $tipo): array
     {
         $definizione = [
-            'ritardo'   => 'Doveva rientrare',
+            'ritardo'   => 'In ritardo',
             'escono'    => 'Escono oggi',
             'rientrano' => 'Rientrano oggi',
             'fuori'     => 'Fuori',
