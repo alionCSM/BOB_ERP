@@ -711,7 +711,10 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/cron/run',                 [ApiV1Controller::class, 'cronRun'])
             ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory'])
             ->get('/api/v1/noleggi/giornata',          [ApiV1Controller::class, 'noleggiGiornata'])
-            ->post('/api/v1/noleggi/giornata/segna',   [ApiV1Controller::class, 'noleggiSegna']);
+            ->post('/api/v1/noleggi/giornata/segna',   [ApiV1Controller::class, 'noleggiSegna'])
+            // Cantieri: elenco con gli stessi filtri del web, e scheda
+            ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
+            ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);
 
     $router->dispatch($request, $container);
 }
