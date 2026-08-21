@@ -168,6 +168,20 @@
     background: #fff;
 }
 
+.gi-vai {
+    height: 44px;
+    padding: 0 16px;
+    flex: 0 0 auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.gi-vai:hover { background: #f1f5f9; }
+
 .gi-cerca {
     display: flex;
     align-items: center;

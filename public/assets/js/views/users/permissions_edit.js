@@ -69,6 +69,18 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnAll) btnAll.addEventListener('click', () => setAll(true));
     if (btnNone) btnNone.addEventListener('click', () => setAll(false));
 
+    // Cambio societa': ricarica la pagina sui permessi di quella societa'.
+    //
+    // Va legato qui e non con onchange="" nell'HTML: la CSP di BOB
+    // (script-src con nonce, senza 'unsafe-inline') blocca gli handler
+    // scritti come attributo, e il selettore non faceva niente.
+    const selSocieta = document.getElementById('pe-societa-sel');
+    if (selSocieta) {
+        selSocieta.addEventListener('change', function () {
+            if (this.form) this.form.submit();
+        });
+    }
+
     // Initial count update
     updateCount();
 });

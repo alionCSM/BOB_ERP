@@ -43,7 +43,7 @@
        e i permessi che l'utente ha li' dentro. #}
     <form method="GET" class="pe-societa">
         <label for="pe-societa-sel">Permessi in</label>
-        <select name="societa" id="pe-societa-sel" onchange="this.form.submit()">
+        <select name="societa" id="pe-societa-sel">
             {% for id, nome in societa %}
                 <option value="{{ id }}" {{ id == societaId ? 'selected' : '' }}>{{ nome }}</option>
             {% endfor %}
@@ -55,7 +55,9 @@
                 {{ moduliSocieta|length }} moduli abilitati su questa societa'
             {% endif %}
         </span>
-        <noscript><button type="submit">Cambia</button></noscript>
+        {# il pulsante resta visibile: se il JS non parte il selettore da solo
+           non manderebbe niente, e la pagina sembrerebbe rotta #}
+        <button type="submit" class="pe-societa-vai">Cambia</button>
     </form>
 
     {% if message %}
@@ -137,5 +139,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/users/permissions_edit.js"></script>
+<script src="/assets/js/views/users/permissions_edit.js?v=2"></script>
 {% endblock %}
