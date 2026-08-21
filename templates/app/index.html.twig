@@ -9,7 +9,7 @@
 #}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/app/releases.css?v=1">
+<link rel="stylesheet" href="/assets/css/views/app/releases.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -64,17 +64,16 @@
             <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required>
         </label>
 
-        <label class="ap-f">
-            <span>versionCode</span>
-            <input type="number" name="version_code" min="1" required placeholder="12">
-            <small>il numero in build.gradle: decide chi e' piu' nuovo</small>
-        </label>
-
-        <label class="ap-f">
-            <span>versionName</span>
-            <input type="text" name="version_name" maxlength="40" required placeholder="1.4.2">
-            <small>quello che leggono le persone</small>
-        </label>
+        {# versionCode e versionName si leggono dall'APK e non si digitano piu':
+           bastava sbagliare quel numero per mandare in loop tutti i telefoni #}
+        <div class="ap-f ap-f-largo ap-nota-form">
+            <strong>Versione e numero di build si leggono dal file.</strong>
+            Non c'e' niente da scrivere: prima si digitavano a mano, e se il numero
+            non corrispondeva a quello dell'APK i telefoni si aggiornavano
+            all'infinito. Se il versionCode e' gia' stato caricato il salvataggio
+            si ferma, perche' due pacchetti con lo stesso numero l'app non li
+            distingue.
+        </div>
 
         <label class="ap-f ap-f-largo">
             <span>Cosa cambia</span>

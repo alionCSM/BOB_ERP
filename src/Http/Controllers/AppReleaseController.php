@@ -72,13 +72,35 @@ final class AppReleaseController
             $this->torna("Il file non sembra un APK (dovrebbe essere un pacchetto zip).");
         }
 
-        $versionCode = (int)($_POST['version_code'] ?? 0);
-        $versionName = trim((string)($_POST['version_name'] ?? ''));
-        if ($versionCode <= 0 || $versionName === '') {
-            $this->torna('Servono versionCode (numero) e versionName.');
+        // Versione letta DALL'APK, non digitata.
+        //
+        // Finche' quel numero si scriveva a mano, sbagliarlo metteva in
+        // ginocchio tutti i telefoni: l'app confronta il proprio versionCode
+        // con quello dichiarato qui, quindi dichiarandone uno piu' alto di
+        // quello vero ogni telefono si aggiorna, si riavvia, si ritrova
+        // ancora "vecchio" e richiede di aggiornare, all'infinito. Con
+        // l'aggiornamento obbligatorio non c'era nemmeno modo di chiudere.
+        $letto = \App\Service\ApkInfo::leggi((string)$file['tmp_name']);
+        if ($letto === null) {
+            $this->torna(
+                "Non riesco a leggere la versione dall'APK: controlla che sia "
+                . "un pacchetto Android valido e non un file rinominato."
+            );
+        }
+
+        $versionCode = $letto['version_code'];
+        $versionName = $letto['version_name'] !== ''
+            ? $letto['version_name']
+            : trim((string)($_POST['version_name'] ?? ''));
+
+        if ($versionName === '') {
+            $versionName = (string)$versionCode;
         }
         if ($this->versionCodeEsiste($versionCode)) {
-            $this->torna("La versione {$versionCode} e' gia' caricata.");
+            $this->torna(
+                "La versione {$versionCode} ({$versionName}) e' gia' caricata: "
+                . "alza il versionCode in build.gradle.kts e ricompila."
+            );
         }
 
         if (!is_dir(self::CARTELLA) && !@mkdir(self::CARTELLA, 0775, true) && !is_dir(self::CARTELLA)) {
