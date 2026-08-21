@@ -188,7 +188,7 @@ final class ApiV1Controller
         Response::json([
             'success'                 => true,
             'user'                    => $this->userPayload($row),
-            'modules'                 => array_keys(array_filter($user->getPermissions())),
+            'modules'                 => array_keys($this->modulePermissions($user)),
             'can_see_prices'          => $user->canSeePrices(),
             'companies'               => $this->currentCompany()->availableFor((int)$user->id),
             'active_company_id'       => $this->currentCompany()->id(),
@@ -470,7 +470,7 @@ final class ApiV1Controller
         Response::json([
             'success'                 => true,
             'user'                    => $this->userPayload($row),
-            'modules'                 => array_keys(array_filter($user->getPermissions())),
+            'modules'                 => array_keys($this->modulePermissions($user)),
             'can_see_prices'          => $user->canSeePrices(),
             'companies'               => $this->currentCompany()->availableFor((int)$user->id),
             'active_company_id'       => $this->currentCompany()->id(),
@@ -771,6 +771,11 @@ final class ApiV1Controller
      */
     private function modulePermissions(User $user): array
     {
+        // I due filtri servono ENTRAMBI: il permesso dell'utente e i moduli
+        // della societa' in cui sta lavorando. Usando solo il primo — come
+        // faceva la risposta di login e /me — l'app mostrava la scheda di un
+        // modulo che la societa' attiva non ha, e al tocco arrivava un 403.
+
         $mods = array_filter($user->getPermissions());
 
         return array_filter(
@@ -1024,7 +1029,7 @@ final class ApiV1Controller
             'token'                   => $token,
             'token_expires_at'        => $expires,
             'user'                    => $this->userPayload($row),
-            'modules'                 => array_keys(array_filter($user->getPermissions())),
+            'modules'                 => array_keys($this->modulePermissions($user)),
             'can_see_prices'          => $user->canSeePrices(),
             'companies'               => $currentCompany->availableFor((int)$user->id),
             'active_company_id'       => $needsSelection ? null : $currentCompany->id(),
