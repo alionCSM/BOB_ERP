@@ -203,3 +203,15 @@
 }
 
 .pe-vuoto a { color: #1d4ed8; font-weight: 600; }
+
+.pe-societa-vai {
+    padding: 6px 14px;
+    border: 1px solid #1e3a5f;
+    border-radius: 6px;
+    background: #1e3a5f;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.pe-societa-vai:hover { background: #16304e; }

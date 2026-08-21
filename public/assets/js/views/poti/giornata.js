@@ -71,6 +71,17 @@
         });
     }
 
+    // ── Cambio giorno dal calendario ────────────────────────────────────────
+    // Legato qui e non con onchange="" nell'HTML: la CSP di BOB blocca gli
+    // handler scritti come attributo, e il campo data non faceva niente.
+
+    var campoData = document.querySelector('.gi-giorni input[type="date"]');
+    if (campoData) {
+        campoData.addEventListener('change', function () {
+            if (this.form) this.form.submit();
+        });
+    }
+
     // ── Segnare senza ricaricare ────────────────────────────────────────────
 
     document.addEventListener('submit', function (e) {
