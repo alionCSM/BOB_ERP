@@ -1,0 +1,160 @@
+{% extends 'layout/base.html.twig' %}
+
+{#
+  Pubblicazione dell'app Android.
+
+  L'app non sta sul Play Store: da qui si carica l'APK una volta sola, i
+  telefoni lo scaricano dallo stesso indirizzo e l'app stessa si accorge
+  quando ne esiste uno piu' nuovo.
+#}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/app/releases.css?v=1">
+{% endblock %}
+
+{% block content %}
+<div class="ap-page">
+
+    <div class="ap-testata">
+        <div>
+            <h1>App BOB per Android</h1>
+            <p>Carica una versione nuova: i telefoni la trovano da soli.</p>
+        </div>
+    </div>
+
+    {% if salvato %}<div class="ap-avviso is-ok">Fatto.</div>{% endif %}
+    {% if errore %}<div class="ap-avviso is-ko">{{ errore }}</div>{% endif %}
+
+    {# ── Link da dare alle persone ────────────────────────────────────────── #}
+    {% if ultima %}
+        <div class="ap-corrente">
+            <div class="ap-corrente-tit">
+                In distribuzione
+                <b>{{ ultima.version_name }}</b>
+                <span class="ap-vc">versionCode {{ ultima.version_code }}</span>
+                {% if ultima.obbligatorio %}<span class="ap-obb">aggiornamento obbligatorio</span>{% endif %}
+            </div>
+
+            {# si copia e si manda su WhatsApp: e' il modo in cui la gente
+               installa la prima volta, quando l'app ancora non c'e' #}
+            <label class="ap-link">
+                <span>Link di installazione</span>
+                <input type="text" readonly id="ap-url"
+                       value="{{ baseUrl }}/app/scarica/{{ ultima.token }}">
+                <button type="button" class="ap-btn" id="ap-copia">Copia</button>
+                <a class="ap-btn" href="/app/scarica/{{ ultima.token }}">Scarica</a>
+            </label>
+
+            <p class="ap-nota">
+                Il link non chiede la password: il telefono scarica fuori dal browser e
+                non porta con se' la sessione. E' lungo e non indovinabile, e smette di
+                funzionare appena disattivi la versione.
+            </p>
+        </div>
+    {% endif %}
+
+    {# ── Caricamento ──────────────────────────────────────────────────────── #}
+    <form method="POST" action="/app/carica" enctype="multipart/form-data" class="ap-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="ap-form-tit">Carica una versione</div>
+
+        <label class="ap-f ap-f-largo">
+            <span>File APK</span>
+            <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required>
+        </label>
+
+        <label class="ap-f">
+            <span>versionCode</span>
+            <input type="number" name="version_code" min="1" required placeholder="12">
+            <small>il numero in build.gradle: decide chi e' piu' nuovo</small>
+        </label>
+
+        <label class="ap-f">
+            <span>versionName</span>
+            <input type="text" name="version_name" maxlength="40" required placeholder="1.4.2">
+            <small>quello che leggono le persone</small>
+        </label>
+
+        <label class="ap-f ap-f-largo">
+            <span>Cosa cambia</span>
+            <textarea name="note" rows="3" placeholder="Giornata tecnici, notifiche push piu' veloci…"></textarea>
+        </label>
+
+        <label class="ap-f ap-check">
+            <input type="checkbox" name="obbligatorio" value="1">
+            <span>Aggiornamento obbligatorio (l'app non si usa finche' non si aggiorna)</span>
+        </label>
+
+        <div class="ap-azioni">
+            <button class="ap-btn ap-btn-primary">Pubblica</button>
+        </div>
+    </form>
+
+    {# ── Storico ──────────────────────────────────────────────────────────── #}
+    <div class="ap-storico">
+        <div class="ap-form-tit">Versioni caricate</div>
+
+        <div class="ap-tabella-wrap">
+            <table class="ap-tabella">
+                <thead>
+                    <tr>
+                        <th>Versione</th>
+                        <th>code</th>
+                        <th>Dimensione</th>
+                        <th>Caricata</th>
+                        <th>Da</th>
+                        <th>Note</th>
+                        <th>Stato</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in versioni %}
+                        <tr class="{{ v.attiva ? '' : 'is-spenta' }}">
+                            <td><b>{{ v.version_name }}</b></td>
+                            <td class="ap-vc-cella">{{ v.version_code }}</td>
+                            <td>{{ (v.dimensione / 1048576)|number_format(1, ',', '.') }} MB</td>
+                            <td>{{ v.created_at|date('d/m/Y H:i') }}</td>
+                            <td>{{ v.caricato_nome ?: '—' }}</td>
+                            <td class="ap-note-cella" title="{{ v.note }}">{{ v.note ?: '—' }}</td>
+                            <td>
+                                {% if v.attiva %}
+                                    <span class="ap-stato is-on">attiva</span>
+                                {% else %}
+                                    <span class="ap-stato is-off">spenta</span>
+                                {% endif %}
+                                {% if v.obbligatorio %}<span class="ap-stato is-obb">obbl.</span>{% endif %}
+                            </td>
+                            <td class="ap-azioni-cella">
+                                <a class="ap-mini" href="/app/scarica/{{ v.token }}">scarica</a>
+
+                                <form method="POST" action="/app/stato">
+                                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                                    <input type="hidden" name="id" value="{{ v.id }}">
+                                    <button class="ap-mini">{{ v.attiva ? 'disattiva' : 'attiva' }}</button>
+                                </form>
+
+                                {# la conferma la mette il JS: la CSP di BOB blocca
+                                   gli onsubmit scritti nell'HTML #}
+                                <form method="POST" action="/app/elimina" data-ap-conferma="Eliminare la versione {{ v.version_name }}? Il file viene cancellato dal server.">
+                                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                                    <input type="hidden" name="id" value="{{ v.id }}">
+                                    <button class="ap-mini is-ko">elimina</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="8" class="ap-vuoto">Nessuna versione caricata.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/app/releases.js?v=1"></script>
+{% endblock %}

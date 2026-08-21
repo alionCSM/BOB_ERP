@@ -6,3 +6,6 @@ storage/cache/
 
 # Manuale utente: generato, non va versionato
 /docs/manuale_utente_bob.*
+
+# APK dell'app Android pubblicati da /app
+storage/app_releases/

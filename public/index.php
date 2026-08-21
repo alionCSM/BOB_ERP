@@ -100,6 +100,27 @@ function includeAppFile(string $uri, string $allowedDir): void {
  * Add one `if` block per domain as it gets migrated.
  */
 
+// ── App Android: scaricamento e controllo versione (public — no middleware) ───
+// Devono restare aperti per forza. Il telefono scarica col gestore download di
+// Android, che non porta i cookie della sessione, e il controllo aggiornamenti
+// deve funzionare anche a token scaduto — altrimenti per aggiornare bisognerebbe
+// prima riuscire ad accedere, cioe' proprio quello che magari non funziona piu'.
+// Al posto del login c'e' un token lungo e non indovinabile nell'indirizzo.
+if (str_starts_with($uri, '/app/scarica/') || $uri === '/api/v1/app/versione') {
+    require_once APP_ROOT . '/includes/bootstrap.php';
+
+    $db         = new \App\Infrastructure\Database();
+    $connection = $db->connect();
+    $container  = \App\Infrastructure\ContainerFactory::build($connection);
+    $request    = new \App\Http\Request();
+    $router     = new \App\Http\Router();
+
+    $router->get('/app/scarica/{token}',  [AppReleaseController::class, 'scarica'])
+           ->get('/api/v1/app/versione',  [AppReleaseController::class, 'versione']);
+
+    $router->dispatch($request, $container);
+}
+
 // ── Auth (public — no middleware) ─────────────────────────────────────────────
 if (in_array($uri, ['/login', '/logout', '/verify-login'], true)) {
     require_once APP_ROOT . '/includes/bootstrap.php';
@@ -115,6 +136,22 @@ if (in_array($uri, ['/login', '/logout', '/verify-login'], true)) {
            ->get('/logout',         [AuthController::class, 'logout'])
            ->get('/verify-login',   [AuthController::class, 'verifyLogin'])
            ->post('/verify-login',  [AuthController::class, 'verifyLogin']);
+
+    $router->dispatch($request, $container);
+}
+
+// ── App Android: pubblicazione (riservato) ────────────────────────────────────
+if ($uri === '/app' || in_array($uri, ['/app/carica', '/app/stato', '/app/elimina'], true)) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get('/app',           [AppReleaseController::class, 'index'])
+           ->post('/app/carica',   [AppReleaseController::class, 'carica'])
+           ->post('/app/stato',    [AppReleaseController::class, 'stato'])
+           ->post('/app/elimina',  [AppReleaseController::class, 'elimina']);
 
     $router->dispatch($request, $container);
 }
