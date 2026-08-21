@@ -296,6 +296,7 @@
             .forEach(function (i) { i.value = ''; });
         modale.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
         campo('nl-id').value = '';
+        campo('nl-firmato').checked = false;
 
         // le ricerche vanno chiuse prima di svuotare, altrimenti restano
         // agganciate a campi che non esistono piu'
@@ -332,6 +333,7 @@
             campo('nl-telefono').value  = d.telefono || '';
             campo('nl-luogo').value     = d.luogo || '';
             campo('nl-contratto').value = d.contratto || '';
+            campo('nl-firmato').checked = !!Number(d.contratto_firmato);
             campo('nl-stato').value     = d.stato || 'confermato';
             campo('nl-pagamento').value = d.pagamento || 'da_pagare';
             campo('nl-note').value      = d.note || '';

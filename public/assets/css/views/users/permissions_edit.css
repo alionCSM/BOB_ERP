@@ -152,3 +152,54 @@
     .pe-header-right { display: none; }
     .pe-footer { flex-direction: column; gap: 12px; }
 }
+
+/* ── Scelta della societa' ────────────────────────────────────────────────
+   I permessi valgono per societa': la barra dice quale si sta configurando.
+   Sta in alto e non dentro il form dei moduli, perche' cambiarla ricarica
+   la pagina e non e' un campo da salvare. */
+.pe-societa {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 16px 0 8px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #1e3a5f;
+    border-radius: 8px;
+}
+
+.pe-societa label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.pe-societa select {
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.pe-societa-nota {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.pe-vuoto {
+    padding: 28px;
+    text-align: center;
+    font-size: 14px;
+    color: #64748b;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+}
+
+.pe-vuoto a { color: #1d4ed8; font-weight: 600; }

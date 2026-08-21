@@ -149,6 +149,8 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
            ->get('/autocarrate/prenotazioni/occupati', [AutocarrateController::class, 'occupati'])
            ->post('/autocarrate/prenotazioni/salva',   [AutocarrateController::class, 'salvaPrenotazione'])
            ->post('/autocarrate/prenotazioni/elimina', [AutocarrateController::class, 'eliminaPrenotazione'])
+           ->get('/autocarrate/giornata',              [AutocarrateController::class, 'giornata'])
+           ->post('/autocarrate/giornata/segna',        [AutocarrateController::class, 'segna'])
            ->get('/autocarrate/registro',              [AutocarrateController::class, 'registro'])
            ->post('/autocarrate/ripristina',           [AutocarrateController::class, 'ripristina']);
 
@@ -170,6 +172,8 @@ if ($uri === '/noleggi' || str_starts_with($uri, '/noleggi/')) {
            ->post('/noleggi/elimina',        [NoleggiController::class, 'elimina'])
            ->get('/noleggi/macchine',        [NoleggiController::class, 'macchine'])
            ->post('/noleggi/macchine/salva', [NoleggiController::class, 'salvaMacchina'])
+           ->get('/noleggi/giornata',        [NoleggiController::class, 'giornata'])
+           ->post('/noleggi/giornata/segna', [NoleggiController::class, 'segna'])
            ->get('/noleggi/registro',        [NoleggiController::class, 'registro'])
            ->post('/noleggi/ripristina',     [NoleggiController::class, 'ripristina']);
 
@@ -668,7 +672,9 @@ if (str_starts_with($uri, '/api/v1/')) {
            ->post('/api/v1/switch-company',           [ApiV1Controller::class, 'switchCompany'])
             ->get('/api/v1/dashboard',                 [ApiV1Controller::class, 'dashboard'])
             ->post('/api/v1/cron/run',                 [ApiV1Controller::class, 'cronRun'])
-            ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory']);
+            ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory'])
+            ->get('/api/v1/noleggi/giornata',          [ApiV1Controller::class, 'noleggiGiornata'])
+            ->post('/api/v1/noleggi/giornata/segna',   [ApiV1Controller::class, 'noleggiSegna']);
 
     $router->dispatch($request, $container);
 }

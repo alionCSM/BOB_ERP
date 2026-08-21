@@ -84,13 +84,13 @@ final class LayoutDataProvider
             }
         }
 
-        // null = tutti i moduli abilitati (caso del Consorzio); altrimenti
-        // il menu mostra solo le voci della societa' in cui si sta lavorando
-        $moduli = null;
-        $dati   = $service->current();
-        if ($dati && !empty($dati['moduli'])) {
-            $moduli = array_filter(array_map('trim', explode(',', (string)$dati['moduli'])));
-        }
+        // null = tutti i moduli abilitati; altrimenti il menu mostra solo le
+        // voci della societa' in cui si sta lavorando. La lettura la fa
+        // AccessControl, come il middleware e la dashboard: se ognuno se la
+        // leggesse per conto suo, il menu prima o poi mostrerebbe una voce
+        // che poi da' 403.
+        $moduli = (new \App\Security\AccessControl($this->conn))
+            ->moduliSocieta($service->id());
 
         return [
             'groupCompanies'      => $lista,

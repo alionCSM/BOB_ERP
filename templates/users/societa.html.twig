@@ -92,6 +92,17 @@
                                 </label>
                             </div>
 
+                            {# la scelta e' esplicita: "tutti" comprende anche
+                               i moduli che aggiungeremo, mentre non spuntare
+                               niente vuol dire davvero nessun modulo #}
+                            <div class="sg-nota">
+                                <strong>Tutti i moduli</strong> vale anche per quelli che verranno
+                                aggiunti in futuro. Togliendo la spunta valgono solo i moduli scelti
+                                qui sotto: se non ne selezioni nessuno, la societa' resta senza moduli.
+                                I permessi dei singoli utenti si danno poi da
+                                <a href="/users/permissions">Utenti &rarr; Permessi</a>, societa' per societa'.
+                            </div>
+
                             <div class="sg-moduli-body{{ tuttiModuli ? ' is-off' : '' }}" id="sg-moduli-body">
                                 {% for chiave, g in gruppiModuli %}
                                     <div class="sg-mod-gruppo">

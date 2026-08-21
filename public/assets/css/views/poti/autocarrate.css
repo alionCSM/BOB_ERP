@@ -207,6 +207,23 @@
 }
 
 
+/* casella si/no allineata agli altri campi della maschera */
+.ac-check-riga { justify-content: flex-end; }
+
+.ac-check-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    font-size: 13px;
+    color: #334155;
+    cursor: pointer;
+}
+
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {
     padding: 8px 11px;

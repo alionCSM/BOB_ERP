@@ -79,6 +79,11 @@ final class CurrentCompany
             return false;
         }
         $_SESSION[self::SESSION_KEY] = $companyId;
+
+        // moduli e permessi appena letti valgono per la societa' di prima:
+        // tenerli vorrebbe dire rispondere con i permessi sbagliati per il
+        // resto della richiesta
+        \App\Security\AccessControl::svuotaCache();
         return true;
     }
 
@@ -93,7 +98,7 @@ final class CurrentCompany
     {
         try {
             $stmt = $this->conn->prepare("
-                SELECT id, nome, codice, colore, moduli
+                SELECT id, nome, codice, colore, moduli, tutti_moduli
                 FROM   bb_group_companies WHERE id = :id LIMIT 1
             ");
             $stmt->execute([':id' => $this->id()]);
@@ -113,6 +118,10 @@ final class CurrentCompany
     {
         $lista = $this->availableFor($userId);
 
+        // la societa' sta per cambiare: le cache di AccessControl, se
+        // qualcuno le ha gia' riempite in questa richiesta, non valgono piu'
+        \App\Security\AccessControl::svuotaCache();
+
         if (count($lista) === 0) {
             // nessuna assegnazione: comportamento storico, tutto Consorzio
             $_SESSION[self::SESSION_KEY] = self::CONSORZIO_ID;
@@ -130,15 +139,12 @@ final class CurrentCompany
 
     /**
      * True se il modulo e' abilitato per la societa' attiva.
-     * `moduli` vuoto/NULL significa "tutti abilitati" (caso del Consorzio).
+     * La risposta la da' AccessControl: e' l'unico posto che sa leggere
+     * `tutti_moduli` e bb_company_modules.
      */
     public function hasModule(string $modulo): bool
     {
-        $c = $this->current();
-        if (!$c || empty($c['moduli'])) {
-            return true;
-        }
-        $abilitati = array_map('trim', explode(',', (string)$c['moduli']));
-        return in_array($modulo, $abilitati, true);
+        return (new \App\Security\AccessControl($this->conn))
+            ->societaHaModulo($this->id(), $modulo);
     }
 }

@@ -104,57 +104,22 @@ final class GroupCompanyController
 
         $scelta = $sel ? $repo->find($sel) : null;
 
+        // moduli della societa' aperta: null = tutti, anche quelli futuri
+        $moduliScelta = $scelta
+            ? (new \App\Security\AccessControl($this->conn))->moduliSocieta((int)$scelta['id'])
+            : null;
+
         Response::view('users/societa.html.twig', $request, [
             'societa'     => $societa,
             'selezionata' => $scelta,
             'utenti'      => $sel ? $repo->usersForCompany($sel) : [],
             'gruppiModuli'=> \UsersController::buildPermissionGroups(),
-            // vuoto in tabella = tutti i moduli abilitati
-            'moduliAttivi'=> $this->moduliDi($scelta),
-            'tuttiModuli' => $scelta === null || empty($scelta['moduli']),
+            // null = la societa' ha il flag "tutti i moduli"
+            'moduliAttivi'=> $moduliScelta ?? [],
+            'tuttiModuli' => $moduliScelta === null,
             'salvato'     => isset($_GET['salvato']),
             'errore'      => $_GET['errore'] ?? null,
         ]);
-    }
-
-    /**
-     * Moduli abilitati di una societa', come elenco.
-     * @return string[]
-     */
-    private function moduliDi(?array $societa): array
-    {
-        if (!$societa || empty($societa['moduli'])) {
-            return [];
-        }
-        return array_filter(array_map('trim', explode(',', (string)$societa['moduli'])));
-    }
-
-    /**
-     * Moduli scelti nel form, come CSV da salvare.
-     *
-     * Stringa vuota = tutti abilitati. Si accettano solo i codici che
-     * esistono davvero nel registro dei moduli, cosi' un campo manomesso
-     * non finisce in tabella.
-     */
-    private function moduliDaForm(): string
-    {
-        if (!empty($_POST['tutti_moduli'])) {
-            return '';
-        }
-
-        $validi = [];
-        foreach (\UsersController::buildPermissionGroups() as $g) {
-            foreach (array_keys($g['perms']) as $codice) {
-                $validi[$codice] = true;
-            }
-        }
-
-        $scelti = array_filter(
-            (array)($_POST['moduli'] ?? []),
-            static fn($m) => isset($validi[$m])
-        );
-
-        return implode(',', array_unique($scelti));
     }
 
     /** POST /societa/salva */
@@ -178,10 +143,17 @@ final class GroupCompanyController
             'nome'        => $nome,
             'codice'      => $codice,
             'colore'      => trim((string)($_POST['colore'] ?? '#1e3a5f')),
-            'moduli'      => $this->moduliDaForm(),
             'attiva'      => !empty($_POST['attiva']),
             'ordinamento' => (int)($_POST['ordinamento'] ?? 0),
         ]);
+
+        // I moduli si salvano a parte: sono righe, non una colonna. La scelta
+        // "tutti" e' esplicita e comprende anche i moduli aggiunti in futuro.
+        (new \App\Security\AccessControl($this->conn))->salvaModuliSocieta(
+            $nuovoId,
+            !empty($_POST['tutti_moduli']),
+            (array)($_POST['moduli'] ?? [])
+        );
 
         Response::redirect('/societa?id=' . $nuovoId . '&salvato=1');
     }

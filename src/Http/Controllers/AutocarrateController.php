@@ -7,6 +7,7 @@ use App\Http\Response;
 use App\Repository\Poti\AutocarrataRepository;
 use App\Service\CurrentCompany;
 use App\Service\Poti\Audit;
+use App\Service\Poti\Giornata;
 use App\Service\Poti\VistaImpegni;
 
 /**
@@ -242,6 +243,7 @@ final class AutocarrateController
             'tariffa_giorno' => $this->importo($_POST['tariffa_giorno'] ?? ''),
             'totale'         => $this->importo($_POST['totale'] ?? ''),
             'contratto'      => trim((string)($_POST['contratto'] ?? '')),
+            'contratto_firmato' => !empty($_POST['contratto_firmato']),
             'pagamento'      => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
                                 ? (string)$_POST['pagamento']
                                 : 'da_pagare',
@@ -562,5 +564,127 @@ final class AutocarrateController
             $cur = strtotime('+1 day', $cur);
         }
         return $out;
+    }
+
+    // ── GET /autocarrate/giornata — vista dei tecnici ────────────────────────
+
+    /**
+     * La giornata: cosa esce, cosa rientra, cosa e' fuori, cosa e' in ritardo.
+     *
+     * E' la pagina che il tecnico apre la mattina, quindi ragiona su un
+     * GIORNO e non su un periodo come le altre. Non mostra importi: al
+     * tecnico serve sapere se e' pagato, non quanto.
+     */
+    public function giornata(Request $request): void
+    {
+        $this->assertGiornata($request);
+        $repo = new AutocarrataRepository($this->conn);
+        $cid  = $this->companyId();
+
+        $data = VistaImpegni::data($_GET['data'] ?? '', date('Y-m-d'));
+        $user = $this->utente($request);
+
+        // La pagina e' la stessa dei mezzi di sollevamento: le due sezioni
+        // raccontano la stessa storia, e Giornata normalizza le righe in
+        // schede uguali. Qui resta solo cio' che le distingue davvero.
+        $blocchi = Giornata::blocchi($repo->giornata($cid, $data), Giornata::AUTOCARRATA);
+
+        $collegamenti = [];
+        if ($user->canAccess('pn_autocarrate')) {
+            $collegamenti = [
+                ['href' => '/autocarrate', 'label' => "Disponibilita'"],
+                ['href' => '/autocarrate/prenotazioni', 'label' => 'Prenotazioni'],
+            ];
+        }
+
+        $vista = [
+            'titolo'       => 'Giornata autocarrate',
+            'sottotitolo'  => "Cosa esce, cosa rientra e cosa e' ancora fuori.",
+            'base'         => '/autocarrate/giornata',
+            'azione'       => '/autocarrate/giornata/segna',
+            'collegamenti' => $collegamenti,
+            'data'         => $data,
+            'ieri'         => date('Y-m-d', strtotime($data . ' -1 day')),
+            'domani'       => date('Y-m-d', strtotime($data . ' +1 day')),
+            'oggi'         => date('Y-m-d'),
+            'blocchi'      => $blocchi,
+            'riepilogo'    => Giornata::riepilogo($blocchi),
+            'prossime'     => Giornata::prossime(
+                $repo->prossimeConsegne($cid, $data, 14), Giornata::AUTOCARRATA
+            ),
+            'salvato'      => isset($_GET['salvato']),
+        ];
+
+        // Dopo un tocco la pagina chiede solo il pezzo che cambia: riepilogo
+        // e schede. Rimandare tutto — menu, barra, prossime partenze — per
+        // aggiornare una riga sarebbe sprecato su un telefono in officina.
+        if (isset($_GET['frammento'])) {
+            Response::view('poti/_giornata_corpo.html.twig', $request, $vista);
+        }
+
+        Response::view('poti/giornata.html.twig', $request, $vista);
+    }
+
+    // ── POST /autocarrate/giornata/segna ─────────────────────────────────────
+
+    /**
+     * Segna consegna, rientro o firma del contratto.
+     *
+     * Un solo endpoint per le tre azioni: cambiano una colonna e finiscono
+     * tutte nel registro allo stesso modo, e tre rotte quasi identiche
+     * sarebbero solo tre punti in cui sbagliare il controllo dei permessi.
+     */
+    public function segna(Request $request): void
+    {
+        $this->assertGiornata($request);
+        $repo = new AutocarrataRepository($this->conn);
+        $cid  = $this->companyId();
+
+        $id    = (int)($_POST['id'] ?? 0);
+        $cosa  = (string)($_POST['cosa'] ?? '');
+        $data  = VistaImpegni::data($_POST['data'] ?? '', date('Y-m-d'));
+
+        $prima = $id ? $repo->prenotazione($cid, $id) : null;
+
+        if ($prima) {
+            if ($cosa === 'firma') {
+                $repo->segnaContrattoFirmato($cid, $id, empty($prima['contratto_firmato']));
+            } elseif (in_array($cosa, ['consegnato', 'rientrato'], true)) {
+                $repo->segnaMomento($cid, $id, $cosa, (int)$this->utente($request)->id);
+            }
+
+            (new Audit($this->conn))->registra(
+                $cid, 'prenotazione', $id, 'modificato',
+                $prima, $repo->prenotazione($cid, $id),
+                (int)$this->utente($request)->id, (string)$prima['cliente']
+            );
+        }
+
+        // Dalla pagina il tocco arriva via AJAX: rispondere con un redirect
+        // farebbe ricaricare tutto e perdere il punto dell'elenco in cui il
+        // tecnico era arrivato.
+        if ($request->isAjax()) {
+            Response::json(['ok' => $prima !== null]);
+        }
+
+        Response::redirect('/autocarrate/giornata?data=' . $data . '&salvato=1');
+    }
+
+    /**
+     * Chi puo' vedere la giornata.
+     *
+     * Oltre a chi gestisce il modulo, anche chi ha il solo permesso da
+     * tecnico: quella pagina non mostra importi ne' permette di creare o
+     * eliminare prenotazioni, quindi puo' stare in mano a chi prepara i mezzi.
+     */
+    private function assertGiornata(Request $request): void
+    {
+        $user = $this->utente($request);
+        if ((int)$user->id === 1
+            || $user->canAccess('pn_autocarrate')
+            || $user->canAccess('pn_autocarrate_giornata')) {
+            return;
+        }
+        Response::error("Permesso 'pn_autocarrate_giornata' richiesto", 403);
     }
 }

@@ -1,0 +1,644 @@
+/*
+ * Poti — la giornata dei tecnici. Prefisso gi-.
+ *
+ * Pensata per il telefono, in officina, spesso coi guanti: poche cose per
+ * schermata, testo grande, un solo pulsante ovvio per scheda e aree da
+ * toccare mai sotto i 44px. Funziona anche da desktop, dove le schede si
+ * mettono in due colonne.
+ *
+ * Non dipende da autocarrate.css: e' una pagina a se', e legarla ai fogli
+ * di stile delle pagine d'ufficio significava vederla cambiare a ogni
+ * ritocco fatto altrove.
+ */
+
+/* il filtro nasconde con l'attributo hidden: senza questa riga le regole
+   display:flex qui sotto vincerebbero e il "nessun risultato" resterebbe
+   sempre a schermo */
+.gi-page [hidden] { display: none !important; }
+
+.gi-page {
+    --gi-blu:    #0369a1;
+    --gi-verde:  #16a34a;
+    --gi-rosso:  #dc2626;
+    --gi-ambra:  #d97706;
+    --gi-grigio: #94a3b8;
+    --gi-bordo:  #e2e8f0;
+    --gi-testo:  #0f172a;
+    --gi-tenue:  #64748b;
+
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 4px 60px;
+    color: var(--gi-testo);
+}
+
+/* ── Intestazione ───────────────────────────────────────────────────────── */
+.gi-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 22px 4px 18px;
+}
+
+.gi-hero h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+
+.gi-hero p {
+    margin: 5px 0 0;
+    font-size: 14px;
+    color: var(--gi-tenue);
+}
+
+.gi-hero-link { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.gi-hero-link a {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--gi-bordo);
+    border-radius: 9px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    text-decoration: none;
+}
+.gi-hero-link a:hover { background: #f1f5f9; }
+
+/* ── Barra del giorno ───────────────────────────────────────────────────── */
+/* resta appesa in alto: scorrendo un elenco lungo si deve poter cambiare
+   giorno o cercare senza risalire tutto */
+.gi-barra {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 14px;
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--gi-bordo);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.gi-giorni {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.gi-freccia {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    background: #fff;
+    color: #334155;
+}
+.gi-freccia:hover { background: #f1f5f9; }
+.gi-freccia svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.gi-data {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 4px;
+}
+
+.gi-data-gg {
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: capitalize;
+    letter-spacing: -.01em;
+}
+
+.gi-data-n { font-size: 14px; color: var(--gi-tenue); font-weight: 600; }
+
+.gi-oggi-pill {
+    padding: 2px 9px;
+    border-radius: 20px;
+    background: var(--gi-blu);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.gi-torna-oggi {
+    padding: 0 12px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.gi-giorni input[type="date"] {
+    height: 44px;
+    padding: 0 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    font-size: 13px;
+    color: #334155;
+    background: #fff;
+}
+
+.gi-cerca {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 240px;
+    height: 44px;
+    padding: 0 13px;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    background: #fff;
+}
+.gi-cerca:focus-within { border-color: var(--gi-blu); box-shadow: 0 0 0 3px rgba(3, 105, 161, .12); }
+.gi-cerca svg { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: var(--gi-grigio); stroke-width: 2.2; stroke-linecap: round; }
+
+.gi-cerca input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    font-size: 15px;
+    background: transparent;
+    color: var(--gi-testo);
+}
+
+/* ── Riepilogo e filtri ─────────────────────────────────────────────────── */
+.gi-riepilogo {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: stretch;
+    margin-bottom: 20px;
+}
+
+.gi-avanzamento {
+    flex: 1 1 260px;
+    padding: 15px 18px;
+    background: linear-gradient(135deg, #0f2942, #1e3a5f);
+    border-radius: 14px;
+    color: #fff;
+}
+.gi-avanzamento.is-finita { background: linear-gradient(135deg, #14532d, #16a34a); }
+
+.gi-avanzamento-testa {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 11px;
+}
+
+.gi-avanzamento-n {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -.03em;
+}
+.gi-avanzamento-n small { font-size: 16px; font-weight: 600; opacity: .6; }
+
+.gi-avanzamento-lb {
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    opacity: .85;
+    text-align: right;
+}
+
+.gi-barra-avanzamento {
+    height: 7px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, .18);
+    overflow: hidden;
+}
+.gi-barra-avanzamento span {
+    display: block;
+    height: 100%;
+    border-radius: 20px;
+    background: #fff;
+    transition: width .3s ease;
+}
+
+.gi-filtri {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 2 1 420px;
+}
+
+/* le caselle contano E filtrano: un tocco e restano solo quelle righe */
+.gi-filtro {
+    flex: 1 1 96px;
+    min-height: 70px;
+    padding: 10px 12px;
+    border: 1px solid var(--gi-bordo);
+    border-radius: 13px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.gi-filtro:hover { background: #f8fafc; }
+
+.gi-filtro.is-on {
+    border-color: var(--gi-testo);
+    box-shadow: 0 0 0 2px rgba(15, 23, 42, .1);
+}
+
+.gi-filtro-n {
+    display: block;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -.03em;
+}
+
+.gi-filtro-lb {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--gi-tenue);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.gi-f-ritardo   .gi-filtro-n { color: var(--gi-rosso); }
+.gi-f-escono    .gi-filtro-n { color: var(--gi-verde); }
+.gi-f-rientrano .gi-filtro-n { color: var(--gi-blu); }
+.gi-f-fuori     .gi-filtro-n { color: var(--gi-grigio); }
+
+/* ── Blocchi ────────────────────────────────────────────────────────────── */
+.gi-blocco { margin-bottom: 26px; }
+
+.gi-blocco-tit {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 11px;
+    font-size: 12.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #475569;
+}
+
+.gi-punto { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+.gi-p-ritardo   { background: var(--gi-rosso); }
+.gi-p-escono    { background: var(--gi-verde); }
+.gi-p-rientrano { background: var(--gi-blu); }
+.gi-p-fuori     { background: var(--gi-grigio); }
+.gi-p-prossime  { background: #7c3aed; }
+
+.gi-conta {
+    padding: 1px 8px;
+    border-radius: 20px;
+    background: #e2e8f0;
+    font-size: 11px;
+    font-weight: 800;
+    color: #475569;
+}
+
+/* ── Scheda ─────────────────────────────────────────────────────────────── */
+.gi-card {
+    position: relative;
+    padding: 15px 16px 14px 19px;
+    margin-bottom: 10px;
+    background: #fff;
+    border: 1px solid var(--gi-bordo);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+/* la striscia colorata dice a colpo d'occhio di che blocco e' la scheda */
+.gi-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+}
+.gi-ritardo::before   { background: var(--gi-rosso); }
+.gi-escono::before    { background: var(--gi-verde); }
+.gi-rientrano::before { background: var(--gi-blu); }
+.gi-fuori::before     { background: #cbd5e1; }
+
+.gi-ritardo { border-color: #fecaca; background: #fffbfb; }
+
+/* fatta: resta leggibile ma smette di chiedere attenzione */
+.gi-card.is-fatta { background: #fafdfb; border-color: #d1fae5; }
+.gi-card.is-fatta .gi-mezzo-box { opacity: .75; }
+
+.gi-card-main { display: flex; gap: 14px; align-items: flex-start; }
+
+/* targa/matricola: il dato che il tecnico cerca per primo */
+.gi-mezzo-box {
+    flex: 0 0 auto;
+    min-width: 104px;
+    max-width: 150px;
+    padding: 8px 11px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.gi-mezzo {
+    display: block;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+.gi-sotto {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gi-tenue);
+    line-height: 1.3;
+}
+
+.gi-info { flex: 1 1 auto; min-width: 0; }
+
+.gi-cliente {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+}
+
+.gi-meta {
+    display: flex;
+    gap: 6px 16px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.gi-meta-v {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    color: var(--gi-tenue);
+}
+.gi-meta-v svg { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: var(--gi-grigio); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* chiamare e' l'azione piu' frequente dopo segnare: merita un pulsante */
+.gi-chiama {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 38px;
+    margin-top: 9px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+}
+.gi-chiama:hover { background: #dbeafe; }
+.gi-chiama svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.gi-stati { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+.gi-tag {
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.gi-tag.is-ok     { background: #dcfce7; color: #166534; }
+.gi-tag.is-ko     { background: #fee2e2; color: #991b1b; }
+.gi-tag.is-attesa { background: #fef3c7; color: #92400e; }
+.gi-tag.is-info   { background: #e0f2fe; color: #075985; }
+.gi-tag.is-fatto  { background: #f1f5f9; color: #475569; }
+
+.gi-note {
+    margin-top: 9px;
+    padding: 8px 11px;
+    background: #f8fafc;
+    border-left: 3px solid #cbd5e1;
+    border-radius: 0 7px 7px 0;
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.45;
+}
+
+/* ── Azioni ─────────────────────────────────────────────────────────────── */
+.gi-azioni {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 13px;
+    padding-top: 12px;
+    border-top: 1px dashed #e8edf3;
+}
+
+.gi-form { margin: 0; }
+
+/* il pulsante grande e' UNO: quello che serve in questo blocco */
+.gi-primaria {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 22px;
+    border: 0;
+    border-radius: 11px;
+    background: var(--gi-verde);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.gi-primaria:hover { filter: brightness(.94); }
+.gi-rientrano .gi-primaria { background: var(--gi-blu); }
+.gi-ritardo   .gi-primaria { background: var(--gi-rosso); }
+
+.gi-primaria.is-fatta {
+    background: #fff;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+}
+.gi-primaria.is-fatta:hover { background: #f0fdf4; filter: none; }
+.gi-primaria svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
+.gi-primaria-annulla {
+    padding-left: 9px;
+    margin-left: 3px;
+    border-left: 1px solid #d1fae5;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gi-tenue);
+    text-transform: lowercase;
+}
+
+.gi-secondarie { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.gi-secondaria {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 15px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    color: #475569;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.gi-secondaria:hover { background: #f1f5f9; }
+
+/* mentre la richiesta e' in volo la scheda non risponde: due tocchi rapidi
+   segnavano e subito annullavano */
+.gi-card.is-attesa { opacity: .55; pointer-events: none; }
+
+/* ── Vuoti e avvisi ─────────────────────────────────────────────────────── */
+.gi-vuoto {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 34px 20px;
+    background: #fff;
+    border: 1px dashed var(--gi-bordo);
+    border-radius: 14px;
+    text-align: center;
+    color: var(--gi-tenue);
+}
+.gi-vuoto strong { font-size: 15px; color: #334155; }
+.gi-vuoto span { font-size: 13px; }
+.gi-vuoto svg { width: 30px; height: 30px; margin-bottom: 4px; fill: none; stroke: #cbd5e1; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+.gi-avviso {
+    padding: 11px 15px;
+    margin-bottom: 14px;
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #166534;
+}
+
+/* ── Prossime partenze ──────────────────────────────────────────────────── */
+.gi-prossime { margin-top: 34px; }
+
+.gi-giorno { margin-bottom: 14px; }
+
+.gi-giorno-tit {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+.gi-giorno-tit strong { font-size: 14px; font-weight: 800; }
+.gi-giorno-tit span { color: var(--gi-grigio); text-transform: capitalize; }
+
+.gi-prossima {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    margin-bottom: 5px;
+    background: #fff;
+    border: 1px solid #eef2f7;
+    border-radius: 10px;
+    font-size: 13.5px;
+}
+
+.gi-mezzo-mini {
+    font-weight: 800;
+    letter-spacing: .03em;
+    padding: 2px 8px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-size: 12.5px;
+}
+
+.gi-prossima-cliente { font-weight: 600; color: #334155; }
+.gi-prossima-luogo   { color: var(--gi-grigio); font-size: 12.5px; }
+.gi-prossima-gg      { margin-left: auto; color: var(--gi-tenue); font-size: 12.5px; font-weight: 600; }
+
+/* ── Schermi larghi: due colonne ────────────────────────────────────────── */
+@media (min-width: 900px) {
+    .gi-blocco {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        align-items: start;
+    }
+    .gi-blocco-tit { grid-column: 1 / -1; margin-bottom: 0; }
+    .gi-blocco > .gi-card { margin-bottom: 0; }
+}
+
+/* ── Telefono ───────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .gi-hero { padding-top: 14px; }
+    .gi-hero h1 { font-size: 21px; }
+
+    .gi-barra { padding: 9px; border-radius: 12px; }
+    .gi-data { order: -1; width: 100%; justify-content: center; }
+    .gi-cerca { flex-basis: 100%; }
+
+    .gi-avanzamento { flex-basis: 100%; }
+    .gi-filtro { flex: 1 1 calc(50% - 4px); }
+
+    .gi-card-main { flex-direction: column; gap: 10px; }
+    .gi-mezzo-box { min-width: 0; max-width: none; width: 100%; text-align: left; }
+    .gi-mezzo { font-size: 19px; }
+
+    /* a tutta larghezza: si centrano senza guardare */
+    .gi-primaria { width: 100%; }
+    .gi-secondarie { width: 100%; }
+    .gi-secondaria { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ── Stampa: l'elenco da appendere in officina ──────────────────────────── */
+@media print {
+    .gi-barra, .gi-filtri, .gi-azioni, .gi-hero-link, .gi-chiama { display: none !important; }
+    .gi-card { break-inside: avoid; box-shadow: none; }
+    .gi-page { padding: 0; }
+}

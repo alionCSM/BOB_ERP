@@ -1,0 +1,79 @@
+{#
+  Il corpo della giornata: riepilogo, filtri e le schede.
+
+  E' la parte che cambia quando il tecnico segna un'uscita o un rientro, ed
+  e' anche l'unica cosa che il server rimanda dopo un tocco (?frammento=1):
+  ricaricare l'intera pagina — menu, barra in alto, prossime partenze — per
+  cambiare una riga sarebbe sprecato su un telefono in officina.
+
+  Attese: blocchi, riepilogo, data, azione, csrfToken.
+#}
+{% import 'poti/_giornata_scheda.html.twig' as g %}
+
+{# ── Riepilogo: quanto lavoro c'e' e quanto ne resta ─────────────────────── #}
+<div class="gi-riepilogo">
+    <div class="gi-avanzamento{{ riepilogo.movimenti > 0 and riepilogo.mancanti == 0 ? ' is-finita' : '' }}">
+        <div class="gi-avanzamento-testa">
+            <span class="gi-avanzamento-n">{{ riepilogo.fatti }}<small>/{{ riepilogo.movimenti }}</small></span>
+            <span class="gi-avanzamento-lb">
+                {% if riepilogo.movimenti == 0 %}
+                    Nessun movimento
+                {% elseif riepilogo.mancanti == 0 %}
+                    Giornata completata
+                {% else %}
+                    {{ riepilogo.mancanti }} da segnare
+                {% endif %}
+            </span>
+        </div>
+        <div class="gi-barra-avanzamento">
+            <span style="width: {{ riepilogo.percentuale }}%"></span>
+        </div>
+    </div>
+
+    {# Le caselle contano e filtrano: si tocca "Escono" e restano solo quelle.
+       Sul telefono e' molto piu' pratico di scorrere tutto l'elenco. #}
+    <div class="gi-filtri" role="group" aria-label="Filtra la giornata">
+        <button type="button" class="gi-filtro is-on" data-gi-filtro="tutti">
+            <span class="gi-filtro-n">{{ riepilogo.totale }}</span>
+            <span class="gi-filtro-lb">Tutti</span>
+        </button>
+        {% for chiave, b in blocchi %}
+            {% if b.schede|length %}
+                <button type="button" class="gi-filtro gi-f-{{ chiave }}" data-gi-filtro="{{ chiave }}">
+                    <span class="gi-filtro-n">{{ b.schede|length }}</span>
+                    <span class="gi-filtro-lb">{{ b.etichetta }}</span>
+                </button>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+{# ── I blocchi ───────────────────────────────────────────────────────────── #}
+<div id="gi-lista">
+    {% for chiave, b in blocchi %}
+        {% if b.schede|length %}
+            <section class="gi-blocco" data-gi-blocco-sez="{{ chiave }}">
+                <h2 class="gi-blocco-tit">
+                    <span class="gi-punto gi-p-{{ chiave }}"></span>
+                    {{ b.etichetta }}
+                    <span class="gi-conta">{{ b.schede|length }}</span>
+                </h2>
+                {% for s in b.schede %}{{ g.scheda(s, data, azione, csrfToken) }}{% endfor %}
+            </section>
+        {% endif %}
+    {% endfor %}
+
+    {% if riepilogo.totale == 0 %}
+        <div class="gi-vuoto">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <strong>Giornata libera</strong>
+            <span>Nessun mezzo esce o rientra in questa data.</span>
+        </div>
+    {% endif %}
+
+    {# compare quando la ricerca dal vivo non lascia niente #}
+    <div class="gi-vuoto" id="gi-nessuno" hidden>
+        <strong>Nessun risultato</strong>
+        <span>Prova con un'altra targa, cliente o paese.</span>
+    </div>
+</div>

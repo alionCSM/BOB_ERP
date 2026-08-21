@@ -130,11 +130,12 @@ class AiSqlController
         if ($isSuperAdmin) {
             $allowedModules = null; // null = unrestricted
         } else {
-            $permStmt = $this->conn->prepare(
-                "SELECT module FROM bb_user_permissions WHERE user_id = :uid AND allowed = 1"
-            );
-            $permStmt->execute([':uid' => $userId]);
-            $allowedModules = $permStmt->fetchAll(\PDO::FETCH_COLUMN);
+            // permessi nella societa' in cui si sta lavorando: l'AI non deve
+            // poter leggere le tabelle di una societa' diversa da questa
+            $allowedModules = array_keys(array_filter(
+                (new \App\Security\AccessControl($this->conn))
+                    ->permessi($userId, \App\Security\AccessControl::societaAttiva())
+            ));
         }
 
         // Price visibility now lives in the bb_user_permissions table under

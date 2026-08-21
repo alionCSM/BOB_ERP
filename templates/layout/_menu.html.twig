@@ -76,10 +76,13 @@
             {# ── POTI NOLEGGI — autocarrate
                  canAccess tiene conto anche dei moduli della societa' attiva,
                  quindi la voce sparisce da sola quando si entra nel Consorzio #}
-            {% if user.canAccess('pn_autocarrate') %}
+            {# il tecnico ha solo il permesso giornata: entra dalla sua pagina,
+               chi gestisce il modulo entra dalla disponibilita' #}
+            {% if user.canAccess('pn_autocarrate') or user.canAccess('pn_autocarrate_giornata') %}
                 {% set acActive = currentPath starts with '/autocarrate' %}
+                {% set acHome = user.canAccess('pn_autocarrate') ? '/autocarrate' : '/autocarrate/giornata' %}
                 <li>
-                    <a href="/autocarrate" class="side-menu {{ acActive ? 'side-menu--active' : '' }}">
+                    <a href="{{ acHome }}" class="side-menu {{ acActive ? 'side-menu--active' : '' }}">
                         <div class="side-menu__icon"><i data-lucide="truck"></i></div>
                         <div class="side-menu__title">Autocarrate</div>
                     </a>
@@ -88,10 +91,11 @@
             {% endif %}
 
             {# ── POTI NOLEGGI — macchine (piattaforme, carrelli, telescopici) #}
-            {% if user.canAccess('pn_noleggi') %}
+            {% if user.canAccess('pn_noleggi') or user.canAccess('pn_noleggi_giornata') %}
                 {% set nolActive = currentPath starts with '/noleggi' %}
+                {% set nolHome = user.canAccess('pn_noleggi') ? '/noleggi' : '/noleggi/giornata' %}
                 <li>
-                    <a href="/noleggi" class="side-menu {{ nolActive ? 'side-menu--active' : '' }}">
+                    <a href="{{ nolHome }}" class="side-menu {{ nolActive ? 'side-menu--active' : '' }}">
                         {# forklift non c'e' nel bundle Lucide del template #}
                         <div class="side-menu__icon"><i data-lucide="hard-hat"></i></div>
                         <div class="side-menu__title">Mezzi sollevamento</div>

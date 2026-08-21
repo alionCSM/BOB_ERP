@@ -201,17 +201,6 @@ final class DashboardController
         ];
     }
 
-    /**
-     * True se la societa' attiva ha un elenco di moduli, cioe' non e' il
-     * Consorzio che li ha tutti. Serve a capire se le dashboard fisse
-     * hanno ancora senso.
-     */
-    private function societaLimitata(): bool
-    {
-        $service = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
-        $dati    = $service->current();
-        return $dati !== null && !empty($dati['moduli']);
-    }
 
     // ──────────────────────────────────────────────────────────────
     // Admin dashboard data
@@ -358,38 +347,41 @@ final class DashboardController
         @setlocale(LC_TIME, 'it_IT.UTF-8', 'it_IT', 'italian');
         $today = @strftime('%A %d %B %Y') ?: date('d/m/Y');
 
-        // Stato del sistema e risorse del server valgono per tutte le societa':
-        // sono la macchina, non i dati di una azienda. Le quattro card in alto
-        // invece sono del Consorzio, e dentro un'altra societa' lasciano il
-        // posto ai contatori di quella societa'.
-        // I contatori seguono i moduli della societa' in cui si sta lavorando,
-        // presi dallo stesso elenco della dashboard dinamica. Prima erano
-        // fissi sulle autocarrate: dentro il Consorzio comparivano le loro
-        // card a zero, che non c'entrano niente con CSM.
-        // canAccess() applica gia' il filtro della societa' attiva.
-        $statsSocieta = null;
-        if ($this->societaLimitata()) {
-            // Gli utenti sono di BOB, non di una societa': l'amministratore
-            // deve vederli sempre, come lo stato del sistema e le risorse
-            // del server qui sotto. Restano fuori dal filtro dei moduli.
-            $statsSocieta = [[
-                'num'   => (int)$totalUsers,
-                'label' => 'Utenti registrati',
-                'sub'   => $activeUsers . ' attivi',
-                'color' => '#2563eb',
-                'bg'    => '#eff6ff',
-                'href'  => '/users',
-                'icon'  => 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0',
-            ]];
+        // Le card in alto seguono SEMPRE i moduli della societa' in cui si sta
+        // lavorando, Consorzio compreso.
+        //
+        // Prima c'erano due versioni della stessa riga: una fissa (utenti,
+        // cantieri, presenze, documenti) e una dinamica, e si sceglieva
+        // guardando se la societa' aveva dei moduli spuntati. Cosi' bastava
+        // configurare i moduli di CSM per cambiarle la dashboard sotto il
+        // naso, senza che nessuno avesse chiesto niente — ed era il motivo
+        // per cui le dashboard risultavano sbagliate. Una sola strada: se un
+        // modulo e' abilitato la sua card c'e', altrimenti no.
+        //
+        // Stato del sistema, risorse del server e utenti online restano
+        // uguali ovunque: sono la macchina, non i dati di un'azienda.
 
-            $statsSocieta = array_merge($statsSocieta, $this->contatoriModuli(
-                static fn(string ...$m): bool => (bool)array_filter(
-                    $m,
-                    static fn(string $modulo): bool => $user->canAccess($modulo)
-                ),
-                $user
-            ));
-        }
+        // Gli utenti sono di BOB, non di una societa': l'amministratore li
+        // vede sempre, fuori dal filtro dei moduli.
+        $statsSocieta = [[
+            'num'   => (int)$totalUsers,
+            'label' => 'Utenti registrati',
+            'sub'   => $activeUsers . ' attivi',
+            'color' => '#2563eb',
+            'bg'    => '#eff6ff',
+            'href'  => '/users',
+            'icon'  => 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 108 0 4 4 0 00-8 0',
+        ]];
+
+        // canAccess() applica gia' sia i moduli della societa' sia i permessi
+        // dell'utente in quella societa'.
+        $statsSocieta = array_merge($statsSocieta, $this->contatoriModuli(
+            static fn(string ...$m): bool => (bool)array_filter(
+                $m,
+                static fn(string $modulo): bool => $user->canAccess($modulo)
+            ),
+            $user
+        ));
 
         return compact(
             'statsSocieta',
@@ -573,13 +565,11 @@ final class DashboardController
     {
         $conn = $this->conn;
 
-        $stmt = $conn->prepare("SELECT module FROM bb_user_permissions WHERE user_id = :uid AND allowed = 1");
-        $stmt->execute([':uid' => $userId]);
-        $mods = array_fill_keys($stmt->fetchAll(\PDO::FETCH_COLUMN), true);
+        // Permessi dell'utente NELLA societa' in cui sta lavorando, poi
+        // filtrati anche sui moduli della societa': dentro Poti non devono
+        // comparire le scorciatoie del Consorzio.
+        $mods = array_filter($user->getPermissions());
 
-        // Le scorciatoie seguono la societa' in cui si sta lavorando: dentro
-        // Poti non devono comparire quelle del Consorzio. canAccess() applica
-        // gia' lo stesso filtro, qui i permessi si leggono direttamente.
         $mods = array_filter(
             $mods,
             static fn(string $m): bool => $user->canAccess($m),

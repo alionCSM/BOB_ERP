@@ -7,6 +7,7 @@ use App\Http\Response;
 use App\Repository\Poti\MacchinaRepository;
 use App\Service\CurrentCompany;
 use App\Service\Poti\Audit;
+use App\Service\Poti\Giornata;
 use App\Service\Poti\VistaImpegni;
 
 /**
@@ -148,6 +149,7 @@ final class NoleggiController
             'telefono'  => trim((string)($_POST['telefono'] ?? '')),
             'luogo'     => trim((string)($_POST['luogo'] ?? '')),
             'contratto' => trim((string)($_POST['contratto'] ?? '')),
+            'contratto_firmato' => !empty($_POST['contratto_firmato']),
             'stato'     => $stato,
             'trasporto' => VistaImpegni::importo($_POST['trasporto'] ?? ''),
             'totale'    => VistaImpegni::importo($_POST['totale'] ?? ''),
@@ -430,5 +432,120 @@ final class NoleggiController
     {
         $service = $GLOBALS['currentCompany'] ?? new CurrentCompany($this->conn);
         return $service->id();
+    }
+
+    // ── GET /noleggi/giornata — vista dei tecnici ────────────────────────────
+
+    /**
+     * La giornata dei mezzi: cosa esce, cosa rientra, cosa e' fuori e cosa
+     * e' in ritardo. Ragiona su un giorno e non mostra importi, come la
+     * pagina gemella delle autocarrate.
+     */
+    public function giornata(Request $request): void
+    {
+        $this->assertGiornata($request);
+        $repo = new MacchinaRepository($this->conn);
+        $cid  = $this->companyId();
+
+        $data = VistaImpegni::data($_GET['data'] ?? '', date('Y-m-d'));
+        $user = $this->utente($request);
+
+        // Stessa pagina delle autocarrate: qui l'unita' e' la singola
+        // macchina del noleggio, ma la scheda che ne esce e' identica.
+        $blocchi = Giornata::blocchi($repo->giornata($cid, $data), Giornata::MACCHINA);
+
+        $collegamenti = [];
+        if ($user->canAccess('pn_noleggi')) {
+            $collegamenti = [
+                ['href' => '/noleggi', 'label' => "Disponibilita'"],
+                ['href' => '/noleggi/elenco', 'label' => 'Noleggi'],
+                ['href' => '/noleggi/macchine', 'label' => 'Mezzi'],
+            ];
+        }
+
+        $vista = [
+            'titolo'       => 'Giornata mezzi sollevamento',
+            'sottotitolo'  => "Cosa esce, cosa rientra e cosa e' ancora fuori.",
+            'base'         => '/noleggi/giornata',
+            'azione'       => '/noleggi/giornata/segna',
+            'collegamenti' => $collegamenti,
+            'data'         => $data,
+            'ieri'         => date('Y-m-d', strtotime($data . ' -1 day')),
+            'domani'       => date('Y-m-d', strtotime($data . ' +1 day')),
+            'oggi'         => date('Y-m-d'),
+            'blocchi'      => $blocchi,
+            'riepilogo'    => Giornata::riepilogo($blocchi),
+            'prossime'     => Giornata::prossime(
+                $repo->prossimeConsegne($cid, $data, 14), Giornata::MACCHINA
+            ),
+            'salvato'      => isset($_GET['salvato']),
+        ];
+
+        // Dopo un tocco la pagina chiede solo il pezzo che cambia: riepilogo
+        // e schede. Rimandare tutto — menu, barra, prossime partenze — per
+        // aggiornare una riga sarebbe sprecato su un telefono in officina.
+        if (isset($_GET['frammento'])) {
+            Response::view('poti/_giornata_corpo.html.twig', $request, $vista);
+        }
+
+        Response::view('poti/giornata.html.twig', $request, $vista);
+    }
+
+    // ── POST /noleggi/giornata/segna ─────────────────────────────────────────
+
+    /**
+     * Consegna e rientro riguardano la RIGA (la singola macchina), la firma
+     * del contratto riguarda il NOLEGGIO: per questo arrivano due id diversi.
+     */
+    public function segna(Request $request): void
+    {
+        $this->assertGiornata($request);
+        $repo = new MacchinaRepository($this->conn);
+        $cid  = $this->companyId();
+
+        $cosa       = (string)($_POST['cosa'] ?? '');
+        $rigaId     = (int)($_POST['riga_id'] ?? 0);
+        $noleggioId = (int)($_POST['noleggio_id'] ?? 0);
+        $data       = VistaImpegni::data($_POST['data'] ?? '', date('Y-m-d'));
+
+        $prima = $noleggioId ? $repo->noleggio($cid, $noleggioId) : null;
+
+        if ($prima) {
+            if ($cosa === 'firma') {
+                $repo->segnaContrattoFirmato($cid, $noleggioId, empty($prima['contratto_firmato']));
+            } elseif ($rigaId && in_array($cosa, ['consegnato', 'rientrato'], true)) {
+                $repo->segnaMomento($cid, $rigaId, $cosa, (int)$this->utente($request)->id);
+            }
+
+            (new Audit($this->conn))->registra(
+                $cid, 'noleggio', $noleggioId, 'modificato',
+                $prima, $repo->noleggio($cid, $noleggioId),
+                (int)$this->utente($request)->id, (string)$prima['cliente']
+            );
+        }
+
+        // come nelle autocarrate: il tocco arriva via AJAX e la pagina si
+        // aggiorna sul posto, senza far ripartire l'elenco da capo
+        if ($request->isAjax()) {
+            Response::json(['ok' => $prima !== null]);
+        }
+
+        Response::redirect('/noleggi/giornata?data=' . $data . '&salvato=1');
+    }
+
+    /**
+     * Chi puo' vedere la giornata: chi gestisce il modulo, oppure chi ha il
+     * solo permesso da tecnico. Quella pagina non mostra importi e non crea
+     * ne' elimina noleggi.
+     */
+    private function assertGiornata(Request $request): void
+    {
+        $user = $this->utente($request);
+        if ((int)$user->id === 1
+            || $user->canAccess('pn_noleggi')
+            || $user->canAccess('pn_noleggi_giornata')) {
+            return;
+        }
+        Response::error("Permesso 'pn_noleggi_giornata' richiesto", 403);
     }
 }
