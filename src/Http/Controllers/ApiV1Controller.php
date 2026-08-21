@@ -28,6 +28,8 @@ use App\Service\Mailer;
  *   GET  /api/v1/dashboard                  (Bearer)
  *   POST /api/v1/cron/run                   (Bearer, admin)
  *   GET  /api/v1/cron/history?job=xxx       (Bearer, admin)
+ *   GET  /api/v1/noleggi/giornata            (Bearer, permessi Poti)
+ *   POST /api/v1/noleggi/giornata/segna      (Bearer, permessi Poti)
  */
 final class ApiV1Controller
 {
@@ -474,6 +476,128 @@ final class ApiV1Controller
             'active_company_id'       => $this->currentCompany()->id(),
             'needs_company_selection' => false,
         ]);
+    }
+
+    // ── NOLEGGI / GIORNATA TECNICI (Bearer) ──────────────────────────────────
+
+    /**
+     * GET /api/v1/noleggi/giornata?tipo=autocarrate|macchina&data=YYYY-MM-DD
+     *
+     * La giornata dei tecnici (stessa pagina web): cosa esce, cosa rientra,
+     * cosa e' fuori, cosa e' in ritardo. Permessi identici al web
+     * (assertGiornata dei due controller). Riusa le repository e il service
+     * Giornata del sito: stessi dati, stessa normalizzazione.
+     */
+    public function noleggiGiornata(Request $request): never
+    {
+        $user = $request->user();
+        $tipo = (string)($_GET['tipo'] ?? 'autocarrate');
+
+        [$ok, $repo, $msg] = $this->noleggiAccesso($user, $tipo);
+        if (!$ok) {
+            Response::json(['success' => false, 'message' => $msg], 403);
+        }
+
+        $cid     = (int)$this->currentCompany()->id();
+        $data    = \App\Service\Poti\VistaImpegni::data($_GET['data'] ?? '', date('Y-m-d'));
+        $blocco  = $tipo === 'macchina' ? \App\Service\Poti\Giornata::MACCHINA : \App\Service\Poti\Giornata::AUTOCARRATA;
+        $blocchi = \App\Service\Poti\Giornata::blocchi($repo->giornata($cid, $data), $blocco);
+
+        Response::json([
+            'success'   => true,
+            'tipo'      => $tipo,
+            'data'      => $data,
+            'oggi'      => date('Y-m-d'),
+            'blocchi'   => $blocchi,
+            'riepilogo' => \App\Service\Poti\Giornata::riepilogo($blocchi),
+            'prossime'  => \App\Service\Poti\Giornata::prossime($repo->prossimeConsegne($cid, $data, 14), $blocco),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/noleggi/giornata/segna
+     * {tipo, cosa, id?, riga_id?, noleggio_id?} — cosa: consegnato|rientrato|firma
+     *
+     * Toggle come nel web: un tocco segna, il tocco successivo annulla.
+     * Stesse repository e stesso registro di modifica (Audit Poti).
+     */
+    public function noleggiSegna(Request $request): never
+    {
+        $user = $request->user();
+        $body = $this->jsonBody();
+        $tipo = (string)($body['tipo'] ?? 'autocarrate');
+
+        [$ok, $repo, $msg] = $this->noleggiAccesso($user, $tipo);
+        if (!$ok) {
+            Response::json(['success' => false, 'message' => $msg], 403);
+        }
+
+        $cosa = (string)($body['cosa'] ?? '');
+        if (!in_array($cosa, ['consegnato', 'rientrato', 'firma'], true)) {
+            Response::json(['success' => false, 'message' => 'Azione non valida'], 422);
+        }
+
+        $cid = (int)$this->currentCompany()->id();
+        $uid = (int)$user->id;
+
+        if ($tipo === 'macchina') {
+            $rigaId     = (int)($body['riga_id'] ?? 0);
+            $noleggioId = (int)($body['noleggio_id'] ?? 0);
+            $prima      = $noleggioId ? $repo->noleggio($cid, $noleggioId) : null;
+
+            if ($prima) {
+                if ($cosa === 'firma') {
+                    $repo->segnaContrattoFirmato($cid, $noleggioId, empty($prima['contratto_firmato']));
+                } elseif ($rigaId && in_array($cosa, ['consegnato', 'rientrato'], true)) {
+                    $repo->segnaMomento($cid, $rigaId, $cosa, $uid);
+                }
+                (new \App\Service\Poti\Audit($this->conn))->registra(
+                    $cid, 'noleggio', $noleggioId, 'modificato',
+                    $prima, $repo->noleggio($cid, $noleggioId),
+                    $uid, (string)$prima['cliente']
+                );
+            }
+            Response::json(['success' => $prima !== null]);
+        }
+
+        $id    = (int)($body['id'] ?? 0);
+        $prima = $id ? $repo->prenotazione($cid, $id) : null;
+
+        if ($prima) {
+            if ($cosa === 'firma') {
+                $repo->segnaContrattoFirmato($cid, $id, empty($prima['contratto_firmato']));
+            } elseif (in_array($cosa, ['consegnato', 'rientrato'], true)) {
+                $repo->segnaMomento($cid, $id, $cosa, $uid);
+            }
+            (new \App\Service\Poti\Audit($this->conn))->registra(
+                $cid, 'prenotazione', $id, 'modificato',
+                $prima, $repo->prenotazione($cid, $id),
+                $uid, (string)$prima['cliente']
+            );
+        }
+        Response::json(['success' => $prima !== null]);
+    }
+
+    /**
+     * Accesso alla giornata noleggi: stesse regole dei web (assertGiornata).
+     *
+     * @return array{0:bool,1:\App\Repository\Poti\AutocarrataRepository|\App\Repository\Poti\MacchinaRepository|null,2:string}
+     */
+    private function noleggiAccesso(User $user, string $tipo): array
+    {
+        $super = (int)$user->id === 1;
+
+        if ($tipo === 'macchina') {
+            if ($super || $user->canAccess('pn_noleggi') || $user->canAccess('pn_noleggi_giornata')) {
+                return [true, new \App\Repository\Poti\MacchinaRepository($this->conn), ''];
+            }
+            return [false, null, "Permesso 'pn_noleggi_giornata' richiesto"];
+        }
+
+        if ($super || $user->canAccess('pn_autocarrate') || $user->canAccess('pn_autocarrate_giornata')) {
+            return [true, new \App\Repository\Poti\AutocarrataRepository($this->conn), ''];
+        }
+        return [false, null, "Permesso 'pn_autocarrate_giornata' richiesto"];
     }
 
     // ── DATI DASHBOARD (ricalcati dal web) ───────────────────────────────────

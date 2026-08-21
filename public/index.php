@@ -672,7 +672,9 @@ if (str_starts_with($uri, '/api/v1/')) {
            ->post('/api/v1/switch-company',           [ApiV1Controller::class, 'switchCompany'])
             ->get('/api/v1/dashboard',                 [ApiV1Controller::class, 'dashboard'])
             ->post('/api/v1/cron/run',                 [ApiV1Controller::class, 'cronRun'])
-            ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory']);
+            ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory'])
+            ->get('/api/v1/noleggi/giornata',          [ApiV1Controller::class, 'noleggiGiornata'])
+            ->post('/api/v1/noleggi/giornata/segna',   [ApiV1Controller::class, 'noleggiSegna']);
 
     $router->dispatch($request, $container);
 }
