@@ -1205,8 +1205,7 @@ final class ApiV1Controller
                     <img src=\"" . $site . "/images/logo.png\" alt=\"BOB\" width=\"72\" height=\"72\"
                          onerror=\"this.style.display='none'\">
                     <div>
-                        <div style=\"font-size:14px; font-weight:700; letter-spacing:1px; color:#0f766e\">C S MONTAGGI S.R.L.</div>
-                        <div style=\"font-size:11px; color:#64748b\">Sistema di Gestione Interna</div>
+                        <div style=\"font-size:22px; font-weight:800; letter-spacing:1px; color:#0f766e\">BOB</div>
                     </div>
                 </div>
                 <h2 style=\"font-size:18px; margin:28px 0 8px\">Codice di accesso da nuovo dispositivo</h2>
