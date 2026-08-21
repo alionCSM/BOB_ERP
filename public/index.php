@@ -716,6 +716,50 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);
 
+    // ── BOB Zone dall'app ─────────────────────────────────────────────────
+    // Stessi metodi del sito, non una seconda copia: cambia solo come si
+    // entra (Bearer invece del cookie di sessione). I metodi leggono i
+    // parametri dalla rotta e l'utente da $GLOBALS, quindi non si accorgono
+    // di quale dei due middleware li ha chiamati.
+    //
+    // Non sono esposti tutti i 47: qui c'e' cio' che si usa in cantiere.
+    // Creare template di moduli, calibrare disegni o accendere Zone su un
+    // cantiere restano cose da ufficio, da schermo grande.
+    require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
+    $router
+        // stato del cantiere in Zone
+        ->get( '/api/v1/zone/{id}/tasks',                            [FieldwireController::class, 'tasks'])
+        ->post('/api/v1/zone/{id}/tasks',                            [FieldwireController::class, 'createTask'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/update',            [FieldwireController::class, 'updateTask'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/status',            [FieldwireController::class, 'updateTaskStatus'])
+        ->get( '/api/v1/zone/{id}/tasks/{taskId}/comments',          [FieldwireController::class, 'comments'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/comments',          [FieldwireController::class, 'postComment'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/photo',             [FieldwireController::class, 'postPhoto'])
+        ->get( '/api/v1/zone/{id}/tasks/{taskId}/checklist',         [FieldwireController::class, 'checklist'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/checklist',         [FieldwireController::class, 'addChecklistItem'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/checklist/{itemId}/complete',
+                                                                     [FieldwireController::class, 'completeChecklistItem'])
+        ->get( '/api/v1/zone/{id}/photo',                            [FieldwireController::class, 'zonePhoto'])
+        ->get( '/api/v1/zone/{id}/users',                            [FieldwireController::class, 'bobUsers'])
+        // file: si consultano e si scaricano, non si riordinano
+        ->get( '/api/v1/zone/{id}/files',                            [FieldwireController::class, 'files'])
+        ->get( '/api/v1/zone/{id}/files/{fileId}/download',          [FieldwireController::class, 'downloadFile'])
+        ->get( '/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'fileComments'])
+        ->post('/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'postFileComment'])
+        // moduli: si compilano in cantiere, i template si fanno da ufficio
+        ->get( '/api/v1/zone/{id}/forms',                            [FieldwireController::class, 'formTemplates'])
+        ->get( '/api/v1/zone/{id}/forms/submissions',                [FieldwireController::class, 'formSubmissions'])
+        ->get( '/api/v1/zone/{id}/forms/submission/{subId}',         [FieldwireController::class, 'formSubmission'])
+        ->get( '/api/v1/zone/{id}/forms/{tplId}',                    [FieldwireController::class, 'formTemplate'])
+        ->post('/api/v1/zone/{id}/forms/{tplId}/submit',             [FieldwireController::class, 'submitForm'])
+        ->get( '/api/v1/zone/{id}/form-file',                        [FieldwireController::class, 'formFile'])
+        // disegni: solo da guardare, con i pin dei task sopra
+        ->get( '/api/v1/zone/{id}/disegni',                          [FieldwireController::class, 'disegni'])
+        ->get( '/api/v1/zone/{id}/floorplans',                       [FieldwireController::class, 'floorplans'])
+        ->get( '/api/v1/zone/{id}/disegni/{docId}/annotations',      [FieldwireController::class, 'annotations'])
+        ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg',              [FieldwireController::class, 'dwgMeta'])
+        ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg-svg',          [FieldwireController::class, 'dwgSvg']);
+
     $router->dispatch($request, $container);
 }
 
