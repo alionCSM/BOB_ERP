@@ -57,6 +57,14 @@ final class FieldwireController
 
     public function page(Request $request): void
     {
+        // La pagina web merita un rimando alla dashboard, non il JSON che
+        // ricevono le chiamate dell'app: chi ci arriva senza permesso sta
+        // navigando col browser, e un blocco di JSON in faccia sembra guasto.
+        $utente = $request->user();
+        if (!$utente || ((int)$utente->id !== 1 && !$utente->canAccess('zone'))) {
+            Response::redirect('/dashboard?no_permission=1');
+        }
+
         $worksiteId = (int) ($request->param('id') ?? 0);
         $worksite   = $this->worksiteRepo->findById($worksiteId);
         if (!$worksite) { http_response_code(404); exit; }
@@ -263,6 +271,8 @@ final class FieldwireController
     /** Upload foto su un task → crea un commento con file_url. Multipart. */
     public function postPhoto(Request $request): void
     {
+        $this->assertZone();
+
         // NB: multipart, non JSON. Risponde JSON.
         header('Content-Type: application/json');
         try {
@@ -315,6 +325,8 @@ final class FieldwireController
     /** Stream di una foto BOB Zone (path relativo in ?f=). */
     public function zonePhoto(Request $request): void
     {
+        $this->assertZone();
+
         $worksiteId = (int) $request->param('id');
         $rel = (string) ($_GET['f'] ?? '');
         // sicurezza: deve stare sotto BOBZone/<worksiteId>/ e niente traversal
@@ -467,6 +479,8 @@ final class FieldwireController
     /** Report PDF (punch list) dei task del cantiere. */
     public function report(Request $request): void
     {
+        $this->assertZone();
+
         $worksiteId = (int) $request->param('id');
         $worksite   = $this->worksiteRepo->findById($worksiteId);
         if (!$worksite) { http_response_code(404); exit('Cantiere non trovato'); }
@@ -607,6 +621,8 @@ final class FieldwireController
     /** Stream firma/foto modulo (?f=). */
     public function formFile(Request $request): void
     {
+        $this->assertZone();
+
         $worksiteId = (int) $request->param('id');
         $rel = (string)($_GET['f'] ?? '');
         $prefix = 'BOBZone/' . $worksiteId . '/forms/';
@@ -687,6 +703,8 @@ final class FieldwireController
 
     public function uploadFile(Request $request): void
     {
+        $this->assertZone();
+
         header('Content-Type: application/json');
         try {
             $worksiteId = (int) $request->param('id');
@@ -746,6 +764,8 @@ final class FieldwireController
 
     public function downloadFile(Request $request): void
     {
+        $this->assertZone();
+
         $worksiteId = (int) $request->param('id');
         $fileId     = (int) $request->param('fileId');
         $file = $this->fileRepo->find($fileId);
@@ -1076,6 +1096,8 @@ final class FieldwireController
     /** Stream dell'SVG generato dal DWG. */
     public function dwgSvg(Request $request): void
     {
+        $this->assertZone();
+
         $docId = (int) $request->param('docId');
         $row = (new \App\Service\Fieldwire\DwgConverter($this->conn))->status($docId);
         if (!$row || $row['status'] !== 'ok' || empty($row['svg_path'])) {
@@ -1262,8 +1284,45 @@ final class FieldwireController
      * un warning silenzioso bombarda il JSON e il frontend mostra
      * "Risposta non valida dal server".
      */
+    /**
+     * Chi puo' usare BOB Zone.
+     *
+     * Fino a ora il controllo non c'era affatto: bastava il permesso
+     * 'worksites', perche' le rotte stanno sotto /worksites e il middleware
+     * del sito controlla quello. Adesso Zone ha un permesso suo, e serve un
+     * controllo qui dentro perche' l'app arriva da /api/v1, dove quel
+     * middleware non passa.
+     *
+     * L'utente si legge da $GLOBALS: lo riempiono entrambi i middleware, web
+     * e API, quindi il metodo funziona identico da tutte e due le parti.
+     */
+    private function assertZone(): void
+    {
+        $user = $GLOBALS['user'] ?? null;
+
+        if ($user instanceof \App\Domain\User
+            && ((int)$user->id === 1 || $user->canAccess('zone'))) {
+            return;
+        }
+
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode([
+            'ok'    => false,
+            'error' => "Permesso 'zone' richiesto per BOB Zone",
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     private function jsonResponse(callable $fn): void
     {
+        // Il controllo sta qui e non ripetuto in ogni metodo: gli endpoint
+        // che passano di qua sono trentanove, e ne basta uno dimenticato per
+        // lasciare la porta aperta. Chi ne aggiunge un altro domani se lo
+        // ritrova gia' protetto senza doverci pensare.
+        $this->assertZone();
+
         // pulisce eventuali buffer ereditati
         while (ob_get_level() > 0) { ob_end_clean(); }
         ob_start();
