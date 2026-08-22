@@ -62,7 +62,7 @@ final class ApiV1CantieriController
         );
 
         $prezzi = $user->canSeePrices();
-        $zone   = $this->zoneAttivaPerCantiere(array_column($cantieri, 'id'));
+        $aperti = $this->taskApertiPerCantiere(array_column($cantieri, 'id'));
 
         $out = [];
         foreach ($cantieri as $c) {
@@ -78,7 +78,7 @@ final class ApiV1CantieriController
                 'al'          => (string)($c['end_date'] ?? ''),
                 // il margine e' un dato economico: lo vede solo chi puo'
                 'margine'     => $prezzi && $c['margin'] !== null ? (float)$c['margin'] : null,
-                'zone_attivo' => in_array($id, $zone, true),
+                'task_aperti' => $aperti[$id] ?? 0,
             ];
         }
 
@@ -159,11 +159,17 @@ final class ApiV1CantieriController
                 'contratto' => (float)(($companyId === 1 ? $w['total_offer'] : $w['ext_total_offer']) ?? 0),
                 'margine'   => $w['margin'] !== null ? (float)$w['margin'] : null,
             ] : null,
+            // BOB Zone funziona su OGNI cantiere: le tabelle bb_zone_* sono
+            // la fonte, non una copia di Fieldwire. fieldwire_enabled_at dice
+            // solo se il cantiere e' collegato a Fieldwire per la sincronia,
+            // ed e' un'altra cosa — prendendolo per "Zone attivo" l'app
+            // diceva "non attivo su questo cantiere" praticamente sempre.
             'zone'        => [
-                'attivo' => !empty($w['fieldwire_enabled_at']),
                 // il permesso e' separato da 'worksites': si possono vedere i
                 // cantieri senza poter entrare in Zone
-                'permesso' => $user->canAccess('zone'),
+                'permesso'   => (int)$user->id === 1 || $user->canAccess('zone'),
+                'taskAperti' => $this->taskAperti($id),
+                'fieldwire'  => !empty($w['fieldwire_enabled_at']),
             ],
         ]);
     }
@@ -204,6 +210,28 @@ final class ApiV1CantieriController
         ];
     }
 
+    /**
+     * Quanti task ci sono ancora da fare.
+     *
+     * Serve a dare un motivo per entrare in Zone: "3 task aperti" dice
+     * qualcosa, "Task, file, moduli e disegni" e' solo un elenco di parole.
+     */
+    private function taskAperti(int $id): int
+    {
+        try {
+            $stmt = $this->conn->prepare("
+                SELECT COUNT(*) FROM bb_zone_tasks
+                WHERE worksite_id = :wid AND status IN ('open', 'in_progress')
+            ");
+            $stmt->execute([':wid' => $id]);
+            return (int)$stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            // tabella non ancora creata: meglio nessun numero che una scheda
+            // che non si apre
+            return 0;
+        }
+    }
+
     /** @return array<int, array{nome:string}> */
     private function squadra(int $id): array
     {
@@ -224,29 +252,53 @@ final class ApiV1CantieriController
     }
 
     /**
-     * Quali dei cantieri elencati hanno Zone acceso.
+     * Quanti task aperti ha ciascun cantiere dell'elenco.
      *
-     * Una query sola per tutta la pagina invece di una per riga: con 200
-     * cantieri sarebbero 200 andate e ritorno al database.
+     * Prima qui si guardava fieldwire_enabled_at per dire "Zone attivo": e'
+     * sbagliato due volte. Zone funziona su OGNI cantiere — le bb_zone_* sono
+     * la fonte, non una copia di Fieldwire — e quel campo dice solo se il
+     * cantiere e' collegato a Fieldwire per la sincronia. Il risultato era
+     * che l'icona non compariva quasi mai, e nella scheda il pulsante per
+     * entrare in Zone restava spento.
+     *
+     * Il numero dei task aperti e' anche piu' utile: dice dove c'e' del
+     * lavoro, invece di ripetere su ogni riga una cosa sempre vera.
+     *
+     * Una query sola per tutta la pagina: con 200 cantieri, una per riga
+     * sarebbero 200 andate e ritorno al database.
      *
      * @param  array<int, mixed> $ids
-     * @return int[]
+     * @return array<int, int>   id cantiere => task aperti
      */
-    private function zoneAttivaPerCantiere(array $ids): array
+    private function taskApertiPerCantiere(array $ids): array
     {
         $ids = array_values(array_unique(array_map('intval', $ids)));
         if (!$ids) {
             return [];
         }
 
-        $segnaposto = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $this->conn->prepare("
-            SELECT id FROM bb_worksites
-            WHERE  id IN ({$segnaposto}) AND fieldwire_enabled_at IS NOT NULL
-        ");
-        $stmt->execute($ids);
+        try {
+            $segnaposto = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $this->conn->prepare("
+                SELECT worksite_id, COUNT(*) AS n
+                FROM   bb_zone_tasks
+                WHERE  worksite_id IN ({$segnaposto})
+                  AND  status IN ('open', 'in_progress')
+                GROUP BY worksite_id
+            ");
+            $stmt->execute($ids);
 
-        return array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN));
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $out[(int)$r['worksite_id']] = (int)$r['n'];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            // tabella non ancora creata: l'elenco dei cantieri deve aprirsi
+            // lo stesso, senza il contatore
+            error_log('[ApiV1Cantieri] taskAperti: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /** @return int[] */
