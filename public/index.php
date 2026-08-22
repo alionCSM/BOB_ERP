@@ -722,9 +722,10 @@ if (str_starts_with($uri, '/api/v1/')) {
     // parametri dalla rotta e l'utente da $GLOBALS, quindi non si accorgono
     // di quale dei due middleware li ha chiamati.
     //
-    // Non sono esposti tutti i 47: qui c'e' cio' che si usa in cantiere.
-    // Creare template di moduli, calibrare disegni o accendere Zone su un
-    // cantiere restano cose da ufficio, da schermo grande.
+    // Non sono esposti tutti i 47: qui c'e' cio' che si usa in cantiere,
+    // scrittura compresa — task, file, checklist, commenti, moduli.
+    // Restano fuori le cose da ufficio: creare i template dei moduli,
+    // calibrare i disegni, accendere Zone su un cantiere.
     require_once APP_ROOT . '/src/Http/Controllers/FieldwireController.php';
     $router
         // stato del cantiere in Zone
@@ -739,10 +740,18 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->post('/api/v1/zone/{id}/tasks/{taskId}/checklist',         [FieldwireController::class, 'addChecklistItem'])
         ->post('/api/v1/zone/{id}/tasks/{taskId}/checklist/{itemId}/complete',
                                                                      [FieldwireController::class, 'completeChecklistItem'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/checklist/{itemId}/delete',
+                                                                     [FieldwireController::class, 'deleteChecklistItem'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/delete',            [FieldwireController::class, 'deleteTask'])
+        ->post('/api/v1/zone/{id}/tasks/{taskId}/comments/{commentId}/delete',
+                                                                     [FieldwireController::class, 'deleteComment'])
         ->get( '/api/v1/zone/{id}/photo',                            [FieldwireController::class, 'zonePhoto'])
         ->get( '/api/v1/zone/{id}/users',                            [FieldwireController::class, 'bobUsers'])
         // file: si consultano e si scaricano, non si riordinano
         ->get( '/api/v1/zone/{id}/files',                            [FieldwireController::class, 'files'])
+        ->post('/api/v1/zone/{id}/files',                            [FieldwireController::class, 'uploadFile'])
+        ->post('/api/v1/zone/{id}/files/folder',                     [FieldwireController::class, 'createFolder'])
+        ->post('/api/v1/zone/{id}/files/{fileId}/delete',            [FieldwireController::class, 'deleteFile'])
         ->get( '/api/v1/zone/{id}/files/{fileId}/download',          [FieldwireController::class, 'downloadFile'])
         ->get( '/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'fileComments'])
         ->post('/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'postFileComment'])
