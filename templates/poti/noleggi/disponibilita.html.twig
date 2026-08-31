@@ -2,6 +2,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+{# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
 {% endblock %}
 
 {% block content %}
@@ -41,10 +43,26 @@
                     {% endfor %}
                 </select>
             </label>
+            <label class="ac-f">
+                <span>stato</span>
+                <select name="stato">
+                    <option value="">tutti</option>
+                    {% for s in stati %}
+                        <option value="{{ s }}" {{ stato == s ? 'selected' : '' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {# con un parco grosso il mezzo si cerca per matricola: scorrere
+               centinaia di schede per trovarne una non e' un modo di lavorare #}
+            <label class="ac-f ac-f-cerca">
+                <span>mezzo</span>
+                <input type="search" name="q" value="{{ cerca }}"
+                       placeholder="matricola, modello…">
+            </label>
             <input type="hidden" name="dal" value="{{ dal }}">
             <input type="hidden" name="al" value="{{ al }}">
             <button class="ac-btn ac-btn-primary">Verifica</button>
-            {% if ricercaAttiva or tipo %}
+            {% if ricercaAttiva or tipo or cerca or stato %}
                 <a href="/noleggi" class="ac-link">azzera</a>
             {% endif %}
         </div>
@@ -79,10 +97,20 @@
             </div>
         {% else %}
             <div class="ac-empty">
-                Nessun mezzo registrato. <a href="/noleggi/macchine">Aggiungine uno</a>.
+                {% if cerca or tipo or stato %}
+                    Nessun mezzo corrisponde ai filtri.
+                {% else %}
+                    Nessun mezzo registrato. <a href="/noleggi/macchine">Aggiungine uno</a>.
+                {% endif %}
             </div>
         {% endfor %}
     </div>
+
+    {# La griglia qui sotto disegna una riga per mezzo: e' il motivo per cui
+       questa pagina si mostra a pagine e non tutta insieme. #}
+    {% include 'poti/_paginazione.html.twig' with {
+        base: '/noleggi', nome: 'mezzi'
+    } %}
 
     {# ── Impegni: calendario e timeline ──────────────────────────────────── #}
     {% if macchine %}
@@ -99,7 +127,12 @@
                 <input type="date" name="al" value="{{ al }}">
                 <input type="hidden" name="cerca_dal" value="{{ cercaDal }}">
                 <input type="hidden" name="cerca_al" value="{{ cercaAl }}">
+                {# i filtri sui mezzi si portano dietro: cambiare il periodo
+                   non deve rimettere in elenco tutto il parco #}
                 <input type="hidden" name="tipo" value="{{ tipo }}">
+                <input type="hidden" name="stato" value="{{ stato }}">
+                <input type="hidden" name="q" value="{{ cerca }}">
+                <input type="hidden" name="pagina" value="{{ pagina }}">
                 <button class="ac-btn">Mostra</button>
             </form>
         </div>

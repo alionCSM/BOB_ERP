@@ -4,6 +4,8 @@
 {# stessi stili delle autocarrate: le due sezioni si assomigliano e tenerne
    due copie vorrebbe dire vederle divergere al primo ritocco #}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+{# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
 {% endblock %}
 
 {% block content %}
@@ -23,6 +25,38 @@
 
     {% if salvato %}<div class="ac-alert is-ok">Modifiche salvate.</div>{% endif %}
     {% if errore %}<div class="ac-alert is-ko">{{ errore }}</div>{% endif %}
+
+    {# Con centinaia di mezzi si arriva qui cercandone uno, non scorrendo:
+       la ricerca sta in cima ed e' il primo campo della pagina. #}
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca</span>
+            <input type="search" name="q" value="{{ cerca }}" autofocus
+                   placeholder="matricola, modello, tipo, note…">
+        </label>
+        <label class="ac-f">
+            <span>Tipo</span>
+            <select name="tipo">
+                <option value="">tutti</option>
+                {% for t in tipi %}
+                    <option value="{{ t }}" {{ tipo == t ? 'selected' : '' }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Stato</span>
+            <select name="stato">
+                <option value="">tutti</option>
+                {% for s in stati %}
+                    <option value="{{ s }}" {{ stato == s ? 'selected' : '' }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Cerca</button>
+        {% if cerca or tipo or stato %}
+            <a href="/noleggi/macchine" class="ac-link">azzera</a>
+        {% endif %}
+    </form>
 
     <div class="ac-box">
         <div class="ac-table-wrap">
@@ -55,11 +89,23 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="ac-empty">Nessun mezzo registrato.</td></tr>
+                        <tr>
+                            <td colspan="8" class="ac-empty">
+                                {% if cerca or tipo or stato %}
+                                    Nessun mezzo corrisponde ai filtri.
+                                {% else %}
+                                    Nessun mezzo registrato.
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {% include 'poti/_paginazione.html.twig' with {
+            base: '/noleggi/macchine', nome: 'mezzi'
+        } %}
     </div>
 
     {# ── Modale mezzo ────────────────────────────────────────────────────── #}

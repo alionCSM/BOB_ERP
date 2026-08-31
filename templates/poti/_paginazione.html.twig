@@ -1,0 +1,43 @@
+{# Barra di paginazione condivisa da noleggi, mezzi e disponibilita'.
+
+   Attende: pagina, pagine, totale, primo, ultimo (dal controller) piu'
+   base (il percorso), qs (gli altri filtri gia' in forma di query string)
+   e nome (come si chiamano gli elementi contati).
+
+   I filtri si riportano nell'indirizzo di ogni link: senza, passare alla
+   pagina due azzererebbe la ricerca appena fatta.
+
+   La stringa arriva gia' fatta dal controller e non si compone qui: in
+   Twig una variabile assegnata dentro un {% for %} non sopravvive al
+   ciclo, quindi accumularla un pezzo per volta darebbe una stringa vuota
+   e i filtri si perderebbero al primo cambio pagina. #}
+
+{% if totale > 0 %}
+<div class="nl-pag">
+    <div class="nl-pag-conta">
+        {{ primo }}–{{ ultimo }} di <strong>{{ totale }}</strong> {{ nome }}
+    </div>
+
+    {% if pagine > 1 %}
+        <div class="nl-pag-nav">
+            {% if pagina > 1 %}
+                <a class="nl-pag-b" href="{{ base }}?pagina=1{{ qs|raw }}" title="Prima pagina">«</a>
+                <a class="nl-pag-b" href="{{ base }}?pagina={{ pagina - 1 }}{{ qs|raw }}">‹ Indietro</a>
+            {% else %}
+                <span class="nl-pag-b is-off">«</span>
+                <span class="nl-pag-b is-off">‹ Indietro</span>
+            {% endif %}
+
+            <span class="nl-pag-ora">{{ pagina }} / {{ pagine }}</span>
+
+            {% if pagina < pagine %}
+                <a class="nl-pag-b" href="{{ base }}?pagina={{ pagina + 1 }}{{ qs|raw }}">Avanti ›</a>
+                <a class="nl-pag-b" href="{{ base }}?pagina={{ pagine }}{{ qs|raw }}" title="Ultima pagina">»</a>
+            {% else %}
+                <span class="nl-pag-b is-off">Avanti ›</span>
+                <span class="nl-pag-b is-off">»</span>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endif %}

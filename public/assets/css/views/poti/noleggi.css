@@ -108,23 +108,41 @@
 
 .nl-righe-lista { display: flex; flex-direction: column; gap: 10px; }
 
-/* la macchina si prende piu' spazio degli altri campi: il suo testo e' il
-   piu' lungo e in una colonna stretta verrebbe troncato subito */
+/* A flex e non a griglia: la tariffa a mese compare solo sulle righe a
+   mese, e con le colonne fisse una riga a giorni lascerebbe un buco dove
+   quel campo non c'e'. Cosi' i campi si stringono e vanno a capo da soli.
+
+   La macchina si prende piu' spazio degli altri: il suo testo e' il piu'
+   lungo e in una colonna stretta verrebbe troncato subito. */
 .nl-riga {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 10px;
-    align-items: end;
+    align-items: flex-end;
     padding: 10px;
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
 }
 
+.nl-riga > .ac-f { flex: 1 1 110px; min-width: 0; }
+.nl-riga-macchina { flex: 3 1 220px; }
+.nl-riga-unita   { flex: 0 0 96px; }
+.nl-riga-azioni  { flex: 0 0 auto; margin-left: auto; }
+
+/* quanto dura la riga, sotto il totale: "1 mese + 5 gg" dice a colpo
+   d'occhio da dove viene la cifra */
+.nl-riga-durata {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
 @media (max-width: 900px) {
-    .nl-riga { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .nl-riga-macchina { grid-column: span 2; }
-    .nl-riga-azioni { grid-column: span 2; }
+    .nl-riga > .ac-f { flex: 1 1 calc(50% - 5px); }
+    .nl-riga-macchina, .nl-riga-azioni { flex: 1 1 100%; }
+    .nl-riga-azioni { margin-left: 0; }
 }
 
 .nl-riga-azioni {
@@ -163,4 +181,72 @@
     text-align: center;
     font-size: 12px;
     color: #94a3b8;
+}
+
+
+/* ── Assicurazione ──────────────────────────────────────────────────────── */
+/* Sulla scheda si legge sempre la percentuale insieme all'importo: senza,
+   un numero in mezzo agli altri non si capisce da dove esce. */
+.nl-assic { color: #0369a1; }
+
+.nl-solo-assic { flex: 0 0 110px; }
+
+#nl-assic-importo {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #0369a1;
+}
+
+/* durata nella scheda: "1 mese + 5 gg" non deve spezzarsi a meta' */
+.nl-durata { white-space: nowrap; }
+
+/* ── Paginazione ────────────────────────────────────────────────────────── */
+/* Il conteggio sta a sinistra e i pulsanti a destra: la prima cosa da
+   sapere e' quanti sono in tutto, non su quale pagina si e'. */
+.nl-pag {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding: 12px 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.nl-pag-conta strong { color: #0f172a; }
+
+.nl-pag-nav { display: flex; align-items: center; gap: 6px; }
+
+.nl-pag-b {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 11px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.nl-pag-b:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+/* i bordi restano anche da spenti: senza, la barra si accorcia passando
+   dalla prima pagina alla seconda e i pulsanti ballano */
+.nl-pag-b.is-off { opacity: .4; pointer-events: none; }
+
+.nl-pag-ora {
+    padding: 0 8px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
 }

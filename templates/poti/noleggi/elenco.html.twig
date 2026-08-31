@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=3">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
 {# stessa versione usata nelle altre pagine di BOB #}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 {% endblock %}
@@ -37,12 +37,32 @@
             <input type="date" name="al" value="{{ al }}">
         </label>
         <label class="ac-f ac-f-cerca">
-            <span>Cerca <small id="nl-conta"></small></span>
+            <span>Cerca</span>
             <input type="search" name="q" value="{{ cerca }}" id="nl-cerca"
                    placeholder="cliente, luogo, contratto, note…">
         </label>
-        <button class="ac-btn ac-btn-primary">Filtra periodo</button>
-        {% if cerca %}
+        <label class="ac-f">
+            <span>Stato</span>
+            <select name="stato">
+                <option value="">confermati</option>
+                {% for s in stati %}
+                    <option value="{{ s }}" {{ filtri.stato == s ? 'selected' : '' }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Pagamento</span>
+            <select name="pagamento">
+                <option value="">tutti</option>
+                {% for p in pagamenti %}
+                    <option value="{{ p }}" {{ filtri.pagamento == p ? 'selected' : '' }}>
+                        {{ p == 'pagata' ? 'pagata' : 'da pagare' }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Filtra</button>
+        {% if cerca or filtri.stato or filtri.pagamento %}
             <a href="/noleggi/elenco?dal={{ dal }}&al={{ al }}" class="ac-link">azzera</a>
         {% endif %}
     </form>
@@ -52,7 +72,7 @@
        duplicati a ogni riga. #}
     <div class="nl-elenco" id="nl-elenco">
         {% for n in noleggi %}
-            <div class="nl-card" data-nl-testo="{{ (n.cliente ~ ' ' ~ (n.luogo ?: '') ~ ' ' ~ (n.contratto ?: '') ~ ' ' ~ (n.note ?: ''))|lower }}">
+            <div class="nl-card">
                 <div class="nl-card-head">
                     <div class="nl-cliente">
                         {{ n.cliente }}
@@ -84,8 +104,21 @@
                                 <td class="nl-matr">{{ r.matricola }}</td>
                                 <td class="nl-tipo">{{ r.tipo }}</td>
                                 <td>{{ r.data_inizio|date('d/m/Y') }} → {{ r.data_fine|date('d/m/Y') }}</td>
-                                <td class="right">{{ r.giorni }} gg</td>
-                                <td class="right">{{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
+                                <td class="right nl-durata">
+                                    {%- if r.unita == 'mese' -%}
+                                        {{ r.mesi }} {{ r.mesi == 1 ? 'mese' : 'mesi' }}
+                                        {%- if r.giorni_residui %} + {{ r.giorni_residui }} gg{% endif -%}
+                                    {%- else -%}
+                                        {{ r.giorni }} gg
+                                    {%- endif -%}
+                                </td>
+                                <td class="right">
+                                    {%- if r.unita == 'mese' -%}
+                                        {{ r.tariffa_mese ? '€ ' ~ r.tariffa_mese|number_format(2, ',', '.') ~ '/mese' : '—' }}
+                                    {%- else -%}
+                                        {{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') : '—' }}
+                                    {%- endif -%}
+                                </td>
                                 <td class="right nl-tot">{{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}</td>
                             </tr>
                         {% else %}
@@ -100,19 +133,32 @@
                         {% if n.trasporto %}
                             <span>trasporto € {{ n.trasporto|number_format(2, ',', '.') }}</span>
                         {% endif %}
+                        {% if n.assicurazione %}
+                            <span class="nl-assic">
+                                assicurazione {{ n.assicurazione_perc|number_format(0) }}%
+                                € {{ n.assicurazione_importo|number_format(2, ',', '.') }}
+                            </span>
+                        {% endif %}
                         <strong>totale € {{ n.totale ? n.totale|number_format(2, ',', '.') : '0,00' }}</strong>
                     </div>
                 </div>
             </div>
         {% else %}
-            <div class="ac-box"><div class="ac-empty">Nessun noleggio nel periodo.</div></div>
+            <div class="ac-box">
+                <div class="ac-empty">
+                    {% if cerca or filtri.stato or filtri.pagamento %}
+                        Nessun noleggio corrisponde ai filtri.
+                    {% else %}
+                        Nessun noleggio nel periodo.
+                    {% endif %}
+                </div>
+            </div>
         {% endfor %}
-
-        {# compare quando la ricerca dal vivo non lascia schede #}
-        <div class="ac-box" id="nl-nessuno" style="display:none">
-            <div class="ac-empty">Nessun noleggio corrisponde alla ricerca.</div>
-        </div>
     </div>
+
+    {% include 'poti/_paginazione.html.twig' with {
+        base: '/noleggi/elenco', nome: 'noleggi'
+    } %}
 
     {# ── Modale noleggio ─────────────────────────────────────────────────── #}
     <div class="ac-modal" id="nl-modal" hidden aria-hidden="true">
@@ -195,6 +241,23 @@
                                    placeholder="0,00">
                         </label>
 
+                        {# La percentuale si calcola sui soli mezzi: si
+                           assicura la macchina, non il viaggio del camion. #}
+                        <label class="ac-f ac-check-riga">
+                            <span>Assicurazione</span>
+                            <span class="ac-check-box">
+                                <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
+                                <span>Includi</span>
+                            </span>
+                        </label>
+
+                        <label class="ac-f nl-solo-assic" hidden>
+                            <span>%</span>
+                            <input type="text" name="assicurazione_perc" id="nl-assic-perc"
+                                   inputmode="decimal" value="{{ assicPerc|number_format(0) }}">
+                            <small id="nl-assic-importo"></small>
+                        </label>
+
                         <label class="ac-f">
                             <span>Totale</span>
                             <input type="text" name="totale" id="nl-totale" inputmode="decimal"
@@ -258,14 +321,32 @@
                 <input type="date" name="riga_al[]">
             </label>
 
+            <label class="ac-f nl-riga-unita">
+                <span>A</span>
+                <select name="riga_unita[]">
+                    <option value="giorno">giorno</option>
+                    <option value="mese">mese</option>
+                </select>
+            </label>
+
+            {# La tariffa a mese compare solo quando serve. Le due restano
+               campi distinti e non uno solo che cambia significato: un
+               noleggio a mese oltre il mese intero si paga a giorni, quindi
+               servono davvero tutte e due. #}
+            <label class="ac-f nl-solo-mese" hidden>
+                <span>Tariffa/mese</span>
+                <input type="text" name="riga_tariffa_mese[]" inputmode="decimal" placeholder="0,00">
+            </label>
+
             <label class="ac-f">
-                <span>Tariffa/g</span>
+                <span class="nl-et-giorno">Tariffa/g</span>
                 <input type="text" name="riga_tariffa[]" inputmode="decimal" placeholder="0,00">
             </label>
 
             <label class="ac-f">
                 <span>Totale</span>
                 <input type="text" name="riga_totale[]" inputmode="decimal" placeholder="0,00">
+                <small class="nl-riga-durata"></small>
             </label>
 
             <div class="nl-riga-azioni">
@@ -286,5 +367,5 @@
 {% block scripts %}
 {# TomSelect prima: noleggi.js lo usa appena aggiunge una riga #}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/poti/noleggi.js?v=3"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=4"></script>
 {% endblock %}

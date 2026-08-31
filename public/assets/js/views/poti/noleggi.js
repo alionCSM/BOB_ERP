@@ -40,6 +40,42 @@
         return Math.round((d2 - d1) / 86400000) + 1;
     }
 
+    /**
+     * Mesi di calendario piu' i giorni che avanzano.
+     *
+     * Deve rispondere come Tariffa::mesiEGiorni in PHP: qui il conto serve
+     * a far vedere il totale mentre si scrive, ma quello che vale e' il
+     * conto del server. Se le due versioni si allontanano l'utente vede una
+     * cifra e ne salva un'altra.
+     */
+    function mesiEGiorni(dal, al) {
+        if (!dal || !al) return { mesi: 0, giorni: 0 };
+        var inizio = new Date(dal + 'T00:00:00');
+        var fine   = new Date(al + 'T00:00:00');
+        if (fine < inizio) return { mesi: 0, giorni: 0 };
+
+        var mesi = 0;
+        while (piuMesi(inizio, mesi + 1) <= fine) mesi++;
+
+        if (mesi === 0) {
+            return { mesi: 0, giorni: giorniTra(dal, al) };
+        }
+        var scadenza = piuMesi(inizio, mesi);
+        return { mesi: mesi, giorni: Math.round((fine - scadenza) / 86400000) };
+    }
+
+    /**
+     * Somma mesi restando dentro il mese di arrivo: il 31 gennaio piu' un
+     * mese e' il 28 febbraio, non il 3 marzo.
+     */
+    function piuMesi(data, n) {
+        var giorno  = data.getDate();
+        var arrivo  = new Date(data.getFullYear(), data.getMonth() + n, 1);
+        var ultimo  = new Date(arrivo.getFullYear(), arrivo.getMonth() + 1, 0).getDate();
+        arrivo.setDate(Math.min(giorno, ultimo));
+        return arrivo;
+    }
+
     function campo(id) { return document.getElementById(id); }
 
     // ── Cambio vista (calendario / timeline) ────────────────────────────────
@@ -163,7 +199,7 @@
         }
     }
 
-    /** Totale di una riga: giorni per tariffa, se non e' stato scritto a mano. */
+    /** Quanto costa una riga, se il totale non e' stato scritto a mano. */
     function ricalcolaRiga(riga) {
         var dal  = riga.querySelector('[name="riga_dal[]"]');
         var al   = riga.querySelector('[name="riga_al[]"]');
@@ -171,29 +207,84 @@
         var tot  = riga.querySelector('[name="riga_totale[]"]');
         if (!dal || !al || !tar || !tot) return;
 
-        var gg = giorniTra(dal.value, al.value);
-        var t  = numero(tar.value);
+        var unita  = riga.querySelector('[name="riga_unita[]"]');
+        var aMese  = unita && unita.value === 'mese';
+        var durata = riga.querySelector('.nl-riga-durata');
 
-        if (gg && !isNaN(t) && !tot.dataset.aMano) {
-            tot.value = euro(gg * t);
+        mostraCampiMese(riga, aMese);
+
+        var somma;
+        if (aMese) {
+            var tarM = riga.querySelector('[name="riga_tariffa_mese[]"]');
+            var q    = mesiEGiorni(dal.value, al.value);
+            somma = q.mesi * (numero(tarM ? tarM.value : '') || 0)
+                  + q.giorni * (numero(tar.value) || 0);
+
+            if (durata) {
+                durata.textContent = q.mesi
+                    ? q.mesi + (q.mesi === 1 ? ' mese' : ' mesi')
+                      + (q.giorni ? ' + ' + q.giorni + ' gg' : '')
+                    : (q.giorni ? q.giorni + ' gg' : '');
+            }
+        } else {
+            var gg = giorniTra(dal.value, al.value);
+            somma = gg * (numero(tar.value) || 0);
+            if (durata) durata.textContent = gg ? gg + ' gg' : '';
+        }
+
+        if (!tot.dataset.aMano && somma) {
+            tot.value = euro(somma);
         }
     }
 
-    /** Totale del noleggio: somma delle righe piu' il trasporto. */
+    /** Mostra o nasconde la tariffa a mese e cambia l'etichetta dei giorni. */
+    function mostraCampiMese(riga, aMese) {
+        var soloMese = riga.querySelector('.nl-solo-mese');
+        if (soloMese) soloMese.hidden = !aMese;
+
+        // a mese la tariffa giornaliera resta, ma serve a un'altra cosa:
+        // pagare i giorni oltre l'ultimo mese intero
+        var et = riga.querySelector('.nl-et-giorno');
+        if (et) et.textContent = aMese ? 'Tariffa/g oltre' : 'Tariffa/g';
+    }
+
+    /** Totale del noleggio: mezzi, piu' trasporto, piu' assicurazione. */
     function ricalcolaTotale() {
-        var somma = 0;
+        var mezzi = 0;
         righe().forEach(function (r) {
             var v = numero(r.querySelector('[name="riga_totale[]"]').value);
-            if (!isNaN(v)) somma += v;
+            if (!isNaN(v)) mezzi += v;
         });
 
         var trasp = numero(campo('nl-trasporto').value);
-        if (!isNaN(trasp)) somma += trasp;
+        if (isNaN(trasp)) trasp = 0;
+
+        // L'assicurazione si calcola sui soli mezzi: il trasporto resta
+        // fuori dalla base. Stessa regola di Tariffa::assicurazione.
+        var assic = 0;
+        var spunta = campo('nl-assic');
+        var perc   = campo('nl-assic-perc');
+        var box    = document.querySelector('.nl-solo-assic');
+        var acceso = !!(spunta && spunta.checked);
+
+        if (box) box.hidden = !acceso;
+
+        if (acceso) {
+            var p = numero(perc ? perc.value : '');
+            if (isNaN(p)) p = 12;
+            assic = Math.round(mezzi * p) / 100;
+
+            var etichetta = campo('nl-assic-importo');
+            if (etichetta) etichetta.textContent = '€ ' + euro(assic);
+        }
+
+        var somma = mezzi + trasp + assic;
 
         if (calcolo) {
             calcolo.textContent = righe().length
-                ? 'macchine ' + euro(somma - (isNaN(trasp) ? 0 : trasp))
-                  + (isNaN(trasp) ? '' : ' + trasporto ' + euro(trasp))
+                ? 'mezzi ' + euro(mezzi)
+                  + (trasp ? ' + trasporto ' + euro(trasp) : '')
+                  + (assic ? ' + assicurazione ' + euro(assic) : '')
                 : '';
         }
         if (totale && !totaleAMano) totale.value = euro(somma);
@@ -214,12 +305,29 @@
             riga.querySelector('[name="riga_al[]"]').value       = dati.data_fine || '';
             riga.querySelector('[name="riga_tariffa[]"]').value  =
                 dati.tariffa_giorno ? euro(dati.tariffa_giorno) : '';
+
+            var unita = riga.querySelector('[name="riga_unita[]"]');
+            var aMese = (dati.unita || 'giorno') === 'mese';
+            if (unita) unita.value = aMese ? 'mese' : 'giorno';
+
+            var tarM = riga.querySelector('[name="riga_tariffa_mese[]"]');
+            if (tarM) tarM.value = dati.tariffa_mese ? euro(dati.tariffa_mese) : '';
+            mostraCampiMese(riga, aMese);
+
             var tot = riga.querySelector('[name="riga_totale[]"]');
             tot.value = dati.totale ? euro(dati.totale) : '';
 
             // un totale che non coincide col calcolo era stato corretto a
             // mano e non va sovrascritto
-            var atteso = euro(giorniTra(dati.data_inizio, dati.data_fine) * (numero(dati.tariffa_giorno) || 0));
+            var atteso;
+            if (aMese) {
+                var q = mesiEGiorni(dati.data_inizio, dati.data_fine);
+                atteso = euro(q.mesi * (numero(dati.tariffa_mese) || 0)
+                            + q.giorni * (numero(dati.tariffa_giorno) || 0));
+            } else {
+                atteso = euro(giorniTra(dati.data_inizio, dati.data_fine)
+                            * (numero(dati.tariffa_giorno) || 0));
+            }
             if (tot.value && tot.value !== atteso) tot.dataset.aMano = '1';
         }
 
@@ -280,6 +388,13 @@
     campo('nl-aggiungi').addEventListener('click', function () { aggiungiRiga(); });
     campo('nl-trasporto').addEventListener('input', ricalcolaTotale);
 
+    // spunta e percentuale rifanno il totale: e' l'unico modo di vedere
+    // quanto pesa l'assicurazione prima di salvare
+    var spuntaAssic = campo('nl-assic');
+    var percAssic   = campo('nl-assic-perc');
+    spuntaAssic && spuntaAssic.addEventListener('change', ricalcolaTotale);
+    percAssic   && percAssic.addEventListener('input',  ricalcolaTotale);
+
     // ── Apertura e chiusura ─────────────────────────────────────────────────
     function apri(t) {
         titolo.textContent = t;
@@ -297,6 +412,8 @@
         modale.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
         campo('nl-id').value = '';
         campo('nl-firmato').checked = false;
+        if (spuntaAssic) spuntaAssic.checked = false;
+        if (percAssic)   percAssic.value = '12';
 
         // le ricerche vanno chiuse prima di svuotare, altrimenti restano
         // agganciate a campi che non esistono piu'
@@ -339,6 +456,14 @@
             campo('nl-note').value      = d.note || '';
             campo('nl-trasporto').value = d.trasporto ? euro(d.trasporto) : '';
 
+            // la percentuale si rilegge da com'era salvata e non dal valore
+            // di oggi: se un domani cambia, i noleggi vecchi devono
+            // continuare a mostrare quella con cui sono stati fatti
+            if (spuntaAssic) spuntaAssic.checked = !!Number(d.assicurazione);
+            if (percAssic && d.assicurazione_perc) {
+                percAssic.value = String(Number(d.assicurazione_perc));
+            }
+
             (d.righe || []).forEach(function (r) { aggiungiRiga(r); });
             if (!(d.righe || []).length) aggiungiRiga();
 
@@ -375,37 +500,14 @@
         campo('nl-form-elimina').submit();
     });
 
-    // ── Ricerca dal vivo ────────────────────────────────────────────────────
-    // I noleggi del periodo sono gia' tutti nella pagina: filtrarli qui e'
-    // immediato e non serve tornare al server.
-    var cerca    = campo('nl-cerca');
-    var contatore = campo('nl-conta');
-    var nessuno   = campo('nl-nessuno');
-    var schede    = Array.prototype.slice.call(document.querySelectorAll('.nl-card'));
+    // ── Ricerca ─────────────────────────────────────────────────────────────
+    // Qui prima c'era un filtro che nascondeva le schede gia' presenti nella
+    // pagina. Adesso la pagina ne contiene una parte per volta, e cercare
+    // fra quelle vorrebbe dire cercare in un ventiquattresimo dell'archivio
+    // credendo di averlo guardato tutto: la ricerca la fa il database.
+    //
+    // Quel codice fermava anche l'invio del form quando il cursore era nel
+    // campo di ricerca, quindi va tolto per intero: lasciandolo, premere
+    // Invio non cercherebbe niente.
 
-    if (cerca) {
-        var filtra = function () {
-            var q = cerca.value.trim().toLowerCase();
-            var visibili = 0;
-
-            schede.forEach(function (c) {
-                var ok = !q || (c.dataset.nlTesto || '').indexOf(q) !== -1;
-                c.style.display = ok ? '' : 'none';
-                if (ok) visibili++;
-            });
-
-            if (nessuno) nessuno.style.display = (schede.length && !visibili) ? '' : 'none';
-            if (contatore) {
-                contatore.textContent = (q && visibili !== schede.length)
-                    ? visibili + ' di ' + schede.length
-                    : '';
-            }
-        };
-
-        cerca.addEventListener('input', filtra);
-        cerca.form && cerca.form.addEventListener('submit', function (e) {
-            if (document.activeElement === cerca) e.preventDefault();
-        });
-        if (cerca.value) filtra();
-    }
 })();
