@@ -520,7 +520,13 @@ final class BillingRepository
             $yardId = (int)$r['yard_id'];
             if (!array_key_exists($yardId, $map)) continue; // riga sparita su Yard: non tocchiamo
             $new = $map[$yardId] ? 1 : 0;
-            if ((int)$r['emessa'] !== $new) {
+
+            // Il NULL va trattato a parte: in PHP (int)null fa 0, quindi una
+            // riga mai scritta che in Yard non e' emessa sembrava "gia'
+            // giusta" e il cron la saltava. Restava NULL per sempre, e con
+            // NULL i conteggi dell'elenco clienti la ignorano — la fattura
+            // spariva finche' qualcuno non apriva la scheda del cliente.
+            if ($r['emessa'] === null || (int)$r['emessa'] !== $new) {
                 $upd->execute([':emessa' => $new, ':id' => $r['id']]);
                 $updated++;
             }

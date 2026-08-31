@@ -54,8 +54,42 @@ final class BillingController
 
     public function clientList(Request $request): void
     {
-        $currentYear   = (int)date('Y');
-        $clients       = $this->billingRepo->getClientsWithBillingSummary($currentYear);
+        // Allineamento con Yard PRIMA di contare.
+        //
+        // I conteggi qui sotto leggono bb_billing.emessa, che e' una copia di
+        // quello che dice Yard. Finora quella copia si aggiornava solo
+        // aprendo la scheda di un cliente, quindi l'elenco poteva mostrare
+        // numeri vecchi: una fattura gia' emessa contata fra le da emettere,
+        // o il contrario.
+        //
+        // Si allinea tutto e non solo l'anno mostrato: le colonne dei
+        // totali e il filtro che decide quali clienti compaiono guardano
+        // tutti gli anni, quindi fermarsi al corrente lascerebbe sbagliata
+        // proprio quella parte.
+        //
+        // Costa poco: getEmessaMap interroga a blocchi di 500 con un solo
+        // IN (...) per blocco, non una query per riga come fa la versione
+        // per singolo cliente. Le UPDATE partono solo per le righe cambiate.
+        //
+        // Se Yard non risponde si tira dritto con la copia che c'e': meglio
+        // un elenco con numeri di ieri che una pagina di fatturazione che non
+        // si apre. L'avviso in cima dice che i numeri potrebbero essere
+        // vecchi, cosi' nessuno ci fa affidamento senza saperlo.
+        $currentYear = (int)date('Y');
+
+        $syncFallita = null;
+        try {
+            $this->billingRepo->syncEmessaAll(
+                new \App\Domain\YardWorksiteBilling(
+                    new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config())
+                )
+            );
+        } catch (\Throwable $e) {
+            $syncFallita = $e->getMessage();
+            error_log('[BillingController] sync emessa da Yard non riuscita: ' . $e->getMessage());
+        }
+
+        $clients = $this->billingRepo->getClientsWithBillingSummary($currentYear);
 
         // ── Prospetto fatto ────────────────────────────────────────────────
         // Suggested period: if today is within day 1–10 of a month, we're
@@ -147,6 +181,7 @@ final class BillingController
 
         Response::view('billing/clients.html.twig', $request, compact(
             'clients', 'totDaEmettere', 'totEmesse', 'totEuroDa', 'totEuroEm', 'currentYear',
+            'syncFallita',
             'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',

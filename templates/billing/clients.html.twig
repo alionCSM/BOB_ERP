@@ -26,6 +26,18 @@
     </div>
 </div>
 
+{# Numeri vecchi: meglio dirlo che lasciar contare su un dato non aggiornato. #}
+{% if syncFallita %}
+<div class="bc-avviso-sync">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+    <div>
+        <strong>Dati non aggiornati da Yard.</strong>
+        I conteggi qui sotto sono quelli dell'ultimo allineamento riuscito: una fattura
+        emessa in Yard poco fa potrebbe risultare ancora da emettere.
+    </div>
+</div>
+{% endif %}
+
 {# ── Apri dettaglio emesse-reale per un mese specifico (apre solo la modale, via AJAX) ── #}
 {# Two native <select>s instead of <input type=month> for cross-browser parity (Safari desktop) #}
 {% set _ymParts  = defaultPickerValue|split('-') %}

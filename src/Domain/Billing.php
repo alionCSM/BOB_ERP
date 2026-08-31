@@ -42,7 +42,17 @@ class Billing {
     }
 
     /**
-     * Crea una nuova fattura
+     * Crea una nuova fattura.
+     *
+     * emessa = 0 scritto ESPLICITAMENTE, non lasciato al default della
+     * colonna. Se il default e' NULL la riga diventa invisibile: l'elenco
+     * clienti conta con SUM(emessa = 0), e NULL = 0 non e' ne' vero ne'
+     * falso, quindi SUM la salta. La riga non finisce ne' fra le da emettere
+     * ne' fra le emesse — sparisce, finche' qualcuno non apre la scheda del
+     * cliente e la sincronizzazione da Yard ci scrive sopra uno zero.
+     *
+     * Una riga appena creata non e' emessa per definizione: dirlo e' anche
+     * piu' onesto che dedurlo da un default.
      */
     public function create($data) {
         try {
@@ -50,11 +60,11 @@ class Billing {
                 INSERT INTO bb_billing (
                     worksite_id, nome_cantiere, nome_cliente, data,
                     descrizione, totale_imponibile, aliquota_iva,
-                    articolo_id, iva_id, attivita_id
+                    articolo_id, iva_id, attivita_id, emessa
                 ) VALUES (
                     :worksite_id, :nome_cantiere, :nome_cliente, :data,
                     :descrizione, :totale_imponibile, :aliquota_iva,
-                    :articolo_id, :iva_id, :attivita_id
+                    :articolo_id, :iva_id, :attivita_id, 0
                 )
             ");
             $stmt->execute([

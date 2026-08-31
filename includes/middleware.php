@@ -41,7 +41,18 @@ $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 $uri = rtrim($uri, '/');
 if ($uri === '') $uri = '/';
 
-if (!empty($user->must_change_password) && $uri !== '/change-password') {
+// Ha la precedenza su tutto il resto, compresa la scelta della societa' qui
+// sotto: finche' la password temporanea non e' stata sostituita l'unica
+// pagina raggiungibile e' questa.
+//
+// Prima non era cosi' e i due controlli si rimbalzavano a vicenda: da
+// /change-password la scelta societa' mandava su /select-company, e da
+// /select-company questo controllo rimandava su /change-password. Un utente
+// appena creato con piu' di una societa' non riusciva a entrare: il browser
+// si fermava dopo qualche decina di redirect.
+$deveCambiarePassword = !empty($user->must_change_password);
+
+if ($deveCambiarePassword && $uri !== '/change-password') {
     header('Location: /change-password');
     exit;
 }
@@ -57,7 +68,11 @@ $GLOBALS['currentCompany'] = $currentCompany;
 // su un 403 invece che sulla pagina di scelta
 $sceltaSocietaEsclusa = in_array($user->type, ['worker', 'client'], true);
 
-if (!$sceltaSocietaEsclusa && !isset($_SESSION[\App\Service\CurrentCompany::SESSION_KEY])) {
+// Con il cambio password in sospeso non si sceglie niente: si sta su
+// /change-password e basta. La societa' viene scelta al primo accesso vero,
+// dopo che la password e' stata cambiata.
+if (!$sceltaSocietaEsclusa && !$deveCambiarePassword
+    && !isset($_SESSION[\App\Service\CurrentCompany::SESSION_KEY])) {
     $sceltaAutomatica = $currentCompany->autoSelectOnLogin((int)$user->id);
     if (!$sceltaAutomatica && $uri !== '/select-company') {
         header('Location: /select-company');
