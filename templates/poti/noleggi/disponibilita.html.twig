@@ -28,7 +28,7 @@
     <form method="GET" class="ac-check">
         <div class="ac-check-tile">
             <i data-lucide="calendar"></i>
-            <span>Cosa ti serve</span>
+            <span>Verifica disponibilita'</span>
         </div>
         <div class="ac-check-campi">
             <label class="ac-f">
@@ -55,7 +55,7 @@
             </label>
             <input type="hidden" name="dal" value="{{ dal }}">
             <input type="hidden" name="al" value="{{ al }}">
-            <button class="ac-btn ac-btn-primary">Cerca mezzi liberi</button>
+            <button class="ac-btn ac-btn-primary">Verifica</button>
             {% if ricercaAttiva %}
                 <a href="/noleggi" class="ac-link">azzera</a>
             {% endif %}
@@ -63,19 +63,14 @@
     </form>
 
     {% if not ricercaAttiva %}
-        {# Niente elenco finche' non si chiede: il calendario qui sotto da'
-           gia' il quadro del periodo. #}
-        <div class="ac-box ac-invito">
-            <div class="ac-invito-txt">
-                <strong>Dimmi quando ti serve.</strong>
-                Scegli le date qui sopra e vedrai solo i mezzi liberi in quei giorni.
-            </div>
-        </div>
+        {# Niente elenco finche' non c'e' un periodo: il calendario qui sotto
+           da' gia' il quadro del mese. #}
+        <div class="ac-vuoto">Nessun periodo selezionato.</div>
     {% else %}
         <div class="ac-risultato">
             <strong>{{ totale }}</strong>
-            {{ totale == 1 ? 'mezzo libero' : 'mezzi liberi' }}
-            dal {{ cercaDal|date('d/m/Y') }} al {{ cercaAl|date('d/m/Y') }}
+            {{ totale == 1 ? 'mezzo disponibile' : 'mezzi disponibili' }}
+            <span>{{ cercaDal|date('d/m/Y') }} — {{ cercaAl|date('d/m/Y') }}</span>
         </div>
 
         <div class="ac-mezzi">
@@ -92,11 +87,11 @@
                         {% if m.altezza_max_m %}<span>{{ m.altezza_max_m|number_format(2, ',', '.') }} m</span>{% endif %}
                         {% if m.portata_kg %}<span>{{ m.portata_kg }} kg</span>{% endif %}
                     </div>
-                    <div class="ac-libero">Libero nel periodo</div>
+                    <div class="ac-libero">Disponibile</div>
                 </div>
             {% else %}
                 <div class="ac-empty">
-                    Nessun mezzo libero in quei giorni{{ tipo or cerca ? ' con questi filtri' : '' }}.
+                    Nessun mezzo disponibile nel periodo{{ tipo or cerca ? ' con i filtri impostati' : '' }}.
                 </div>
             {% endfor %}
         </div>

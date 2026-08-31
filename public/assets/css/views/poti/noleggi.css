@@ -84,7 +84,11 @@
 .nl-totali strong { font-size: 15px; color: #0f172a; }
 
 /* ── Righe nella maschera ───────────────────────────────────────────────── */
-.nl-modal-box { width: 900px; }
+/* Piu' larga delle altre maschere: qui dentro c'e' una tabella di mezzi
+   con sette colonne, e a 900px le colonne si strozzavano fino a far
+   sbordare la riga fuori dal riquadro. Il min() la tiene dentro lo schermo
+   anche sui portatili piccoli. */
+.nl-modal-box { width: min(1080px, 96vw); }
 
 .nl-righe-box {
     border: 1px solid #e2e8f0;
@@ -108,81 +112,79 @@
 
 .nl-righe-lista { display: flex; flex-direction: column; gap: 10px; }
 
-/* A flex e non a griglia: la tariffa a mese compare solo sulle righe a
-   mese, e con le colonne fisse una riga a giorni lascerebbe un buco dove
-   quel campo non c'e'. Cosi' i campi si stringono e vanno a capo da soli.
+/* ── Righe dei mezzi ────────────────────────────────────────────────────
+   Griglia e non flex: intestazione e righe devono stare sulle stesse
+   colonne, e con flex le larghezze si assestano riga per riga — bastava un
+   nome di mezzo piu' lungo per disallineare tutto rispetto al titolo.
 
-   La macchina si prende piu' spazio degli altri: il suo testo e' il piu'
+   Le colonne sono scritte una volta sola in una variabile: ripetere lo
+   stesso elenco su intestazione e righe vuol dire che prima o poi qualcuno
+   ne cambia una e non l'altra, e da fuori sembra un bug misterioso.
+
+   La macchina si prende il doppio delle altre: il suo testo e' il piu'
    lungo e in una colonna stretta verrebbe troncato subito. */
-.nl-riga {
-    display: flex;
-    flex-wrap: wrap;
+.nl-righe-box {
+    --nl-cols: minmax(0, 1.9fr) 126px 126px 106px minmax(0, 1fr) minmax(0, 1fr) 88px;
+}
+
+.nl-righe-cols {
+    display: grid;
+    grid-template-columns: var(--nl-cols);
     gap: 10px;
-    align-items: flex-end;
+    padding: 0 10px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #94a3b8;
+}
+
+.nl-riga {
+    display: grid;
+    grid-template-columns: var(--nl-cols);
+    gap: 10px;
+    align-items: start;
     padding: 10px;
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
 }
 
-.nl-riga > .ac-f { flex: 1 1 110px; min-width: 0; }
-.nl-riga-macchina { flex: 3 1 220px; }
-.nl-riga-unita   { flex: 0 0 104px; }
-.nl-riga-azioni  { flex: 0 0 auto; margin-left: auto; }
-
-/* quanto dura la riga, sotto il totale: "1 mese + 5 gg" dice a colpo
-   d'occhio da dove viene la cifra */
-.nl-riga-durata {
-    display: block;
-    margin-top: 3px;
-    font-size: 11px;
-    color: #94a3b8;
-}
-
-@media (max-width: 900px) {
-    .nl-riga > .ac-f { flex: 1 1 calc(50% - 5px); }
-    .nl-riga-macchina, .nl-riga-azioni { flex: 1 1 100%; }
-    .nl-riga-azioni { margin-left: 0; }
+/* su schermo largo le etichette le da' l'intestazione: ripeterle su ogni
+   riga era piu' testo dei dati */
+@media (min-width: 901px) {
+    .nl-riga > .ac-f > span { display: none; }
 }
 
 .nl-riga-azioni {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding-bottom: 8px;
+    gap: 2px;
+    align-items: flex-start;
+    padding-top: 9px;
     white-space: nowrap;
 }
 
-.nl-togli { color: #b91c1c; }
+.nl-riga-azioni .ac-link { font-size: 11.5px; }
 
-/* ── Campo macchina con ricerca (TomSelect) ─────────────────────────────── */
-/* La tendina deve stare sopra la modale, che ha z-index 60: senza questo
-   finirebbe dietro e non si vedrebbe cosa si sta scegliendo. */
-.nl-riga .ts-dropdown { z-index: 70; }
-
-/* stessa altezza e stesso bordo degli altri campi della riga */
-.nl-riga .ts-control {
-    min-height: 36px;
-    padding: 5px 9px;
-    border: 1px solid #cbd5e1;
-    border-radius: 7px;
-    font-size: 13px;
-}
-
-.nl-riga .ts-control:focus-within {
-    border-color: #0369a1;
-    box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
-}
-
-.nl-riga .ts-dropdown .active { background: #e0f2fe; }
-
-.nl-righe-vuoto {
-    padding: 14px;
-    text-align: center;
-    font-size: 12px;
+/* quanto dura la riga, sotto il totale: "1 mese + 5 gg" dice a colpo
+   d'occhio da dove viene la cifra */
+.nl-riga-durata {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
     color: #94a3b8;
 }
 
+@media (max-width: 900px) {
+    .nl-righe-cols { display: none; }
+    .nl-riga {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: end;
+    }
+    .nl-riga-macchina, .nl-riga-azioni { grid-column: span 2; }
+    .nl-riga-azioni { flex-direction: row; gap: 14px; }
+}
 
 /* ── Assicurazione ──────────────────────────────────────────────────────── */
 /* Sulla scheda si legge sempre la percentuale insieme all'importo: senza,
@@ -321,21 +323,69 @@
     overflow-wrap: anywhere;
 }
 
-/* ── Invito iniziale della disponibilita' ───────────────────────────────── */
-/* La pagina non elenca piu' il parco all'apertura: prima si chiede il
-   periodo. Questo riquadro dice cosa fare invece di lasciare il vuoto. */
-.ac-invito {
-    padding: 26px 20px;
-    text-align: center;
+/* ── Stato iniziale della disponibilita' ────────────────────────────────
+   La pagina non elenca il parco all'apertura: prima si sceglie il periodo.
+   Una riga sobria dice come stanno le cose senza occupare mezzo schermo. */
+.ac-vuoto {
+    padding: 14px 18px;
+    margin-top: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #94a3b8;
 }
-
-.ac-invito-txt { font-size: 14px; color: #64748b; }
-.ac-invito-txt strong { display: block; margin-bottom: 4px; font-size: 15px; color: #0f172a; }
 
 .ac-risultato {
-    margin: 16px 0 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 18px 0 10px;
     font-size: 13px;
-    color: #64748b;
+    color: #475569;
 }
 
-.ac-risultato strong { font-size: 16px; color: #0f172a; }
+.ac-risultato strong { font-size: 17px; color: #0f172a; }
+.ac-risultato span { margin-left: auto; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+/* ── Assicurazione nel riquadro importi ─────────────────────────────────── */
+/* Spunta e percentuale sulla stessa riga: sono una cosa sola, e tenere la
+   percentuale su una riga a parte la faceva sembrare un campo scollegato. */
+.nl-assic-riga {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.nl-assic-riga .ac-check-box { flex: 0 0 auto; }
+
+/* stretta quanto basta a due cifre e una virgola: larga com'era sembrava
+   un campo importante mentre e' un dettaglio della spunta accanto */
+.nl-assic-perc {
+    position: relative;
+    flex: 0 0 84px;
+    min-width: 0;
+}
+
+.nl-assic-perc input {
+    padding-right: 26px;
+    text-align: right;
+}
+
+/* spenta finche' non si include: si vede che non e' in gioco */
+.nl-assic-perc input:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+.nl-assic-simbolo {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+#nl-assic-importo { color: #0369a1; font-weight: 600; }

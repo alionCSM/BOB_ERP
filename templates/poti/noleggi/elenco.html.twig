@@ -176,6 +176,11 @@
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <input type="hidden" name="id" id="nl-id" value="">
 
+                {# Riga 1: chi e il documento. Riga 2: dove e come sta.
+                   Prima la spunta della firma stava da sola in mezzo a Luogo
+                   e Stato, in una cella larga come un campo di testo: sembrava
+                   un dato da inserire. Adesso sta sotto il numero di
+                   contratto, che e' la cosa a cui si riferisce. #}
                 <label class="ac-f ac-f-2">
                     <span>Cliente</span>
                     <input type="text" name="cliente" id="nl-cliente" required maxlength="160">
@@ -186,19 +191,15 @@
                     <input type="text" name="telefono" id="nl-telefono" maxlength="40">
                 </label>
 
-                <label class="ac-f">
+                <div class="ac-f">
                     <span>Contratto</span>
                     <input type="text" name="contratto" id="nl-contratto" maxlength="100">
-                </label>
-
-                {# la stessa casella che il tecnico spunta dalla giornata #}
-                <label class="ac-f ac-check-riga">
-                    <span>Firma</span>
-                    <span class="ac-check-box">
+                    {# la stessa casella che il tecnico spunta dalla giornata #}
+                    <label class="ac-check-box ac-sotto-campo">
                         <input type="checkbox" name="contratto_firmato" id="nl-firmato" value="1">
-                        <span>Contratto firmato</span>
-                    </span>
-                </label>
+                        <span>Firmato</span>
+                    </label>
+                </div>
 
                 <label class="ac-f ac-f-2">
                     <span>Luogo</span>
@@ -228,6 +229,22 @@
                         <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi mezzo</button>
                     </div>
 
+                    {# Le intestazioni stanno qui una volta sola invece che
+                       su ogni riga. Con cinque mezzi le stesse sei parole
+                       ripetute cinque volte erano piu' testo dei dati. Sotto
+                       i 900px tornano su ogni riga: in colonna stretta le
+                       colonne non esistono e senza etichetta non si capisce
+                       piu' cosa si sta scrivendo. #}
+                    <div class="nl-righe-cols">
+                        <span>Mezzo</span>
+                        <span>Dal</span>
+                        <span>Al</span>
+                        <span>Tariffa a</span>
+                        <span>Importo</span>
+                        <span>Totale</span>
+                        <span></span>
+                    </div>
+
                     <div class="nl-righe-lista" id="nl-righe"></div>
 
                     <div class="nl-righe-vuoto" id="nl-righe-vuoto">
@@ -235,7 +252,12 @@
                     </div>
                 </div>
 
-                {# ── Importi ────────────────────────────────────────────── #}
+                {# ── Importi ──────────────────────────────────────────────
+                   Tre celle su una riga sola. Prima la percentuale finiva da
+                   sola sulla riga sotto, staccata dalla spunta a cui
+                   appartiene: sembrava un campo a se'. Adesso spunta,
+                   percentuale e importo calcolato stanno insieme, perche'
+                   sono la stessa cosa detta in tre pezzi. #}
                 <div class="ac-f ac-f-4 ac-soldi">
                     <div class="ac-soldi-tit">Importi</div>
                     <div class="ac-soldi-campi">
@@ -247,20 +269,22 @@
 
                         {# La percentuale si calcola sui soli mezzi: si
                            assicura la macchina, non il viaggio del camion. #}
-                        <label class="ac-f ac-check-riga">
+                        <div class="ac-f">
                             <span>Assicurazione</span>
-                            <span class="ac-check-box">
-                                <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
-                                <span>Includi</span>
-                            </span>
-                        </label>
-
-                        <label class="ac-f nl-solo-assic" hidden>
-                            <span>%</span>
-                            <input type="text" name="assicurazione_perc" id="nl-assic-perc"
-                                   inputmode="decimal" value="{{ assicPerc|number_format(0) }}">
+                            <div class="nl-assic-riga">
+                                <label class="ac-check-box">
+                                    <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
+                                    <span>Includi</span>
+                                </label>
+                                <div class="nl-assic-perc">
+                                    <input type="text" name="assicurazione_perc" id="nl-assic-perc"
+                                           inputmode="decimal" value="{{ assicPerc|number_format(0) }}"
+                                           aria-label="Percentuale assicurazione" disabled>
+                                    <span class="nl-assic-simbolo">%</span>
+                                </div>
+                            </div>
                             <small id="nl-assic-importo"></small>
-                        </label>
+                        </div>
 
                         <label class="ac-f">
                             <span>Totale</span>
@@ -326,7 +350,7 @@
             </label>
 
             <label class="ac-f nl-riga-unita">
-                <span>A</span>
+                <span>Tariffa a</span>
                 <select name="riga_unita[]">
                     <option value="giorno">giornata</option>
                     <option value="mese">mese</option>
@@ -338,7 +362,7 @@
                L'etichetta cambia con l'unita' scelta, cosi' e' sempre chiaro
                che cifra si sta scrivendo. #}
             <label class="ac-f">
-                <span class="nl-et-tariffa">Tariffa/g</span>
+                <span class="nl-et-tariffa">Importo/g</span>
                 <input type="text" name="riga_tariffa[]" inputmode="decimal" placeholder="0,00">
             </label>
 
@@ -352,9 +376,8 @@
                 {# copia il periodo di questa riga su tutte le altre: nella
                    maggior parte dei noleggi le macchine vanno e tornano
                    insieme, e riscrivere le date ogni volta e' inutile #}
-                <button type="button" class="ac-link" data-nl-copia title="Copia queste date sugli altri mezzi">
-                    copia periodo
-                </button>
+                <button type="button" class="ac-link" data-nl-copia
+                        title="Copia queste date sugli altri mezzi">copia date</button>
                 <button type="button" class="ac-link nl-togli" data-nl-togli>togli</button>
             </div>
         </div>

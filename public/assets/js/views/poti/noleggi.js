@@ -281,9 +281,9 @@
     function aggiornaEtichetta(riga, unita) {
         var et = riga.querySelector('.nl-et-tariffa');
         if (!et) return;
-        et.textContent = unita === 'mese' ? 'Tariffa/mese'
-                       : unita === 'tantum' ? 'Importo'
-                       : 'Tariffa/g';
+        et.textContent = unita === 'mese' ? 'Importo/mese'
+                       : unita === 'tantum' ? 'Importo fisso'
+                       : 'Importo/g';
     }
 
     /** Totale del noleggio: mezzi, piu' trasporto, piu' assicurazione. */
@@ -299,21 +299,24 @@
 
         // L'assicurazione si calcola sui soli mezzi: il trasporto resta
         // fuori dalla base. Stessa regola di Tariffa::assicurazione.
-        var assic = 0;
+        var assic  = 0;
         var spunta = campo('nl-assic');
         var perc   = campo('nl-assic-perc');
-        var box    = document.querySelector('.nl-solo-assic');
         var acceso = !!(spunta && spunta.checked);
 
-        if (box) box.hidden = !acceso;
+        // la percentuale resta spenta finche' non si include: un campo
+        // scrivibile che non incide su niente e' un invito a sbagliare
+        if (perc) perc.disabled = !acceso;
+
+        var etichetta = campo('nl-assic-importo');
 
         if (acceso) {
             var p = numero(perc ? perc.value : '');
             if (isNaN(p)) p = 12;
             assic = Math.round(mezzi * p) / 100;
-
-            var etichetta = campo('nl-assic-importo');
-            if (etichetta) etichetta.textContent = '€ ' + euro(assic);
+            if (etichetta) etichetta.textContent = '€ ' + euro(assic) + ' sui mezzi';
+        } else if (etichetta) {
+            etichetta.textContent = '';
         }
 
         var somma = mezzi + trasp + assic;
@@ -445,8 +448,17 @@
         modale.querySelectorAll('select').forEach(function (s) { s.selectedIndex = 0; });
         campo('nl-id').value = '';
         campo('nl-firmato').checked = false;
+        // l'assicurazione torna come su una maschera appena aperta: spunta
+        // giu', percentuale al valore di partenza e spenta, importo via.
+        // Senza, aprendo un noleggio nuovo dopo uno assicurato restavano il
+        // campo attivo e la cifra del noleggio di prima.
         if (spuntaAssic) spuntaAssic.checked = false;
-        if (percAssic)   percAssic.value = '12';
+        if (percAssic) {
+            percAssic.value = '12';
+            percAssic.disabled = true;
+        }
+        var etAssic = campo('nl-assic-importo');
+        if (etAssic) etAssic.textContent = '';
 
         // le ricerche vanno chiuse prima di svuotare, altrimenti restano
         // agganciate a campi che non esistono piu'
