@@ -143,6 +143,33 @@
     }
 
     // ── Noleggi ─────────────────────────────────────────────────────────────
+    // ── Elenco mezzi: riga che si apre ──────────────────────────────────────
+    // Sta prima dell'uscita qui sotto: la pagina dei mezzi non ha la modale
+    // dei noleggi, quindi tutto quello che viene dopo li' non gira.
+    //
+    // Il click apre e chiude i dettagli. Niente onclick nell'HTML: le
+    // regole di sicurezza della pagina non eseguono gli attributi inline,
+    // quindi un handler scritto li' sarebbe morto in partenza.
+    document.querySelectorAll('[data-nl-mezzo]').forEach(function (riga) {
+        function apriChiudi() {
+            var dett = document.querySelector('[data-nl-dett="' + riga.dataset.nlMezzo + '"]');
+            if (!dett) return;
+            dett.hidden = !dett.hidden;
+            riga.classList.toggle('is-aperta', !dett.hidden);
+        }
+
+        riga.addEventListener('click', apriChiudi);
+
+        // da tastiera: la riga e' raggiungibile col tab, deve rispondere
+        // anche a Invio e barra spaziatrice
+        riga.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                apriChiudi();
+            }
+        });
+    });
+
     var modale = campo('nl-modal');
     if (!modale) return;
 
@@ -201,51 +228,62 @@
 
     /** Quanto costa una riga, se il totale non e' stato scritto a mano. */
     function ricalcolaRiga(riga) {
-        var dal  = riga.querySelector('[name="riga_dal[]"]');
-        var al   = riga.querySelector('[name="riga_al[]"]');
-        var tar  = riga.querySelector('[name="riga_tariffa[]"]');
-        var tot  = riga.querySelector('[name="riga_totale[]"]');
+        var dal = riga.querySelector('[name="riga_dal[]"]');
+        var al  = riga.querySelector('[name="riga_al[]"]');
+        var tar = riga.querySelector('[name="riga_tariffa[]"]');
+        var tot = riga.querySelector('[name="riga_totale[]"]');
         if (!dal || !al || !tar || !tot) return;
 
         var unita  = riga.querySelector('[name="riga_unita[]"]');
-        var aMese  = unita && unita.value === 'mese';
+        var u      = unita ? unita.value : 'giorno';
         var durata = riga.querySelector('.nl-riga-durata');
 
-        mostraCampiMese(riga, aMese);
+        aggiornaEtichetta(riga, u);
 
-        var somma;
-        if (aMese) {
-            var tarM = riga.querySelector('[name="riga_tariffa_mese[]"]');
-            var q    = mesiEGiorni(dal.value, al.value);
-            somma = q.mesi * (numero(tarM ? tarM.value : '') || 0)
-                  + q.giorni * (numero(tar.value) || 0);
+        var somma = calcolaRiga(u, dal.value, al.value, numero(tar.value) || 0);
 
-            if (durata) {
-                durata.textContent = q.mesi
-                    ? q.mesi + (q.mesi === 1 ? ' mese' : ' mesi')
-                      + (q.giorni ? ' + ' + q.giorni + ' gg' : '')
-                    : (q.giorni ? q.giorni + ' gg' : '');
-            }
-        } else {
-            var gg = giorniTra(dal.value, al.value);
-            somma = gg * (numero(tar.value) || 0);
-            if (durata) durata.textContent = gg ? gg + ' gg' : '';
-        }
-
-        if (!tot.dataset.aMano && somma) {
-            tot.value = euro(somma);
-        }
+        if (durata) durata.textContent = testoDurata(u, dal.value, al.value);
+        if (!tot.dataset.aMano && somma) tot.value = euro(somma);
     }
 
-    /** Mostra o nasconde la tariffa a mese e cambia l'etichetta dei giorni. */
-    function mostraCampiMese(riga, aMese) {
-        var soloMese = riga.querySelector('.nl-solo-mese');
-        if (soloMese) soloMese.hidden = !aMese;
+    /**
+     * Il conto della riga. Gemello di Tariffa::totaleRiga in PHP: se le due
+     * versioni si allontanano si vede una cifra e se ne salva un'altra.
+     */
+    function calcolaRiga(unita, dal, al, tariffa) {
+        if (unita === 'tantum') return tariffa;          // a corpo: la durata non conta
 
-        // a mese la tariffa giornaliera resta, ma serve a un'altra cosa:
-        // pagare i giorni oltre l'ultimo mese intero
-        var et = riga.querySelector('.nl-et-giorno');
-        if (et) et.textContent = aMese ? 'Tariffa/g oltre' : 'Tariffa/g';
+        if (unita === 'mese') {
+            var q = mesiEGiorni(dal, al);
+            // i giorni oltre l'ultimo mese intero si pagano in trentesimi
+            // del canone: non si arrotonda al mese pieno, farebbe pagare un
+            // mese per cinque giorni
+            return q.mesi * tariffa + q.giorni * (tariffa / 30);
+        }
+        return giorniTra(dal, al) * tariffa;
+    }
+
+    /** "1 mese + 5 gg", "12 gg", oppure niente per la tariffa a corpo. */
+    function testoDurata(unita, dal, al) {
+        if (unita === 'tantum') return 'a corpo';
+
+        if (unita === 'mese') {
+            var q = mesiEGiorni(dal, al);
+            if (!q.mesi) return q.giorni ? q.giorni + ' gg' : '';
+            return q.mesi + (q.mesi === 1 ? ' mese' : ' mesi')
+                 + (q.giorni ? ' + ' + q.giorni + ' gg' : '');
+        }
+        var gg = giorniTra(dal, al);
+        return gg ? gg + ' gg' : '';
+    }
+
+    /** L'etichetta della tariffa dice sempre che cifra si sta scrivendo. */
+    function aggiornaEtichetta(riga, unita) {
+        var et = riga.querySelector('.nl-et-tariffa');
+        if (!et) return;
+        et.textContent = unita === 'mese' ? 'Tariffa/mese'
+                       : unita === 'tantum' ? 'Importo'
+                       : 'Tariffa/g';
     }
 
     /** Totale del noleggio: mezzi, piu' trasporto, piu' assicurazione. */
@@ -303,31 +341,26 @@
             riga.querySelector('[name="riga_macchina[]"]').value = dati.macchina_id || '';
             riga.querySelector('[name="riga_dal[]"]').value      = dati.data_inizio || '';
             riga.querySelector('[name="riga_al[]"]').value       = dati.data_fine || '';
-            riga.querySelector('[name="riga_tariffa[]"]').value  =
-                dati.tariffa_giorno ? euro(dati.tariffa_giorno) : '';
-
+            var u = dati.unita || 'giorno';
             var unita = riga.querySelector('[name="riga_unita[]"]');
-            var aMese = (dati.unita || 'giorno') === 'mese';
-            if (unita) unita.value = aMese ? 'mese' : 'giorno';
+            if (unita) unita.value = u;
 
-            var tarM = riga.querySelector('[name="riga_tariffa_mese[]"]');
-            if (tarM) tarM.value = dati.tariffa_mese ? euro(dati.tariffa_mese) : '';
-            mostraCampiMese(riga, aMese);
+            // la tariffa sta nella colonna della sua unita': a mese in
+            // tariffa_mese, negli altri casi in tariffa_giorno
+            var salvata = u === 'mese' ? dati.tariffa_mese : dati.tariffa_giorno;
+            riga.querySelector('[name="riga_tariffa[]"]').value = salvata ? euro(salvata) : '';
+            aggiornaEtichetta(riga, u);
+
+            var durata = riga.querySelector('.nl-riga-durata');
+            if (durata) durata.textContent = testoDurata(u, dati.data_inizio, dati.data_fine);
 
             var tot = riga.querySelector('[name="riga_totale[]"]');
             tot.value = dati.totale ? euro(dati.totale) : '';
 
             // un totale che non coincide col calcolo era stato corretto a
             // mano e non va sovrascritto
-            var atteso;
-            if (aMese) {
-                var q = mesiEGiorni(dati.data_inizio, dati.data_fine);
-                atteso = euro(q.mesi * (numero(dati.tariffa_mese) || 0)
-                            + q.giorni * (numero(dati.tariffa_giorno) || 0));
-            } else {
-                atteso = euro(giorniTra(dati.data_inizio, dati.data_fine)
-                            * (numero(dati.tariffa_giorno) || 0));
-            }
+            var atteso = euro(calcolaRiga(u, dati.data_inizio, dati.data_fine,
+                                          numero(salvata) || 0));
             if (tot.value && tot.value !== atteso) tot.dataset.aMano = '1';
         }
 

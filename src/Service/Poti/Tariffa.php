@@ -80,23 +80,60 @@ final class Tariffa
     }
 
     /**
+     * La tariffa della riga, presa dalla colonna che corrisponde all'unita'.
+     *
+     * A database le due colonne restano separate perche' dicono cose
+     * diverse — 80 euro al giorno e 80 euro al mese non sono lo stesso
+     * numero — ma nel form ne compare una sola, quella che serve.
+     *
+     * @param array<string, mixed> $riga
+     */
+    public static function tariffaDi(array $riga): float
+    {
+        $unita = (string)($riga['unita'] ?? 'giorno');
+
+        if ($unita === 'mese') {
+            return (float)($riga['tariffa_mese'] ?? 0);
+        }
+        // giorno e una tantum leggono lo stesso campo: per la tantum non e'
+        // una tariffa al giorno ma l'importo secco, e tenerne un terzo in
+        // tabella per una cifra sola non varrebbe la colonna
+        return (float)($riga['tariffa_giorno'] ?? 0);
+    }
+
+    /**
      * Quanto costa una riga.
+     *
+     * Una tariffa sola per riga: o si affitta a giornata, o a mese, o a
+     * corpo. Prima la riga a mese ne chiedeva due, una al mese e una al
+     * giorno per i giorni oltre l'ultimo mese intero, ed era un campo di
+     * troppo da compilare ogni volta.
+     *
+     * Adesso i giorni che avanzano si contano in trentesimi del canone
+     * mensile: un mese e cinque giorni a 900 euro al mese fanno 900 piu'
+     * cinque trentesimi, cioe' 1050. Non si arrotonda al mese pieno di
+     * proposito — farebbe pagare un mese intero per cinque giorni.
      *
      * @param array<string, mixed> $riga
      */
     public static function totaleRiga(array $riga): float
     {
-        $dal = (string)($riga['data_inizio'] ?? '');
-        $al  = (string)($riga['data_fine'] ?? '');
+        $unita   = (string)($riga['unita'] ?? 'giorno');
+        $tariffa = self::tariffaDi($riga);
+        $dal     = (string)($riga['data_inizio'] ?? '');
+        $al      = (string)($riga['data_fine'] ?? '');
 
-        if (($riga['unita'] ?? 'giorno') === 'mese') {
-            $q       = self::mesiEGiorni($dal, $al);
-            $alMese  = (float)($riga['tariffa_mese'] ?? 0);
-            $alGiorno= (float)($riga['tariffa_giorno'] ?? 0);
-            return round($q['mesi'] * $alMese + $q['giorni'] * $alGiorno, 2);
+        // a corpo: la durata non c'entra, si paga quella cifra e basta
+        if ($unita === 'tantum') {
+            return round($tariffa, 2);
         }
 
-        return round(self::giorni($dal, $al) * (float)($riga['tariffa_giorno'] ?? 0), 2);
+        if ($unita === 'mese') {
+            $q = self::mesiEGiorni($dal, $al);
+            return round($q['mesi'] * $tariffa + $q['giorni'] * ($tariffa / 30), 2);
+        }
+
+        return round(self::giorni($dal, $al) * $tariffa, 2);
     }
 
     /**

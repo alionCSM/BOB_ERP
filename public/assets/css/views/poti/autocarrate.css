@@ -208,20 +208,40 @@
 
 
 /* casella si/no allineata agli altri campi della maschera */
+/* La spunta del contratto occupava una cella intera come i campi di testo,
+   con la sua etichetta sopra e un riquadro alto quanto un input: accanto a
+   cliente e telefono sembrava un campo da riempire, mentre e' un si' o no.
+   Adesso e' larga quanto il suo testo e bassa, cosi' si legge per quello
+   che e' senza rompere l'allineamento delle altre. */
 .ac-check-riga { justify-content: flex-end; }
 
 .ac-check-box {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    height: 36px;
-    padding: 0 11px;
-    border: 1px solid #cbd5e1;
-    border-radius: 7px;
-    background: #fff;
-    font-size: 13px;
-    color: #334155;
+    gap: 7px;
+    width: fit-content;
+    max-width: 100%;
+    height: 30px;
+    padding: 0 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 15px;
+    background: #f8fafc;
+    font-size: 12.5px;
+    color: #475569;
     cursor: pointer;
+    white-space: nowrap;
+}
+
+.ac-check-box:hover { border-color: #cbd5e1; background: #f1f5f9; }
+
+.ac-check-box input { margin: 0; cursor: pointer; }
+
+/* spuntata si accende: firmato o da firmare si deve capire di sfuggita */
+.ac-check-box:has(input:checked) {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+    font-weight: 600;
 }
 
 /* campo mostrato ma non modificabile (il commerciale) */

@@ -10,10 +10,13 @@ use Phinx\Migration\AbstractMigration;
  * Due aggiunte che si toccano solo alla fine, sul totale:
  *
  * 1) Fino a qui una riga aveva una sola tariffa, al giorno. Adesso puo'
- *    essere a mese: `unita` dice quale delle due si applica. Resta anche la
- *    tariffa giornaliera sulle righe a mese, perche' i giorni oltre l'ultimo
- *    mese intero si contano a giorni (dal 10 gennaio al 15 febbraio = 1 mese
- *    piu' 5 giorni).
+ *    essere a giornata, a mese o a corpo: `unita` dice quale. La tariffa
+ *    resta una sola per riga, ma le colonne sono due perche' ottanta euro
+ *    al giorno e ottanta al mese non sono lo stesso numero: tenerle nello
+ *    stesso campo vorrebbe dire che cambiando unita' la vecchia cifra
+ *    sopravvive come se fosse ancora buona. La tariffa a corpo sta in
+ *    tariffa_giorno: e' un importo secco, e una terza colonna per una cifra
+ *    sola non varrebbe la pena.
  *
  * 2) L'assicurazione e' una percentuale sul noleggio dei mezzi — il
  *    trasporto resta fuori. La percentuale si conserva sul noleggio invece
@@ -39,7 +42,7 @@ final class PotiNoleggiMeseAssicurazione extends AbstractMigration
                 'limit'   => 10,
                 'null'    => false,
                 'default' => 'giorno',
-                'comment' => 'giorno | mese — quale tariffa si applica',
+                'comment' => 'giorno | mese | tantum — quale tariffa si applica',
                 'after'   => 'data_fine',
             ]);
         }

@@ -79,13 +79,34 @@ final class MacchinaRepository
      * altrimenti il numero di pagine finisce per non corrispondere a
      * quello che si vede.
      *
-     * @param array{q?:string, tipo?:string, stato?:string} $filtri
+     * @param array{q?:string, tipo?:string, stato?:string,
+     *               liberiDal?:string, liberiAl?:string} $filtri
      * @return array{0:string, 1:array<string,mixed>}
      */
     private function filtriMacchine(int $companyId, array $filtri): array
     {
         $where = 'group_company_id = :cid';
         $args  = [':cid' => $companyId];
+
+        // "mi serve dal ... al ...": restano solo i mezzi liberi in quel
+        // periodo. Il taglio lo fa il database e non PHP dopo aver letto:
+        // scartando le righe a valle, una pagina da cinquanta ne mostrerebbe
+        // magari sei, e il conteggio direbbe un numero che non si vede.
+        if (!empty($filtri['liberiDal']) && !empty($filtri['liberiAl'])) {
+            $where .= " AND id NOT IN (
+                SELECT r.macchina_id
+                FROM   pn_noleggi_righe r
+                JOIN   pn_noleggi n ON n.id = r.noleggio_id
+                WHERE  n.group_company_id = :cid2
+                  AND  n.eliminato_at IS NULL
+                  AND  n.stato <> 'annullato'
+                  AND  r.data_inizio <= :lal
+                  AND  r.data_fine   >= :ldal
+            )";
+            $args[':cid2'] = $companyId;
+            $args[':ldal'] = $filtri['liberiDal'];
+            $args[':lal']  = $filtri['liberiAl'];
+        }
 
         if (!empty($filtri['tipo'])) {
             $where .= ' AND tipo = :tipo';
@@ -326,6 +347,8 @@ final class MacchinaRepository
             // la durata si scompone qui e non nel template: una riga a mese
             // si legge "1 mese + 5 gg", e Twig non e' il posto dove fare i
             // conti sui calendari
+            // a corpo la durata resta il periodo: si paga a forfait, ma
+            // sapere quanti giorni il mezzo e' stato fuori serve lo stesso
             if (($r['unita'] ?? 'giorno') === 'mese') {
                 $q = \App\Service\Poti\Tariffa::mesiEGiorni(
                     (string)$r['data_inizio'], (string)$r['data_fine']

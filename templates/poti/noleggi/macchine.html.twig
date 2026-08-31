@@ -3,7 +3,7 @@
 {% block head %}
 {# stessi stili delle autocarrate: le due sezioni si assomigliano e tenerne
    due copie vorrebbe dire vederle divergere al primo ritocco #}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
 {# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
 <link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
 {% endblock %}
@@ -60,37 +60,60 @@
 
     <div class="ac-box">
         <div class="ac-table-wrap">
-            <table class="ac-table">
+            {# Quattro colonne e non otto: con centinaia di mezzi si arriva
+               qui per trovarne uno, e altezza, portata e note sono cose che
+               si guardano su quello, non su tutti insieme. Stanno nella riga
+               che si apre cliccando. #}
+            <table class="ac-table nl-mezzi-tab">
                 <thead>
                     <tr>
-                        <th>Tipo</th>
                         <th>Matricola</th>
+                        <th>Tipo</th>
                         <th>Modello</th>
-                        <th class="right">Altezza</th>
-                        <th class="right">Portata</th>
                         <th>Stato</th>
-                        <th>Note</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in macchine %}
-                        <tr>
-                            <td>{{ m.tipo }}</td>
+                        <tr class="nl-mezzo-r" data-nl-mezzo="{{ m.id }}" tabindex="0">
                             <td class="ac-td-targa">{{ m.matricola }}</td>
+                            <td>{{ m.tipo }}</td>
                             <td>{{ m.modello ?: '—' }}</td>
-                            <td class="right">{{ m.altezza_max_m ? m.altezza_max_m|number_format(2, ',', '.') ~ ' m' : '—' }}</td>
-                            <td class="right">{{ m.portata_kg ? m.portata_kg ~ ' kg' : '—' }}</td>
                             <td><span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span></td>
-                            <td class="ac-td-note" title="{{ m.note }}">{{ m.note ?: '—' }}</td>
-                            <td class="right">
-                                <button type="button" class="ac-link"
-                                        data-ac-modifica="{{ m|json_encode|e('html_attr') }}">modifica</button>
+                            <td class="right nl-mezzo-freccia" aria-hidden="true">▾</td>
+                        </tr>
+
+                        {# i dettagli restano nel documento e non si vanno a
+                           chiedere al server: sono quattro campi, e aprirli
+                           dev'essere immediato #}
+                        <tr class="nl-mezzo-d" data-nl-dett="{{ m.id }}" hidden>
+                            <td colspan="5">
+                                <div class="nl-dett">
+                                    <div class="nl-dett-campi">
+                                        <div>
+                                            <span>Altezza max</span>
+                                            <strong>{{ m.altezza_max_m ? m.altezza_max_m|number_format(2, ',', '.') ~ ' m' : '—' }}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Portata</span>
+                                            <strong>{{ m.portata_kg ? m.portata_kg ~ ' kg' : '—' }}</strong>
+                                        </div>
+                                        <div class="nl-dett-note">
+                                            <span>Note</span>
+                                            <strong>{{ m.note ?: '—' }}</strong>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="ac-btn"
+                                            data-ac-modifica="{{ m|json_encode|e('html_attr') }}">
+                                        Modifica
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="8" class="ac-empty">
+                            <td colspan="5" class="ac-empty">
                                 {% if cerca or tipo or stato %}
                                     Nessun mezzo corrisponde ai filtri.
                                 {% else %}
@@ -176,5 +199,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/noleggi.js?v=1"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=4"></script>
 {% endblock %}

@@ -25,7 +25,7 @@ final class NoleggiController
     private const STATI_MACCHINA = ['attiva', 'manutenzione', 'dismessa'];
     private const STATI_NOLEGGIO = ['confermato', 'annullato'];
     private const PAGAMENTI      = ['da_pagare', 'pagata'];
-    private const UNITA          = ['giorno', 'mese'];
+    private const UNITA          = ['giorno', 'mese', 'tantum'];
 
     /** Quante schede per pagina nell'elenco noleggi e nell'elenco mezzi. */
     private const PER_PAGINA         = 25;
@@ -47,39 +47,44 @@ final class NoleggiController
             $al = $dal;
         }
 
-        // Con qualche centinaio di mezzi la pagina non puo' partire da
-        // "tutti": una griglia di seicento righe per trenta giorni sono
-        // diciottomila celle, illeggibili prima ancora che lente. Si parte
-        // dai filtri e si mostra una pagina per volta.
+        // ── Prima la domanda, poi i mezzi ────────────────────────────────
+        // La pagina non parte piu' elencando il parco. Con centinaia di
+        // mezzi quell'elenco non risponde a niente: chi arriva qui non
+        // vuole sapere quali macchine esistono, vuole sapere cosa e' libero
+        // nei giorni che ha in mente. Quindi si chiede prima il periodo, e
+        // l'elenco compare solo dopo, gia' ridotto ai mezzi disponibili.
+        $cercaDal = VistaImpegni::data($_GET['cerca_dal'] ?? '', '');
+        $cercaAl  = VistaImpegni::data($_GET['cerca_al'] ?? '', '');
+        if ($cercaDal && $cercaAl && $cercaAl < $cercaDal) {
+            [$cercaDal, $cercaAl] = [$cercaAl, $cercaDal];   // date invertite
+        }
+        $ricercaAttiva = (bool)($cercaDal && $cercaAl);
+
         $tipo   = trim((string)($_GET['tipo'] ?? ''));
         $cerca  = trim((string)($_GET['q'] ?? ''));
         $stato  = in_array($_GET['stato'] ?? '', self::STATI_MACCHINA, true)
                   ? (string)$_GET['stato'] : '';
         $pagina = max(1, (int)($_GET['pagina'] ?? 1));
 
-        $esito    = $repo->elencoMacchine(
-            $cid, ['q' => $cerca, 'tipo' => $tipo, 'stato' => $stato],
-            $pagina, self::MEZZI_PER_PAGINA
-        );
-        $macchine = $esito['righe'];
+        $macchine = [];
+        $esito    = ['righe' => [], 'totale' => 0];
 
-        // Gli impegni si chiedono solo per i mezzi che si stanno guardando:
-        // caricare quelli di tutto il parco per disegnarne cinquanta sarebbe
-        // lavoro buttato. L'elenco vuoto va gestito a parte, perche' per
-        // righeNelPeriodo significa "tutti": senza il controllo, filtrando
-        // via ogni mezzo si disegnerebbe la griglia di quelli nascosti.
-        $idVisibili = array_map('intval', array_column($macchine, 'id'));
-        $impegni    = $idVisibili
-            ? $this->impegni($repo->righeNelPeriodo($cid, $dal, $al, $idVisibili))
-            : [];
-        $giorni     = VistaImpegni::giorni($dal, $al);
+        if ($ricercaAttiva) {
+            $esito = $repo->elencoMacchine($cid, [
+                'q'         => $cerca,
+                'tipo'      => $tipo,
+                'stato'     => $stato,
+                'liberiDal' => $cercaDal,
+                'liberiAl'  => $cercaAl,
+            ], $pagina, self::MEZZI_PER_PAGINA);
+            $macchine = $esito['righe'];
+        }
 
-        // filtro "mi serve dal ... al ...": restano solo le macchine libere
-        $cercaDal = VistaImpegni::data($_GET['cerca_dal'] ?? '', '');
-        $cercaAl  = VistaImpegni::data($_GET['cerca_al'] ?? '', '');
-        $occupate = ($cercaDal && $cercaAl && $cercaAl >= $cercaDal)
-            ? $repo->occupateTra($cid, $cercaDal, $cercaAl)
-            : [];
+        // Il calendario invece guarda tutto il parco: e' il colpo d'occhio
+        // sul periodo e ha senso solo con dentro tutti gli impegni. Non
+        // costa come la vecchia griglia, perche' raggruppa per giorno
+        // invece di disegnare una riga per mezzo.
+        $impegni = $this->impegni($repo->righeNelPeriodo($cid, $dal, $al));
 
         Response::view('poti/noleggi/disponibilita.html.twig', $request, [
             'macchine'      => $macchine,
@@ -88,16 +93,12 @@ final class NoleggiController
             'cerca'         => $cerca,
             'stato'         => $stato,
             'stati'         => self::STATI_MACCHINA,
-            'giorni'        => $giorni,
-            'griglia'       => VistaImpegni::griglia($impegni, $giorni),
             'calendario'    => VistaImpegni::calendario($dal, $al, $impegni),
-            'liberaDal'     => $repo->primoGiornoLibero($cid, date('Y-m-d')),
             'dal'           => $dal,
             'al'            => $al,
             'cercaDal'      => $cercaDal,
             'cercaAl'       => $cercaAl,
-            'occupate'      => $occupate,
-            'ricercaAttiva' => (bool)($cercaDal && $cercaAl),
+            'ricercaAttiva' => $ricercaAttiva,
         ] + $this->paginazione($pagina, $esito['totale'], self::MEZZI_PER_PAGINA, [
             'q' => $cerca, 'tipo' => $tipo, 'stato' => $stato,
             'dal' => $dal, 'al' => $al,
@@ -465,15 +466,20 @@ final class NoleggiController
                 ? (string)$_POST['riga_unita'][$i]
                 : 'giorno';
 
+            // Dal form arriva una tariffa sola: qui si mette nella colonna
+            // che le corrisponde. Le due colonne restano separate perche'
+            // ottanta euro al giorno e ottanta al mese non sono lo stesso
+            // numero, e cambiando unita' la vecchia cifra non deve
+            // sopravvivere come se fosse ancora buona.
+            $tariffa = VistaImpegni::importo($_POST['riga_tariffa'][$i] ?? '');
+
             $riga = [
                 'macchina_id'    => (string)$macchinaId,
                 'data_inizio'    => $dal,
                 'data_fine'      => $al,
                 'unita'          => $unita,
-                'tariffa_giorno' => VistaImpegni::importo($_POST['riga_tariffa'][$i] ?? ''),
-                'tariffa_mese'   => $unita === 'mese'
-                                    ? VistaImpegni::importo($_POST['riga_tariffa_mese'][$i] ?? '')
-                                    : '',
+                'tariffa_giorno' => $unita === 'mese' ? '' : $tariffa,
+                'tariffa_mese'   => $unita === 'mese' ? $tariffa : '',
                 'totale'         => VistaImpegni::importo($_POST['riga_totale'][$i] ?? ''),
                 'note'           => trim((string)($_POST['riga_note'][$i] ?? '')),
             ];
