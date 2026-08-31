@@ -362,3 +362,30 @@
 }
 .bc-prospetto-btn-confirm:hover { background: #15803d; }
 .bc-prospetto-btn-confirm:disabled { opacity: .55; cursor: wait; }
+
+/* Avviso "dati non aggiornati": compare solo se Yard non ha risposto.
+   Ambra e non rosso — la pagina funziona, i numeri sono solo vecchi. */
+.bc-avviso-sync {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin: 16px 0 0;
+    padding: 13px 16px;
+    border: 1px solid #fcd34d;
+    border-left-width: 4px;
+    border-radius: 10px;
+    background: #fffbeb;
+    color: #78350f;
+    font-size: .875rem;
+    line-height: 1.45;
+}
+.bc-avviso-sync svg {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    fill: none;
+    stroke: #d97706;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
