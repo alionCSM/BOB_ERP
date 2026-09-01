@@ -132,6 +132,50 @@ class CloudPath
         return $path;
     }
 
+    /**
+     * Cartella foto Poti Noleggi: <root>/PotiNoleggi/foto/<anno>/<mese>
+     *
+     * Divise per mese e non tutte insieme: sono due per ogni uscita e due
+     * per ogni rientro, quindi in un anno diventano migliaia. Una cartella
+     * con migliaia di file e' lenta da aprire e impossibile da guardare
+     * quando serve andarci dentro a mano.
+     */
+    public static function ensurePotiFotoDir(string $data): string
+    {
+        $t = strtotime($data) ?: time();
+        $path = implode(DIRECTORY_SEPARATOR, [
+            self::root(), 'PotiNoleggi', 'foto', date('Y', $t), date('m', $t),
+        ]);
+
+        if (!is_dir($path) && !@mkdir($path, 0775, true) && !is_dir($path)) {
+            $err = error_get_last()['message'] ?? '?';
+            throw new RuntimeException("Impossibile creare la cartella foto: {$path} ({$err})");
+        }
+        if (!is_writable($path)) {
+            throw new RuntimeException("Cartella foto non scrivibile: {$path}");
+        }
+        return $path;
+    }
+
+    /**
+     * Percorso assoluto di una foto salvata, con il controllo che non esca
+     * dalla cartella dei file.
+     *
+     * Serve perche' il percorso arriva dall'indirizzo: senza questo
+     * controllo un "../.." nella richiesta farebbe leggere qualunque file
+     * del server a chi sa scriverlo.
+     */
+    public static function fotoAssoluta(string $relativo): ?string
+    {
+        $base = realpath(self::root() . DIRECTORY_SEPARATOR . 'PotiNoleggi');
+        $file = realpath(self::root() . DIRECTORY_SEPARATOR . $relativo);
+
+        if (!$base || !$file || !is_file($file)) {
+            return null;
+        }
+        return str_starts_with($file, $base) ? $file : null;
+    }
+
     /** Cartella moduli BOB Zone (firme/foto compilazioni): <root>/BOBZone/<id>/forms */
     public static function ensureZoneFormsDir(int $worksiteId): string
     {

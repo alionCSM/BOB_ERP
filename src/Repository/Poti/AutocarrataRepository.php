@@ -448,21 +448,41 @@ final class AutocarrataRepository
      * Il campo si azzera se era gia' valorizzato: un tocco per sbaglio si
      * annulla con un altro tocco, senza dover chiamare l'ufficio.
      */
-    public function segnaMomento(int $companyId, int $id, string $campo, ?int $userId): void
-    {
+    public function segnaMomento(
+        int $companyId,
+        int $id,
+        string $campo,
+        ?int $userId,
+        ?string $carburante = null
+    ): void {
         if (!in_array($campo, ['consegnato', 'rientrato'], true)) {
             return;
         }
         $quando = $campo . '_at';
         $chi    = $campo . '_da';
+        $carb   = $campo === 'consegnato' ? 'carburante_uscita' : 'carburante_rientro';
 
+        // Il livello del carburante e chi ha fatto l'operazione si
+        // assegnano PRIMA della data, non dopo. In MySQL le assegnazioni di
+        // una UPDATE si leggono da sinistra a destra e quelle successive
+        // vedono i valori gia' scritti: mettendo la data per prima, il
+        // "CASE WHEN ... IS NULL" delle righe sotto la trovava gia'
+        // valorizzata e cadeva sempre nel ramo ELSE. Risultato, consegnato_da
+        // restava NULL a ogni consegna e non si e' mai saputo chi l'avesse
+        // fatta.
         $stmt = $this->conn->prepare("
             UPDATE pn_prenotazioni
-            SET    {$quando} = CASE WHEN {$quando} IS NULL THEN NOW() ELSE NULL END,
-                   {$chi}    = CASE WHEN {$quando} IS NULL THEN :uid ELSE NULL END
+            SET    {$chi}    = CASE WHEN {$quando} IS NULL THEN :uid  ELSE NULL END,
+                   {$carb}   = CASE WHEN {$quando} IS NULL THEN :carb ELSE NULL END,
+                   {$quando} = CASE WHEN {$quando} IS NULL THEN NOW() ELSE NULL END
             WHERE  id = :id AND group_company_id = :cid AND eliminato_at IS NULL
         ");
-        $stmt->execute([':id' => $id, ':cid' => $companyId, ':uid' => $userId]);
+        $stmt->execute([
+            ':id'   => $id,
+            ':cid'  => $companyId,
+            ':uid'  => $userId,
+            ':carb' => ($carburante ?? '') !== '' ? $carburante : null,
+        ]);
     }
 
     /** Spunta o toglie la firma del contratto. */
