@@ -314,10 +314,16 @@
             var p = numero(perc ? perc.value : '');
             if (isNaN(p)) p = 12;
             assic = Math.round(mezzi * p) / 100;
-            if (etichetta) etichetta.textContent = '€ ' + euro(assic) + ' sui mezzi';
+            if (etichetta) etichetta.textContent = '= € ' + euro(assic);
         } else if (etichetta) {
             etichetta.textContent = '';
         }
+
+        // il subtotale dei mezzi si vede accanto alla spunta: e' la cifra su
+        // cui si applica la percentuale, e vederla toglie ogni dubbio su
+        // cosa entri nel conto e cosa no
+        var sub = campo('nl-mezzi-tot');
+        if (sub) sub.textContent = '€ ' + euro(mezzi);
 
         var somma = mezzi + trasp + assic;
 
@@ -459,6 +465,8 @@
         }
         var etAssic = campo('nl-assic-importo');
         if (etAssic) etAssic.textContent = '';
+        var subMezzi = campo('nl-mezzi-tot');
+        if (subMezzi) subMezzi.textContent = '€ 0,00';
 
         // le ricerche vanno chiuse prima di svuotare, altrimenti restano
         // agganciate a campi che non esistono piu'

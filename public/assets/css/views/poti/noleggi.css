@@ -156,16 +156,58 @@
     .nl-riga > .ac-f > span { display: none; }
 }
 
+/* due icone affiancate: stanno in meno spazio di quanto ne prendeva una
+   sola delle due scritte di prima */
 .nl-riga-azioni {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: flex-start;
-    padding-top: 9px;
-    white-space: nowrap;
+    gap: 5px;
+    align-items: center;
+    padding-top: 7px;
 }
 
-.nl-riga-azioni .ac-link { font-size: 11.5px; }
+.nl-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 31px;
+    height: 31px;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.nl-ic svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.nl-ic:hover {
+    color: #0369a1;
+    border-color: #7dd3fc;
+    background: #f0f9ff;
+}
+
+/* il cestino si colora di rosso solo al passaggio: rosso sempre acceso su
+   ogni riga sarebbe un allarme continuo per un'azione normale */
+.nl-ic-ko:hover {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.nl-ic:focus-visible {
+    outline: 2px solid #0369a1;
+    outline-offset: 1px;
+}
 
 /* quanto dura la riga, sotto il totale: "1 mese + 5 gg" dice a colpo
    d'occhio da dove viene la cifra */
@@ -183,7 +225,7 @@
         align-items: end;
     }
     .nl-riga-macchina, .nl-riga-azioni { grid-column: span 2; }
-    .nl-riga-azioni { flex-direction: row; gap: 14px; }
+    .nl-riga-azioni { justify-content: flex-end; padding-top: 0; }
 }
 
 /* ── Assicurazione ──────────────────────────────────────────────────────── */
@@ -367,9 +409,25 @@
     min-width: 0;
 }
 
+/* Fuori da .ac-f questo campo non eredita piu' lo stile dei campi della
+   maschera: senza queste righe torna un input di sistema, largo la sua
+   ventina di caratteri, che sbordava dal contenitore da 84px. */
 .nl-assic-perc input {
-    padding-right: 26px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 26px 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    font-size: 13px;
+    color: #1e293b;
     text-align: right;
+}
+
+.nl-assic-perc input:focus {
+    outline: none;
+    border-color: #0369a1;
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
 }
 
 /* spenta finche' non si include: si vede che non e' in gioco */
@@ -389,3 +447,47 @@
 }
 
 #nl-assic-importo { color: #0369a1; font-weight: 600; }
+
+/* ── Piede del riquadro mezzi ───────────────────────────────────────────── */
+/* Il subtotale dei mezzi e l'assicurazione stanno insieme perche' sono la
+   stessa frase: questa e' la somma, questa la percentuale che ci si applica.
+   Fra trasporto e totale, com'era prima, sembrava una voce sul totale. */
+.nl-mezzi-piede {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.nl-mezzi-sub {
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.nl-mezzi-sub strong {
+    margin-left: 6px;
+    font-size: 15px;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.nl-assic-riga { align-items: center; }
+
+#nl-assic-importo {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0369a1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* il riquadro importi e' tornato a due voci */
+.ac-soldi-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+@media (max-width: 620px) {
+    .ac-soldi-2 { grid-template-columns: minmax(0, 1fr) !important; }
+}

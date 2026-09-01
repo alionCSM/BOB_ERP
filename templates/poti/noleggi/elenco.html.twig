@@ -250,41 +250,45 @@
                     <div class="nl-righe-vuoto" id="nl-righe-vuoto">
                         Nessun mezzo: aggiungine almeno uno.
                     </div>
+
+                    {# L'assicurazione sta qui e non fra gli importi perche'
+                       e' una percentuale sui mezzi: nel riquadro sotto,
+                       schiacciata fra trasporto e totale, sembrava applicarsi
+                       anche al trasporto. Qui e' attaccata alla somma su cui
+                       si calcola, che si vede a fianco. #}
+                    <div class="nl-mezzi-piede">
+                        <div class="nl-mezzi-sub">
+                            Totale mezzi
+                            <strong id="nl-mezzi-tot">€ 0,00</strong>
+                        </div>
+                        <div class="nl-assic-riga">
+                            <label class="ac-check-box">
+                                <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
+                                <span>Assicurazione</span>
+                            </label>
+                            <div class="nl-assic-perc">
+                                <input type="text" name="assicurazione_perc" id="nl-assic-perc"
+                                       inputmode="decimal" value="{{ assicPerc|number_format(0) }}"
+                                       aria-label="Percentuale assicurazione" disabled>
+                                <span class="nl-assic-simbolo">%</span>
+                            </div>
+                            <span id="nl-assic-importo"></span>
+                        </div>
+                    </div>
                 </div>
 
                 {# ── Importi ──────────────────────────────────────────────
-                   Tre celle su una riga sola. Prima la percentuale finiva da
-                   sola sulla riga sotto, staccata dalla spunta a cui
-                   appartiene: sembrava un campo a se'. Adesso spunta,
-                   percentuale e importo calcolato stanno insieme, perche'
-                   sono la stessa cosa detta in tre pezzi. #}
+                   Restano il trasporto e il totale. L'assicurazione e' salita
+                   nel riquadro dei mezzi: si calcola su quelli, e tenerla qui
+                   in mezzo la faceva sembrare una percentuale sul totale. #}
                 <div class="ac-f ac-f-4 ac-soldi">
                     <div class="ac-soldi-tit">Importi</div>
-                    <div class="ac-soldi-campi">
+                    <div class="ac-soldi-campi ac-soldi-2">
                         <label class="ac-f">
                             <span>Trasporto</span>
                             <input type="text" name="trasporto" id="nl-trasporto" inputmode="decimal"
                                    placeholder="0,00">
                         </label>
-
-                        {# La percentuale si calcola sui soli mezzi: si
-                           assicura la macchina, non il viaggio del camion. #}
-                        <div class="ac-f">
-                            <span>Assicurazione</span>
-                            <div class="nl-assic-riga">
-                                <label class="ac-check-box">
-                                    <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
-                                    <span>Includi</span>
-                                </label>
-                                <div class="nl-assic-perc">
-                                    <input type="text" name="assicurazione_perc" id="nl-assic-perc"
-                                           inputmode="decimal" value="{{ assicPerc|number_format(0) }}"
-                                           aria-label="Percentuale assicurazione" disabled>
-                                    <span class="nl-assic-simbolo">%</span>
-                                </div>
-                            </div>
-                            <small id="nl-assic-importo"></small>
-                        </div>
 
                         <label class="ac-f">
                             <span>Totale</span>
@@ -372,13 +376,35 @@
                 <small class="nl-riga-durata"></small>
             </label>
 
+            {# Icone e non parole: la riga ha sette colonne e due frasi in
+               fondo si mangiavano lo spazio dei campi, andando a capo.
+
+               Disegnate qui dentro invece che con data-lucide: le righe le
+               clona il JavaScript dal modello, e lucide sostituisce le sue
+               icone una volta sola al caricamento — su una riga aggiunta
+               dopo resterebbero due caselle vuote.
+
+               Il titolo resta scritto: un'icona da sola non dice cosa fa
+               finche' non ci si passa sopra. #}
             <div class="nl-riga-azioni">
-                {# copia il periodo di questa riga su tutte le altre: nella
-                   maggior parte dei noleggi le macchine vanno e tornano
-                   insieme, e riscrivere le date ogni volta e' inutile #}
-                <button type="button" class="ac-link" data-nl-copia
-                        title="Copia queste date sugli altri mezzi">copia date</button>
-                <button type="button" class="ac-link nl-togli" data-nl-togli>togli</button>
+                <button type="button" class="nl-ic" data-nl-copia
+                        title="Copia queste date sugli altri mezzi"
+                        aria-label="Copia queste date sugli altri mezzi">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="9" y="9" width="11" height="11" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+                <button type="button" class="nl-ic nl-ic-ko" data-nl-togli
+                        title="Togli questo mezzo dal noleggio"
+                        aria-label="Togli questo mezzo dal noleggio">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 6h18"/>
+                        <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </template>
