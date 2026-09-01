@@ -5,7 +5,7 @@
    due copie vorrebbe dire vederle divergere al primo ritocco #}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
 {# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=5">
 {% endblock %}
 
 {% block content %}
@@ -32,7 +32,7 @@
         <label class="ac-f ac-f-cerca">
             <span>Cerca</span>
             <input type="search" name="q" value="{{ cerca }}" autofocus
-                   placeholder="matricola, modello, tipo, note…">
+                   placeholder="numero, matricola, modello, tipo…">
         </label>
         <label class="ac-f">
             <span>Tipo</span>
@@ -67,6 +67,10 @@
             <table class="ac-table nl-mezzi-tab">
                 <thead>
                     <tr>
+                        {# Il numero sta per primo: e' l'adesivo attaccato sulla
+                           macchina, quello che si legge in cantiere. La
+                           matricola e' il dato del costruttore e serve dopo. #}
+                        <th class="nl-col-n">N.</th>
                         <th>Matricola</th>
                         <th>Tipo</th>
                         <th>Modello</th>
@@ -77,6 +81,13 @@
                 <tbody>
                     {% for m in macchine %}
                         <tr class="nl-mezzo-r" data-nl-mezzo="{{ m.id }}" tabindex="0">
+                            <td class="nl-col-n">
+                                {% if m.numero %}
+                                    <span class="nl-numero">{{ m.numero }}</span>
+                                {% else %}
+                                    <span class="nl-numero-no" title="Adesivo non ancora messo">—</span>
+                                {% endif %}
+                            </td>
                             <td class="ac-td-targa">{{ m.matricola }}</td>
                             <td>{{ m.tipo }}</td>
                             <td>{{ m.modello ?: '—' }}</td>
@@ -88,7 +99,7 @@
                            chiedere al server: sono quattro campi, e aprirli
                            dev'essere immediato #}
                         <tr class="nl-mezzo-d" data-nl-dett="{{ m.id }}" hidden>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <div class="nl-dett">
                                     <div class="nl-dett-campi">
                                         <div>
@@ -113,7 +124,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="5" class="ac-empty">
+                            <td colspan="6" class="ac-empty">
                                 {% if cerca or tipo or stato %}
                                     Nessun mezzo corrisponde ai filtri.
                                 {% else %}
@@ -151,6 +162,14 @@
                     <datalist id="ac-tipi">
                         {% for t in tipi %}<option value="{{ t }}">{% endfor %}
                     </datalist>
+                </label>
+
+                {# Sta prima della matricola perche' e' il numero che si ha
+                   sotto gli occhi quando si registra la macchina. #}
+                <label class="ac-f">
+                    <span>Numero adesivo</span>
+                    <input type="text" name="numero" id="ac-m-numero" maxlength="20"
+                           placeholder="es. 42">
                 </label>
 
                 <label class="ac-f">
@@ -199,5 +218,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/noleggi.js?v=4"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=5"></script>
 {% endblock %}

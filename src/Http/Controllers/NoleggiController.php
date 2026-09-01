@@ -403,12 +403,23 @@ final class NoleggiController
         $id        = (int)($_POST['id'] ?? 0) ?: null;
         $matricola = strtoupper(trim((string)($_POST['matricola'] ?? '')));
         $tipo      = trim((string)($_POST['tipo'] ?? ''));
+        $numero    = strtoupper(trim((string)($_POST['numero'] ?? '')));
 
         if ($matricola === '' || $tipo === '') {
             Response::redirect('/noleggi/macchine?errore=' . urlencode('Tipo e matricola sono obbligatori'));
         }
         if ($repo->matricolaInUso($cid, $matricola, $id)) {
             Response::redirect('/noleggi/macchine?errore=' . urlencode("La matricola {$matricola} esiste gia'"));
+        }
+
+        // Due macchine con lo stesso adesivo sarebbero indistinguibili in
+        // cantiere: chi legge il numero non ha modo di sapere quale delle due
+        // ha davanti. Si dice anche su quale sta gia', altrimenti tocca
+        // cercarla a mano.
+        if ($altra = $repo->numeroInUso($cid, $numero, $id)) {
+            Response::redirect('/noleggi/macchine?errore=' . urlencode(
+                "Il numero {$numero} e' gia' sulla macchina {$altra}"
+            ));
         }
 
         $stato = in_array($_POST['stato'] ?? '', self::STATI_MACCHINA, true)
@@ -418,6 +429,7 @@ final class NoleggiController
 
         $nuovoId = $repo->salvaMacchina($cid, $id, [
             'tipo'          => $tipo,
+            'numero'        => $numero,
             'matricola'     => $matricola,
             'modello'       => trim((string)($_POST['modello'] ?? '')),
             'altezza_max_m' => VistaImpegni::importo($_POST['altezza_max_m'] ?? ''),
@@ -429,7 +441,8 @@ final class NoleggiController
         (new Audit($this->conn))->registra(
             $cid, 'macchina', $nuovoId, $id ? 'modificato' : 'creato',
             $prima, $repo->macchina($cid, $nuovoId),
-            (int)$this->utente($request)->id, $matricola
+            (int)$this->utente($request)->id,
+            $numero !== '' ? $numero . ' — ' . $matricola : $matricola
         );
 
         Response::redirect('/noleggi/macchine?salvato=1');
@@ -507,7 +520,12 @@ final class NoleggiController
         foreach ($righe as $r) {
             $out[] = [
                 'risorsa'     => (int)$r['macchina_id'],
-                'etichetta'   => (string)$r['matricola'],
+                // nel calendario ci sta poco: si scrive il numero
+                // dell'adesivo, che e' come la macchina viene chiamata, e la
+                // matricola solo se l'adesivo non c'e' ancora
+                'etichetta'   => ($r['numero'] ?? '') !== ''
+                                 ? (string)$r['numero']
+                                 : (string)$r['matricola'],
                 'cliente'     => (string)$r['cliente'],
                 'luogo'       => (string)($r['luogo'] ?? ''),
                 'stato'       => (string)$r['stato'],

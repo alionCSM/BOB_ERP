@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=5">
 {# stessa versione usata nelle altre pagine di BOB #}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 {% endblock %}
@@ -101,7 +101,10 @@
                     <tbody>
                         {% for r in n.righe %}
                             <tr>
-                                <td class="nl-matr">{{ r.matricola }}</td>
+                                <td class="nl-matr">
+                                    {% if r.numero %}<span class="nl-numero">{{ r.numero }}</span>{% endif %}
+                                    {{ r.matricola }}
+                                </td>
                                 <td class="nl-tipo">{{ r.tipo }}</td>
                                 <td>{{ r.data_inizio|date('d/m/Y') }} → {{ r.data_fine|date('d/m/Y') }}</td>
                                 <td class="right nl-durata">
@@ -338,7 +341,7 @@
                        guarda il testo della voce, quindi si trova il mezzo
                        scrivendo uno qualsiasi dei tre #}
                     {% for m in macchine %}
-                        <option value="{{ m.id }}">{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
+                        <option value="{{ m.id }}">{{ m.numero ? '#' ~ m.numero ~ ' · ' : '' }}{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
                     {% endfor %}
                 </select>
             </label>
@@ -415,5 +418,5 @@
 {% block scripts %}
 {# TomSelect prima: noleggi.js lo usa appena aggiunge una riga #}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/poti/noleggi.js?v=4"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=5"></script>
 {% endblock %}

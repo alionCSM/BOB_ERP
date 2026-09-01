@@ -64,7 +64,13 @@ final class Giornata
     {
         $autocarrata = $tipo === self::AUTOCARRATA;
 
-        $mezzo = (string)($autocarrata ? ($r['targa'] ?? '') : ($r['matricola'] ?? ''));
+        // Sui mezzi di sollevamento si scrive il numero dell'adesivo, che
+        // e' quello attaccato sulla macchina e quello che il tecnico legge in
+        // piazzale. La matricola resta il ripiego per le macchine non ancora
+        // etichettate. Le autocarrate non hanno adesivo: si vanno a targa.
+        $mezzo = (string)($autocarrata
+            ? ($r['targa'] ?? '')
+            : (($r['numero'] ?? '') !== '' ? $r['numero'] : ($r['matricola'] ?? '')));
 
         // sotto la targa: sull'autocarrata basta il modello, sul mezzo di
         // sollevamento serve prima il tipo (piattaforma, telescopico...),
@@ -179,7 +185,9 @@ final class Giornata
         foreach ($prossime as $giorno => $righe) {
             foreach ($righe as $r) {
                 $out[$giorno][] = [
-                    'mezzo'   => (string)($autocarrata ? ($r['targa'] ?? '') : ($r['matricola'] ?? '')),
+                    'mezzo'   => (string)($autocarrata
+                        ? ($r['targa'] ?? '')
+                        : (($r['numero'] ?? '') !== '' ? $r['numero'] : ($r['matricola'] ?? ''))),
                     'cliente' => (string)($r['cliente'] ?? ''),
                     'luogo'   => (string)($r['luogo'] ?? ''),
                     'giorni'  => (int)($r['giorni'] ?? 0),

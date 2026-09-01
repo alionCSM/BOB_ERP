@@ -66,7 +66,11 @@ final class MacchinaRepository
         $stmt = $this->conn->prepare("
             SELECT * FROM pn_macchine
             WHERE  {$where}
-            ORDER BY tipo ASC, matricola ASC
+            ORDER BY tipo ASC,
+                     -- i mezzi senza adesivo in fondo al loro tipo: sono i
+                     -- pochi da etichettare, e in cima darebbero l'idea che
+                     -- manchi il numero a tutti
+                     numero IS NULL, LENGTH(numero), numero, matricola
             LIMIT  {$perPagina} OFFSET {$offset}
         ");
         $stmt->execute($args);
@@ -117,8 +121,11 @@ final class MacchinaRepository
             $args[':stato'] = $filtri['stato'];
         }
         if (!empty($filtri['q'])) {
-            $where .= ' AND (matricola LIKE :q1 OR modello LIKE :q2 OR tipo LIKE :q3 OR note LIKE :q4)';
-            foreach (['q1', 'q2', 'q3', 'q4'] as $seg) {
+            // il numero sta per primo perche' e' quello che si legge sulla
+            // macchina: chi cerca parte da li', non dalla matricola
+            $where .= ' AND (numero LIKE :q0 OR matricola LIKE :q1 OR modello LIKE :q2
+                             OR tipo LIKE :q3 OR note LIKE :q4)';
+            foreach (['q0', 'q1', 'q2', 'q3', 'q4'] as $seg) {
                 $args[':' . $seg] = '%' . $filtri['q'] . '%';
             }
         }
@@ -153,6 +160,7 @@ final class MacchinaRepository
     {
         $p = [
             ':tipo'      => $d['tipo'],
+            ':numero'    => ($d['numero'] ?? '') !== '' ? $d['numero'] : null,
             ':matricola' => $d['matricola'],
             ':modello'   => $d['modello'] !== '' ? $d['modello'] : null,
             ':altezza'   => $d['altezza_max_m'] !== '' ? $d['altezza_max_m'] : null,
@@ -165,7 +173,7 @@ final class MacchinaRepository
         if ($id) {
             $stmt = $this->conn->prepare("
                 UPDATE pn_macchine
-                SET tipo = :tipo, matricola = :matricola, modello = :modello,
+                SET tipo = :tipo, numero = :numero, matricola = :matricola, modello = :modello,
                     altezza_max_m = :altezza, portata_kg = :portata,
                     note = :note, stato = :stato
                 WHERE id = :id AND group_company_id = :cid
@@ -176,11 +184,37 @@ final class MacchinaRepository
 
         $stmt = $this->conn->prepare("
             INSERT INTO pn_macchine
-                (group_company_id, tipo, matricola, modello, altezza_max_m, portata_kg, note, stato)
-            VALUES (:cid, :tipo, :matricola, :modello, :altezza, :portata, :note, :stato)
+                (group_company_id, tipo, numero, matricola, modello, altezza_max_m, portata_kg, note, stato)
+            VALUES (:cid, :tipo, :numero, :matricola, :modello, :altezza, :portata, :note, :stato)
         ");
         $stmt->execute($p);
         return (int)$this->conn->lastInsertId();
+    }
+
+    /**
+     * Il numero dell'adesivo e' gia' su un'altra macchina?
+     *
+     * Ritorna la matricola di quella macchina invece di un si'/no: davanti a
+     * "il numero 42 esiste gia'" la prima domanda e' sempre "su quale?", e
+     * senza la risposta tocca cercarla a mano.
+     */
+    public function numeroInUso(int $companyId, string $numero, ?int $escludiId = null): ?string
+    {
+        if ($numero === '') {
+            return null;   // vuoto: non e' un doppione, e' un adesivo non ancora messo
+        }
+
+        $sql  = 'SELECT matricola FROM pn_macchine WHERE group_company_id = :cid AND numero = :n';
+        $args = [':cid' => $companyId, ':n' => $numero];
+        if ($escludiId) {
+            $sql .= ' AND id <> :id';
+            $args[':id'] = $escludiId;
+        }
+        $sql .= ' LIMIT 1';
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($args);
+        return $stmt->fetchColumn() ?: null;
     }
 
     public function matricolaInUso(int $companyId, string $matricola, ?int $escludiId = null): bool
@@ -333,7 +367,7 @@ final class MacchinaRepository
         $segnaposti = implode(',', array_fill(0, count($noleggioIds), '?'));
 
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni
             FROM   pn_noleggi_righe r
             JOIN   pn_macchine m ON m.id = r.macchina_id
@@ -628,7 +662,7 @@ final class MacchinaRepository
         }
 
         $stmt = $this->conn->prepare("
-            SELECT r.*, n.cliente, n.luogo, n.stato, m.matricola, m.tipo
+            SELECT r.*, n.cliente, n.luogo, n.stato, m.numero, m.matricola, m.tipo
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
             JOIN   pn_macchine m ON m.id = r.macchina_id
@@ -658,7 +692,7 @@ final class MacchinaRepository
     public function giornata(int $companyId, string $data): array
     {
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
                    n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
                    n.contratto, n.contratto_firmato, n.pagamento, n.note AS note_noleggio
@@ -712,7 +746,7 @@ final class MacchinaRepository
         $al = date('Y-m-d', strtotime($dal . ' +' . $giorni . ' days'));
 
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
                    n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
                    n.contratto, n.contratto_firmato, n.pagamento

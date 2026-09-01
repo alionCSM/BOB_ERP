@@ -123,6 +123,7 @@
                 try { d = JSON.parse(b.dataset.acModifica); } catch (e) { return; }
                 campo('ac-m-id').value        = d.id;
                 campo('ac-m-tipo').value      = d.tipo || '';
+                campo('ac-m-numero').value    = d.numero || '';
                 campo('ac-m-matricola').value = d.matricola || '';
                 campo('ac-m-modello').value   = d.modello || '';
                 // dal database arriva col punto: si rimette all'italiana
@@ -130,7 +131,9 @@
                 campo('ac-m-portata').value   = d.portata_kg || '';
                 campo('ac-m-stato').value     = d.stato || 'attiva';
                 campo('ac-m-note').value      = d.note || '';
-                apriM('Mezzo ' + (d.matricola || ''));
+                // intestata al numero quando c'e': in cantiere la macchina
+                // si chiama cosi', la matricola non la sa nessuno a memoria
+                apriM('Mezzo ' + (d.numero ? d.numero + ' — ' : '') + (d.matricola || ''));
             });
         });
 

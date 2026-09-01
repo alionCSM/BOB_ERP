@@ -3,7 +3,7 @@
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
 {# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=5">
 {% endblock %}
 
 {% block content %}
@@ -51,7 +51,7 @@
             <label class="ac-f ac-f-cerca">
                 <span>mezzo</span>
                 <input type="search" name="q" value="{{ cerca }}"
-                       placeholder="matricola, modello…">
+                       placeholder="numero, matricola, modello…">
             </label>
             <input type="hidden" name="dal" value="{{ dal }}">
             <input type="hidden" name="al" value="{{ al }}">
@@ -77,6 +77,9 @@
             {% for m in macchine %}
                 <div class="ac-mezzo is-ok">
                     <div class="ac-mezzo-top">
+                        {# il numero grande: e' quello che si va a cercare in
+                           piazzale, la matricola sta sotto come riscontro #}
+                        {% if m.numero %}<span class="nl-numero">{{ m.numero }}</span>{% endif %}
                         <span class="ac-targa">{{ m.matricola }}</span>
                         {% if m.stato != 'attiva' %}
                             <span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span>
@@ -166,5 +169,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/noleggi.js?v=4"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=5"></script>
 {% endblock %}

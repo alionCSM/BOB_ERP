@@ -491,3 +491,35 @@
 @media (max-width: 620px) {
     .ac-soldi-2 { grid-template-columns: minmax(0, 1fr) !important; }
 }
+
+/* ── Numero dell'adesivo ────────────────────────────────────────────────── */
+/* E' il numero attaccato sulla macchina: in cantiere e' cosi' che la
+   chiamano. Si vede a distanza di braccio, con lo sfondo pieno, perche' e'
+   il dato che si confronta con quello che si ha davanti. La matricola resta
+   accanto in grigio come riscontro. */
+.nl-numero {
+    display: inline-block;
+    min-width: 30px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* macchina non ancora etichettata: si vede che manca senza gridarlo */
+.nl-numero-no { color: #cbd5e1; }
+
+.nl-col-n { width: 76px; white-space: nowrap; }
+
+/* nella scheda del noleggio il numero precede la matricola sulla stessa
+   riga: insieme sono l'identita' del mezzo */
+.nl-matr .nl-numero { margin-right: 6px; }
+
+/* sulla scheda della disponibilita' il numero sta in cima, prima della
+   matricola, e le due non devono accavallarsi quando il riquadro e' stretto */
+.ac-mezzo-top { flex-wrap: wrap; gap: 6px; }
