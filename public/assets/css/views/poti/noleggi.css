@@ -84,7 +84,11 @@
 .nl-totali strong { font-size: 15px; color: #0f172a; }
 
 /* ── Righe nella maschera ───────────────────────────────────────────────── */
-.nl-modal-box { width: 900px; }
+/* Piu' larga delle altre maschere: qui dentro c'e' una tabella di mezzi
+   con sette colonne, e a 900px le colonne si strozzavano fino a far
+   sbordare la riga fuori dal riquadro. Il min() la tiene dentro lo schermo
+   anche sui portatili piccoli. */
+.nl-modal-box { width: min(1080px, 96vw); }
 
 .nl-righe-box {
     border: 1px solid #e2e8f0;
@@ -108,59 +112,475 @@
 
 .nl-righe-lista { display: flex; flex-direction: column; gap: 10px; }
 
-/* la macchina si prende piu' spazio degli altri campi: il suo testo e' il
-   piu' lungo e in una colonna stretta verrebbe troncato subito */
+/* ── Righe dei mezzi ────────────────────────────────────────────────────
+   Griglia e non flex: intestazione e righe devono stare sulle stesse
+   colonne, e con flex le larghezze si assestano riga per riga — bastava un
+   nome di mezzo piu' lungo per disallineare tutto rispetto al titolo.
+
+   Le colonne sono scritte una volta sola in una variabile: ripetere lo
+   stesso elenco su intestazione e righe vuol dire che prima o poi qualcuno
+   ne cambia una e non l'altra, e da fuori sembra un bug misterioso.
+
+   La macchina si prende il doppio delle altre: il suo testo e' il piu'
+   lungo e in una colonna stretta verrebbe troncato subito. */
+.nl-righe-box {
+    --nl-cols: minmax(0, 1.9fr) 126px 126px 106px minmax(0, 1fr) minmax(0, 1fr) 88px;
+}
+
+.nl-righe-cols {
+    display: grid;
+    grid-template-columns: var(--nl-cols);
+    gap: 10px;
+    padding: 0 10px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #94a3b8;
+}
+
 .nl-riga {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto;
+    grid-template-columns: var(--nl-cols);
     gap: 10px;
-    align-items: end;
+    align-items: start;
     padding: 10px;
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
 }
 
-@media (max-width: 900px) {
-    .nl-riga { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .nl-riga-macchina { grid-column: span 2; }
-    .nl-riga-azioni { grid-column: span 2; }
+/* su schermo largo le etichette le da' l'intestazione: ripeterle su ogni
+   riga era piu' testo dei dati */
+@media (min-width: 901px) {
+    .nl-riga > .ac-f > span { display: none; }
 }
 
+/* due icone affiancate: stanno in meno spazio di quanto ne prendeva una
+   sola delle due scritte di prima */
 .nl-riga-azioni {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-bottom: 8px;
+    gap: 5px;
+    align-items: center;
+    padding-top: 7px;
+}
+
+.nl-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 31px;
+    height: 31px;
+    padding: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: color .12s, border-color .12s, background .12s;
+}
+
+.nl-ic svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.nl-ic:hover {
+    color: #0369a1;
+    border-color: #7dd3fc;
+    background: #f0f9ff;
+}
+
+/* il cestino si colora di rosso solo al passaggio: rosso sempre acceso su
+   ogni riga sarebbe un allarme continuo per un'azione normale */
+.nl-ic-ko:hover {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    background: #fef2f2;
+}
+
+.nl-ic:focus-visible {
+    outline: 2px solid #0369a1;
+    outline-offset: 1px;
+}
+
+/* quanto dura la riga, sotto il totale: "1 mese + 5 gg" dice a colpo
+   d'occhio da dove viene la cifra */
+.nl-riga-durata {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+@media (max-width: 900px) {
+    .nl-righe-cols { display: none; }
+    .nl-riga {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: end;
+    }
+    .nl-riga-macchina, .nl-riga-azioni { grid-column: span 2; }
+    .nl-riga-azioni { justify-content: flex-end; padding-top: 0; }
+}
+
+/* ── Assicurazione ──────────────────────────────────────────────────────── */
+/* Sulla scheda si legge sempre la percentuale insieme all'importo: senza,
+   un numero in mezzo agli altri non si capisce da dove esce. */
+.nl-assic { color: #0369a1; }
+
+.nl-solo-assic { flex: 0 0 110px; }
+
+#nl-assic-importo {
+    display: block;
+    margin-top: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #0369a1;
+}
+
+/* durata nella scheda: "1 mese + 5 gg" non deve spezzarsi a meta' */
+.nl-durata { white-space: nowrap; }
+
+/* ── Paginazione ────────────────────────────────────────────────────────── */
+/* Il conteggio sta a sinistra e i pulsanti a destra: la prima cosa da
+   sapere e' quanti sono in tutto, non su quale pagina si e'. */
+.nl-pag {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding: 12px 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.nl-pag-conta strong { color: #0f172a; }
+
+.nl-pag-nav { display: flex; align-items: center; gap: 6px; }
+
+.nl-pag-b {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 11px;
+    border: 1px solid #e2e8f0;
+    border-radius: 7px;
+    background: #fff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
     white-space: nowrap;
 }
 
-.nl-togli { color: #b91c1c; }
+.nl-pag-b:hover { background: #f1f5f9; border-color: #cbd5e1; }
 
-/* ── Campo macchina con ricerca (TomSelect) ─────────────────────────────── */
-/* La tendina deve stare sopra la modale, che ha z-index 60: senza questo
-   finirebbe dietro e non si vedrebbe cosa si sta scegliendo. */
-.nl-riga .ts-dropdown { z-index: 70; }
+/* i bordi restano anche da spenti: senza, la barra si accorcia passando
+   dalla prima pagina alla seconda e i pulsanti ballano */
+.nl-pag-b.is-off { opacity: .4; pointer-events: none; }
 
-/* stessa altezza e stesso bordo degli altri campi della riga */
-.nl-riga .ts-control {
-    min-height: 36px;
-    padding: 5px 9px;
-    border: 1px solid #cbd5e1;
-    border-radius: 7px;
-    font-size: 13px;
+.nl-pag-ora {
+    padding: 0 8px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
 }
 
-.nl-riga .ts-control:focus-within {
+/* riga a corpo: si dice a parole invece di mostrare una tariffa che li'
+   non vuol dire niente */
+.nl-corpo { color: #94a3b8; font-style: italic; }
+
+/* ── Elenco mezzi: riga che si apre ─────────────────────────────────────── */
+/* La tabella e' scesa da otto colonne a quattro. Altezza, portata e note non
+   sono sparite: si guardano su un mezzo per volta, e su un parco da
+   centinaia ripeterle su ogni riga era rumore. */
+.nl-mezzi-tab tbody tr.nl-mezzo-r { cursor: pointer; }
+
+.nl-mezzi-tab tbody tr.nl-mezzo-r:hover { background: #f8fafc; }
+
+.nl-mezzi-tab tbody tr.nl-mezzo-r:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -2px;
+}
+
+.nl-mezzo-r.is-aperta { background: #f1f5f9; }
+
+.nl-mezzo-freccia {
+    width: 28px;
+    color: #94a3b8;
+    transition: transform .15s ease;
+}
+
+.nl-mezzo-r.is-aperta .nl-mezzo-freccia {
+    display: inline-block;
+    transform: rotate(180deg);
+}
+
+.nl-mezzo-d > td { padding: 0 !important; background: #f8fafc; }
+
+.nl-dett {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.nl-dett-campi {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.nl-dett-campi > div { min-width: 0; }
+.nl-dett-note { flex: 1 1 260px; }
+
+.nl-dett-campi span {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #94a3b8;
+    margin-bottom: 3px;
+}
+
+.nl-dett-campi strong {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    overflow-wrap: anywhere;
+}
+
+/* ── Stato iniziale della disponibilita' ────────────────────────────────
+   La pagina non elenca il parco all'apertura: prima si sceglie il periodo.
+   Una riga sobria dice come stanno le cose senza occupare mezzo schermo. */
+.ac-vuoto {
+    padding: 14px 18px;
+    margin-top: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.ac-risultato {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 18px 0 10px;
+    font-size: 13px;
+    color: #475569;
+}
+
+.ac-risultato strong { font-size: 17px; color: #0f172a; }
+.ac-risultato span { margin-left: auto; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+/* ── Assicurazione nel riquadro importi ─────────────────────────────────── */
+/* Spunta e percentuale sulla stessa riga: sono una cosa sola, e tenere la
+   percentuale su una riga a parte la faceva sembrare un campo scollegato. */
+.nl-assic-riga {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.nl-assic-riga .ac-check-box { flex: 0 0 auto; }
+
+/* stretta quanto basta a due cifre e una virgola: larga com'era sembrava
+   un campo importante mentre e' un dettaglio della spunta accanto */
+.nl-assic-perc {
+    position: relative;
+    flex: 0 0 84px;
+    min-width: 0;
+}
+
+/* Fuori da .ac-f questo campo non eredita piu' lo stile dei campi della
+   maschera: senza queste righe torna un input di sistema, largo la sua
+   ventina di caratteri, che sbordava dal contenitore da 84px. */
+.nl-assic-perc input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 26px 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    font-size: 13px;
+    color: #1e293b;
+    text-align: right;
+}
+
+.nl-assic-perc input:focus {
+    outline: none;
     border-color: #0369a1;
     box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
 }
 
-.nl-riga .ts-dropdown .active { background: #e0f2fe; }
-
-.nl-righe-vuoto {
-    padding: 14px;
-    text-align: center;
-    font-size: 12px;
+/* spenta finche' non si include: si vede che non e' in gioco */
+.nl-assic-perc input:disabled {
+    background: #f1f5f9;
     color: #94a3b8;
 }
+
+.nl-assic-simbolo {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+#nl-assic-importo { color: #0369a1; font-weight: 600; }
+
+/* ── Piede del riquadro mezzi ───────────────────────────────────────────── */
+/* Il subtotale dei mezzi e l'assicurazione stanno insieme perche' sono la
+   stessa frase: questa e' la somma, questa la percentuale che ci si applica.
+   Fra trasporto e totale, com'era prima, sembrava una voce sul totale. */
+.nl-mezzi-piede {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.nl-mezzi-sub {
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.nl-mezzi-sub strong {
+    margin-left: 6px;
+    font-size: 15px;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.nl-assic-riga { align-items: center; }
+
+#nl-assic-importo {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0369a1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* il riquadro importi e' tornato a due voci */
+.ac-soldi-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+@media (max-width: 620px) {
+    .ac-soldi-2 { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+/* ── Numero dell'adesivo ────────────────────────────────────────────────── */
+/* E' il numero attaccato sulla macchina: in cantiere e' cosi' che la
+   chiamano. Si vede a distanza di braccio, con lo sfondo pieno, perche' e'
+   il dato che si confronta con quello che si ha davanti. La matricola resta
+   accanto in grigio come riscontro. */
+.nl-numero {
+    display: inline-block;
+    min-width: 30px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+/* macchina non ancora etichettata: si vede che manca senza gridarlo */
+.nl-numero-no { color: #cbd5e1; }
+
+.nl-col-n { width: 76px; white-space: nowrap; }
+
+/* nella scheda del noleggio il numero precede la matricola sulla stessa
+   riga: insieme sono l'identita' del mezzo */
+.nl-matr .nl-numero { margin-right: 6px; }
+
+/* sulla scheda della disponibilita' il numero sta in cima, prima della
+   matricola, e le due non devono accavallarsi quando il riquadro e' stretto */
+.ac-mezzo-top { flex-wrap: wrap; gap: 6px; }
+
+/* ── Sotto-noleggio ─────────────────────────────────────────────────────── */
+/* Mezzi presi da un altro noleggiatore. Si distinguono a colpo d'occhio dai
+   nostri perche' la domanda "questo e' mio o l'ho preso a nolo?" cambia sia
+   il margine sia chi bisogna chiamare quando c'e' un guasto. */
+.nl-righe-azioni { display: flex; gap: 8px; }
+
+.nl-riga.is-esterna {
+    border-color: #ddd6fe;
+    background: #faf5ff;
+}
+
+/* la seconda riga di campi: chi ce l'ha dato, con che contratto, a quanto */
+.nl-est-riga {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px dashed #ddd6fe;
+}
+
+/* Il display: grid qui sopra e' piu' specifico della regola con cui il
+   browser nasconde gli elementi con l'attributo hidden, quindi da solo lo
+   annulla: i campi del noleggiatore comparivano anche sulle righe del
+   nostro parco, dove non vogliono dire niente. */
+.nl-est-riga[hidden] { display: none; }
+
+@media (max-width: 900px) {
+    .nl-est-riga { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* sulle righe di sotto-noleggio le etichette servono: sono campi che
+   l'intestazione in cima non nomina */
+.nl-est-riga > .ac-f > span { display: block !important; }
+
+.nl-est-tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #7c3aed;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.nl-margine {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* margine negativo: ci stiamo rimettendo, non e' un dettaglio */
+.nl-margine.is-ko { color: #b91c1c; font-weight: 700; }

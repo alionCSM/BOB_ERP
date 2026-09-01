@@ -1,7 +1,9 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
+{# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=6">
 {% endblock %}
 
 {% block content %}
@@ -18,6 +20,11 @@
         </div>
     </div>
 
+    {# ── La domanda, prima di tutto ──────────────────────────────────────
+       Questa pagina serve a rispondere a "cosa ho libero il tal giorno".
+       Con centinaia di mezzi partire dall'elenco completo non risponde a
+       niente: nessuno lo scorre tutto. Quindi si chiede il periodo, e i
+       mezzi compaiono dopo, gia' ridotti a quelli disponibili. #}
     <form method="GET" class="ac-check">
         <div class="ac-check-tile">
             <i data-lucide="calendar"></i>
@@ -26,11 +33,11 @@
         <div class="ac-check-campi">
             <label class="ac-f">
                 <span>dal</span>
-                <input type="date" name="cerca_dal" value="{{ cercaDal }}">
+                <input type="date" name="cerca_dal" value="{{ cercaDal }}" required>
             </label>
             <label class="ac-f">
                 <span>al</span>
-                <input type="date" name="cerca_al" value="{{ cercaAl }}">
+                <input type="date" name="cerca_al" value="{{ cercaAl }}" required>
             </label>
             <label class="ac-f">
                 <span>tipo</span>
@@ -41,65 +48,82 @@
                     {% endfor %}
                 </select>
             </label>
+            <label class="ac-f ac-f-cerca">
+                <span>mezzo</span>
+                <input type="search" name="q" value="{{ cerca }}"
+                       placeholder="numero, matricola, modello…">
+            </label>
             <input type="hidden" name="dal" value="{{ dal }}">
             <input type="hidden" name="al" value="{{ al }}">
             <button class="ac-btn ac-btn-primary">Verifica</button>
-            {% if ricercaAttiva or tipo %}
+            {% if ricercaAttiva %}
                 <a href="/noleggi" class="ac-link">azzera</a>
             {% endif %}
         </div>
     </form>
 
-    {# ── Schede mezzo ────────────────────────────────────────────────────── #}
-    <div class="ac-mezzi">
-        {% for m in macchine %}
-            {% set occupato = ricercaAttiva and occupate[m.id] is defined %}
-            {% set libero   = liberaDal[m.id] is defined and liberaDal[m.id] %}
-            <div class="ac-mezzo{{ ricercaAttiva ? (occupato ? ' is-ko' : ' is-ok') : '' }}">
-                <div class="ac-mezzo-top">
-                    <span class="ac-targa">{{ m.matricola }}</span>
-                    {% if m.stato != 'attiva' %}
-                        <span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span>
-                    {% endif %}
-                </div>
-                <div class="ac-mezzo-mod">{{ m.tipo }}{{ m.modello ? ' — ' ~ m.modello : '' }}</div>
-                <div class="ac-specs">
-                    {% if m.altezza_max_m %}<span>{{ m.altezza_max_m|number_format(2, ',', '.') }} m</span>{% endif %}
-                    {% if m.portata_kg %}<span>{{ m.portata_kg }} kg</span>{% endif %}
-                </div>
-                <div class="ac-libero">
-                    {% if ricercaAttiva %}
-                        {{ occupato ? 'Occupato nel periodo' : 'Libero nel periodo' }}
-                    {% elseif libero %}
-                        Libero dal {{ liberaDal[m.id]|date('d/m/Y') }}
-                    {% else %}
-                        Libero adesso
-                    {% endif %}
-                </div>
-            </div>
-        {% else %}
-            <div class="ac-empty">
-                Nessun mezzo registrato. <a href="/noleggi/macchine">Aggiungine uno</a>.
-            </div>
-        {% endfor %}
-    </div>
+    {% if not ricercaAttiva %}
+        {# Niente elenco finche' non c'e' un periodo: il calendario qui sotto
+           da' gia' il quadro del mese. #}
+        <div class="ac-vuoto">Nessun periodo selezionato.</div>
+    {% else %}
+        <div class="ac-risultato">
+            <strong>{{ totale }}</strong>
+            {{ totale == 1 ? 'mezzo disponibile' : 'mezzi disponibili' }}
+            <span>{{ cercaDal|date('d/m/Y') }} — {{ cercaAl|date('d/m/Y') }}</span>
+        </div>
 
-    {# ── Impegni: calendario e timeline ──────────────────────────────────── #}
-    {% if macchine %}
+        <div class="ac-mezzi">
+            {% for m in macchine %}
+                <div class="ac-mezzo is-ok">
+                    <div class="ac-mezzo-top">
+                        {# il numero grande: e' quello che si va a cercare in
+                           piazzale, la matricola sta sotto come riscontro #}
+                        {% if m.numero %}<span class="nl-numero">{{ m.numero }}</span>{% endif %}
+                        <span class="ac-targa">{{ m.matricola }}</span>
+                        {% if m.stato != 'attiva' %}
+                            <span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="ac-mezzo-mod">{{ m.tipo }}{{ m.modello ? ' — ' ~ m.modello : '' }}</div>
+                    <div class="ac-specs">
+                        {% if m.altezza_max_m %}<span>{{ m.altezza_max_m|number_format(2, ',', '.') }} m</span>{% endif %}
+                        {% if m.portata_kg %}<span>{{ m.portata_kg }} kg</span>{% endif %}
+                    </div>
+                    <div class="ac-libero">Disponibile</div>
+                </div>
+            {% else %}
+                <div class="ac-empty">
+                    Nessun mezzo disponibile nel periodo{{ tipo or cerca ? ' con i filtri impostati' : '' }}.
+                </div>
+            {% endfor %}
+        </div>
+
+        {% include 'poti/_paginazione.html.twig' with {
+            base: '/noleggi', nome: 'mezzi liberi'
+        } %}
+    {% endif %}
+
+    {# ── Impegni del periodo ─────────────────────────────────────────────
+       Solo il calendario. La timeline disegnava una riga per mezzo: su un
+       parco da centinaia era una tabella alta quanto il parco, che nessuno
+       leggeva. Il calendario invece raggruppa per giorno e resta della
+       stessa altezza che ci siano dieci mezzi o mille. #}
     <div class="ac-box">
         <div class="ac-box-head">
             <span>Impegni</span>
-            <div class="ac-vista">
-                <button type="button" class="ac-vista-b on" data-ac-vista="calendario">Calendario</button>
-                <button type="button" class="ac-vista-b" data-ac-vista="timeline">Timeline</button>
-            </div>
             <form method="GET" class="ac-periodo">
                 <input type="date" name="dal" value="{{ dal }}">
                 <span>→</span>
                 <input type="date" name="al" value="{{ al }}">
                 <input type="hidden" name="cerca_dal" value="{{ cercaDal }}">
                 <input type="hidden" name="cerca_al" value="{{ cercaAl }}">
+                {# i filtri sui mezzi si portano dietro: cambiare il periodo
+                   non deve rimettere in elenco tutto il parco #}
                 <input type="hidden" name="tipo" value="{{ tipo }}">
+                <input type="hidden" name="stato" value="{{ stato }}">
+                <input type="hidden" name="q" value="{{ cerca }}">
+                <input type="hidden" name="pagina" value="{{ pagina }}">
                 <button class="ac-btn">Mostra</button>
             </form>
         </div>
@@ -139,47 +163,11 @@
             {% endfor %}
         </div>
 
-        {# scorre in orizzontale: il periodo puo' essere piu' largo dello schermo #}
-        <div class="ac-tl-wrap" id="ac-vista-timeline" hidden>
-            <table class="ac-tl">
-                <thead>
-                    <tr>
-                        <th class="ac-tl-mezzo">Mezzo</th>
-                        {% for g in giorni %}
-                            <th class="ac-tl-g{{ g.festivo ? ' is-fest' : '' }}">
-                                <span class="ac-tl-wd">{{ g.wd }}</span>
-                                <span class="ac-tl-n">{{ g.g }}</span>
-                            </th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in macchine %}
-                        <tr>
-                            <th class="ac-tl-mezzo">{{ m.matricola }}</th>
-                            {% set righeMacchina = griglia[m.id]|default({}) %}
-                            {% for g in giorni %}
-                                {% set cella = righeMacchina[g.iso]|default(null) %}
-                                <td class="ac-tl-c{{ g.festivo ? ' is-fest' : '' }}">
-                                    {% if cella %}
-                                        <span class="ac-barra ac-barra-confermata{{ cella.inizio ? ' is-inizio' : '' }}{{ cella.fine ? ' is-fine' : '' }}"
-                                              title="{{ cella.testo }}">
-                                            {% if cella.inizio %}<span class="ac-barra-txt">{{ cella.cliente }}</span>{% endif %}
-                                        </span>
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
     </div>
-    {% endif %}
 
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/noleggi.js?v=1"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=6"></script>
 {% endblock %}

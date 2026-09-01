@@ -135,6 +135,10 @@
 .ac-f input,
 .ac-f select,
 .ac-f textarea {
+    /* senza questo il width:100% qui sotto e' la larghezza del contenuto e
+       imbottitura e bordo si aggiungono fuori: ogni campo sfora la sua cella
+       di 24px e la maschera esce dal riquadro con la barra di scorrimento */
+    box-sizing: border-box;
     padding: 8px 11px;
     border: 1px solid #cbd5e1;
     border-radius: 7px;
@@ -196,33 +200,75 @@
     color: #475569;
 }
 
+/* tre celle: quello che si aggiunge, quello che si include, il risultato */
 .ac-soldi-campi {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
+    .ac-soldi-campi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
     .ac-soldi-campi { grid-template-columns: minmax(0, 1fr); }
 }
 
 
-/* casella si/no allineata agli altri campi della maschera */
-.ac-check-riga { justify-content: flex-end; }
+/* ── Casella si/no ──────────────────────────────────────────────────────
+   Due cose la rompevano. La prima: qui sopra .ac-f input mette width:100%
+   su ogni campo, e su una checkbox quel 100% diventa un rettangolo largo
+   quanto la cella, con l'etichetta buttata fuori. La seconda:
+   justify-content su un contenitore in colonna agisce sull'asse verticale,
+   quindi "flex-end" non spingeva a destra ma in basso.
+
+   Una casella non e' un campo da riempire, e' un si' o no: sta su una riga
+   sola, alta quanto il testo, e si accende quando e' spuntata. */
+.ac-check-riga { justify-content: flex-start; }
 
 .ac-check-box {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 36px;
-    padding: 0 11px;
-    border: 1px solid #cbd5e1;
+    width: fit-content;
+    max-width: 100%;
+    padding: 7px 12px 7px 10px;
+    border: 1px solid #e2e8f0;
     border-radius: 7px;
     background: #fff;
-    font-size: 13px;
-    color: #334155;
+    font-size: 12.5px;
+    line-height: 1.2;
+    color: #475569;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .12s, background .12s;
+}
+
+.ac-check-box:hover { border-color: #cbd5e1; background: #f8fafc; }
+
+/* il width:100% della regola generale non vale qui */
+.ac-check-box input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 15px;
+    margin: 0;
+    padding: 0;
+    border-radius: 3px;
+    accent-color: #16a34a;
     cursor: pointer;
 }
+
+.ac-check-box:has(input:checked) {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #15803d;
+    font-weight: 600;
+}
+
+/* la casella sotto un campo (contratto firmato sotto il numero) */
+.ac-sotto-campo { margin-top: 6px; }
 
 /* campo mostrato ma non modificabile (il commerciale) */
 .ac-fisso {

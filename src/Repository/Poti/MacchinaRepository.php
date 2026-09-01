@@ -38,6 +38,100 @@ final class MacchinaRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Una pagina di macchine, con i filtri della pagina di gestione.
+     *
+     * Esiste separata da macchine() perche' li' serve l'elenco intero: e'
+     * quello che riempie la tendina del form e la griglia degli impegni.
+     * Qui invece si guarda un parco di centinaia di mezzi, e mandarli tutti
+     * al browser vuol dire una pagina che non si riesce a leggere prima
+     * ancora che a caricare.
+     *
+     * @param array{q?:string, tipo?:string, stato?:string} $filtri
+     * @return array{righe: array<int, array<string,mixed>>, totale: int}
+     */
+    public function elencoMacchine(int $companyId, array $filtri, int $pagina, int $perPagina): array
+    {
+        [$where, $args] = $this->filtriMacchine($companyId, $filtri);
+
+        $conta = $this->conn->prepare("SELECT COUNT(*) FROM pn_macchine WHERE {$where}");
+        $conta->execute($args);
+        $totale = (int)$conta->fetchColumn();
+
+        $offset = max(0, ($pagina - 1) * $perPagina);
+
+        // LIMIT e OFFSET interpolati e non legati: PDO in modalita' emulata
+        // li manderebbe fra virgolette e MySQL rifiuterebbe la query. Sono
+        // interi ricavati da (int), non arrivano mai grezzi dall'indirizzo.
+        $stmt = $this->conn->prepare("
+            SELECT * FROM pn_macchine
+            WHERE  {$where}
+            ORDER BY tipo ASC,
+                     -- i mezzi senza adesivo in fondo al loro tipo: sono i
+                     -- pochi da etichettare, e in cima darebbero l'idea che
+                     -- manchi il numero a tutti
+                     numero IS NULL, LENGTH(numero), numero, matricola
+            LIMIT  {$perPagina} OFFSET {$offset}
+        ");
+        $stmt->execute($args);
+
+        return ['righe' => $stmt->fetchAll(PDO::FETCH_ASSOC), 'totale' => $totale];
+    }
+
+    /**
+     * Condizioni comuni a conteggio ed elenco: scritte una volta sola,
+     * altrimenti il numero di pagine finisce per non corrispondere a
+     * quello che si vede.
+     *
+     * @param array{q?:string, tipo?:string, stato?:string,
+     *               liberiDal?:string, liberiAl?:string} $filtri
+     * @return array{0:string, 1:array<string,mixed>}
+     */
+    private function filtriMacchine(int $companyId, array $filtri): array
+    {
+        $where = 'group_company_id = :cid';
+        $args  = [':cid' => $companyId];
+
+        // "mi serve dal ... al ...": restano solo i mezzi liberi in quel
+        // periodo. Il taglio lo fa il database e non PHP dopo aver letto:
+        // scartando le righe a valle, una pagina da cinquanta ne mostrerebbe
+        // magari sei, e il conteggio direbbe un numero che non si vede.
+        if (!empty($filtri['liberiDal']) && !empty($filtri['liberiAl'])) {
+            $where .= " AND id NOT IN (
+                SELECT r.macchina_id
+                FROM   pn_noleggi_righe r
+                JOIN   pn_noleggi n ON n.id = r.noleggio_id
+                WHERE  n.group_company_id = :cid2
+                  AND  n.eliminato_at IS NULL
+                  AND  n.stato <> 'annullato'
+                  AND  r.data_inizio <= :lal
+                  AND  r.data_fine   >= :ldal
+            )";
+            $args[':cid2'] = $companyId;
+            $args[':ldal'] = $filtri['liberiDal'];
+            $args[':lal']  = $filtri['liberiAl'];
+        }
+
+        if (!empty($filtri['tipo'])) {
+            $where .= ' AND tipo = :tipo';
+            $args[':tipo'] = $filtri['tipo'];
+        }
+        if (!empty($filtri['stato'])) {
+            $where .= ' AND stato = :stato';
+            $args[':stato'] = $filtri['stato'];
+        }
+        if (!empty($filtri['q'])) {
+            // il numero sta per primo perche' e' quello che si legge sulla
+            // macchina: chi cerca parte da li', non dalla matricola
+            $where .= ' AND (numero LIKE :q0 OR matricola LIKE :q1 OR modello LIKE :q2
+                             OR tipo LIKE :q3 OR note LIKE :q4)';
+            foreach (['q0', 'q1', 'q2', 'q3', 'q4'] as $seg) {
+                $args[':' . $seg] = '%' . $filtri['q'] . '%';
+            }
+        }
+        return [$where, $args];
+    }
+
     public function macchina(int $companyId, int $id): ?array
     {
         $stmt = $this->conn->prepare(
@@ -66,6 +160,7 @@ final class MacchinaRepository
     {
         $p = [
             ':tipo'      => $d['tipo'],
+            ':numero'    => ($d['numero'] ?? '') !== '' ? $d['numero'] : null,
             ':matricola' => $d['matricola'],
             ':modello'   => $d['modello'] !== '' ? $d['modello'] : null,
             ':altezza'   => $d['altezza_max_m'] !== '' ? $d['altezza_max_m'] : null,
@@ -78,7 +173,7 @@ final class MacchinaRepository
         if ($id) {
             $stmt = $this->conn->prepare("
                 UPDATE pn_macchine
-                SET tipo = :tipo, matricola = :matricola, modello = :modello,
+                SET tipo = :tipo, numero = :numero, matricola = :matricola, modello = :modello,
                     altezza_max_m = :altezza, portata_kg = :portata,
                     note = :note, stato = :stato
                 WHERE id = :id AND group_company_id = :cid
@@ -89,11 +184,37 @@ final class MacchinaRepository
 
         $stmt = $this->conn->prepare("
             INSERT INTO pn_macchine
-                (group_company_id, tipo, matricola, modello, altezza_max_m, portata_kg, note, stato)
-            VALUES (:cid, :tipo, :matricola, :modello, :altezza, :portata, :note, :stato)
+                (group_company_id, tipo, numero, matricola, modello, altezza_max_m, portata_kg, note, stato)
+            VALUES (:cid, :tipo, :numero, :matricola, :modello, :altezza, :portata, :note, :stato)
         ");
         $stmt->execute($p);
         return (int)$this->conn->lastInsertId();
+    }
+
+    /**
+     * Il numero dell'adesivo e' gia' su un'altra macchina?
+     *
+     * Ritorna la matricola di quella macchina invece di un si'/no: davanti a
+     * "il numero 42 esiste gia'" la prima domanda e' sempre "su quale?", e
+     * senza la risposta tocca cercarla a mano.
+     */
+    public function numeroInUso(int $companyId, string $numero, ?int $escludiId = null): ?string
+    {
+        if ($numero === '') {
+            return null;   // vuoto: non e' un doppione, e' un adesivo non ancora messo
+        }
+
+        $sql  = 'SELECT matricola FROM pn_macchine WHERE group_company_id = :cid AND numero = :n';
+        $args = [':cid' => $companyId, ':n' => $numero];
+        if ($escludiId) {
+            $sql .= ' AND id <> :id';
+            $args[':id'] = $escludiId;
+        }
+        $sql .= ' LIMIT 1';
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($args);
+        return $stmt->fetchColumn() ?: null;
     }
 
     public function matricolaInUso(int $companyId, string $matricola, ?int $escludiId = null): bool
@@ -118,24 +239,93 @@ final class MacchinaRepository
      * con una JOIN moltiplicherebbe le testate per il numero di righe e
      * i totali andrebbero poi ripuliti a mano.
      */
-    public function noleggi(int $companyId, string $dal, string $al, string $cerca = ''): array
+    /**
+     * Una pagina di noleggi.
+     *
+     * La ricerca la fa il database e non il browser: prima le schede
+     * arrivavano tutte e un pezzo di JavaScript ne nascondeva alcune, il che
+     * funziona finche' i noleggi sono poche decine. Con qualche migliaio
+     * significa spedire tutto l'archivio a ogni apertura per guardarne
+     * quindici.
+     *
+     * @param array{dal:string, al:string, q?:string, stato?:string, pagamento?:string} $filtri
+     * @return array{righe: array<int, array<string,mixed>>, totale: int}
+     */
+    public function noleggi(int $companyId, array $filtri, int $pagina = 1, int $perPagina = 25): array
     {
-        $sql = "
+        [$where, $args] = $this->filtriNoleggi($companyId, $filtri);
+
+        $conta = $this->conn->prepare("SELECT COUNT(*) FROM pn_noleggi n WHERE {$where}");
+        $conta->execute($args);
+        $totale = (int)$conta->fetchColumn();
+
+        $offset = max(0, ($pagina - 1) * $perPagina);
+
+        // Il nome del commerciale si aggancia solo alla pagina che si
+        // mostra: fare la join prima di tagliare vorrebbe dire risolverlo
+        // per tutto l'archivio e buttarne via il 99%.
+        $stmt = $this->conn->prepare("
             SELECT n.*,
                    COALESCE(NULLIF(TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))), ''),
                             u.username,
                             n.commerciale_testo) AS commerciale_nome
             FROM   pn_noleggi n
             LEFT JOIN bb_users u ON u.id = n.commerciale_user_id
-            WHERE  n.group_company_id = :cid
-              AND  n.eliminato_at IS NULL
-              AND  n.stato <> 'annullato'
-              AND  n.data_inizio <= :al
-              AND  n.data_fine   >= :dal
-        ";
-        $args = [':cid' => $companyId, ':dal' => $dal, ':al' => $al];
+            WHERE  {$where}
+            ORDER BY n.data_inizio DESC, n.id DESC
+            LIMIT  {$perPagina} OFFSET {$offset}
+        ");
+        $stmt->execute($args);
+        $testate = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if ($cerca !== '') {
+        if (!$testate) {
+            return ['righe' => [], 'totale' => $totale];
+        }
+
+        $righe = $this->righeDi(array_column($testate, 'id'));
+        foreach ($testate as &$t) {
+            $t['righe'] = $righe[(int)$t['id']] ?? [];
+        }
+        unset($t);
+
+        return ['righe' => $testate, 'totale' => $totale];
+    }
+
+    /**
+     * Condizioni comuni a conteggio ed elenco.
+     *
+     * @param array{dal:string, al:string, q?:string, stato?:string, pagamento?:string} $filtri
+     * @return array{0:string, 1:array<string,mixed>}
+     */
+    private function filtriNoleggi(int $companyId, array $filtri): array
+    {
+        $where = "n.group_company_id = :cid
+                  AND n.eliminato_at IS NULL
+                  AND n.data_inizio <= :al
+                  AND n.data_fine   >= :dal";
+        $args = [
+            ':cid' => $companyId,
+            ':dal' => $filtri['dal'],
+            ':al'  => $filtri['al'],
+        ];
+
+        // Gli annullati restano nascosti se non si chiedono: sono la
+        // minoranza e in mezzo agli altri confondono. Chiedendoli
+        // esplicitamente pero' si devono vedere, altrimenti non c'e' modo
+        // di ritrovarli.
+        if (!empty($filtri['stato'])) {
+            $where .= ' AND n.stato = :stato';
+            $args[':stato'] = $filtri['stato'];
+        } else {
+            $where .= " AND n.stato <> 'annullato'";
+        }
+
+        if (!empty($filtri['pagamento'])) {
+            $where .= ' AND n.pagamento = :pag';
+            $args[':pag'] = $filtri['pagamento'];
+        }
+
+        if (!empty($filtri['q'])) {
             // un segnaposto per campo: con le query preparate native lo
             // stesso nome non si puo' ripetere
             $campi = ['n.cliente', 'n.luogo', 'n.contratto', 'n.note',
@@ -143,26 +333,36 @@ final class MacchinaRepository
             $pezzi = [];
             foreach ($campi as $i => $campo) {
                 $pezzi[] = $campo . ' LIKE :q' . $i;
-                $args[':q' . $i] = '%' . $cerca . '%';
+                $args[':q' . $i] = '%' . $filtri['q'] . '%';
             }
-            $sql .= ' AND (' . implode(' OR ', $pezzi) . ')';
+            $where .= ' AND (' . implode(' OR ', $pezzi) . ')';
         }
 
-        $sql .= ' ORDER BY n.data_inizio DESC, n.id DESC';
+        return [$where, $args];
+    }
 
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($args);
-        $testate = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        if (!$testate) {
-            return [];
-        }
-
-        $righe = $this->righeDi(array_column($testate, 'id'));
-        foreach ($testate as &$t) {
-            $t['righe'] = $righe[(int)$t['id']] ?? [];
-        }
-        return $testate;
+    /**
+     * Noleggiatori gia' usati, per riproporli invece di farli riscrivere.
+     *
+     * Stessa idea dei tipi di macchina: l'elenco cresce da solo lavorando,
+     * senza una tabella da configurare da un'altra parte. Con due o tre
+     * fornitori abituali si scrive il nome una volta sola.
+     *
+     * @return string[]
+     */
+    public function fornitori(int $companyId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT r.fornitore
+            FROM   pn_noleggi_righe r
+            JOIN   pn_noleggi n ON n.id = r.noleggio_id
+            WHERE  n.group_company_id = :cid
+              AND  r.fornitore IS NOT NULL
+              AND  r.fornitore <> ''
+            ORDER BY r.fornitore
+        ");
+        $stmt->execute([':cid' => $companyId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
     public function noleggio(int $companyId, int $id): ?array
@@ -191,17 +391,36 @@ final class MacchinaRepository
         $segnaposti = implode(',', array_fill(0, count($noleggioIds), '?'));
 
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni
             FROM   pn_noleggi_righe r
-            JOIN   pn_macchine m ON m.id = r.macchina_id
+            -- LEFT: le righe di sotto-noleggio non hanno una macchina nostra,
+            -- e con la JOIN piena sparirebbero dalla scheda senza dire niente
+            LEFT JOIN pn_macchine m ON m.id = r.macchina_id
             WHERE  r.noleggio_id IN ({$segnaposti})
-            ORDER BY r.data_inizio ASC, m.matricola ASC
+            ORDER BY r.data_inizio ASC,
+                     -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.matricola ASC
         ");
         $stmt->execute(array_map('intval', $noleggioIds));
 
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            // la durata si scompone qui e non nel template: una riga a mese
+            // si legge "1 mese + 5 gg", e Twig non e' il posto dove fare i
+            // conti sui calendari
+            // a corpo la durata resta il periodo: si paga a forfait, ma
+            // sapere quanti giorni il mezzo e' stato fuori serve lo stesso
+            if (($r['unita'] ?? 'giorno') === 'mese') {
+                $q = \App\Service\Poti\Tariffa::mesiEGiorni(
+                    (string)$r['data_inizio'], (string)$r['data_fine']
+                );
+                $r['mesi']           = $q['mesi'];
+                $r['giorni_residui'] = $q['giorni'];
+            } else {
+                $r['mesi']           = 0;
+                $r['giorni_residui'] = (int)$r['giorni'];
+            }
             $out[(int)$r['noleggio_id']][] = $r;
         }
         return $out;
@@ -233,6 +452,9 @@ final class MacchinaRepository
             ':stato'     => $d['stato'],
             ':trasporto' => $d['trasporto'] !== '' ? $d['trasporto'] : null,
             ':totale'    => $d['totale'] !== '' ? $d['totale'] : null,
+            ':assic'     => !empty($d['assicurazione']) ? 1 : 0,
+            ':assicperc' => $d['assicurazione_perc'] !== '' ? $d['assicurazione_perc'] : null,
+            ':assicimp'  => $d['assicurazione_importo'] !== '' ? $d['assicurazione_importo'] : null,
             ':pag'       => $d['pagamento'],
             ':firmato'   => !empty($d['contratto_firmato']) ? 1 : 0,
             ':note'      => $d['note'] !== '' ? $d['note'] : null,
@@ -247,7 +469,9 @@ final class MacchinaRepository
                     SET cliente = :cliente, telefono = :telefono, luogo = :luogo,
                         contratto = :contratto, data_inizio = :dal, data_fine = :al,
                         stato = :stato, trasporto = :trasporto, totale = :totale,
-                        pagamento = :pag, note = :note, contratto_firmato = :firmato
+                        pagamento = :pag, note = :note, contratto_firmato = :firmato,
+                        assicurazione = :assic, assicurazione_perc = :assicperc,
+                        assicurazione_importo = :assicimp
                     WHERE id = :id AND group_company_id = :cid
                 ");
                 $stmt->execute($p + [':id' => $id]);
@@ -262,10 +486,14 @@ final class MacchinaRepository
                     INSERT INTO pn_noleggi
                         (group_company_id, cliente, telefono, luogo, contratto,
                          data_inizio, data_fine, stato, trasporto, totale,
-                         pagamento, note, contratto_firmato, commerciale_user_id, created_by)
+                         pagamento, note, contratto_firmato,
+                         assicurazione, assicurazione_perc, assicurazione_importo,
+                         commerciale_user_id, created_by)
                     VALUES (:cid, :cliente, :telefono, :luogo, :contratto,
                             :dal, :al, :stato, :trasporto, :totale,
-                            :pag, :note, :firmato, :comm, :uid)
+                            :pag, :note, :firmato,
+                            :assic, :assicperc, :assicimp,
+                            :comm, :uid)
                 ");
                 $stmt->execute($p + [':comm' => $userId, ':uid' => $userId]);
                 $noleggioId = (int)$this->conn->lastInsertId();
@@ -273,18 +501,34 @@ final class MacchinaRepository
 
             $ins = $this->conn->prepare("
                 INSERT INTO pn_noleggi_righe
-                    (noleggio_id, macchina_id, data_inizio, data_fine, tariffa_giorno, totale, note)
-                VALUES (:nid, :mid, :dal, :al, :tariffa, :totale, :note)
+                    (noleggio_id, macchina_id, fornitore, mezzo_esterno,
+                     contratto_fornitore, costo,
+                     data_inizio, data_fine, unita,
+                     tariffa_giorno, tariffa_mese, totale, note)
+                VALUES (:nid, :mid, :fornitore, :mezzoest,
+                        :contrfor, :costo,
+                        :dal, :al, :unita,
+                        :tariffa, :tariffamese, :totale, :note)
             ");
             foreach ($righe as $r) {
+                // riga di sotto-noleggio: la macchina non e' nostra e resta
+                // vuota, al suo posto c'e' com'e' fatta e chi ce l'ha data
+                $esterna = empty($r['macchina_id']);
+
                 $ins->execute([
-                    ':nid'     => $noleggioId,
-                    ':mid'     => (int)$r['macchina_id'],
-                    ':dal'     => $r['data_inizio'],
-                    ':al'      => $r['data_fine'],
-                    ':tariffa' => $r['tariffa_giorno'] !== '' ? $r['tariffa_giorno'] : null,
-                    ':totale'  => $r['totale'] !== '' ? $r['totale'] : null,
-                    ':note'    => $r['note'] !== '' ? $r['note'] : null,
+                    ':nid'         => $noleggioId,
+                    ':mid'         => $esterna ? null : (int)$r['macchina_id'],
+                    ':fornitore'   => ($r['fornitore'] ?? '') !== '' ? $r['fornitore'] : null,
+                    ':mezzoest'    => ($r['mezzo_esterno'] ?? '') !== '' ? $r['mezzo_esterno'] : null,
+                    ':contrfor'    => ($r['contratto_fornitore'] ?? '') !== '' ? $r['contratto_fornitore'] : null,
+                    ':costo'       => ($r['costo'] ?? '') !== '' ? $r['costo'] : null,
+                    ':dal'         => $r['data_inizio'],
+                    ':al'          => $r['data_fine'],
+                    ':unita'       => $r['unita'] ?? 'giorno',
+                    ':tariffa'     => $r['tariffa_giorno'] !== '' ? $r['tariffa_giorno'] : null,
+                    ':tariffamese' => ($r['tariffa_mese'] ?? '') !== '' ? $r['tariffa_mese'] : null,
+                    ':totale'      => $r['totale'] !== '' ? $r['totale'] : null,
+                    ':note'        => $r['note'] !== '' ? $r['note'] : null,
                 ]);
             }
 
@@ -437,21 +681,44 @@ final class MacchinaRepository
     }
 
     /** Righe dei noleggi che toccano il periodo, per timeline e calendario. */
-    public function righeNelPeriodo(int $companyId, string $dal, string $al): array
+    /**
+     * @param int[] $soloMacchine Vuoto = tutte. La griglia degli impegni ne
+     *                            disegna una pagina per volta: chiedere gli
+     *                            impegni dell'intero parco per mostrarne
+     *                            cinquanta e' lavoro che si butta via.
+     */
+    public function righeNelPeriodo(int $companyId, string $dal, string $al, array $soloMacchine = []): array
     {
+        $filtro = '';
+        $args   = [':cid' => $companyId, ':dal' => $dal, ':al' => $al];
+
+        if ($soloMacchine) {
+            $segnaposti = [];
+            foreach (array_values($soloMacchine) as $i => $mid) {
+                $segnaposti[]      = ':m' . $i;
+                $args[':m' . $i]   = (int)$mid;
+            }
+            $filtro = ' AND r.macchina_id IN (' . implode(',', $segnaposti) . ')';
+        }
+
         $stmt = $this->conn->prepare("
-            SELECT r.*, n.cliente, n.luogo, n.stato, m.matricola, m.tipo
+            SELECT r.*, n.cliente, n.luogo, n.stato, m.numero, m.matricola, m.tipo
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
+            -- JOIN piena e non LEFT, di proposito: qui si disegnano gli
+            -- impegni del NOSTRO parco, e le righe di sotto-noleggio (che
+            -- hanno macchina_id vuota) cadono da sole. Un mezzo di un altro
+            -- noleggiatore non occupa una nostra macchina.
             JOIN   pn_macchine m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_inizio <= :al
               AND  r.data_fine   >= :dal
+              {$filtro}
             ORDER BY m.tipo ASC, m.matricola ASC, r.data_inizio ASC
         ");
-        $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
+        $stmt->execute($args);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -469,13 +736,15 @@ final class MacchinaRepository
     public function giornata(int $companyId, string $data): array
     {
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
                    n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
                    n.contratto, n.contratto_firmato, n.pagamento, n.note AS note_noleggio
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi   n ON n.id = r.noleggio_id
-            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            -- LEFT: anche un mezzo preso da un altro noleggiatore va
+            -- consegnato e ritirato, quindi deve comparire nella giornata
+            LEFT JOIN pn_macchine  m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
@@ -484,7 +753,8 @@ final class MacchinaRepository
                     OR (r.data_fine < :d3 AND r.rientrato_at IS NULL
                         AND r.data_fine >= DATE_SUB(:d4, INTERVAL 60 DAY))
                    )
-            ORDER BY m.tipo ASC, m.matricola ASC
+            ORDER BY -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.tipo ASC, m.matricola ASC
         ");
         $stmt->execute([
             ':cid' => $companyId,
@@ -523,19 +793,23 @@ final class MacchinaRepository
         $al = date('Y-m-d', strtotime($dal . ' +' . $giorni . ' days'));
 
         $stmt = $this->conn->prepare("
-            SELECT r.*, m.matricola, m.tipo, m.modello,
+            SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni,
                    n.id AS noleggio_id, n.cliente, n.telefono, n.luogo,
                    n.contratto, n.contratto_firmato, n.pagamento
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi   n ON n.id = r.noleggio_id
-            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            -- LEFT: anche un mezzo preso da un altro noleggiatore va
+            -- consegnato e ritirato, quindi deve comparire nella giornata
+            LEFT JOIN pn_macchine  m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_inizio > :dal
               AND  r.data_inizio <= :al
-            ORDER BY r.data_inizio ASC, m.matricola ASC
+            ORDER BY r.data_inizio ASC,
+                     -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.matricola ASC
         ");
         $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
 

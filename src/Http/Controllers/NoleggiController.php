@@ -8,6 +8,7 @@ use App\Repository\Poti\MacchinaRepository;
 use App\Service\CurrentCompany;
 use App\Service\Poti\Audit;
 use App\Service\Poti\Giornata;
+use App\Service\Poti\Tariffa;
 use App\Service\Poti\VistaImpegni;
 
 /**
@@ -24,6 +25,11 @@ final class NoleggiController
     private const STATI_MACCHINA = ['attiva', 'manutenzione', 'dismessa'];
     private const STATI_NOLEGGIO = ['confermato', 'annullato'];
     private const PAGAMENTI      = ['da_pagare', 'pagata'];
+    private const UNITA          = ['giorno', 'mese', 'tantum'];
+
+    /** Quante schede per pagina nell'elenco noleggi e nell'elenco mezzi. */
+    private const PER_PAGINA         = 25;
+    private const MEZZI_PER_PAGINA   = 50;
 
     public function __construct(private \PDO $conn) {}
 
@@ -41,33 +47,63 @@ final class NoleggiController
             $al = $dal;
         }
 
-        $tipo     = trim((string)($_GET['tipo'] ?? ''));
-        $macchine = $repo->macchine($cid, false, $tipo);
-        $impegni  = $this->impegni($repo->righeNelPeriodo($cid, $dal, $al));
-        $giorni   = VistaImpegni::giorni($dal, $al);
-
-        // filtro "mi serve dal ... al ...": restano solo le macchine libere
+        // ── Prima la domanda, poi i mezzi ────────────────────────────────
+        // La pagina non parte piu' elencando il parco. Con centinaia di
+        // mezzi quell'elenco non risponde a niente: chi arriva qui non
+        // vuole sapere quali macchine esistono, vuole sapere cosa e' libero
+        // nei giorni che ha in mente. Quindi si chiede prima il periodo, e
+        // l'elenco compare solo dopo, gia' ridotto ai mezzi disponibili.
         $cercaDal = VistaImpegni::data($_GET['cerca_dal'] ?? '', '');
         $cercaAl  = VistaImpegni::data($_GET['cerca_al'] ?? '', '');
-        $occupate = ($cercaDal && $cercaAl && $cercaAl >= $cercaDal)
-            ? $repo->occupateTra($cid, $cercaDal, $cercaAl)
-            : [];
+        if ($cercaDal && $cercaAl && $cercaAl < $cercaDal) {
+            [$cercaDal, $cercaAl] = [$cercaAl, $cercaDal];   // date invertite
+        }
+        $ricercaAttiva = (bool)($cercaDal && $cercaAl);
+
+        $tipo   = trim((string)($_GET['tipo'] ?? ''));
+        $cerca  = trim((string)($_GET['q'] ?? ''));
+        $stato  = in_array($_GET['stato'] ?? '', self::STATI_MACCHINA, true)
+                  ? (string)$_GET['stato'] : '';
+        $pagina = max(1, (int)($_GET['pagina'] ?? 1));
+
+        $macchine = [];
+        $esito    = ['righe' => [], 'totale' => 0];
+
+        if ($ricercaAttiva) {
+            $esito = $repo->elencoMacchine($cid, [
+                'q'         => $cerca,
+                'tipo'      => $tipo,
+                'stato'     => $stato,
+                'liberiDal' => $cercaDal,
+                'liberiAl'  => $cercaAl,
+            ], $pagina, self::MEZZI_PER_PAGINA);
+            $macchine = $esito['righe'];
+        }
+
+        // Il calendario invece guarda tutto il parco: e' il colpo d'occhio
+        // sul periodo e ha senso solo con dentro tutti gli impegni. Non
+        // costa come la vecchia griglia, perche' raggruppa per giorno
+        // invece di disegnare una riga per mezzo.
+        $impegni = $this->impegni($repo->righeNelPeriodo($cid, $dal, $al));
 
         Response::view('poti/noleggi/disponibilita.html.twig', $request, [
             'macchine'      => $macchine,
             'tipi'          => $repo->tipi($cid),
             'tipo'          => $tipo,
-            'giorni'        => $giorni,
-            'griglia'       => VistaImpegni::griglia($impegni, $giorni),
+            'cerca'         => $cerca,
+            'stato'         => $stato,
+            'stati'         => self::STATI_MACCHINA,
             'calendario'    => VistaImpegni::calendario($dal, $al, $impegni),
-            'liberaDal'     => $repo->primoGiornoLibero($cid, date('Y-m-d')),
             'dal'           => $dal,
             'al'            => $al,
             'cercaDal'      => $cercaDal,
             'cercaAl'       => $cercaAl,
-            'occupate'      => $occupate,
-            'ricercaAttiva' => (bool)($cercaDal && $cercaAl),
-        ]);
+            'ricercaAttiva' => $ricercaAttiva,
+        ] + $this->paginazione($pagina, $esito['totale'], self::MEZZI_PER_PAGINA, [
+            'q' => $cerca, 'tipo' => $tipo, 'stato' => $stato,
+            'dal' => $dal, 'al' => $al,
+            'cerca_dal' => $cercaDal, 'cerca_al' => $cercaAl,
+        ]));
     }
 
     // ── GET /noleggi/elenco ──────────────────────────────────────────────────
@@ -82,18 +118,40 @@ final class NoleggiController
         $al    = VistaImpegni::data($_GET['al'] ?? '', date('Y-m-d', strtotime($dal . ' +2 months')));
         $cerca = trim((string)($_GET['q'] ?? ''));
 
+        $filtri = [
+            'dal'       => $dal,
+            'al'        => $al,
+            'q'         => $cerca,
+            'stato'     => in_array($_GET['stato'] ?? '', self::STATI_NOLEGGIO, true)
+                           ? (string)$_GET['stato'] : '',
+            'pagamento' => in_array($_GET['pagamento'] ?? '', self::PAGAMENTI, true)
+                           ? (string)$_GET['pagamento'] : '',
+        ];
+
+        $pagina = max(1, (int)($_GET['pagina'] ?? 1));
+        $esito  = $repo->noleggi($cid, $filtri, $pagina, self::PER_PAGINA);
+
         Response::view('poti/noleggi/elenco.html.twig', $request, [
-            'noleggi'    => $repo->noleggi($cid, $dal, $al, $cerca),
+            'noleggi'    => $esito['righe'],
             'macchine'   => $repo->macchine($cid, true),
             'stati'      => self::STATI_NOLEGGIO,
             'pagamenti'  => self::PAGAMENTI,
             'utenteNome' => $this->nomeUtente($request),
+            'assicPerc'  => Tariffa::ASSICURAZIONE_PERC,
+            'fornitori'  => $repo->fornitori($cid),
             'dal'        => $dal,
             'al'         => $al,
             'cerca'      => $cerca,
+            'filtri'     => $filtri,
             'salvato'    => isset($_GET['salvato']),
             'errore'     => $_GET['errore'] ?? null,
-        ]);
+        ] + $this->paginazione($pagina, $esito['totale'], self::PER_PAGINA, [
+            'q'         => $cerca,
+            'dal'       => $dal,
+            'al'        => $al,
+            'stato'     => $filtri['stato'],
+            'pagamento' => $filtri['pagamento'],
+        ]));
     }
 
     // ── POST /noleggi/salva ──────────────────────────────────────────────────
@@ -126,6 +184,12 @@ final class NoleggiController
 
         if ($stato !== 'annullato') {
             foreach ($righe as $r) {
+                // le righe di sotto-noleggio si saltano: non possiamo
+                // impegnare due volte una macchina che non e' nostra, e il
+                // controllo su un id vuoto risponderebbe a caso
+                if (empty($r['macchina_id'])) {
+                    continue;
+                }
                 $scontri = $repo->sovrapposizioni($cid, (int)$r['macchina_id'],
                                                   $r['data_inizio'], $r['data_fine'], $id);
                 if ($scontri) {
@@ -144,6 +208,30 @@ final class NoleggiController
         // lo stato precedente si legge prima di scrivere: dopo non c'e' piu'
         $prima = $id ? $repo->noleggio($cid, $id) : null;
 
+        // ── Assicurazione ────────────────────────────────────────────────
+        // Percentuale sui soli mezzi: il trasporto non si assicura. Il conto
+        // lo rifa' il server anche se il browser l'ha gia' mostrato, perche'
+        // quello che arriva dal form e' solo una proposta.
+        $assicurato = !empty($_POST['assicurazione']);
+        $perc       = VistaImpegni::importo($_POST['assicurazione_perc'] ?? '');
+        $perc       = $perc !== '' ? (float)$perc : Tariffa::ASSICURAZIONE_PERC;
+        $perc       = max(0.0, min(100.0, $perc));
+
+        $totaleMezzi   = Tariffa::totaleMezzi($righe);
+        $importoAssic  = $assicurato ? Tariffa::assicurazione($totaleMezzi, $perc) : 0.0;
+
+        $trasporto = VistaImpegni::importo($_POST['trasporto'] ?? '');
+        $totale    = VistaImpegni::importo($_POST['totale'] ?? '');
+
+        // Totale non compilato: si somma qui. Se e' stato scritto a mano si
+        // lascia stare, e' una cifra concordata col cliente.
+        if ($totale === '') {
+            $totale = number_format(
+                $totaleMezzi + ($trasporto !== '' ? (float)$trasporto : 0.0) + $importoAssic,
+                2, '.', ''
+            );
+        }
+
         $nuovoId = $repo->salvaNoleggio($cid, $id, [
             'cliente'   => $cliente,
             'telefono'  => trim((string)($_POST['telefono'] ?? '')),
@@ -151,8 +239,11 @@ final class NoleggiController
             'contratto' => trim((string)($_POST['contratto'] ?? '')),
             'contratto_firmato' => !empty($_POST['contratto_firmato']),
             'stato'     => $stato,
-            'trasporto' => VistaImpegni::importo($_POST['trasporto'] ?? ''),
-            'totale'    => VistaImpegni::importo($_POST['totale'] ?? ''),
+            'trasporto' => $trasporto,
+            'totale'    => $totale,
+            'assicurazione'         => $assicurato,
+            'assicurazione_perc'    => $assicurato ? number_format($perc, 2, '.', '') : '',
+            'assicurazione_importo' => $assicurato ? number_format($importoAssic, 2, '.', '') : '',
             'pagamento' => in_array($_POST['pagamento'] ?? '', self::PAGAMENTI, true)
                            ? (string)$_POST['pagamento'] : 'da_pagare',
             'note'      => trim((string)($_POST['note'] ?? '')),
@@ -283,13 +374,29 @@ final class NoleggiController
         $repo = new MacchinaRepository($this->conn);
         $cid  = $this->companyId();
 
+        $cerca  = trim((string)($_GET['q'] ?? ''));
+        $tipo   = trim((string)($_GET['tipo'] ?? ''));
+        $stato  = in_array($_GET['stato'] ?? '', self::STATI_MACCHINA, true)
+                  ? (string)$_GET['stato'] : '';
+        $pagina = max(1, (int)($_GET['pagina'] ?? 1));
+
+        $esito = $repo->elencoMacchine(
+            $cid, ['q' => $cerca, 'tipo' => $tipo, 'stato' => $stato],
+            $pagina, self::MEZZI_PER_PAGINA
+        );
+
         Response::view('poti/noleggi/macchine.html.twig', $request, [
-            'macchine' => $repo->macchine($cid),
+            'macchine' => $esito['righe'],
             'tipi'     => $repo->tipi($cid),
             'stati'    => self::STATI_MACCHINA,
+            'cerca'    => $cerca,
+            'tipo'     => $tipo,
+            'stato'    => $stato,
             'salvato'  => isset($_GET['salvato']),
             'errore'   => $_GET['errore'] ?? null,
-        ]);
+        ] + $this->paginazione($pagina, $esito['totale'], self::MEZZI_PER_PAGINA, [
+            'q' => $cerca, 'tipo' => $tipo, 'stato' => $stato,
+        ]));
     }
 
     // ── POST /noleggi/macchine/salva ─────────────────────────────────────────
@@ -303,12 +410,23 @@ final class NoleggiController
         $id        = (int)($_POST['id'] ?? 0) ?: null;
         $matricola = strtoupper(trim((string)($_POST['matricola'] ?? '')));
         $tipo      = trim((string)($_POST['tipo'] ?? ''));
+        $numero    = strtoupper(trim((string)($_POST['numero'] ?? '')));
 
         if ($matricola === '' || $tipo === '') {
             Response::redirect('/noleggi/macchine?errore=' . urlencode('Tipo e matricola sono obbligatori'));
         }
         if ($repo->matricolaInUso($cid, $matricola, $id)) {
             Response::redirect('/noleggi/macchine?errore=' . urlencode("La matricola {$matricola} esiste gia'"));
+        }
+
+        // Due macchine con lo stesso adesivo sarebbero indistinguibili in
+        // cantiere: chi legge il numero non ha modo di sapere quale delle due
+        // ha davanti. Si dice anche su quale sta gia', altrimenti tocca
+        // cercarla a mano.
+        if ($altra = $repo->numeroInUso($cid, $numero, $id)) {
+            Response::redirect('/noleggi/macchine?errore=' . urlencode(
+                "Il numero {$numero} e' gia' sulla macchina {$altra}"
+            ));
         }
 
         $stato = in_array($_POST['stato'] ?? '', self::STATI_MACCHINA, true)
@@ -318,6 +436,7 @@ final class NoleggiController
 
         $nuovoId = $repo->salvaMacchina($cid, $id, [
             'tipo'          => $tipo,
+            'numero'        => $numero,
             'matricola'     => $matricola,
             'modello'       => trim((string)($_POST['modello'] ?? '')),
             'altezza_max_m' => VistaImpegni::importo($_POST['altezza_max_m'] ?? ''),
@@ -329,7 +448,8 @@ final class NoleggiController
         (new Audit($this->conn))->registra(
             $cid, 'macchina', $nuovoId, $id ? 'modificato' : 'creato',
             $prima, $repo->macchina($cid, $nuovoId),
-            (int)$this->utente($request)->id, $matricola
+            (int)$this->utente($request)->id,
+            $numero !== '' ? $numero . ' — ' . $matricola : $matricola
         );
 
         Response::redirect('/noleggi/macchine?salvato=1');
@@ -355,21 +475,59 @@ final class NoleggiController
             $dal = VistaImpegni::data($_POST['riga_dal'][$i] ?? '', '');
             $al  = VistaImpegni::data($_POST['riga_al'][$i] ?? '', '');
 
-            if (!$macchinaId || !$dal || !$al) {
+            // Riga di sotto-noleggio: la macchina e' di un altro
+            // noleggiatore, non sta nel nostro parco e non ha un id. Al suo
+            // posto basta sapere com'e' fatta — della matricola non
+            // disponiamo, e chiederla bloccherebbe il salvataggio.
+            $mezzoEsterno = trim((string)($_POST['riga_mezzo_esterno'][$i] ?? ''));
+            $esterna      = $macchinaId === 0 && $mezzoEsterno !== '';
+
+            if ((!$macchinaId && !$esterna) || !$dal || !$al) {
                 continue;
             }
             if ($al < $dal) {
                 [$dal, $al] = [$al, $dal];   // date invertite: si raddrizzano
             }
 
-            $out[] = [
-                'macchina_id'    => (string)$macchinaId,
+            $unita = in_array($_POST['riga_unita'][$i] ?? '', self::UNITA, true)
+                ? (string)$_POST['riga_unita'][$i]
+                : 'giorno';
+
+            // Dal form arriva una tariffa sola: qui si mette nella colonna
+            // che le corrisponde. Le due colonne restano separate perche'
+            // ottanta euro al giorno e ottanta al mese non sono lo stesso
+            // numero, e cambiando unita' la vecchia cifra non deve
+            // sopravvivere come se fosse ancora buona.
+            $tariffa = VistaImpegni::importo($_POST['riga_tariffa'][$i] ?? '');
+
+            $riga = [
+                'macchina_id'    => $esterna ? '' : (string)$macchinaId,
+                'fornitore'      => $esterna ? trim((string)($_POST['riga_fornitore'][$i] ?? '')) : '',
+                'mezzo_esterno'  => $esterna ? $mezzoEsterno : '',
+                'contratto_fornitore' => $esterna
+                                    ? trim((string)($_POST['riga_contratto_for'][$i] ?? '')) : '',
+                // quello che paghiamo al noleggiatore: e' un costo, non
+                // entra nel totale che paga il cliente
+                'costo'          => $esterna
+                                    ? VistaImpegni::importo($_POST['riga_costo'][$i] ?? '') : '',
                 'data_inizio'    => $dal,
                 'data_fine'      => $al,
-                'tariffa_giorno' => VistaImpegni::importo($_POST['riga_tariffa'][$i] ?? ''),
+                'unita'          => $unita,
+                'tariffa_giorno' => $unita === 'mese' ? '' : $tariffa,
+                'tariffa_mese'   => $unita === 'mese' ? $tariffa : '',
                 'totale'         => VistaImpegni::importo($_POST['riga_totale'][$i] ?? ''),
                 'note'           => trim((string)($_POST['riga_note'][$i] ?? '')),
             ];
+
+            // Un totale non scritto si calcola qui e non si lascia vuoto: il
+            // browser lo compila mentre si scrive, ma il conto che vale e'
+            // questo. Se e' stato scritto a mano si rispetta com'e', perche'
+            // capita di concordare una cifra tonda diversa dal calcolo.
+            if ($riga['totale'] === '') {
+                $riga['totale'] = number_format(Tariffa::totaleRiga($riga), 2, '.', '');
+            }
+
+            $out[] = $riga;
         }
         return $out;
     }
@@ -384,7 +542,12 @@ final class NoleggiController
         foreach ($righe as $r) {
             $out[] = [
                 'risorsa'     => (int)$r['macchina_id'],
-                'etichetta'   => (string)$r['matricola'],
+                // nel calendario ci sta poco: si scrive il numero
+                // dell'adesivo, che e' come la macchina viene chiamata, e la
+                // matricola solo se l'adesivo non c'e' ancora
+                'etichetta'   => ($r['numero'] ?? '') !== ''
+                                 ? (string)$r['numero']
+                                 : (string)$r['matricola'],
                 'cliente'     => (string)$r['cliente'],
                 'luogo'       => (string)($r['luogo'] ?? ''),
                 'stato'       => (string)$r['stato'],
@@ -393,6 +556,37 @@ final class NoleggiController
             ];
         }
         return $out;
+    }
+
+    /**
+     * I numeri della paginazione, gia' pronti per il template.
+     *
+     * @return array{pagina:int, pagine:int, totale:int, primo:int, ultimo:int}
+     */
+    private function paginazione(int $pagina, int $totale, int $perPagina, array $query = []): array
+    {
+        $pagine = max(1, (int)ceil($totale / $perPagina));
+        $pagina = min($pagina, $pagine);
+
+        return [
+            'pagina' => $pagina,
+            'pagine' => $pagine,
+            'totale' => $totale,
+            'primo'  => $totale ? ($pagina - 1) * $perPagina + 1 : 0,
+            'ultimo' => min($pagina * $perPagina, $totale),
+            'qs'     => $this->queryString($query),
+        ];
+    }
+
+    /**
+     * I filtri in forma di query string, pronti da appendere ai link della
+     * paginazione. I vuoti si tolgono: un indirizzo pieno di parametri a
+     * zero e' illeggibile e non aggiunge niente.
+     */
+    private function queryString(array $query): string
+    {
+        $pieni = array_filter($query, static fn($v) => $v !== '' && $v !== null);
+        return $pieni ? '&' . http_build_query($pieni) : '';
     }
 
     private function tornaConErrore(string $messaggio): never

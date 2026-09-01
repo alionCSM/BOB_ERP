@@ -3,7 +3,9 @@
 {% block head %}
 {# stessi stili delle autocarrate: le due sezioni si assomigliano e tenerne
    due copie vorrebbe dire vederle divergere al primo ritocco #}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
+{# la barra di paginazione sta qui: la usano tutte e tre le pagine #}
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=6">
 {% endblock %}
 
 {% block content %}
@@ -24,42 +26,120 @@
     {% if salvato %}<div class="ac-alert is-ok">Modifiche salvate.</div>{% endif %}
     {% if errore %}<div class="ac-alert is-ko">{{ errore }}</div>{% endif %}
 
+    {# Con centinaia di mezzi si arriva qui cercandone uno, non scorrendo:
+       la ricerca sta in cima ed e' il primo campo della pagina. #}
+    <form method="GET" class="ac-filtri">
+        <label class="ac-f ac-f-cerca">
+            <span>Cerca</span>
+            <input type="search" name="q" value="{{ cerca }}" autofocus
+                   placeholder="numero, matricola, modello, tipo…">
+        </label>
+        <label class="ac-f">
+            <span>Tipo</span>
+            <select name="tipo">
+                <option value="">tutti</option>
+                {% for t in tipi %}
+                    <option value="{{ t }}" {{ tipo == t ? 'selected' : '' }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Stato</span>
+            <select name="stato">
+                <option value="">tutti</option>
+                {% for s in stati %}
+                    <option value="{{ s }}" {{ stato == s ? 'selected' : '' }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Cerca</button>
+        {% if cerca or tipo or stato %}
+            <a href="/noleggi/macchine" class="ac-link">azzera</a>
+        {% endif %}
+    </form>
+
     <div class="ac-box">
         <div class="ac-table-wrap">
-            <table class="ac-table">
+            {# Quattro colonne e non otto: con centinaia di mezzi si arriva
+               qui per trovarne uno, e altezza, portata e note sono cose che
+               si guardano su quello, non su tutti insieme. Stanno nella riga
+               che si apre cliccando. #}
+            <table class="ac-table nl-mezzi-tab">
                 <thead>
                     <tr>
-                        <th>Tipo</th>
+                        {# Il numero sta per primo: e' l'adesivo attaccato sulla
+                           macchina, quello che si legge in cantiere. La
+                           matricola e' il dato del costruttore e serve dopo. #}
+                        <th class="nl-col-n">N.</th>
                         <th>Matricola</th>
+                        <th>Tipo</th>
                         <th>Modello</th>
-                        <th class="right">Altezza</th>
-                        <th class="right">Portata</th>
                         <th>Stato</th>
-                        <th>Note</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for m in macchine %}
-                        <tr>
-                            <td>{{ m.tipo }}</td>
+                        <tr class="nl-mezzo-r" data-nl-mezzo="{{ m.id }}" tabindex="0">
+                            <td class="nl-col-n">
+                                {% if m.numero %}
+                                    <span class="nl-numero">{{ m.numero }}</span>
+                                {% else %}
+                                    <span class="nl-numero-no" title="Adesivo non ancora messo">—</span>
+                                {% endif %}
+                            </td>
                             <td class="ac-td-targa">{{ m.matricola }}</td>
+                            <td>{{ m.tipo }}</td>
                             <td>{{ m.modello ?: '—' }}</td>
-                            <td class="right">{{ m.altezza_max_m ? m.altezza_max_m|number_format(2, ',', '.') ~ ' m' : '—' }}</td>
-                            <td class="right">{{ m.portata_kg ? m.portata_kg ~ ' kg' : '—' }}</td>
                             <td><span class="ac-stato ac-stato-{{ m.stato }}">{{ m.stato }}</span></td>
-                            <td class="ac-td-note" title="{{ m.note }}">{{ m.note ?: '—' }}</td>
-                            <td class="right">
-                                <button type="button" class="ac-link"
-                                        data-ac-modifica="{{ m|json_encode|e('html_attr') }}">modifica</button>
+                            <td class="right nl-mezzo-freccia" aria-hidden="true">▾</td>
+                        </tr>
+
+                        {# i dettagli restano nel documento e non si vanno a
+                           chiedere al server: sono quattro campi, e aprirli
+                           dev'essere immediato #}
+                        <tr class="nl-mezzo-d" data-nl-dett="{{ m.id }}" hidden>
+                            <td colspan="6">
+                                <div class="nl-dett">
+                                    <div class="nl-dett-campi">
+                                        <div>
+                                            <span>Altezza max</span>
+                                            <strong>{{ m.altezza_max_m ? m.altezza_max_m|number_format(2, ',', '.') ~ ' m' : '—' }}</strong>
+                                        </div>
+                                        <div>
+                                            <span>Portata</span>
+                                            <strong>{{ m.portata_kg ? m.portata_kg ~ ' kg' : '—' }}</strong>
+                                        </div>
+                                        <div class="nl-dett-note">
+                                            <span>Note</span>
+                                            <strong>{{ m.note ?: '—' }}</strong>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="ac-btn"
+                                            data-ac-modifica="{{ m|json_encode|e('html_attr') }}">
+                                        Modifica
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="8" class="ac-empty">Nessun mezzo registrato.</td></tr>
+                        <tr>
+                            <td colspan="6" class="ac-empty">
+                                {% if cerca or tipo or stato %}
+                                    Nessun mezzo corrisponde ai filtri.
+                                {% else %}
+                                    Nessun mezzo registrato.
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {% include 'poti/_paginazione.html.twig' with {
+            base: '/noleggi/macchine', nome: 'mezzi'
+        } %}
     </div>
 
     {# ── Modale mezzo ────────────────────────────────────────────────────── #}
@@ -82,6 +162,14 @@
                     <datalist id="ac-tipi">
                         {% for t in tipi %}<option value="{{ t }}">{% endfor %}
                     </datalist>
+                </label>
+
+                {# Sta prima della matricola perche' e' il numero che si ha
+                   sotto gli occhi quando si registra la macchina. #}
+                <label class="ac-f">
+                    <span>Numero adesivo</span>
+                    <input type="text" name="numero" id="ac-m-numero" maxlength="20"
+                           placeholder="es. 42">
                 </label>
 
                 <label class="ac-f">
@@ -130,5 +218,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/poti/noleggi.js?v=1"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=6"></script>
 {% endblock %}

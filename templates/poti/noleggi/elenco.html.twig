@@ -1,8 +1,8 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=14">
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=3">
+<link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=6">
 {# stessa versione usata nelle altre pagine di BOB #}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 {% endblock %}
@@ -37,12 +37,32 @@
             <input type="date" name="al" value="{{ al }}">
         </label>
         <label class="ac-f ac-f-cerca">
-            <span>Cerca <small id="nl-conta"></small></span>
+            <span>Cerca</span>
             <input type="search" name="q" value="{{ cerca }}" id="nl-cerca"
                    placeholder="cliente, luogo, contratto, note…">
         </label>
-        <button class="ac-btn ac-btn-primary">Filtra periodo</button>
-        {% if cerca %}
+        <label class="ac-f">
+            <span>Stato</span>
+            <select name="stato">
+                <option value="">confermati</option>
+                {% for s in stati %}
+                    <option value="{{ s }}" {{ filtri.stato == s ? 'selected' : '' }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="ac-f">
+            <span>Pagamento</span>
+            <select name="pagamento">
+                <option value="">tutti</option>
+                {% for p in pagamenti %}
+                    <option value="{{ p }}" {{ filtri.pagamento == p ? 'selected' : '' }}>
+                        {{ p == 'pagata' ? 'pagata' : 'da pagare' }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="ac-btn ac-btn-primary">Filtra</button>
+        {% if cerca or filtri.stato or filtri.pagamento %}
             <a href="/noleggi/elenco?dal={{ dal }}&al={{ al }}" class="ac-link">azzera</a>
         {% endif %}
     </form>
@@ -52,7 +72,7 @@
        duplicati a ogni riga. #}
     <div class="nl-elenco" id="nl-elenco">
         {% for n in noleggi %}
-            <div class="nl-card" data-nl-testo="{{ (n.cliente ~ ' ' ~ (n.luogo ?: '') ~ ' ' ~ (n.contratto ?: '') ~ ' ' ~ (n.note ?: ''))|lower }}">
+            <div class="nl-card">
                 <div class="nl-card-head">
                     <div class="nl-cliente">
                         {{ n.cliente }}
@@ -81,12 +101,55 @@
                     <tbody>
                         {% for r in n.righe %}
                             <tr>
-                                <td class="nl-matr">{{ r.matricola }}</td>
-                                <td class="nl-tipo">{{ r.tipo }}</td>
+                                {# Riga presa da un altro noleggiatore: al posto
+                                   di numero e matricola c'e' com'e' fatto il
+                                   mezzo, perche' la matricola non ce l'abbiamo. #}
+                                {% if r.macchina_id %}
+                                    <td class="nl-matr">
+                                        {% if r.numero %}<span class="nl-numero">{{ r.numero }}</span>{% endif %}
+                                        {{ r.matricola }}
+                                    </td>
+                                    <td class="nl-tipo">{{ r.tipo }}</td>
+                                {% else %}
+                                    <td class="nl-matr">
+                                        <span class="nl-est-tag" title="Preso da un altro noleggiatore">nolo</span>
+                                        {{ r.mezzo_esterno }}
+                                    </td>
+                                    <td class="nl-tipo">
+                                        {{ r.fornitore ?: '—' }}
+                                        {%- if r.contratto_fornitore %} · {{ r.contratto_fornitore }}{% endif -%}
+                                    </td>
+                                {% endif %}
                                 <td>{{ r.data_inizio|date('d/m/Y') }} → {{ r.data_fine|date('d/m/Y') }}</td>
-                                <td class="right">{{ r.giorni }} gg</td>
-                                <td class="right">{{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') : '—' }}</td>
-                                <td class="right nl-tot">{{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}</td>
+                                <td class="right nl-durata">
+                                    {%- if r.unita == 'tantum' -%}
+                                        {{ r.giorni }} gg
+                                    {%- elseif r.unita == 'mese' and r.mesi -%}
+                                        {{ r.mesi }} {{ r.mesi == 1 ? 'mese' : 'mesi' }}
+                                        {%- if r.giorni_residui %} + {{ r.giorni_residui }} gg{% endif -%}
+                                    {%- else -%}
+                                        {{ r.giorni }} gg
+                                    {%- endif -%}
+                                </td>
+                                <td class="right">
+                                    {%- if r.unita == 'tantum' -%}
+                                        <span class="nl-corpo">a corpo</span>
+                                    {%- elseif r.unita == 'mese' -%}
+                                        {{ r.tariffa_mese ? '€ ' ~ r.tariffa_mese|number_format(2, ',', '.') ~ '/mese' : '—' }}
+                                    {%- else -%}
+                                        {{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') ~ '/g' : '—' }}
+                                    {%- endif -%}
+                                </td>
+                                <td class="right nl-tot">
+                                    {{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}
+                                    {% if r.costo %}
+                                        {% set margine = r.totale - r.costo %}
+                                        <small class="nl-margine{{ margine < 0 ? ' is-ko' : '' }}">
+                                            costo € {{ r.costo|number_format(2, ',', '.') }} ·
+                                            margine € {{ margine|number_format(2, ',', '.') }}
+                                        </small>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% else %}
                             <tr><td colspan="6" class="ac-empty">Nessun mezzo.</td></tr>
@@ -100,19 +163,32 @@
                         {% if n.trasporto %}
                             <span>trasporto € {{ n.trasporto|number_format(2, ',', '.') }}</span>
                         {% endif %}
+                        {% if n.assicurazione %}
+                            <span class="nl-assic">
+                                assicurazione {{ n.assicurazione_perc|number_format(0) }}%
+                                € {{ n.assicurazione_importo|number_format(2, ',', '.') }}
+                            </span>
+                        {% endif %}
                         <strong>totale € {{ n.totale ? n.totale|number_format(2, ',', '.') : '0,00' }}</strong>
                     </div>
                 </div>
             </div>
         {% else %}
-            <div class="ac-box"><div class="ac-empty">Nessun noleggio nel periodo.</div></div>
+            <div class="ac-box">
+                <div class="ac-empty">
+                    {% if cerca or filtri.stato or filtri.pagamento %}
+                        Nessun noleggio corrisponde ai filtri.
+                    {% else %}
+                        Nessun noleggio nel periodo.
+                    {% endif %}
+                </div>
+            </div>
         {% endfor %}
-
-        {# compare quando la ricerca dal vivo non lascia schede #}
-        <div class="ac-box" id="nl-nessuno" style="display:none">
-            <div class="ac-empty">Nessun noleggio corrisponde alla ricerca.</div>
-        </div>
     </div>
+
+    {% include 'poti/_paginazione.html.twig' with {
+        base: '/noleggi/elenco', nome: 'noleggi'
+    } %}
 
     {# ── Modale noleggio ─────────────────────────────────────────────────── #}
     <div class="ac-modal" id="nl-modal" hidden aria-hidden="true">
@@ -126,6 +202,11 @@
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                 <input type="hidden" name="id" id="nl-id" value="">
 
+                {# Riga 1: chi e il documento. Riga 2: dove e come sta.
+                   Prima la spunta della firma stava da sola in mezzo a Luogo
+                   e Stato, in una cella larga come un campo di testo: sembrava
+                   un dato da inserire. Adesso sta sotto il numero di
+                   contratto, che e' la cosa a cui si riferisce. #}
                 <label class="ac-f ac-f-2">
                     <span>Cliente</span>
                     <input type="text" name="cliente" id="nl-cliente" required maxlength="160">
@@ -136,19 +217,15 @@
                     <input type="text" name="telefono" id="nl-telefono" maxlength="40">
                 </label>
 
-                <label class="ac-f">
+                <div class="ac-f">
                     <span>Contratto</span>
                     <input type="text" name="contratto" id="nl-contratto" maxlength="100">
-                </label>
-
-                {# la stessa casella che il tecnico spunta dalla giornata #}
-                <label class="ac-f ac-check-riga">
-                    <span>Firma</span>
-                    <span class="ac-check-box">
+                    {# la stessa casella che il tecnico spunta dalla giornata #}
+                    <label class="ac-check-box ac-sotto-campo">
                         <input type="checkbox" name="contratto_firmato" id="nl-firmato" value="1">
-                        <span>Contratto firmato</span>
-                    </span>
-                </label>
+                        <span>Firmato</span>
+                    </label>
+                </div>
 
                 <label class="ac-f ac-f-2">
                     <span>Luogo</span>
@@ -175,7 +252,30 @@
                 <div class="ac-f-4 nl-righe-box">
                     <div class="nl-righe-head">
                         <span>Mezzi</span>
-                        <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi mezzo</button>
+                        <div class="nl-righe-azioni">
+                            <button type="button" class="ac-btn" id="nl-aggiungi">Dal nostro parco</button>
+                            {# Quando il parco non basta il mezzo si prende da
+                               un altro noleggiatore. Due pulsanti distinti e
+                               non una spunta dentro la riga: la scelta si fa
+                               prima di compilare, non dopo. #}
+                            <button type="button" class="ac-btn" id="nl-aggiungi-est">Da noleggiatore</button>
+                        </div>
+                    </div>
+
+                    {# Le intestazioni stanno qui una volta sola invece che
+                       su ogni riga. Con cinque mezzi le stesse sei parole
+                       ripetute cinque volte erano piu' testo dei dati. Sotto
+                       i 900px tornano su ogni riga: in colonna stretta le
+                       colonne non esistono e senza etichetta non si capisce
+                       piu' cosa si sta scrivendo. #}
+                    <div class="nl-righe-cols">
+                        <span>Mezzo</span>
+                        <span>Dal</span>
+                        <span>Al</span>
+                        <span>Tariffa a</span>
+                        <span>Importo</span>
+                        <span>Totale</span>
+                        <span></span>
                     </div>
 
                     <div class="nl-righe-lista" id="nl-righe"></div>
@@ -183,12 +283,40 @@
                     <div class="nl-righe-vuoto" id="nl-righe-vuoto">
                         Nessun mezzo: aggiungine almeno uno.
                     </div>
+
+                    {# L'assicurazione sta qui e non fra gli importi perche'
+                       e' una percentuale sui mezzi: nel riquadro sotto,
+                       schiacciata fra trasporto e totale, sembrava applicarsi
+                       anche al trasporto. Qui e' attaccata alla somma su cui
+                       si calcola, che si vede a fianco. #}
+                    <div class="nl-mezzi-piede">
+                        <div class="nl-mezzi-sub">
+                            Totale mezzi
+                            <strong id="nl-mezzi-tot">€ 0,00</strong>
+                        </div>
+                        <div class="nl-assic-riga">
+                            <label class="ac-check-box">
+                                <input type="checkbox" name="assicurazione" id="nl-assic" value="1">
+                                <span>Assicurazione</span>
+                            </label>
+                            <div class="nl-assic-perc">
+                                <input type="text" name="assicurazione_perc" id="nl-assic-perc"
+                                       inputmode="decimal" value="{{ assicPerc|number_format(0) }}"
+                                       aria-label="Percentuale assicurazione" disabled>
+                                <span class="nl-assic-simbolo">%</span>
+                            </div>
+                            <span id="nl-assic-importo"></span>
+                        </div>
+                    </div>
                 </div>
 
-                {# ── Importi ────────────────────────────────────────────── #}
+                {# ── Importi ──────────────────────────────────────────────
+                   Restano il trasporto e il totale. L'assicurazione e' salita
+                   nel riquadro dei mezzi: si calcola su quelli, e tenerla qui
+                   in mezzo la faceva sembrare una percentuale sul totale. #}
                 <div class="ac-f ac-f-4 ac-soldi">
                     <div class="ac-soldi-tit">Importi</div>
-                    <div class="ac-soldi-campi">
+                    <div class="ac-soldi-campi ac-soldi-2">
                         <label class="ac-f">
                             <span>Trasporto</span>
                             <input type="text" name="trasporto" id="nl-trasporto" inputmode="decimal"
@@ -232,18 +360,31 @@
         </div>
     </div>
 
+    {# noleggiatori gia' usati: l'elenco cresce lavorando, come i tipi di
+       macchina, senza una tabella da configurare altrove #}
+    <datalist id="nl-fornitori">
+        {% for f in fornitori %}<option value="{{ f }}">{% endfor %}
+    </datalist>
+
     {# modello di riga, clonato dal JS #}
     <template id="nl-riga-modello">
         <div class="nl-riga">
             <label class="ac-f nl-riga-macchina">
                 <span>Mezzo</span>
+                {# Il campo di testo per il mezzo preso a nolo sta qui accanto
+                   alla tendina, nascosto sulle righe nostre. Restano tutti e
+                   due in ogni riga di proposito: il salvataggio accoppia i
+                   campi per posizione, e togliendone uno le righe successive
+                   si sposterebbero di un posto. #}
+                <input type="text" name="riga_mezzo_esterno[]" class="nl-est-mezzo"
+                       maxlength="160" placeholder="es. Piattaforma 16 m" hidden>
                 <select name="riga_macchina[]">
                     <option value="">— scegli —</option>
                     {# nel testo stanno matricola, tipo e modello: la ricerca
                        guarda il testo della voce, quindi si trova il mezzo
                        scrivendo uno qualsiasi dei tre #}
                     {% for m in macchine %}
-                        <option value="{{ m.id }}">{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
+                        <option value="{{ m.id }}">{{ m.numero ? '#' ~ m.numero ~ ' · ' : '' }}{{ m.matricola }} — {{ m.tipo }}{{ m.modello ? ' · ' ~ m.modello : '' }}</option>
                     {% endfor %}
                 </select>
             </label>
@@ -258,24 +399,78 @@
                 <input type="date" name="riga_al[]">
             </label>
 
+            <label class="ac-f nl-riga-unita">
+                <span>Tariffa a</span>
+                <select name="riga_unita[]">
+                    <option value="giorno">giornata</option>
+                    <option value="mese">mese</option>
+                    <option value="tantum">corpo</option>
+                </select>
+            </label>
+
+            {# Una tariffa sola: o a giornata, o a mese, o a corpo.
+               L'etichetta cambia con l'unita' scelta, cosi' e' sempre chiaro
+               che cifra si sta scrivendo. #}
             <label class="ac-f">
-                <span>Tariffa/g</span>
+                <span class="nl-et-tariffa">Importo/g</span>
                 <input type="text" name="riga_tariffa[]" inputmode="decimal" placeholder="0,00">
             </label>
 
             <label class="ac-f">
                 <span>Totale</span>
                 <input type="text" name="riga_totale[]" inputmode="decimal" placeholder="0,00">
+                <small class="nl-riga-durata"></small>
             </label>
 
+            {# Icone e non parole: la riga ha sette colonne e due frasi in
+               fondo si mangiavano lo spazio dei campi, andando a capo.
+
+               Disegnate qui dentro invece che con data-lucide: le righe le
+               clona il JavaScript dal modello, e lucide sostituisce le sue
+               icone una volta sola al caricamento — su una riga aggiunta
+               dopo resterebbero due caselle vuote.
+
+               Il titolo resta scritto: un'icona da sola non dice cosa fa
+               finche' non ci si passa sopra. #}
             <div class="nl-riga-azioni">
-                {# copia il periodo di questa riga su tutte le altre: nella
-                   maggior parte dei noleggi le macchine vanno e tornano
-                   insieme, e riscrivere le date ogni volta e' inutile #}
-                <button type="button" class="ac-link" data-nl-copia title="Copia queste date sugli altri mezzi">
-                    copia periodo
+                <button type="button" class="nl-ic" data-nl-copia
+                        title="Copia queste date sugli altri mezzi"
+                        aria-label="Copia queste date sugli altri mezzi">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="9" y="9" width="11" height="11" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
                 </button>
-                <button type="button" class="ac-link nl-togli" data-nl-togli>togli</button>
+                <button type="button" class="nl-ic nl-ic-ko" data-nl-togli
+                        title="Togli questo mezzo dal noleggio"
+                        aria-label="Togli questo mezzo dal noleggio">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 6h18"/>
+                        <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                    </svg>
+                </button>
+            </div>
+
+            {# Il lato noleggiatore: chi ce l'ha dato, con che contratto e a
+               quanto. Il nostro contratto e' quello del noleggio in testa e
+               il nostro prezzo e' il totale della riga: qui c'e' solo la
+               parte che riguarda loro. #}
+            <div class="nl-est-riga" hidden>
+                <label class="ac-f">
+                    <span>Noleggiatore</span>
+                    <input type="text" name="riga_fornitore[]" list="nl-fornitori" maxlength="160">
+                </label>
+                <label class="ac-f">
+                    <span>Loro contratto</span>
+                    <input type="text" name="riga_contratto_for[]" maxlength="100">
+                </label>
+                <label class="ac-f">
+                    <span>Loro prezzo</span>
+                    <input type="text" name="riga_costo[]" inputmode="decimal" placeholder="0,00">
+                    <small class="nl-margine"></small>
+                </label>
             </div>
         </div>
     </template>
@@ -286,5 +481,5 @@
 {% block scripts %}
 {# TomSelect prima: noleggi.js lo usa appena aggiunge una riga #}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/poti/noleggi.js?v=3"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=6"></script>
 {% endblock %}
