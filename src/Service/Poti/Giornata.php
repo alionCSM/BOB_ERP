@@ -171,7 +171,16 @@ final class Giornata
             // Le foto arrivano gia' raggruppate da chi chiama: qui non si
             // interroga il database, altrimenti una giornata da trenta
             // schede farebbe trenta viaggi per mostrare due miniature.
-            'foto'        => $foto,
+            //
+            // Le due chiavi ci sono SEMPRE, anche vuote. Senza, un mezzo
+            // senza foto darebbe un array vuoto, e json_encode scrive [] e
+            // non {}: l'app che si aspetta un oggetto va in eccezione e si
+            // chiude appena apre la giornata. Succedeva su quasi tutte le
+            // schede, perche' quasi nessuna ha foto.
+            'foto'        => [
+                'uscita'  => $foto['uscita']  ?? [],
+                'rientro' => $foto['rientro'] ?? [],
+            ],
             'note'        => $note,
             'azione'      => $azione,
             'fatta'       => $fatta,
