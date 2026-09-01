@@ -555,7 +555,7 @@ final class ApiV1Controller
             if (!$entitaId) {
                 throw new \RuntimeException('Manca il mezzo a cui legare la foto');
             }
-            $foto = (new \App\Service\Poti\Foto($this->conn))->salva(
+            $esito = (new \App\Service\Poti\Foto($this->conn))->salvaMolte(
                 (int)$this->currentCompany()->id(), $entita, $entitaId, $momento,
                 (array)($_FILES['foto'] ?? []), (int)$user->id
             );
@@ -563,9 +563,24 @@ final class ApiV1Controller
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        // all'app serve l'id: l'indirizzo per scaricarla se lo costruisce da
-        // se', perche' il suo non e' quello del sito ma /api/v1/...
-        Response::json(['success' => true, 'foto' => $foto]);
+        // Se almeno una foto e' passata la risposta e' un successo, con
+        // l'elenco di quelle rifiutate: rispondere 422 butterebbe via anche
+        // le buone dal punto di vista di chi ha scattato, e a quel punto
+        // rifarebbe tutto da capo.
+        if (!$esito['foto']) {
+            Response::json([
+                'success' => false,
+                'message' => implode(' · ', $esito['errori']),
+            ], 422);
+        }
+
+        // all'app servono gli id: l'indirizzo per scaricarle se lo costruisce
+        // da se', perche' il suo non e' quello del sito ma /api/v1/...
+        Response::json([
+            'success' => true,
+            'foto'    => $esito['foto'],
+            'errori'  => $esito['errori'],
+        ]);
     }
 
     /**

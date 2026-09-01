@@ -771,7 +771,7 @@ final class NoleggiController
             if (!$entitaId) {
                 throw new \RuntimeException('Manca il mezzo a cui legare la foto');
             }
-            $foto = (new \App\Service\Poti\Foto($this->conn))->salva(
+            $esito = (new \App\Service\Poti\Foto($this->conn))->salvaMolte(
                 $this->companyId(), 'riga', $entitaId, $momento,
                 (array)($_FILES['foto'] ?? []), (int)$this->utente($request)->id
             );
@@ -779,7 +779,16 @@ final class NoleggiController
             Response::json(['ok' => false, 'messaggio' => $e->getMessage()], 422);
         }
 
-        Response::json(['ok' => true, 'foto' => $foto]);
+        // basta che ne sia passata una: le altre si dicono, non si buttano
+        if (!$esito['foto']) {
+            Response::json(['ok' => false, 'messaggio' => implode(' · ', $esito['errori'])], 422);
+        }
+
+        Response::json([
+            'ok'        => true,
+            'foto'      => $esito['foto'],
+            'messaggio' => $esito['errori'] ? implode(' · ', $esito['errori']) : null,
+        ]);
     }
 
     // ── GET .../foto/{id} ────────────────────────────────────────────────────
