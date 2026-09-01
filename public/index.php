@@ -724,6 +724,7 @@ if (str_starts_with($uri, '/api/v1/')) {
             // terzo su una linea che in cantiere e' gia' lenta.
             ->post('/api/v1/noleggi/giornata/foto',    [ApiV1Controller::class, 'noleggiFoto'])
             ->get('/api/v1/noleggi/foto/{id}',         [ApiV1Controller::class, 'noleggiFotoFile'])
+            ->post('/api/v1/noleggi/foto/elimina',     [ApiV1Controller::class, 'noleggiFotoElimina'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);

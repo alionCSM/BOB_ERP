@@ -73,37 +73,55 @@
         {% set fotoUscita  = s.foto.uscita  ?? [] %}
         {% set fotoRientro = s.foto.rientro ?? [] %}
 
-        <div class="gi-foto">
+        {# Il giro e' in due tempi: prima si scelgono, si guarda cosa si e'
+           preso e si butta quello venuto male, poi si carica. Caricare al
+           volo vorrebbe dire avere la foto sfocata gia' sul server prima di
+           accorgersene, e per toglierla servirebbe un altro giro. #}
+        <div class="gi-foto" data-gi-foto-zona
+             data-gi-url="{{ azioneFoto }}"
+             data-gi-url-elimina="{{ azioneFoto }}/elimina"
+             data-gi-entita="{{ s.campi.riga_id ?? s.campi.id }}"
+             data-gi-momento="{{ s.rientrato or s.azione == 'rientrato' ? 'rientro' : 'uscita' }}"
+             data-gi-csrf="{{ csrf }}">
+
             {% for f in fotoUscita %}
-                <a class="gi-foto-t" href="{{ f.url }}" target="_blank" rel="noopener"
-                   title="Foto dell'uscita">
-                    <img src="{{ f.url }}" alt="Foto dell'uscita" loading="lazy">
+                <span class="gi-foto-t" data-gi-id="{{ f.id }}">
+                    <a href="{{ f.url }}" target="_blank" rel="noopener" title="Apri la foto dell'uscita">
+                        <img src="{{ f.url }}" alt="Foto dell'uscita" loading="lazy">
+                    </a>
                     <span class="gi-foto-m">↑</span>
-                </a>
+                    <button type="button" class="gi-foto-x" data-gi-elimina="{{ f.id }}"
+                            title="Elimina questa foto" aria-label="Elimina questa foto">×</button>
+                </span>
             {% endfor %}
             {% for f in fotoRientro %}
-                <a class="gi-foto-t" href="{{ f.url }}" target="_blank" rel="noopener"
-                   title="Foto del rientro">
-                    <img src="{{ f.url }}" alt="Foto del rientro" loading="lazy">
+                <span class="gi-foto-t" data-gi-id="{{ f.id }}">
+                    <a href="{{ f.url }}" target="_blank" rel="noopener" title="Apri la foto del rientro">
+                        <img src="{{ f.url }}" alt="Foto del rientro" loading="lazy">
+                    </a>
                     <span class="gi-foto-m is-giu">↓</span>
-                </a>
+                    <button type="button" class="gi-foto-x" data-gi-elimina="{{ f.id }}"
+                            title="Elimina questa foto" aria-label="Elimina questa foto">×</button>
+                </span>
             {% endfor %}
+
+            {# qui il JavaScript mette le miniature di quelle scelte e non
+               ancora caricate #}
+            <span class="gi-foto-attesa" data-gi-attesa></span>
 
             {# multiple e senza capture: capture forzerebbe la fotocamera e una
                foto per volta, mentre girando intorno al mezzo se ne fanno tre
                o quattro. Senza, il telefono offre lo stesso la fotocamera nel
                suo elenco, ma lascia anche prenderne piu' d'una gia' scattate. #}
             <label class="gi-foto-piu" title="Aggiungi foto">
-                <input type="file" accept="image/*" multiple hidden
-                       data-gi-foto="{{ azioneFoto }}"
-                       data-gi-entita="{{ s.campi.riga_id ?? s.campi.id }}"
-                       data-gi-momento="{{ s.rientrato or s.azione == 'rientrato' ? 'rientro' : 'uscita' }}"
-                       data-gi-csrf="{{ csrf }}">
+                <input type="file" accept="image/*" multiple hidden data-gi-scegli>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                     <circle cx="12" cy="13" r="4"/>
                 </svg>
             </label>
+
+            <button type="button" class="gi-foto-carica" data-gi-carica hidden></button>
         </div>
 
         {# Un'azione grande e ovvia — quella della colonna — e le altre
