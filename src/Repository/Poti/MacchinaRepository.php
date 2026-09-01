@@ -341,6 +341,30 @@ final class MacchinaRepository
         return [$where, $args];
     }
 
+    /**
+     * Noleggiatori gia' usati, per riproporli invece di farli riscrivere.
+     *
+     * Stessa idea dei tipi di macchina: l'elenco cresce da solo lavorando,
+     * senza una tabella da configurare da un'altra parte. Con due o tre
+     * fornitori abituali si scrive il nome una volta sola.
+     *
+     * @return string[]
+     */
+    public function fornitori(int $companyId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT r.fornitore
+            FROM   pn_noleggi_righe r
+            JOIN   pn_noleggi n ON n.id = r.noleggio_id
+            WHERE  n.group_company_id = :cid
+              AND  r.fornitore IS NOT NULL
+              AND  r.fornitore <> ''
+            ORDER BY r.fornitore
+        ");
+        $stmt->execute([':cid' => $companyId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
     public function noleggio(int $companyId, int $id): ?array
     {
         $stmt = $this->conn->prepare(
@@ -370,9 +394,13 @@ final class MacchinaRepository
             SELECT r.*, m.numero, m.matricola, m.tipo, m.modello,
                    DATEDIFF(r.data_fine, r.data_inizio) + 1 AS giorni
             FROM   pn_noleggi_righe r
-            JOIN   pn_macchine m ON m.id = r.macchina_id
+            -- LEFT: le righe di sotto-noleggio non hanno una macchina nostra,
+            -- e con la JOIN piena sparirebbero dalla scheda senza dire niente
+            LEFT JOIN pn_macchine m ON m.id = r.macchina_id
             WHERE  r.noleggio_id IN ({$segnaposti})
-            ORDER BY r.data_inizio ASC, m.matricola ASC
+            ORDER BY r.data_inizio ASC,
+                     -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.matricola ASC
         ");
         $stmt->execute(array_map('intval', $noleggioIds));
 
@@ -473,15 +501,27 @@ final class MacchinaRepository
 
             $ins = $this->conn->prepare("
                 INSERT INTO pn_noleggi_righe
-                    (noleggio_id, macchina_id, data_inizio, data_fine, unita,
+                    (noleggio_id, macchina_id, fornitore, mezzo_esterno,
+                     contratto_fornitore, costo,
+                     data_inizio, data_fine, unita,
                      tariffa_giorno, tariffa_mese, totale, note)
-                VALUES (:nid, :mid, :dal, :al, :unita,
+                VALUES (:nid, :mid, :fornitore, :mezzoest,
+                        :contrfor, :costo,
+                        :dal, :al, :unita,
                         :tariffa, :tariffamese, :totale, :note)
             ");
             foreach ($righe as $r) {
+                // riga di sotto-noleggio: la macchina non e' nostra e resta
+                // vuota, al suo posto c'e' com'e' fatta e chi ce l'ha data
+                $esterna = empty($r['macchina_id']);
+
                 $ins->execute([
                     ':nid'         => $noleggioId,
-                    ':mid'         => (int)$r['macchina_id'],
+                    ':mid'         => $esterna ? null : (int)$r['macchina_id'],
+                    ':fornitore'   => ($r['fornitore'] ?? '') !== '' ? $r['fornitore'] : null,
+                    ':mezzoest'    => ($r['mezzo_esterno'] ?? '') !== '' ? $r['mezzo_esterno'] : null,
+                    ':contrfor'    => ($r['contratto_fornitore'] ?? '') !== '' ? $r['contratto_fornitore'] : null,
+                    ':costo'       => ($r['costo'] ?? '') !== '' ? $r['costo'] : null,
                     ':dal'         => $r['data_inizio'],
                     ':al'          => $r['data_fine'],
                     ':unita'       => $r['unita'] ?? 'giorno',
@@ -665,6 +705,10 @@ final class MacchinaRepository
             SELECT r.*, n.cliente, n.luogo, n.stato, m.numero, m.matricola, m.tipo
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
+            -- JOIN piena e non LEFT, di proposito: qui si disegnano gli
+            -- impegni del NOSTRO parco, e le righe di sotto-noleggio (che
+            -- hanno macchina_id vuota) cadono da sole. Un mezzo di un altro
+            -- noleggiatore non occupa una nostra macchina.
             JOIN   pn_macchine m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
@@ -698,7 +742,9 @@ final class MacchinaRepository
                    n.contratto, n.contratto_firmato, n.pagamento, n.note AS note_noleggio
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi   n ON n.id = r.noleggio_id
-            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            -- LEFT: anche un mezzo preso da un altro noleggiatore va
+            -- consegnato e ritirato, quindi deve comparire nella giornata
+            LEFT JOIN pn_macchine  m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
@@ -707,7 +753,8 @@ final class MacchinaRepository
                     OR (r.data_fine < :d3 AND r.rientrato_at IS NULL
                         AND r.data_fine >= DATE_SUB(:d4, INTERVAL 60 DAY))
                    )
-            ORDER BY m.tipo ASC, m.matricola ASC
+            ORDER BY -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.tipo ASC, m.matricola ASC
         ");
         $stmt->execute([
             ':cid' => $companyId,
@@ -752,13 +799,17 @@ final class MacchinaRepository
                    n.contratto, n.contratto_firmato, n.pagamento
             FROM   pn_noleggi_righe r
             JOIN   pn_noleggi   n ON n.id = r.noleggio_id
-            JOIN   pn_macchine  m ON m.id = r.macchina_id
+            -- LEFT: anche un mezzo preso da un altro noleggiatore va
+            -- consegnato e ritirato, quindi deve comparire nella giornata
+            LEFT JOIN pn_macchine  m ON m.id = r.macchina_id
             WHERE  n.group_company_id = :cid
               AND  n.eliminato_at IS NULL
               AND  n.stato <> 'annullato'
               AND  r.data_inizio > :dal
               AND  r.data_inizio <= :al
-            ORDER BY r.data_inizio ASC, m.matricola ASC
+            ORDER BY r.data_inizio ASC,
+                     -- i mezzi presi a nolo in fondo: prima il nostro parco
+                     m.matricola IS NULL, m.matricola ASC
         ");
         $stmt->execute([':cid' => $companyId, ':dal' => $dal, ':al' => $al]);
 

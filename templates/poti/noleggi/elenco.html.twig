@@ -2,7 +2,7 @@
 
 {% block head %}
 <link rel="stylesheet" href="/assets/css/views/poti/autocarrate.css?v=15">
-<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=5">
+<link rel="stylesheet" href="/assets/css/views/poti/noleggi.css?v=6">
 {# stessa versione usata nelle altre pagine di BOB #}
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 {% endblock %}
@@ -101,11 +101,25 @@
                     <tbody>
                         {% for r in n.righe %}
                             <tr>
-                                <td class="nl-matr">
-                                    {% if r.numero %}<span class="nl-numero">{{ r.numero }}</span>{% endif %}
-                                    {{ r.matricola }}
-                                </td>
-                                <td class="nl-tipo">{{ r.tipo }}</td>
+                                {# Riga presa da un altro noleggiatore: al posto
+                                   di numero e matricola c'e' com'e' fatto il
+                                   mezzo, perche' la matricola non ce l'abbiamo. #}
+                                {% if r.macchina_id %}
+                                    <td class="nl-matr">
+                                        {% if r.numero %}<span class="nl-numero">{{ r.numero }}</span>{% endif %}
+                                        {{ r.matricola }}
+                                    </td>
+                                    <td class="nl-tipo">{{ r.tipo }}</td>
+                                {% else %}
+                                    <td class="nl-matr">
+                                        <span class="nl-est-tag" title="Preso da un altro noleggiatore">nolo</span>
+                                        {{ r.mezzo_esterno }}
+                                    </td>
+                                    <td class="nl-tipo">
+                                        {{ r.fornitore ?: '—' }}
+                                        {%- if r.contratto_fornitore %} · {{ r.contratto_fornitore }}{% endif -%}
+                                    </td>
+                                {% endif %}
                                 <td>{{ r.data_inizio|date('d/m/Y') }} → {{ r.data_fine|date('d/m/Y') }}</td>
                                 <td class="right nl-durata">
                                     {%- if r.unita == 'tantum' -%}
@@ -126,7 +140,16 @@
                                         {{ r.tariffa_giorno ? '€ ' ~ r.tariffa_giorno|number_format(2, ',', '.') ~ '/g' : '—' }}
                                     {%- endif -%}
                                 </td>
-                                <td class="right nl-tot">{{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}</td>
+                                <td class="right nl-tot">
+                                    {{ r.totale ? '€ ' ~ r.totale|number_format(2, ',', '.') : '—' }}
+                                    {% if r.costo %}
+                                        {% set margine = r.totale - r.costo %}
+                                        <small class="nl-margine{{ margine < 0 ? ' is-ko' : '' }}">
+                                            costo € {{ r.costo|number_format(2, ',', '.') }} ·
+                                            margine € {{ margine|number_format(2, ',', '.') }}
+                                        </small>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% else %}
                             <tr><td colspan="6" class="ac-empty">Nessun mezzo.</td></tr>
@@ -229,7 +252,14 @@
                 <div class="ac-f-4 nl-righe-box">
                     <div class="nl-righe-head">
                         <span>Mezzi</span>
-                        <button type="button" class="ac-btn" id="nl-aggiungi">Aggiungi mezzo</button>
+                        <div class="nl-righe-azioni">
+                            <button type="button" class="ac-btn" id="nl-aggiungi">Dal nostro parco</button>
+                            {# Quando il parco non basta il mezzo si prende da
+                               un altro noleggiatore. Due pulsanti distinti e
+                               non una spunta dentro la riga: la scelta si fa
+                               prima di compilare, non dopo. #}
+                            <button type="button" class="ac-btn" id="nl-aggiungi-est">Da noleggiatore</button>
+                        </div>
                     </div>
 
                     {# Le intestazioni stanno qui una volta sola invece che
@@ -330,11 +360,24 @@
         </div>
     </div>
 
+    {# noleggiatori gia' usati: l'elenco cresce lavorando, come i tipi di
+       macchina, senza una tabella da configurare altrove #}
+    <datalist id="nl-fornitori">
+        {% for f in fornitori %}<option value="{{ f }}">{% endfor %}
+    </datalist>
+
     {# modello di riga, clonato dal JS #}
     <template id="nl-riga-modello">
         <div class="nl-riga">
             <label class="ac-f nl-riga-macchina">
                 <span>Mezzo</span>
+                {# Il campo di testo per il mezzo preso a nolo sta qui accanto
+                   alla tendina, nascosto sulle righe nostre. Restano tutti e
+                   due in ogni riga di proposito: il salvataggio accoppia i
+                   campi per posizione, e togliendone uno le righe successive
+                   si sposterebbero di un posto. #}
+                <input type="text" name="riga_mezzo_esterno[]" class="nl-est-mezzo"
+                       maxlength="160" placeholder="es. Piattaforma 16 m" hidden>
                 <select name="riga_macchina[]">
                     <option value="">— scegli —</option>
                     {# nel testo stanno matricola, tipo e modello: la ricerca
@@ -409,6 +452,26 @@
                     </svg>
                 </button>
             </div>
+
+            {# Il lato noleggiatore: chi ce l'ha dato, con che contratto e a
+               quanto. Il nostro contratto e' quello del noleggio in testa e
+               il nostro prezzo e' il totale della riga: qui c'e' solo la
+               parte che riguarda loro. #}
+            <div class="nl-est-riga" hidden>
+                <label class="ac-f">
+                    <span>Noleggiatore</span>
+                    <input type="text" name="riga_fornitore[]" list="nl-fornitori" maxlength="160">
+                </label>
+                <label class="ac-f">
+                    <span>Loro contratto</span>
+                    <input type="text" name="riga_contratto_for[]" maxlength="100">
+                </label>
+                <label class="ac-f">
+                    <span>Loro prezzo</span>
+                    <input type="text" name="riga_costo[]" inputmode="decimal" placeholder="0,00">
+                    <small class="nl-margine"></small>
+                </label>
+            </div>
         </div>
     </template>
 
@@ -418,5 +481,5 @@
 {% block scripts %}
 {# TomSelect prima: noleggi.js lo usa appena aggiunge una riga #}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/poti/noleggi.js?v=5"></script>
+<script src="/assets/js/views/poti/noleggi.js?v=6"></script>
 {% endblock %}

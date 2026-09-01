@@ -138,6 +138,7 @@ final class NoleggiController
             'pagamenti'  => self::PAGAMENTI,
             'utenteNome' => $this->nomeUtente($request),
             'assicPerc'  => Tariffa::ASSICURAZIONE_PERC,
+            'fornitori'  => $repo->fornitori($cid),
             'dal'        => $dal,
             'al'         => $al,
             'cerca'      => $cerca,
@@ -183,6 +184,12 @@ final class NoleggiController
 
         if ($stato !== 'annullato') {
             foreach ($righe as $r) {
+                // le righe di sotto-noleggio si saltano: non possiamo
+                // impegnare due volte una macchina che non e' nostra, e il
+                // controllo su un id vuoto risponderebbe a caso
+                if (empty($r['macchina_id'])) {
+                    continue;
+                }
                 $scontri = $repo->sovrapposizioni($cid, (int)$r['macchina_id'],
                                                   $r['data_inizio'], $r['data_fine'], $id);
                 if ($scontri) {
@@ -468,7 +475,14 @@ final class NoleggiController
             $dal = VistaImpegni::data($_POST['riga_dal'][$i] ?? '', '');
             $al  = VistaImpegni::data($_POST['riga_al'][$i] ?? '', '');
 
-            if (!$macchinaId || !$dal || !$al) {
+            // Riga di sotto-noleggio: la macchina e' di un altro
+            // noleggiatore, non sta nel nostro parco e non ha un id. Al suo
+            // posto basta sapere com'e' fatta — della matricola non
+            // disponiamo, e chiederla bloccherebbe il salvataggio.
+            $mezzoEsterno = trim((string)($_POST['riga_mezzo_esterno'][$i] ?? ''));
+            $esterna      = $macchinaId === 0 && $mezzoEsterno !== '';
+
+            if ((!$macchinaId && !$esterna) || !$dal || !$al) {
                 continue;
             }
             if ($al < $dal) {
@@ -487,7 +501,15 @@ final class NoleggiController
             $tariffa = VistaImpegni::importo($_POST['riga_tariffa'][$i] ?? '');
 
             $riga = [
-                'macchina_id'    => (string)$macchinaId,
+                'macchina_id'    => $esterna ? '' : (string)$macchinaId,
+                'fornitore'      => $esterna ? trim((string)($_POST['riga_fornitore'][$i] ?? '')) : '',
+                'mezzo_esterno'  => $esterna ? $mezzoEsterno : '',
+                'contratto_fornitore' => $esterna
+                                    ? trim((string)($_POST['riga_contratto_for'][$i] ?? '')) : '',
+                // quello che paghiamo al noleggiatore: e' un costo, non
+                // entra nel totale che paga il cliente
+                'costo'          => $esterna
+                                    ? VistaImpegni::importo($_POST['riga_costo'][$i] ?? '') : '',
                 'data_inizio'    => $dal,
                 'data_fine'      => $al,
                 'unita'          => $unita,

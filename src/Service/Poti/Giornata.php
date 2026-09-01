@@ -68,16 +68,26 @@ final class Giornata
         // e' quello attaccato sulla macchina e quello che il tecnico legge in
         // piazzale. La matricola resta il ripiego per le macchine non ancora
         // etichettate. Le autocarrate non hanno adesivo: si vanno a targa.
+        // Un mezzo preso da un altro noleggiatore non ha ne' adesivo ne'
+        // matricola: al suo posto si scrive com'e' fatto. In cantiere e'
+        // comunque un mezzo da consegnare e da ritirare come gli altri, e
+        // lasciare la scheda senza nome vorrebbe dire non sapere cosa
+        // caricare sul camion.
         $mezzo = (string)($autocarrata
             ? ($r['targa'] ?? '')
-            : (($r['numero'] ?? '') !== '' ? $r['numero'] : ($r['matricola'] ?? '')));
+            : (($r['numero'] ?? '') !== ''   ? $r['numero']
+             : (($r['matricola'] ?? '') !== '' ? $r['matricola']
+             : ($r['mezzo_esterno'] ?? ''))));
 
         // sotto la targa: sull'autocarrata basta il modello, sul mezzo di
         // sollevamento serve prima il tipo (piattaforma, telescopico...),
-        // che e' quello che il tecnico cerca davvero
+        // che e' quello che il tecnico cerca davvero. Sul mezzo a nolo si
+        // scrive chi ce l'ha dato: e' a loro che si telefona se non parte.
         $sotto = $autocarrata
             ? (string)($r['modello'] ?? '')
-            : trim((string)($r['tipo'] ?? '') . ($r['modello'] ? ' · ' . $r['modello'] : ''));
+            : (($r['macchina_id'] ?? null) === null
+                ? trim('a nolo' . (($r['fornitore'] ?? '') !== '' ? ' · ' . $r['fornitore'] : ''))
+                : trim((string)($r['tipo'] ?? '') . ($r['modello'] ? ' · ' . $r['modello'] : '')));
 
         // Consegna e rientro riguardano la riga; la firma del contratto
         // riguarda il noleggio intero. Nelle autocarrate coincidono.
@@ -187,7 +197,9 @@ final class Giornata
                 $out[$giorno][] = [
                     'mezzo'   => (string)($autocarrata
                         ? ($r['targa'] ?? '')
-                        : (($r['numero'] ?? '') !== '' ? $r['numero'] : ($r['matricola'] ?? ''))),
+                        : (($r['numero'] ?? '') !== ''   ? $r['numero']
+                         : (($r['matricola'] ?? '') !== '' ? $r['matricola']
+                         : ($r['mezzo_esterno'] ?? '')))),
                     'cliente' => (string)($r['cliente'] ?? ''),
                     'luogo'   => (string)($r['luogo'] ?? ''),
                     'giorni'  => (int)($r['giorni'] ?? 0),

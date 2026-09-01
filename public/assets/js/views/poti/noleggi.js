@@ -344,10 +344,41 @@
         if (vuoto) vuoto.style.display = righe().length ? 'none' : '';
     }
 
-    function aggiungiRiga(dati) {
+    /**
+     * Trasforma una riga in sotto-noleggio (o la riporta nel parco).
+     *
+     * La tendina delle nostre macchine e il campo di testo restano tutti e
+     * due nella riga: si nasconde quello che non serve. Il salvataggio
+     * accoppia i campi per posizione, e togliendone uno dal documento le
+     * righe successive scalerebbero di un posto, finendo con le date di
+     * un'altra macchina.
+     */
+    function impostaEsterna(riga, esterna) {
+        riga.classList.toggle('is-esterna', esterna);
+
+        var sel  = riga.querySelector('[name="riga_macchina[]"]');
+        var testo= riga.querySelector('.nl-est-mezzo');
+        var box  = riga.querySelector('.nl-est-riga');
+
+        if (testo) testo.hidden = !esterna;
+        if (box)   box.hidden   = !esterna;
+
+        // TomSelect avvolge la tendina in un suo contenitore: nascondere il
+        // <select> non basta, va nascosto l'involucro
+        var involucro = sel && sel.tomselect ? sel.tomselect.wrapper : sel;
+        if (involucro) involucro.hidden = esterna;
+
+        if (esterna && sel) sel.value = '';   // niente macchina nostra
+    }
+
+    function aggiungiRiga(dati, esterna) {
         var nodo = modello.content.cloneNode(true);
         contRighe.appendChild(nodo);
         var riga = contRighe.lastElementChild;
+
+        // dal database la riga e' di sotto-noleggio quando non ha una
+        // macchina nostra collegata
+        if (dati) esterna = !dati.macchina_id;
 
         if (dati) {
             riga.querySelector('[name="riga_macchina[]"]').value = dati.macchina_id || '';
@@ -376,11 +407,52 @@
             if (tot.value && tot.value !== atteso) tot.dataset.aMano = '1';
         }
 
-        // dopo aver messo il valore, mai prima
-        attivaRicerca(riga);
+        if (dati && esterna) {
+            riga.querySelector('.nl-est-mezzo').value = dati.mezzo_esterno || '';
+            riga.querySelector('[name="riga_fornitore[]"]').value = dati.fornitore || '';
+            riga.querySelector('[name="riga_contratto_for[]"]').value = dati.contratto_fornitore || '';
+            riga.querySelector('[name="riga_costo[]"]').value =
+                dati.costo ? euro(dati.costo) : '';
+        }
+
+        // la ricerca si accende solo sulle righe del nostro parco: su una
+        // riga di sotto-noleggio la tendina e' nascosta e non serve
+        if (!esterna) {
+            attivaRicerca(riga);   // dopo aver messo il valore, mai prima
+        }
+
+        impostaEsterna(riga, !!esterna);
+        ricalcolaMargine(riga);
 
         aggiornaVuoto();
         return riga;
+    }
+
+    /**
+     * Quanto ci resta su una riga presa a nolo: il nostro prezzo meno il
+     * loro. Si vede mentre si scrive, che e' il momento in cui serve —
+     * dopo, il numero da correggere e' gia' andato al cliente.
+     */
+    function ricalcolaMargine(riga) {
+        var et = riga.querySelector('.nl-margine');
+        if (!et) return;
+
+        if (!riga.classList.contains('is-esterna')) {
+            et.textContent = '';
+            return;
+        }
+
+        var costo  = numero(riga.querySelector('[name="riga_costo[]"]').value);
+        var totale = numero(riga.querySelector('[name="riga_totale[]"]').value);
+
+        if (isNaN(costo) || isNaN(totale) || !costo) {
+            et.textContent = '';
+            return;
+        }
+
+        var m = totale - costo;
+        et.textContent = 'margine € ' + euro(m);
+        et.classList.toggle('is-ko', m < 0);   // ci rimettiamo: si vede
     }
 
     // ── Eventi sulle righe ──────────────────────────────────────────────────
@@ -393,12 +465,13 @@
         } else {
             ricalcolaRiga(riga);
         }
+        ricalcolaMargine(riga);
         ricalcolaTotale();
     });
 
     contRighe.addEventListener('change', function (e) {
         var riga = e.target.closest('.nl-riga');
-        if (riga) { ricalcolaRiga(riga); ricalcolaTotale(); }
+        if (riga) { ricalcolaRiga(riga); ricalcolaMargine(riga); ricalcolaTotale(); }
     });
 
     contRighe.addEventListener('click', function (e) {
@@ -431,6 +504,11 @@
     });
 
     campo('nl-aggiungi').addEventListener('click', function () { aggiungiRiga(); });
+
+    var bottoneEst = campo('nl-aggiungi-est');
+    bottoneEst && bottoneEst.addEventListener('click', function () {
+        aggiungiRiga(null, true);
+    });
     campo('nl-trasporto').addEventListener('input', ricalcolaTotale);
 
     // spunta e percentuale rifanno il totale: e' l'unico modo di vedere
@@ -472,7 +550,9 @@
         if (subMezzi) subMezzi.textContent = '€ 0,00';
 
         // le ricerche vanno chiuse prima di svuotare, altrimenti restano
-        // agganciate a campi che non esistono piu'
+        // agganciate a campi che non esistono piu'. Sulle righe di
+        // sotto-noleggio non ne e' mai stata accesa una: spegniRicerca lo
+        // verifica da se'.
         righe().forEach(spegniRicerca);
         contRighe.innerHTML = '';
         totaleAMano = false;

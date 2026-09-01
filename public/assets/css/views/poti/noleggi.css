@@ -523,3 +523,64 @@
 /* sulla scheda della disponibilita' il numero sta in cima, prima della
    matricola, e le due non devono accavallarsi quando il riquadro e' stretto */
 .ac-mezzo-top { flex-wrap: wrap; gap: 6px; }
+
+/* ── Sotto-noleggio ─────────────────────────────────────────────────────── */
+/* Mezzi presi da un altro noleggiatore. Si distinguono a colpo d'occhio dai
+   nostri perche' la domanda "questo e' mio o l'ho preso a nolo?" cambia sia
+   il margine sia chi bisogna chiamare quando c'e' un guasto. */
+.nl-righe-azioni { display: flex; gap: 8px; }
+
+.nl-riga.is-esterna {
+    border-color: #ddd6fe;
+    background: #faf5ff;
+}
+
+/* la seconda riga di campi: chi ce l'ha dato, con che contratto, a quanto */
+.nl-est-riga {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px dashed #ddd6fe;
+}
+
+/* Il display: grid qui sopra e' piu' specifico della regola con cui il
+   browser nasconde gli elementi con l'attributo hidden, quindi da solo lo
+   annulla: i campi del noleggiatore comparivano anche sulle righe del
+   nostro parco, dove non vogliono dire niente. */
+.nl-est-riga[hidden] { display: none; }
+
+@media (max-width: 900px) {
+    .nl-est-riga { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* sulle righe di sotto-noleggio le etichette servono: sono campi che
+   l'intestazione in cima non nomina */
+.nl-est-riga > .ac-f > span { display: block !important; }
+
+.nl-est-tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #7c3aed;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.nl-margine {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+/* margine negativo: ci stiamo rimettendo, non e' un dettaglio */
+.nl-margine.is-ko { color: #b91c1c; font-weight: 700; }
