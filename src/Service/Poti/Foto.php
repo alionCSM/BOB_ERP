@@ -116,6 +116,93 @@ final class Foto
     }
 
     /**
+     * Piu' foto in un colpo solo.
+     *
+     * PHP consegna i caricamenti multipli in una forma scomoda: invece di
+     * un elenco di file da' un file solo con dentro elenchi paralleli
+     * (tutti i nomi, tutti i temporanei, tutti gli errori). Qui si
+     * raddrizza, cosi' il resto del codice non deve saperlo.
+     *
+     * Le foto buone si salvano anche se una fallisce: al tecnico che ne ha
+     * scattate cinque non si buttano le altre quattro perche' la terza era
+     * di un formato strano. Quelle rifiutate tornano in `errori`.
+     *
+     * @param array<string, mixed> $files la voce $_FILES['foto']
+     * @return array{foto: array<int, array<string,mixed>>, errori: string[]}
+     */
+    public function salvaMolte(
+        int $companyId,
+        string $entita,
+        int $entitaId,
+        string $momento,
+        array $files,
+        ?int $userId
+    ): array {
+        $out    = [];
+        $errori = [];
+
+        foreach ($this->separa($files) as $file) {
+            try {
+                $out[] = $this->salva($companyId, $entita, $entitaId, $momento, $file, $userId);
+            } catch (\Throwable $e) {
+                $errori[] = ($file['name'] ?? 'foto') . ': ' . $e->getMessage();
+            }
+        }
+
+        if (!$out && !$errori) {
+            // Niente file e una richiesta grossa: PHP ha scartato tutto
+            // perche' superava post_max_size, e in quel caso svuota sia
+            // $_FILES sia $_POST senza dire niente. Senza questo controllo
+            // l'app leggerebbe "nessuna foto ricevuta" mentre le aveva
+            // mandate davvero, e nessuno capirebbe perche'.
+            $inviati = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+            $limite  = $this->inByte((string)ini_get('post_max_size'));
+
+            $errori[] = ($limite > 0 && $inviati > $limite)
+                ? sprintf(
+                    'Le foto insieme superano il limite del server (%s). Mandane meno per volta.',
+                    ini_get('post_max_size')
+                )
+                : 'Nessuna foto ricevuta';
+        }
+        return ['foto' => $out, 'errori' => $errori];
+    }
+
+    /**
+     * Da come le manda PHP a un elenco normale di file.
+     *
+     * Con un file solo $_FILES['foto']['name'] e' una stringa; con piu' file
+     * e' un elenco, e lo stesso vale per tutte le altre chiavi. Trattare i
+     * due casi in un posto solo evita di doverci pensare ogni volta.
+     *
+     * @param array<string, mixed> $files
+     * @return array<int, array<string, mixed>>
+     */
+    private function separa(array $files): array
+    {
+        if (!isset($files['name'])) {
+            return [];
+        }
+
+        // un file solo: e' gia' nella forma giusta
+        if (!is_array($files['name'])) {
+            return [$files];
+        }
+
+        $out = [];
+        foreach (array_keys($files['name']) as $i) {
+            $out[] = [
+                'name'     => $files['name'][$i]     ?? '',
+                'type'     => $files['type'][$i]     ?? '',
+                'tmp_name' => $files['tmp_name'][$i] ?? '',
+                'error'    => $files['error'][$i]    ?? UPLOAD_ERR_NO_FILE,
+                'size'     => $files['size'][$i]     ?? 0,
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Foto di piu' righe in un colpo solo, raggruppate.
      *
      * A blocchi e non una query per riga: la giornata puo' avere trenta
@@ -179,6 +266,22 @@ final class Foto
             @unlink($assoluto);
         }
         return true;
+    }
+
+    /** "8M" o "512K" in byte, per confrontarlo con quanto e' arrivato. */
+    private function inByte(string $valore): int
+    {
+        $valore = trim($valore);
+        if ($valore === '') {
+            return 0;
+        }
+        $numero = (int)$valore;
+        return match (strtolower(substr($valore, -1))) {
+            'g'     => $numero * 1024 * 1024 * 1024,
+            'm'     => $numero * 1024 * 1024,
+            'k'     => $numero * 1024,
+            default => $numero,
+        };
     }
 
     /**
