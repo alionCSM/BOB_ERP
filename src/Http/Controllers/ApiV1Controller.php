@@ -501,7 +501,13 @@ final class ApiV1Controller
         $cid     = (int)$this->currentCompany()->id();
         $data    = \App\Service\Poti\VistaImpegni::data($_GET['data'] ?? '', date('Y-m-d'));
         $blocco  = $tipo === 'macchina' ? \App\Service\Poti\Giornata::MACCHINA : \App\Service\Poti\Giornata::AUTOCARRATA;
-        $blocchi = \App\Service\Poti\Giornata::blocchi($repo->giornata($cid, $data), $blocco);
+        $righe   = $repo->giornata($cid, $data);
+        $foto    = (new \App\Service\Poti\Foto($this->conn))->perEntita(
+            $cid,
+            $tipo === 'macchina' ? 'riga' : 'prenotazione',
+            \App\Service\Poti\Giornata::idRighe($righe)
+        );
+        $blocchi = \App\Service\Poti\Giornata::blocchi($righe, $blocco, $foto);
 
         Response::json([
             'success'   => true,
@@ -521,6 +527,85 @@ final class ApiV1Controller
      * Toggle come nel web: un tocco segna, il tocco successivo annulla.
      * Stesse repository e stesso registro di modifica (Audit Poti).
      */
+    /**
+     * Foto di uscita o rientro dall'app.
+     *
+     * Multipart e non JSON: e' un file, e passarlo in base64 dentro un JSON
+     * lo gonfia di un terzo su una linea che in cantiere e' gia' lenta.
+     *
+     * Il livello del carburante arriva con il "segna", non con la foto: si
+     * scrive una volta sola, mentre di foto se ne possono caricare piu' di
+     * una per lo stesso momento.
+     */
+    public function noleggiFoto(Request $request): never
+    {
+        $user = $request->user();
+        $tipo = (string)($_POST['tipo'] ?? 'autocarrate');
+
+        [$ok, , $msg] = $this->noleggiAccesso($user, $tipo);
+        if (!$ok) {
+            Response::json(['success' => false, 'message' => $msg], 403);
+        }
+
+        $entita   = $tipo === 'macchina' ? 'riga' : 'prenotazione';
+        $entitaId = (int)($_POST['entita_id'] ?? 0);
+        $momento  = (string)($_POST['momento'] ?? '');
+
+        try {
+            if (!$entitaId) {
+                throw new \RuntimeException('Manca il mezzo a cui legare la foto');
+            }
+            $foto = (new \App\Service\Poti\Foto($this->conn))->salva(
+                (int)$this->currentCompany()->id(), $entita, $entitaId, $momento,
+                (array)($_FILES['foto'] ?? []), (int)$user->id
+            );
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        // all'app serve l'id: l'indirizzo per scaricarla se lo costruisce da
+        // se', perche' il suo non e' quello del sito ma /api/v1/...
+        Response::json(['success' => true, 'foto' => $foto]);
+    }
+
+    /**
+     * Il file di una foto, per l'app.
+     *
+     * Esiste separata da quella del sito perche' l'app entra col token
+     * Bearer e non col cookie di sessione: e' lo stesso file, ma il
+     * controllo di chi sei passa da un'altra parte.
+     */
+    public function noleggiFotoFile(Request $request): never
+    {
+        $user = $request->user();
+        $tipo = (string)($_GET['tipo'] ?? 'autocarrate');
+
+        [$ok, , $msg] = $this->noleggiAccesso($user, $tipo);
+        if (!$ok) {
+            Response::json(['success' => false, 'message' => $msg], 403);
+        }
+
+        $servizio = new \App\Service\Poti\Foto($this->conn);
+        $foto     = $servizio->trova((int)$this->currentCompany()->id(), (int)$request->param('id'));
+
+        // solo le foto del modulo per cui si e' passato il controllo sopra
+        $atteso = $tipo === 'macchina' ? 'riga' : 'prenotazione';
+        if ($foto && $foto['entita'] !== $atteso) {
+            $foto = null;
+        }
+
+        $assoluto = $foto ? \CloudPath::fotoAssoluta((string)$foto['percorso']) : null;
+        if (!$assoluto) {
+            Response::json(['success' => false, 'message' => 'Foto non trovata'], 404);
+        }
+
+        header('Content-Type: ' . ($foto['mime'] ?: 'image/jpeg'));
+        header('Content-Length: ' . filesize($assoluto));
+        header('Cache-Control: private, max-age=86400');
+        readfile($assoluto);
+        exit;
+    }
+
     public function noleggiSegna(Request $request): never
     {
         $user = $request->user();
@@ -549,7 +634,8 @@ final class ApiV1Controller
                 if ($cosa === 'firma') {
                     $repo->segnaContrattoFirmato($cid, $noleggioId, empty($prima['contratto_firmato']));
                 } elseif ($rigaId && in_array($cosa, ['consegnato', 'rientrato'], true)) {
-                    $repo->segnaMomento($cid, $rigaId, $cosa, $uid);
+                    $repo->segnaMomento($cid, $rigaId, $cosa, $uid,
+                                        trim((string)($body['carburante'] ?? '')));
                 }
                 (new \App\Service\Poti\Audit($this->conn))->registra(
                     $cid, 'noleggio', $noleggioId, 'modificato',
@@ -567,7 +653,8 @@ final class ApiV1Controller
             if ($cosa === 'firma') {
                 $repo->segnaContrattoFirmato($cid, $id, empty($prima['contratto_firmato']));
             } elseif (in_array($cosa, ['consegnato', 'rientrato'], true)) {
-                $repo->segnaMomento($cid, $id, $cosa, $uid);
+                $repo->segnaMomento($cid, $id, $cosa, $uid,
+                                    trim((string)($body['carburante'] ?? '')));
             }
             (new \App\Service\Poti\Audit($this->conn))->registra(
                 $cid, 'prenotazione', $id, 'modificato',

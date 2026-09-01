@@ -587,7 +587,10 @@ final class AutocarrateController
         // La pagina e' la stessa dei mezzi di sollevamento: le due sezioni
         // raccontano la stessa storia, e Giornata normalizza le righe in
         // schede uguali. Qui resta solo cio' che le distingue davvero.
-        $blocchi = Giornata::blocchi($repo->giornata($cid, $data), Giornata::AUTOCARRATA);
+        $righe   = $repo->giornata($cid, $data);
+        $foto    = (new \App\Service\Poti\Foto($this->conn))
+                       ->perEntita($cid, 'prenotazione', Giornata::idRighe($righe));
+        $blocchi = Giornata::blocchi($righe, Giornata::AUTOCARRATA, $foto);
 
         $collegamenti = [];
         if ($user->canAccess('pn_autocarrate')) {
@@ -602,6 +605,7 @@ final class AutocarrateController
             'sottotitolo'  => "Cosa esce, cosa rientra e cosa e' ancora fuori.",
             'base'         => '/autocarrate/giornata',
             'azione'       => '/autocarrate/giornata/segna',
+            'azioneFoto'   => '/autocarrate/giornata/foto',
             'collegamenti' => $collegamenti,
             'data'         => $data,
             'ieri'         => date('Y-m-d', strtotime($data . ' -1 day')),
@@ -650,7 +654,10 @@ final class AutocarrateController
             if ($cosa === 'firma') {
                 $repo->segnaContrattoFirmato($cid, $id, empty($prima['contratto_firmato']));
             } elseif (in_array($cosa, ['consegnato', 'rientrato'], true)) {
-                $repo->segnaMomento($cid, $id, $cosa, (int)$this->utente($request)->id);
+                $repo->segnaMomento(
+                    $cid, $id, $cosa, (int)$this->utente($request)->id,
+                    trim((string)($_POST['carburante'] ?? ''))
+                );
             }
 
             (new Audit($this->conn))->registra(
@@ -686,5 +693,90 @@ final class AutocarrateController
             return;
         }
         Response::error("Permesso 'pn_autocarrate_giornata' richiesto", 403);
+    }
+
+    // ── POST .../giornata/foto ───────────────────────────────────────────────
+
+    /**
+     * Una foto dell'uscita o del rientro.
+     *
+     * Serve a chiudere le discussioni: quando il mezzo torna ammaccato, la
+     * fotografia fatta il giorno della consegna dice com'era prima. Per
+     * questo si carica dalla giornata, sul posto, e non da una schermata di
+     * archivio dove nessuno andrebbe mai.
+     */
+    public function caricaFoto(Request $request): void
+    {
+        $this->assertGiornata($request);
+
+        $entitaId = (int)($_POST['entita_id'] ?? 0);
+        $momento  = (string)($_POST['momento'] ?? '');
+
+        try {
+            if (!$entitaId) {
+                throw new \RuntimeException('Manca il mezzo a cui legare la foto');
+            }
+            $foto = (new \App\Service\Poti\Foto($this->conn))->salva(
+                $this->companyId(), 'prenotazione', $entitaId, $momento,
+                (array)($_FILES['foto'] ?? []), (int)$this->utente($request)->id
+            );
+        } catch (\Throwable $e) {
+            Response::json(['ok' => false, 'messaggio' => $e->getMessage()], 422);
+        }
+
+        Response::json(['ok' => true, 'foto' => $foto]);
+    }
+
+    // ── GET .../foto/{id} ────────────────────────────────────────────────────
+
+    /**
+     * Mostra una foto.
+     *
+     * I file stanno fuori dalla cartella pubblica: passano da qui perche'
+     * qui si controlla che chi guarda abbia il permesso e che la foto sia
+     * della sua societa'. Sotto public sarebbe visibile a chiunque
+     * indovinasse l'indirizzo.
+     */
+    public function mostraFoto(Request $request): void
+    {
+        $this->assertGiornata($request);
+
+        $servizio = new \App\Service\Poti\Foto($this->conn);
+        $foto     = $servizio->trova($this->companyId(), (int)$request->param('id'));
+
+        // Solo le foto di QUESTO modulo. Senza il controllo, il permesso
+        // delle due sezioni non sarebbe davvero separato: basterebbe
+        // indovinare un id per vedere da qui le foto delle mezzi di sollevamento.
+        if ($foto && $foto['entita'] !== 'prenotazione') {
+            $foto = null;
+        }
+
+        $assoluto = $foto ? \CloudPath::fotoAssoluta((string)$foto['percorso']) : null;
+        if (!$assoluto) {
+            Response::error('Foto non trovata', 404);
+        }
+
+        header('Content-Type: ' . ($foto['mime'] ?: 'image/jpeg'));
+        header('Content-Length: ' . filesize($assoluto));
+        // privata: e' il cantiere di un cliente, non deve finire nelle cache
+        // condivise per strada
+        header('Cache-Control: private, max-age=86400');
+        readfile($assoluto);
+        exit;
+    }
+
+    // ── POST .../giornata/foto/elimina ───────────────────────────────────────
+
+    public function eliminaFoto(Request $request): void
+    {
+        $this->assertGiornata($request);
+
+        $servizio = new \App\Service\Poti\Foto($this->conn);
+        $foto     = $servizio->trova($this->companyId(), (int)($_POST['id'] ?? 0));
+
+        $ok = $foto && $foto['entita'] === 'prenotazione'
+            && $servizio->elimina($this->companyId(), (int)$foto['id']);
+
+        Response::json(['ok' => $ok]);
     }
 }

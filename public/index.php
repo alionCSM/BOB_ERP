@@ -189,7 +189,11 @@ if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
            ->get('/autocarrate/giornata',              [AutocarrateController::class, 'giornata'])
            ->post('/autocarrate/giornata/segna',        [AutocarrateController::class, 'segna'])
            ->get('/autocarrate/registro',              [AutocarrateController::class, 'registro'])
-           ->post('/autocarrate/ripristina',           [AutocarrateController::class, 'ripristina']);
+           ->post('/autocarrate/ripristina',           [AutocarrateController::class, 'ripristina'])
+           // foto di uscita e rientro: si caricano dalla giornata, sul posto
+           ->post('/autocarrate/giornata/foto',         [AutocarrateController::class, 'caricaFoto'])
+           ->post('/autocarrate/giornata/foto/elimina', [AutocarrateController::class, 'eliminaFoto'])
+           ->get('/autocarrate/foto/{id}',              [AutocarrateController::class, 'mostraFoto']);
 
     $router->dispatch($request, $container);
 }
@@ -212,7 +216,10 @@ if ($uri === '/noleggi' || str_starts_with($uri, '/noleggi/')) {
            ->get('/noleggi/giornata',        [NoleggiController::class, 'giornata'])
            ->post('/noleggi/giornata/segna', [NoleggiController::class, 'segna'])
            ->get('/noleggi/registro',        [NoleggiController::class, 'registro'])
-           ->post('/noleggi/ripristina',     [NoleggiController::class, 'ripristina']);
+           ->post('/noleggi/ripristina',     [NoleggiController::class, 'ripristina'])
+           ->post('/noleggi/giornata/foto',         [NoleggiController::class, 'caricaFoto'])
+           ->post('/noleggi/giornata/foto/elimina', [NoleggiController::class, 'eliminaFoto'])
+           ->get('/noleggi/foto/{id}',              [NoleggiController::class, 'mostraFoto']);
 
     $router->dispatch($request, $container);
 }
@@ -712,6 +719,11 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/cron/history',              [ApiV1Controller::class, 'cronHistory'])
             ->get('/api/v1/noleggi/giornata',          [ApiV1Controller::class, 'noleggiGiornata'])
             ->post('/api/v1/noleggi/giornata/segna',   [ApiV1Controller::class, 'noleggiSegna'])
+            // Foto dell'uscita e del rientro. Multipart e non JSON: e' un
+            // file, e passarlo in base64 dentro un JSON lo gonfia di un
+            // terzo su una linea che in cantiere e' gia' lenta.
+            ->post('/api/v1/noleggi/giornata/foto',    [ApiV1Controller::class, 'noleggiFoto'])
+            ->get('/api/v1/noleggi/foto/{id}',         [ApiV1Controller::class, 'noleggiFotoFile'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);

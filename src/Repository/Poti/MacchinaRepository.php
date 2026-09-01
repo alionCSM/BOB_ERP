@@ -827,22 +827,42 @@ final class MacchinaRepository
      * sa a quale societa' appartiene, e senza la JOIN si potrebbe toccare
      * la riga di un'altra azienda conoscendone l'id.
      */
-    public function segnaMomento(int $companyId, int $rigaId, string $campo, ?int $userId): void
-    {
+    public function segnaMomento(
+        int $companyId,
+        int $rigaId,
+        string $campo,
+        ?int $userId,
+        ?string $carburante = null
+    ): void {
         if (!in_array($campo, ['consegnato', 'rientrato'], true)) {
             return;
         }
         $quando = $campo . '_at';
         $chi    = $campo . '_da';
+        $carb   = $campo === 'consegnato' ? 'carburante_uscita' : 'carburante_rientro';
 
+        // Il livello del carburante e chi ha fatto l'operazione si
+        // assegnano PRIMA della data, non dopo. In MySQL le assegnazioni di
+        // una UPDATE si leggono da sinistra a destra e quelle successive
+        // vedono i valori gia' scritti: mettendo la data per prima, il
+        // "CASE WHEN ... IS NULL" delle righe sotto la trovava gia'
+        // valorizzata e cadeva sempre nel ramo ELSE. Risultato, consegnato_da
+        // restava NULL a ogni consegna e non si e' mai saputo chi l'avesse
+        // fatta.
         $stmt = $this->conn->prepare("
             UPDATE pn_noleggi_righe r
             JOIN   pn_noleggi n ON n.id = r.noleggio_id
-            SET    r.{$quando} = CASE WHEN r.{$quando} IS NULL THEN NOW() ELSE NULL END,
-                   r.{$chi}    = CASE WHEN r.{$quando} IS NULL THEN :uid ELSE NULL END
+            SET    r.{$chi}    = CASE WHEN r.{$quando} IS NULL THEN :uid  ELSE NULL END,
+                   r.{$carb}   = CASE WHEN r.{$quando} IS NULL THEN :carb ELSE NULL END,
+                   r.{$quando} = CASE WHEN r.{$quando} IS NULL THEN NOW() ELSE NULL END
             WHERE  r.id = :id AND n.group_company_id = :cid AND n.eliminato_at IS NULL
         ");
-        $stmt->execute([':id' => $rigaId, ':cid' => $companyId, ':uid' => $userId]);
+        $stmt->execute([
+            ':id'   => $rigaId,
+            ':cid'  => $companyId,
+            ':uid'  => $userId,
+            ':carb' => ($carburante ?? '') !== '' ? $carburante : null,
+        ]);
     }
 
     /** Spunta o toglie la firma del contratto (e' del noleggio, non della riga). */

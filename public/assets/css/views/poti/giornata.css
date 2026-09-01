@@ -626,3 +626,100 @@
     .gi-col { break-inside: avoid; margin-bottom: 10px; }
     .gi-card { break-inside: avoid; }
 }
+
+/* ── Carburante ─────────────────────────────────────────────────────────── */
+/* Si scrive com'e' scritto sullo strumento: tacche, percentuale o litri.
+   Il confronto uscita → rientro e' il motivo per cui questo dato esiste,
+   quindi si vedono sempre tutti e due. */
+.gi-carb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.gi-carb-ic { font-size: 12px; }
+
+.gi-carb-campo {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 6px;
+    padding: 7px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 12.5px;
+    color: #1e293b;
+}
+
+.gi-carb-campo:focus {
+    outline: none;
+    border-color: #0369a1;
+    box-shadow: 0 0 0 3px rgba(3, 105, 161, .12);
+}
+
+/* ── Foto ───────────────────────────────────────────────────────────────── */
+/* Miniature piccole: sulla scheda servono a dire "c'e' una foto", non a
+   guardarla. Il tocco la apre a grandezza intera. */
+.gi-foto {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+}
+
+.gi-foto-t {
+    position: relative;
+    display: block;
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.gi-foto-t img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* freccia sull'angolo: dice se e' la foto dell'uscita o del rientro senza
+   doverla aprire */
+.gi-foto-m {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    padding: 0 3px;
+    background: #16a34a;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 13px;
+    border-top-left-radius: 4px;
+}
+
+.gi-foto-m.is-giu { background: #0369a1; }
+
+.gi-foto-piu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 6px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.gi-foto-piu:hover { border-color: #0369a1; color: #0369a1; background: #f0f9ff; }
+
+.gi-foto-piu svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

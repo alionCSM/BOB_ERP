@@ -34,7 +34,35 @@ final class Giornata
      * @param array{ritardo:array, escono:array, rientrano:array, fuori:array} $giornata
      * @return array<string, array{etichetta:string, schede:array}>
      */
-    public static function blocchi(array $giornata, string $tipo): array
+    /**
+     * Gli id di tutte le righe della giornata, blocchi compresi.
+     *
+     * Serve a chiedere le foto in una volta sola invece che scheda per
+     * scheda: la stessa riga non compare in due blocchi, ma l'unique regge
+     * comunque se un domani cambiasse.
+     *
+     * @param array<string, array<int, array<string,mixed>>> $giornata
+     * @return int[]
+     */
+    public static function idRighe(array $giornata): array
+    {
+        $ids = [];
+        foreach ($giornata as $righe) {
+            foreach ($righe as $r) {
+                if (!empty($r['id'])) {
+                    $ids[] = (int)$r['id'];
+                }
+            }
+        }
+        return array_values(array_unique($ids));
+    }
+
+    /**
+     * @param array<int, array<string, array<int, array<string,mixed>>>> $foto
+     *        Tutte le foto della giornata, per id di riga. Arrivano da fuori
+     *        gia' pronte: e' l'unico modo di leggerle in una query sola.
+     */
+    public static function blocchi(array $giornata, string $tipo, array $foto = []): array
     {
         $definizione = [
             'ritardo'   => 'In ritardo',
@@ -47,7 +75,9 @@ final class Giornata
         foreach ($definizione as $chiave => $etichetta) {
             $schede = [];
             foreach ($giornata[$chiave] ?? [] as $riga) {
-                $schede[] = self::scheda($riga, $chiave, $tipo);
+                $schede[] = self::scheda(
+                    $riga, $chiave, $tipo, $foto[(int)($riga['id'] ?? 0)] ?? []
+                );
             }
             $out[$chiave] = ['etichetta' => $etichetta, 'schede' => $schede];
         }
@@ -60,7 +90,11 @@ final class Giornata
      * @param array<string,mixed> $r
      * @return array<string,mixed>
      */
-    public static function scheda(array $r, string $blocco, string $tipo): array
+    /**
+     * @param array<string, array<int, array<string,mixed>>> $foto
+     *        Le foto di QUESTA riga, gia' divise per momento.
+     */
+    public static function scheda(array $r, string $blocco, string $tipo, array $foto = []): array
     {
         $autocarrata = $tipo === self::AUTOCARRATA;
 
@@ -129,6 +163,15 @@ final class Giornata
             'rientrato'   => $rientrato,
             'consegnatoAt'=> (string)($r['consegnato_at'] ?? ''),
             'rientratoAt' => (string)($r['rientrato_at'] ?? ''),
+            // Livello del carburante com'e' stato scritto: tacche,
+            // percentuale o litri a seconda del mezzo. Non si normalizza
+            // niente — l'unita' la sceglie chi guarda lo strumento.
+            'carbUscita'  => (string)($r['carburante_uscita'] ?? ''),
+            'carbRientro' => (string)($r['carburante_rientro'] ?? ''),
+            // Le foto arrivano gia' raggruppate da chi chiama: qui non si
+            // interroga il database, altrimenti una giornata da trenta
+            // schede farebbe trenta viaggi per mostrare due miniature.
+            'foto'        => $foto,
             'note'        => $note,
             'azione'      => $azione,
             'fatta'       => $fatta,

@@ -43,7 +43,7 @@
             </header>
 
             <div class="gi-col-corpo">
-                {% for s in b.schede %}{{ g.scheda(s, data, azione, csrfToken) }}{% endfor %}
+                {% for s in b.schede %}{{ g.scheda(s, data, azione, csrfToken, azioneFoto) }}{% endfor %}
 
                 {% if b.schede|length == 0 %}
                     <p class="gi-col-niente">—</p>

@@ -10,7 +10,7 @@
   giornata piena se ne devono vedere sei o sette senza scorrere.
   Niente importi: al tecnico serve sapere se e' pagato, non quanto.
 #}
-{% macro scheda(s, data, azione, csrf) %}
+{% macro scheda(s, data, azione, csrf, azioneFoto) %}
     {# data-gi-* : ci si appoggiano il filtro e la ricerca dal vivo #}
     <article class="gi-card{{ s.fatta ? ' is-fatta' : '' }}"
              data-gi-blocco="{{ s.blocco }}"
@@ -53,6 +53,57 @@
 
         {% if s.note %}<div class="gi-note">{{ s.note }}</div>{% endif %}
 
+        {# Carburante: si scrive com'e' scritto sullo strumento — tacche,
+           percentuale o litri — perche' cambia da mezzo a mezzo e far
+           convertire a mente in piazzale e' il modo piu' veloce per avere
+           numeri sbagliati. Si vedono tutti e due i livelli: il senso di
+           questo dato e' il confronto fra come e' uscito e come e' tornato. #}
+        {% if s.carbUscita or s.carbRientro %}
+            <div class="gi-carb">
+                <span class="gi-carb-ic" aria-hidden="true">⛽</span>
+                {{ s.carbUscita ?: '—' }}
+                {%- if s.rientrato or s.carbRientro %} → {{ s.carbRientro ?: '—' }}{% endif -%}
+            </div>
+        {% endif %}
+
+        {# Foto: quando il mezzo torna ammaccato, la discussione su chi
+           l'ha rotto la chiude una fotografia fatta il giorno della
+           consegna. Per questo si scattano qui, sul posto, e non da una
+           schermata di archivio dove nessuno andrebbe mai. #}
+        {% set fotoUscita  = s.foto.uscita  ?? [] %}
+        {% set fotoRientro = s.foto.rientro ?? [] %}
+
+        <div class="gi-foto">
+            {% for f in fotoUscita %}
+                <a class="gi-foto-t" href="{{ f.url }}" target="_blank" rel="noopener"
+                   title="Foto dell'uscita">
+                    <img src="{{ f.url }}" alt="Foto dell'uscita" loading="lazy">
+                    <span class="gi-foto-m">↑</span>
+                </a>
+            {% endfor %}
+            {% for f in fotoRientro %}
+                <a class="gi-foto-t" href="{{ f.url }}" target="_blank" rel="noopener"
+                   title="Foto del rientro">
+                    <img src="{{ f.url }}" alt="Foto del rientro" loading="lazy">
+                    <span class="gi-foto-m is-giu">↓</span>
+                </a>
+            {% endfor %}
+
+            {# capture: sul telefono apre la fotocamera invece dell'archivio,
+               che e' quello che serve avendo il mezzo davanti #}
+            <label class="gi-foto-piu" title="Aggiungi foto">
+                <input type="file" accept="image/*" capture="environment" hidden
+                       data-gi-foto="{{ azioneFoto }}"
+                       data-gi-entita="{{ s.campi.riga_id ?? s.campi.id }}"
+                       data-gi-momento="{{ s.rientrato or s.azione == 'rientrato' ? 'rientro' : 'uscita' }}"
+                       data-gi-csrf="{{ csrf }}">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+            </label>
+        </div>
+
         {# Un'azione grande e ovvia — quella della colonna — e le altre
            dietro il tasto "…". Prima erano tre pulsanti uguali affiancati e
            bisognava leggerli tutti per capire quale premere. #}
@@ -65,6 +116,18 @@
                     {% for nome, valore in s.campi %}
                         <input type="hidden" name="{{ nome }}" value="{{ valore }}">
                     {% endfor %}
+
+                    {# Si compila insieme al tocco e non prima: chi segna
+                       l'uscita ha il mezzo davanti e legge lo strumento in
+                       quel momento. Sparisce una volta segnato, quando il
+                       livello e' gia' scritto sulla scheda. #}
+                    {% if not s.fatta %}
+                        <input type="text" name="carburante" class="gi-carb-campo"
+                               maxlength="40" autocomplete="off"
+                               placeholder="{{ s.azione == 'consegnato' ? 'gasolio in uscita' : 'gasolio al rientro' }}"
+                               aria-label="Livello carburante">
+                    {% endif %}
+
                     <button class="gi-vai-btn{{ s.fatta ? ' is-fatta' : '' }}">
                         {% if s.fatta %}
                             {{ s.azione == 'consegnato' ? 'Uscita segnata' : 'Rientro segnato' }} · annulla

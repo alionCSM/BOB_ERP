@@ -107,6 +107,54 @@
             .catch(ricarica);
     });
 
+    // ── Foto di uscita e rientro ────────────────────────────────────────────
+    // Il campo file e' nascosto dietro l'icona della macchina fotografica:
+    // sul telefono l'attributo capture apre direttamente la fotocamera, che
+    // e' quello che serve avendo il mezzo davanti.
+    //
+    // Delegato sul documento e non agganciato alle icone: la board viene
+    // riscritta a ogni aggiornamento, e i gestori attaccati ai singoli
+    // elementi sparirebbero con loro.
+    document.addEventListener('change', function (e) {
+        var campo = e.target;
+        if (!campo.dataset || !campo.dataset.giFoto) return;
+        if (!campo.files || !campo.files.length) return;
+        if (!window.fetch) return;
+
+        var card = campo.closest('.gi-card');
+        if (card) card.classList.add('is-attesa');
+
+        var dati = new FormData();
+        dati.append('_csrf', campo.dataset.giCsrf);
+        dati.append('entita_id', campo.dataset.giEntita);
+        dati.append('momento', campo.dataset.giMomento);
+        dati.append('foto', campo.files[0]);
+
+        fetch(campo.dataset.giFoto, {
+            method: 'POST',
+            body: dati,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (risposta) {
+                if (risposta && risposta.ok) {
+                    return aggiorna();
+                }
+                // il messaggio del server dice il perche' (troppo grande,
+                // formato non consentito): ripeterlo generico non aiuta
+                alert(risposta && risposta.messaggio ? risposta.messaggio
+                                                     : 'Caricamento della foto non riuscito');
+                if (card) card.classList.remove('is-attesa');
+            })
+            .catch(function () {
+                alert('Caricamento della foto non riuscito');
+                if (card) card.classList.remove('is-attesa');
+            });
+
+        campo.value = '';   // stessa foto due volte di fila: deve ripartire
+    });
+
     /**
      * Richiede al server il solo pezzo che cambia (avanzamento + board) e lo
      * rimette al suo posto.
