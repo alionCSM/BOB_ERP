@@ -147,11 +147,21 @@ Struttura che BOB crea sotto `CLOUD_ROOT` (da `src/Support/CloudPath.php`):
 ├── offers/                                     # preventivi
 ├── Worksites/<Cliente>/<Anno>/<Codice - Nome>/
 │   └── Disegni/<categoria>/                     # disegni cantiere
-└── BOBZone/<worksiteId>/
-    ├── photos/                                  # foto task BOB Zone
-    ├── files/                                   # repository file BOB Zone
-    └── forms/                                   # firme/foto dei moduli compilati
+├── BOBZone/<worksiteId>/
+│   ├── photos/                                  # foto task BOB Zone
+│   ├── files/                                   # repository file BOB Zone
+│   └── forms/                                   # firme/foto dei moduli compilati
+└── PotiNoleggi/foto/<anno>/<mese>/              # foto di uscita e rientro dei mezzi
 ```
+
+Le foto dei mezzi sono divise per mese e non tutte insieme: sono due per ogni uscita e
+due per ogni rientro, quindi in un anno diventano migliaia, e una cartella con migliaia
+di file è lenta da aprire e impossibile da guardare andandoci dentro a mano.
+
+Il nome dice già tutto senza aprire il database:
+`r<rigaId>_uscita_20260901_143012_a3f1c8.jpg` (mezzi di sollevamento) oppure
+`p<prenotazioneId>_rientro_...` (autocarrate). Le sei cifre finali evitano che due foto
+scattate nello stesso secondo si sovrascrivano.
 
 **Permessi:** l'utente del web server (`www-data`) deve avere **scrittura** su queste
 cartelle. BOB crea le sottocartelle con `mkdir 0775`, ma la radice montata deve essere
