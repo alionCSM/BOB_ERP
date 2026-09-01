@@ -584,6 +584,37 @@ final class ApiV1Controller
     }
 
     /**
+     * Toglie una foto.
+     *
+     * Serve perche' la foto sfocata o quella al mezzo sbagliato non si
+     * possono lasciare li': una fotografia che documenta la cosa sbagliata
+     * e' peggio di nessuna fotografia, perche' qualcuno ci fara' affidamento.
+     */
+    public function noleggiFotoElimina(Request $request): never
+    {
+        $user = $request->user();
+        $body = $this->jsonBody();
+        $tipo = (string)($body['tipo'] ?? 'autocarrate');
+
+        [$ok, , $msg] = $this->noleggiAccesso($user, $tipo);
+        if (!$ok) {
+            Response::json(['success' => false, 'message' => $msg], 403);
+        }
+
+        $servizio = new \App\Service\Poti\Foto($this->conn);
+        $cid      = (int)$this->currentCompany()->id();
+        $foto     = $servizio->trova($cid, (int)($body['id'] ?? 0));
+
+        // solo le foto del modulo per cui si e' passato il controllo sopra
+        $atteso = $tipo === 'macchina' ? 'riga' : 'prenotazione';
+        if (!$foto || $foto['entita'] !== $atteso) {
+            Response::json(['success' => false, 'message' => 'Foto non trovata'], 404);
+        }
+
+        Response::json(['success' => $servizio->elimina($cid, (int)$foto['id'])]);
+    }
+
+    /**
      * Il file di una foto, per l'app.
      *
      * Esiste separata da quella del sito perche' l'app entra col token

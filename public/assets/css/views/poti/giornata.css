@@ -671,14 +671,25 @@
     margin-top: 7px;
 }
 
+/* overflow visibile: la crocetta sporge dall'angolo, e tagliandola resterebbe
+   mezza. A ritagliare l'immagine ci pensa il link qui sotto. */
 .gi-foto-t {
     position: relative;
     display: block;
     width: 38px;
     height: 38px;
+    flex: 0 0 auto;
+}
+
+.gi-foto-t > a,
+.gi-foto-t > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 1px solid #e2e8f0;
     border-radius: 6px;
     overflow: hidden;
-    border: 1px solid #e2e8f0;
+    box-sizing: border-box;
 }
 
 .gi-foto-t img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -687,8 +698,8 @@
    doverla aprire */
 .gi-foto-m {
     position: absolute;
-    right: 0;
-    bottom: 0;
+    right: 1px;
+    bottom: 1px;
     padding: 0 3px;
     background: #16a34a;
     color: #fff;
@@ -723,3 +734,84 @@
     stroke-linecap: round;
     stroke-linejoin: round;
 }
+
+/* ── Foto in attesa e comandi ───────────────────────────────────────────── */
+/* Il giro e' in due tempi: si scelgono, si guarda cosa si e' preso, si butta
+   quello venuto male, e solo alla fine si carica. Le foto in attesa devono
+   distinguersi a colpo d'occhio da quelle gia' sul server, altrimenti non si
+   sa piu' cosa e' salvato e cosa no. */
+/* il bordo sta sull'immagine, non sul contenitore: e' li' che si e' spostato
+   il ritaglio per lasciar sporgere la crocetta */
+.gi-foto-t.is-attesa > img,
+.gi-foto-t.is-attesa > a { border-style: dashed; border-color: #94a3b8; }
+
+/* Una parola sola e ritagliata: il riquadro e' 38px e "da caricare" a 7px ne
+   occupa il doppio, sbordando sulla miniatura accanto. Il senso lo da' gia'
+   il bordo tratteggiato, questa e' la conferma. */
+.gi-foto-nuova {
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
+    padding: 1px 0;
+    background: rgba(15, 23, 42, .68);
+    color: #fff;
+    font-size: 7px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+/* la crocetta sta nell'angolo alto: in basso coprirebbe la foto proprio dove
+   si guarda per capire se e' venuta bene */
+.gi-foto-x {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 17px;
+    height: 17px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #dc2626;
+    color: #fff;
+    font-size: 13px;
+    line-height: 15px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+/* sulle foto gia' caricate compare solo passandoci sopra: sempre visibile
+   sarebbe un invito a cancellare che nessuno ha chiesto. Su quelle in attesa
+   resta fissa, perche' li' scartare e' proprio il senso del passaggio */
+.gi-foto-t:hover .gi-foto-x,
+.gi-foto-x:focus-visible { opacity: 1; }
+.gi-foto-t.is-attesa .gi-foto-x { opacity: 1; }
+
+/* su schermo tattile non esiste il passaggio del mouse: senza questo la
+   crocetta sulle foto caricate non comparirebbe mai */
+@media (hover: none) {
+    .gi-foto-x { opacity: 1; }
+}
+
+.gi-foto-attesa { display: contents; }
+
+.gi-foto-carica {
+    flex: 1 1 100%;
+    margin-top: 4px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: #0369a1;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.gi-foto-carica:hover { background: #075985; }

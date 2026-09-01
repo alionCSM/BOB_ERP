@@ -108,35 +108,127 @@
     });
 
     // ── Foto di uscita e rientro ────────────────────────────────────────────
-    // Il campo file e' nascosto dietro l'icona della macchina fotografica:
-    // sul telefono l'attributo capture apre direttamente la fotocamera, che
-    // e' quello che serve avendo il mezzo davanti.
+    // Due tempi: prima si scelgono e restano qui, si guarda cosa si e' preso
+    // e si butta quello venuto male; poi si carica. Mandarle appena scelte
+    // vorrebbe dire avere la foto sfocata sul server prima di accorgersene.
     //
-    // Delegato sul documento e non agganciato alle icone: la board viene
-    // riscritta a ogni aggiornamento, e i gestori attaccati ai singoli
-    // elementi sparirebbero con loro.
+    // Le foto in attesa vivono in questa mappa e non nel documento: la board
+    // viene riscritta a ogni aggiornamento della giornata, e attaccate alle
+    // schede sparirebbero al primo tocco portandosi via la scelta.
+    var inAttesa = {};   // chiave "entita_momento" -> elenco di File
+
+    function chiaveZona(zona) {
+        return zona.dataset.giEntita + '_' + zona.dataset.giMomento;
+    }
+
+    /** Ridisegna le miniature in attesa e il pulsante di caricamento. */
+    function disegnaAttesa(zona) {
+        var chiave = chiaveZona(zona);
+        var file = inAttesa[chiave] || [];
+        var cassetto = zona.querySelector('[data-gi-attesa]');
+        var bottone = zona.querySelector('[data-gi-carica]');
+        if (!cassetto) return;
+
+        // gli indirizzi temporanei si liberano prima di rifarli: ognuno tiene
+        // in memoria la sua copia del file finche' non lo si revoca
+        Array.prototype.forEach.call(cassetto.querySelectorAll('img'), function (img) {
+            URL.revokeObjectURL(img.src);
+        });
+        cassetto.innerHTML = '';
+
+        file.forEach(function (f, i) {
+            var box = document.createElement('span');
+            box.className = 'gi-foto-t is-attesa';
+
+            var img = document.createElement('img');
+            img.src = URL.createObjectURL(f);
+            img.alt = f.name;
+            box.appendChild(img);
+
+            var eti = document.createElement('span');
+            eti.className = 'gi-foto-nuova';
+            eti.textContent = 'nuova';
+            box.appendChild(eti);
+
+            var x = document.createElement('button');
+            x.type = 'button';
+            x.className = 'gi-foto-x';
+            x.textContent = '×';
+            x.title = 'Togli questa foto';
+            x.dataset.giScarta = String(i);
+            box.appendChild(x);
+
+            cassetto.appendChild(box);
+        });
+
+        if (bottone) {
+            bottone.hidden = file.length === 0;
+            bottone.textContent = file.length === 1
+                ? 'Carica 1 foto'
+                : 'Carica ' + file.length + ' foto';
+        }
+    }
+
+    // scelta dei file: si mettono in attesa, non partono
     document.addEventListener('change', function (e) {
         var campo = e.target;
-        if (!campo.dataset || !campo.dataset.giFoto) return;
-        if (!campo.files || !campo.files.length) return;
+        if (!campo.dataset || campo.dataset.giScegli === undefined) return;
+
+        var zona = campo.closest('[data-gi-foto-zona]');
+        if (!zona || !campo.files || !campo.files.length) return;
+
+        var chiave = chiaveZona(zona);
+        inAttesa[chiave] = (inAttesa[chiave] || []).concat(
+            Array.prototype.slice.call(campo.files)
+        );
+        campo.value = '';   // stesso file due volte di fila: deve ripartire
+        disegnaAttesa(zona);
+    });
+
+    document.addEventListener('click', function (e) {
+        var zona = e.target.closest ? e.target.closest('[data-gi-foto-zona]') : null;
+        if (!zona) return;
+
+        // togliere una foto dalla fila d'attesa
+        var scarta = e.target.closest('[data-gi-scarta]');
+        if (scarta) {
+            var chiave = chiaveZona(zona);
+            (inAttesa[chiave] || []).splice(Number(scarta.dataset.giScarta), 1);
+            disegnaAttesa(zona);
+            return;
+        }
+
+        // eliminare una foto gia' caricata
+        var elimina = e.target.closest('[data-gi-elimina]');
+        if (elimina) {
+            if (!confirm('Eliminare questa foto? Non si recupera.')) return;
+            eliminaFoto(zona, elimina.dataset.giElimina);
+            return;
+        }
+
+        if (e.target.closest('[data-gi-carica]')) {
+            caricaAttesa(zona);
+        }
+    });
+
+    /** Manda tutte le foto in attesa di questa scheda, in una richiesta sola. */
+    function caricaAttesa(zona) {
         if (!window.fetch) return;
 
-        var card = campo.closest('.gi-card');
+        var chiave = chiaveZona(zona);
+        var file = inAttesa[chiave] || [];
+        if (!file.length) return;
+
+        var card = zona.closest('.gi-card');
         if (card) card.classList.add('is-attesa');
 
         var dati = new FormData();
-        dati.append('_csrf', campo.dataset.giCsrf);
-        dati.append('entita_id', campo.dataset.giEntita);
-        dati.append('momento', campo.dataset.giMomento);
+        dati.append('_csrf', zona.dataset.giCsrf);
+        dati.append('entita_id', zona.dataset.giEntita);
+        dati.append('momento', zona.dataset.giMomento);
+        file.forEach(function (f) { dati.append('foto[]', f); });
 
-        // tutte in una richiesta sola: una per foto vorrebbe dire tre o
-        // quattro attese invece di una, ognuna con la sua probabilita' di
-        // andare storta a meta'
-        for (var i = 0; i < campo.files.length; i++) {
-            dati.append('foto[]', campo.files[i]);
-        }
-
-        fetch(campo.dataset.giFoto, {
+        fetch(zona.dataset.giUrl, {
             method: 'POST',
             body: dati,
             credentials: 'same-origin',
@@ -145,23 +237,49 @@
             .then(function (r) { return r.json().catch(function () { return {}; }); })
             .then(function (risposta) {
                 if (risposta && risposta.ok) {
-                    // qualcuna scartata: si dice quale, le altre sono salvate
+                    // si svuota solo adesso: svuotando prima, un errore di
+                    // rete si porterebbe via le foto appena scelte
+                    delete inAttesa[chiave];
                     if (risposta.messaggio) alert(risposta.messaggio);
                     return aggiorna();
                 }
-                // il messaggio del server dice il perche' (troppo grande,
-                // formato non consentito): ripeterlo generico non aiuta
                 alert(risposta && risposta.messaggio ? risposta.messaggio
-                                                     : 'Caricamento della foto non riuscito');
+                                                     : 'Caricamento non riuscito');
                 if (card) card.classList.remove('is-attesa');
             })
             .catch(function () {
-                alert('Caricamento della foto non riuscito');
+                alert('Caricamento non riuscito');
                 if (card) card.classList.remove('is-attesa');
             });
+    }
 
-        campo.value = '';   // stessa foto due volte di fila: deve ripartire
-    });
+    function eliminaFoto(zona, id) {
+        if (!window.fetch) return;
+
+        var card = zona.closest('.gi-card');
+        if (card) card.classList.add('is-attesa');
+
+        var dati = new FormData();
+        dati.append('_csrf', zona.dataset.giCsrf);
+        dati.append('id', id);
+
+        fetch(zona.dataset.giUrlElimina, {
+            method: 'POST',
+            body: dati,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (risposta) {
+                if (risposta && risposta.ok) return aggiorna();
+                alert('Foto non eliminata');
+                if (card) card.classList.remove('is-attesa');
+            })
+            .catch(function () {
+                alert('Foto non eliminata');
+                if (card) card.classList.remove('is-attesa');
+            });
+    }
 
     /**
      * Richiede al server il solo pezzo che cambia (avanzamento + board) e lo
@@ -197,12 +315,23 @@
                 if (board) board.scrollLeft = scorrimento;
 
                 applica();
+                // le foto scelte e non ancora caricate stanno in memoria, non
+                // nel documento: la board appena riscritta non le ha, e vanno
+                // rimesse o sembrerebbero perse
+                ridisegnaAttese();
             })
             .catch(ricarica);
     }
 
     function ricarica() {
         window.location.reload();
+    }
+
+    /** Rimette le miniature in attesa su tutte le schede che ne hanno. */
+    function ridisegnaAttese() {
+        document.querySelectorAll('[data-gi-foto-zona]').forEach(function (zona) {
+            if ((inAttesa[chiaveZona(zona)] || []).length) disegnaAttesa(zona);
+        });
     }
 
     applica();
