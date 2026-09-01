@@ -89,10 +89,12 @@
                 </a>
             {% endfor %}
 
-            {# capture: sul telefono apre la fotocamera invece dell'archivio,
-               che e' quello che serve avendo il mezzo davanti #}
+            {# multiple e senza capture: capture forzerebbe la fotocamera e una
+               foto per volta, mentre girando intorno al mezzo se ne fanno tre
+               o quattro. Senza, il telefono offre lo stesso la fotocamera nel
+               suo elenco, ma lascia anche prenderne piu' d'una gia' scattate. #}
             <label class="gi-foto-piu" title="Aggiungi foto">
-                <input type="file" accept="image/*" capture="environment" hidden
+                <input type="file" accept="image/*" multiple hidden
                        data-gi-foto="{{ azioneFoto }}"
                        data-gi-entita="{{ s.campi.riga_id ?? s.campi.id }}"
                        data-gi-momento="{{ s.rientrato or s.azione == 'rientrato' ? 'rientro' : 'uscita' }}"

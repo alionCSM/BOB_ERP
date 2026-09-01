@@ -128,7 +128,13 @@
         dati.append('_csrf', campo.dataset.giCsrf);
         dati.append('entita_id', campo.dataset.giEntita);
         dati.append('momento', campo.dataset.giMomento);
-        dati.append('foto', campo.files[0]);
+
+        // tutte in una richiesta sola: una per foto vorrebbe dire tre o
+        // quattro attese invece di una, ognuna con la sua probabilita' di
+        // andare storta a meta'
+        for (var i = 0; i < campo.files.length; i++) {
+            dati.append('foto[]', campo.files[i]);
+        }
 
         fetch(campo.dataset.giFoto, {
             method: 'POST',
@@ -139,6 +145,8 @@
             .then(function (r) { return r.json().catch(function () { return {}; }); })
             .then(function (risposta) {
                 if (risposta && risposta.ok) {
+                    // qualcuna scartata: si dice quale, le altre sono salvate
+                    if (risposta.messaggio) alert(risposta.messaggio);
                     return aggiorna();
                 }
                 // il messaggio del server dice il perche' (troppo grande,

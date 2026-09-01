@@ -150,7 +150,20 @@ final class Foto
         }
 
         if (!$out && !$errori) {
-            $errori[] = 'Nessuna foto ricevuta';
+            // Niente file e una richiesta grossa: PHP ha scartato tutto
+            // perche' superava post_max_size, e in quel caso svuota sia
+            // $_FILES sia $_POST senza dire niente. Senza questo controllo
+            // l'app leggerebbe "nessuna foto ricevuta" mentre le aveva
+            // mandate davvero, e nessuno capirebbe perche'.
+            $inviati = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+            $limite  = $this->inByte((string)ini_get('post_max_size'));
+
+            $errori[] = ($limite > 0 && $inviati > $limite)
+                ? sprintf(
+                    'Le foto insieme superano il limite del server (%s). Mandane meno per volta.',
+                    ini_get('post_max_size')
+                )
+                : 'Nessuna foto ricevuta';
         }
         return ['foto' => $out, 'errori' => $errori];
     }
@@ -253,6 +266,22 @@ final class Foto
             @unlink($assoluto);
         }
         return true;
+    }
+
+    /** "8M" o "512K" in byte, per confrontarlo con quanto e' arrivato. */
+    private function inByte(string $valore): int
+    {
+        $valore = trim($valore);
+        if ($valore === '') {
+            return 0;
+        }
+        $numero = (int)$valore;
+        return match (strtolower(substr($valore, -1))) {
+            'g'     => $numero * 1024 * 1024 * 1024,
+            'm'     => $numero * 1024 * 1024,
+            'k'     => $numero * 1024,
+            default => $numero,
+        };
     }
 
     /**
