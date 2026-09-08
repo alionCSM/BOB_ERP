@@ -898,7 +898,15 @@ final class FleetReconciliationService
      */
     private function checkVehiclesWithoutCard(int $runId, string $from, string $to, ?int $vehicleFilter): int
     {
-        $params = [':from' => $from . ' 00:00:00', ':to' => $to . ' 23:59:59'];
+        // from e to comparivano due volte nella query, una nel BETWEEN e una
+        // dentro DATE(): con le query preparate native lo stesso segnaposto
+        // non si puo' ripetere, quindi ne servono due distinti per ciascuna.
+        $params = [
+            ':from'      => $from . ' 00:00:00',
+            ':to'        => $to . ' 23:59:59',
+            ':from_data' => $from,
+            ':to_data'   => $to,
+        ];
         $vFilter = '';
         if ($vehicleFilter) {
             $vFilter = ' AND v.id = :vid';
@@ -912,8 +920,8 @@ final class FleetReconciliationService
               AND NOT EXISTS (
                 SELECT 1 FROM bb_fleet_fuel_card_assignments fca
                 WHERE fca.vehicle_id = v.id
-                  AND fca.from_date <= DATE(:to)
-                  AND (fca.to_date IS NULL OR fca.to_date >= DATE(:from))
+                  AND fca.from_date <= :to_data
+                  AND (fca.to_date IS NULL OR fca.to_date >= :from_data)
               )
               {$vFilter}
             GROUP BY v.id

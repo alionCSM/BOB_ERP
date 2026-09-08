@@ -180,16 +180,28 @@ class AttendanceRepository implements AttendanceRepositoryInterface
 
     public function getWorkerCompanyFromHistory(string $fiscalCode, string $day): ?string
     {
+        // Due segnaposto per la stessa data, e non uno usato due volte: la
+        // connessione ha ATTR_EMULATE_PREPARES a false, quindi le query sono
+        // preparate da MySQL, che vuole un valore per ogni segnaposto e
+        // rifiuta il nome ripetuto con "Invalid parameter number".
+        //
+        // Si vedeva solo inserendo una presenza precedente alla data di
+        // decorrenza dell'azienda attuale: e' l'unico caso in cui si va a
+        // cercare nell'archivio, e quindi l'unico in cui questa query gira.
         $stmt = $this->conn->prepare("
             SELECT company
             FROM bb_worker_company_history
             WHERE fiscal_code = :fiscal
-              AND start_date <= :day
-              AND (end_date IS NULL OR end_date >= :day)
+              AND start_date <= :giorno_inizio
+              AND (end_date IS NULL OR end_date >= :giorno_fine)
             ORDER BY start_date DESC
             LIMIT 1
         ");
-        $stmt->execute([':fiscal' => $fiscalCode, ':day' => $day]);
+        $stmt->execute([
+            ':fiscal'        => $fiscalCode,
+            ':giorno_inizio' => $day,
+            ':giorno_fine'   => $day,
+        ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row['company'] ?? null;
