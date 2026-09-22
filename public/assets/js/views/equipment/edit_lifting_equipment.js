@@ -11,11 +11,20 @@ document.addEventListener('DOMContentLoaded', function () {
             var card = btn.closest('.rn-card');
             card.remove();
 
+            // Il form di QUESTA pagina, preso dal pulsante che si e' premuto.
+            // Prima era document.querySelector('form'), cioe' il PRIMO form del
+            // documento: da quando la barra in alto ha il selettore societa',
+            // quello e' il form del cambio societa'. Il campo finiva li' e non
+            // veniva mai inviato — la scheda spariva da video ma il noleggio
+            // restava a database.
+            var form = btn.closest('form');
+            if (!form) return;
+
             var input = document.createElement('input');
             input.type  = 'hidden';
             input.name  = 'delete_ids[]';
             input.value = id;
-            document.querySelector('form').appendChild(input);
+            form.appendChild(input);
         });
     });
 

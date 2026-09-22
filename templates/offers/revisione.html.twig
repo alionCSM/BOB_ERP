@@ -66,7 +66,7 @@
 
 {# Form Card #}
 <div class="cfo-card">
-    <form action="/offers/{{ originalId }}/revise" method="post" enctype="multipart/form-data">
+    <form action="/offers/{{ originalId }}/revise" method="post" enctype="multipart/form-data" id="form-offerta">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
         <!-- Modal Note Interne -->
@@ -421,5 +421,5 @@
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
 <script type="application/json" id="items-data">{{ itemsData|json_encode|raw }}</script>
-<script src="/assets/js/views/offers/revisione_offerta.js"></script>
+<script src="/assets/js/views/offers/revisione_offerta.js?v=2"></script>
 {% endblock %}

@@ -325,7 +325,11 @@ document.addEventListener('click', function(e) {
 // --------------------------------------------------------------
 // Submit: serializzo le righe
 // --------------------------------------------------------------
-document.querySelector('form').addEventListener('submit', function (e) {
+// Per id e non "il primo form del documento": quello adesso e' il cambio
+// societa' nella barra in alto. Le righe dell'offerta non venivano
+// serializzate al salvataggio, e il controllo scattava invece quando si
+// cambiava societa'.
+document.getElementById('form-offerta').addEventListener('submit', function (e) {
     // Count rows where exactly one of (descrizione, importo) is filled —
     // those would otherwise be silently dropped on save. Warn the operator
     // before continuing.

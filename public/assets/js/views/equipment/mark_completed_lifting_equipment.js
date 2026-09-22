@@ -48,8 +48,11 @@
             }
         });
 
-        // al submit, riabilita i campi obbligatori cosi' che vengano inviati
-        var form = document.querySelector('form');
+        // al submit, riabilita i campi obbligatori cosi' che vengano inviati.
+        // Per id e non "il primo form del documento": quello adesso e' il
+        // cambio societa' nella barra in alto, e i campi restavano disabilitati
+        // — quindi quantita' e data fine non venivano inviate.
+        var form = document.getElementById('form-completa-noleggi');
         if (form) {
             form.addEventListener('submit', function () {
                 document.querySelectorAll('input[data-toggle-row]').forEach(function (chk) {
