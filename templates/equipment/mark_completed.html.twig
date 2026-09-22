@@ -46,7 +46,7 @@
             <p class="rn-empty-text">Nessun mezzo attivo da terminare per questo cantiere.</p>
         </div>
     {% else %}
-    <form method="POST">
+    <form method="POST" id="form-completa-noleggi">
         <input type="hidden" name="_token" value="{{ csrfToken }}">
         <input type="hidden" name="mark_completed" value="1">
 
@@ -107,5 +107,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/equipment/mark_completed_lifting_equipment.js"></script>
+<script src="/assets/js/views/equipment/mark_completed_lifting_equipment.js?v=2"></script>
 {% endblock %}

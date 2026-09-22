@@ -79,7 +79,7 @@
 
 {# Form Card #}
 <div class="cfo-card">
-    <form action="/offers/create" method="post" enctype="multipart/form-data">
+    <form action="/offers/create" method="post" enctype="multipart/form-data" id="form-offerta">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
         <!-- Modal Note Interne -->
@@ -511,5 +511,5 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
 <script src="https://cdn.ckeditor.com/ckeditor5/39.0.1/classic/ckeditor.js"></script>
-<script src="/assets/js/views/offers/create_offer.js"></script>
+<script src="/assets/js/views/offers/create_offer.js?v=2"></script>
 {% endblock %}
