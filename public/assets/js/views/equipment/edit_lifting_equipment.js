@@ -7,18 +7,22 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', function () {
             if (!confirm('Eliminare definitivamente questo noleggio? Ricorda di salvare le modifiche.')) return;
 
-            var id   = btn.getAttribute('data-delete-id');
-            var card = btn.closest('.rn-card');
-            card.remove();
+            var id = btn.getAttribute('data-delete-id');
 
-            // Il form di QUESTA pagina, preso dal pulsante che si e' premuto.
-            // Prima era document.querySelector('form'), cioe' il PRIMO form del
+            // Il form si cerca PRIMA di togliere la scheda, e l'ordine non e'
+            // un dettaglio: una volta rimossa la scheda il pulsante non sta
+            // piu' nel documento, e closest() risale una catena di genitori
+            // che si ferma alla scheda staccata — il form non lo trova piu'.
+            //
+            // E dev'essere il form di QUESTA pagina, non il primo del
             // documento: da quando la barra in alto ha il selettore societa',
-            // quello e' il form del cambio societa'. Il campo finiva li' e non
-            // veniva mai inviato — la scheda spariva da video ma il noleggio
-            // restava a database.
+            // quello e' il form del cambio societa', e il campo finiva li'
+            // senza mai essere inviato.
             var form = btn.closest('form');
             if (!form) return;
+
+            var card = btn.closest('.rn-card');
+            if (card) card.remove();
 
             var input = document.createElement('input');
             input.type  = 'hidden';
