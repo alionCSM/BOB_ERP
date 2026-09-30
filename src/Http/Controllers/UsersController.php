@@ -1051,6 +1051,19 @@ final class UsersController
                      ORDER BY last_name ASC, first_name ASC")
             ->fetchAll(\PDO::FETCH_ASSOC);
 
+        // Gli stessi sei valori dell'ENUM a database. Elencati qui e non
+        // liberi: il campo era di testo, e un ruolo inventato faceva fallire
+        // la INSERT con un errore del database invece di una risposta
+        // comprensibile.
+        $ruoli = [
+            'admin'            => 'Amministratore',
+            'manager'          => 'Responsabile',
+            'user'             => 'Utente',
+            'offerte'          => 'Offerte',
+            'document_manager' => 'Gestione documenti',
+            'company_viewer'   => 'Sola lettura azienda',
+        ];
+
         $success      = '';
         $error        = '';
         $tempPassword = '';
@@ -1066,7 +1079,12 @@ final class UsersController
             $type       = $_POST['type']            ?? 'user';
             $accessProf = $_POST['access_profile']  ?? 'INTERNAL';
             $companyId  = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
-            $role       = trim($_POST['role']       ?? 'user');
+            // si verifica anche qui: l'elenco chiuso nel form si aggira
+            // scrivendo a mano la richiesta, e la colonna non perdona
+            $role       = trim($_POST['role'] ?? 'user');
+            if (!isset($ruoli[$role])) {
+                $role = 'user';
+            }
             $sendEmail  = !empty($_POST['send_email']);
 
             if ($username === '' || $email === '' || $firstName === '' || $lastName === '') {
@@ -1235,7 +1253,7 @@ final class UsersController
         }
 
         Response::view('users/create_bob_user.html.twig', $request, compact(
-            'companies', 'societa', 'clients', 'workers',
+            'companies', 'societa', 'clients', 'workers', 'ruoli',
             'success', 'error', 'tempPassword', 'post'
         ));
     }

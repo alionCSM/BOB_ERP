@@ -186,10 +186,19 @@
                     </div>
                 </div>
                 <div class="cu-row single">
+                    {# A database "role" e' un ENUM con sei valori: era un campo
+                       di testo libero, e scrivendoci qualcosa di diverso la
+                       creazione falliva con un errore del database invece di
+                       dire che il ruolo non esiste. #}
                     <div class="cu-field">
                         <label for="role">Ruolo</label>
-                        <input type="text" id="role" name="role" placeholder="es. admin, user, company_viewer"
-                               value="{{ post.role ?? 'user' }}">
+                        <select id="role" name="role">
+                            {% for chiave, etichetta in ruoli %}
+                                <option value="{{ chiave }}"{{ (post.role ?? 'user') == chiave ? ' selected' : '' }}>
+                                    {{ etichetta }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
 
