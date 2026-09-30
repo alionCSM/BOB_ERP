@@ -30,29 +30,69 @@ final class ApiV1OperaioController
     // ── GET /api/v1/me/cantieri ──────────────────────────────────────────────
 
     /**
-     * I cantieri su cui l'operaio puo' dichiarare una presenza.
+     * I cantieri fra cui l'operaio sceglie quando dichiara una giornata.
      *
-     * Sono quelli a cui e' assegnato, non tutti: un elenco completo su
-     * centoquaranta operai vorrebbe dire che chiunque puo' dichiarare ore su
-     * un cantiere dove non ha mai messo piede, e l'ufficio se ne accorge solo
-     * leggendo riga per riga.
+     * Il problema vero non e' il permesso, e' che uno deve ritrovare il
+     * cantiere dove e' stato. Un operaio non ragiona per codici: sa "quello
+     * di Lecco", o "lo stesso di ieri". Quindi l'elenco parte da dove ha gia'
+     * lavorato — sono quasi sempre quelli, e stanno in cima gia' pronti — e
+     * lascia cercare fra i cantieri aperti per il caso in cui lo mandino da
+     * un'altra parte.
+     *
+     * "Dove ha gia' lavorato" si legge da bb_presenze, che e' l'unico posto
+     * dove quel dato esiste davvero: l'ufficio lo scrive ogni giorno. Prima
+     * qui leggevo bb_worksite_assignments, che in BOB **nessuno scrive mai** —
+     * viene solo letta — quindi l'elenco sarebbe uscito vuoto per tutti e
+     * nessuno avrebbe potuto dichiarare niente.
+     *
+     * Parametro `q`: cerca per nome, codice o paese fra i cantieri aperti.
      */
     public function cantieri(Request $request): never
     {
         $operaio = $this->operaio($request);
+        $cerca   = trim((string)($_GET['q'] ?? ''));
 
+        // ── Dove e' stato di recente ────────────────────────────────────
+        // Sei mesi: piu' indietro sono cantieri chiusi che non servono a
+        // nessuno, e allungano una tendina che si guarda col pollice.
         $stmt = $this->conn->prepare("
-            SELECT w.id, w.worksite_code, w.name, w.location
-            FROM   bb_worksite_assignments a
-            JOIN   bb_worksites w ON w.id = a.worksite_id
-            WHERE  a.worker_id = :wid
-            ORDER BY w.name ASC
+            SELECT w.id, w.worksite_code, w.name, w.location,
+                   MAX(p.data) AS ultima_presenza
+            FROM   bb_presenze p
+            JOIN   bb_worksites w ON w.id = p.worksite_id
+            WHERE  p.worker_id = :wid
+              AND  p.data >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+            GROUP BY w.id, w.worksite_code, w.name, w.location
+            ORDER BY ultima_presenza DESC
+            LIMIT 15
         ");
         $stmt->execute([':wid' => $operaio]);
+        $recenti = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // ── Tutti gli aperti, per quando lo mandano altrove ─────────────
+        $sql  = "SELECT id, worksite_code, name, location
+                 FROM   bb_worksites
+                 WHERE  status IN ('In corso', 'A rischio')";
+        $args = [];
+
+        if ($cerca !== '') {
+            $sql .= " AND (name LIKE :q1 OR worksite_code LIKE :q2 OR location LIKE :q3)";
+            foreach (['q1', 'q2', 'q3'] as $seg) {
+                $args[':' . $seg] = '%' . $cerca . '%';
+            }
+        }
+        $sql .= ' ORDER BY name ASC LIMIT 200';
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($args);
+        $aperti = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         Response::json([
-            'success'  => true,
-            'cantieri' => $stmt->fetchAll(\PDO::FETCH_ASSOC),
+            'success' => true,
+            // quelli suoi, gia' ordinati dall'ultimo giorno lavorato
+            'recenti' => $recenti,
+            // tutti gli aperti, per cercare quando lo mandano da un'altra parte
+            'aperti'  => $aperti,
         ]);
     }
 
@@ -146,11 +186,17 @@ final class ApiV1OperaioController
             ], 422);
         }
 
-        if (!$this->suoCantiere($operaio, $worksiteId)) {
+        // Basta che il cantiere sia aperto. Il controllo vero e'
+        // l'approvazione dell'ufficio: e' li' che qualcuno guarda se quella
+        // giornata ha senso. Restringere qui ai cantieri "assegnati"
+        // sembrava piu' sicuro, ma quell'assegnazione in BOB non la scrive
+        // nessuno — avrebbe rifiutato tutto — e comunque un operaio mandato
+        // per un giorno da un'altra parte deve poterlo dichiarare.
+        if (!$this->cantiereAperto($worksiteId)) {
             Response::json([
                 'success' => false,
-                'message' => 'Non risulti assegnato a questo cantiere',
-            ], 403);
+                'message' => 'Cantiere non trovato o non aperto',
+            ], 422);
         }
 
         $repo = new RichiestaPresenzaRepository($this->conn);
@@ -287,14 +333,14 @@ final class ApiV1OperaioController
         return $workerId;
     }
 
-    /** L'operaio e' assegnato a questo cantiere? */
-    private function suoCantiere(int $workerId, int $worksiteId): bool
+    /** Il cantiere esiste ed e' aperto? */
+    private function cantiereAperto(int $worksiteId): bool
     {
         $stmt = $this->conn->prepare(
-            'SELECT COUNT(*) FROM bb_worksite_assignments
-             WHERE worker_id = :wid AND worksite_id = :ws'
+            "SELECT COUNT(*) FROM bb_worksites
+             WHERE id = :ws AND status IN ('In corso', 'A rischio')"
         );
-        $stmt->execute([':wid' => $workerId, ':ws' => $worksiteId]);
+        $stmt->execute([':ws' => $worksiteId]);
         return (int)$stmt->fetchColumn() > 0;
     }
 
