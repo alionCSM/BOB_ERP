@@ -123,6 +123,7 @@ final class ApiV1OperaioController
         $stmt = $this->conn->prepare("
             SELECT p.id, p.data, p.cantiere, p.worksite_id,
                    pn.capo_squadra AS sei_capo,
+                   pn.trasferta,
                    pn.auto_targa,
                    w.worksite_code, w.name AS cantiere_nome, w.location
             FROM   bb_pianificazione_nostri pn
@@ -139,7 +140,10 @@ final class ApiV1OperaioController
         // altro c'e', e mandare l'elenco dei colleghi a tutti vuol dire
         // spargere dati di centoquaranta persone su centoquaranta telefoni.
         foreach ($giorni as &$g) {
-            $g['sei_capo'] = (bool)$g['sei_capo'];
+            $g['sei_capo']  = (bool)$g['sei_capo'];
+            // l'app la usa per sapere se proporre cena e albergo; l'ufficio
+            // la usa in approvazione per accorgersi di chi li dichiara senza
+            $g['trasferta'] = (bool)$g['trasferta'];
             $g['squadra']  = $g['sei_capo'] ? $this->squadra((int)$g['id']) : [];
         }
         unset($g);

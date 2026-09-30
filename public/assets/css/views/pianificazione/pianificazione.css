@@ -335,3 +335,55 @@
     background: #fffbeb;
     box-shadow: inset 2px 0 0 #f59e0b;
 }
+
+/* ── Trasferta ──────────────────────────────────────────────────────────── */
+/* Per operaio e non per squadra: quasi sempre partono tutti, ma capita
+   quello che abita vicino e la sera torna a casa. Con un interruttore sul
+   cantiere quel caso non si potrebbe scrivere, e in busta paga finirebbe una
+   trasferta che non c'e' stata. */
+.pn-worker-tras {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.pn-worker-tras:hover { color: #7c3aed; background: #faf5ff; }
+.pn-worker-tras.is-tras { color: #6d28d9; background: #ede9fe; }
+
+/* la riga si tinge: guardando la squadra si vede subito chi dorme fuori */
+.pn-worker-row[data-trasferta="1"] { background: #faf5ff; }
+
+/* capo e trasferta insieme: comanda il segno del capo, che e' quello che si
+   cerca per primo */
+.pn-worker-row[data-capo="1"] { background: #fffbeb; }
+
+.pn-section-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pn-tras-tutti {
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    background: #fff;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #6d28d9;
+    cursor: pointer;
+}
+
+.pn-tras-tutti:hover { background: #faf5ff; border-color: #ddd6fe; }

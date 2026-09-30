@@ -48,7 +48,13 @@ final class ProgrammazioneController
         unset($w);
 
         $nosTriCount    = count(array_filter($allWorkers, static fn($w) => $w['is_nostro']));
-        $workersJson    = json_encode($allWorkers, JSON_UNESCAPED_UNICODE);
+
+        // Si mandano tutti, col contrassegno is_nostro gia' calcolato: la
+        // pagina offre solo i nostri nel selettore, ma per leggere una
+        // pianificazione vecchia le servono anche gli altri — se in passato
+        // qualcuno ci ha messo un operaio di una consorziata, quella riga
+        // deve continuare a comparire col nome invece di sparire in silenzio.
+        $workersJson = json_encode($allWorkers, JSON_UNESCAPED_UNICODE);
 
         // Consorziate companies with active worker count
         $stmt = $this->conn->query("
@@ -506,8 +512,9 @@ final class ProgrammazioneController
                     if ($wid <= 0 && $wname === '') continue;
                     $stmt = $this->conn->prepare("
                         INSERT INTO bb_pianificazione_nostri
-                            (pianificazione_id, worker_id, worker_name, auto_targa, note, capo_squadra)
-                        VALUES (:pid, :wid, :wname, :targa, :note, :capo)
+                            (pianificazione_id, worker_id, worker_name, auto_targa, note,
+                             capo_squadra, trasferta)
+                        VALUES (:pid, :wid, :wname, :targa, :note, :capo, :tras)
                     ");
                     $stmt->execute([
                         ':pid'   => $pid,
@@ -516,6 +523,7 @@ final class ProgrammazioneController
                         ':targa' => trim($n['auto_targa'] ?? ''),
                         ':note'  => trim($n['note'] ?? ''),
                         ':capo'  => !empty($n['capo_squadra']) ? 1 : 0,
+                        ':tras'  => !empty($n['trasferta']) ? 1 : 0,
                     ]);
                 }
 
@@ -573,11 +581,11 @@ final class ProgrammazioneController
                 $stmt->execute([':data' => $toDate, ':cantiere' => $sc['cantiere'], ':ws' => $sc['worksite_id'] ?? null, ':sort' => $sc['sort_order'], ':uid' => $userId]);
                 $newPid = (int)$this->conn->lastInsertId();
 
-                $stmt2 = $this->conn->prepare("SELECT worker_id, worker_name, auto_targa, note, capo_squadra FROM bb_pianificazione_nostri WHERE pianificazione_id = :pid");
+                $stmt2 = $this->conn->prepare("SELECT worker_id, worker_name, auto_targa, note, capo_squadra, trasferta FROM bb_pianificazione_nostri WHERE pianificazione_id = :pid");
                 $stmt2->execute([':pid' => $sc['id']]);
                 foreach ($stmt2->fetchAll(\PDO::FETCH_ASSOC) as $n) {
-                    $ins = $this->conn->prepare("INSERT INTO bb_pianificazione_nostri (pianificazione_id, worker_id, worker_name, auto_targa, note, capo_squadra) VALUES (:pid, :wid, :wn, :t, :n, :capo)");
-                    $ins->execute([':pid' => $newPid, ':wid' => $n['worker_id'], ':wn' => $n['worker_name'], ':t' => $n['auto_targa'], ':n' => $n['note'], ':capo' => $n['capo_squadra']]);
+                    $ins = $this->conn->prepare("INSERT INTO bb_pianificazione_nostri (pianificazione_id, worker_id, worker_name, auto_targa, note, capo_squadra, trasferta) VALUES (:pid, :wid, :wn, :t, :n, :capo, :tras)");
+                    $ins->execute([':pid' => $newPid, ':wid' => $n['worker_id'], ':wn' => $n['worker_name'], ':t' => $n['auto_targa'], ':n' => $n['note'], ':capo' => $n['capo_squadra'], ':tras' => $n['trasferta']]);
                 }
 
                 $stmt3 = $this->conn->prepare("SELECT azienda_nome, quantita, note FROM bb_pianificazione_consorziate WHERE pianificazione_id = :pid");
@@ -615,7 +623,7 @@ final class ProgrammazioneController
 
             $stmt2 = $this->conn->prepare("
                 SELECT pn.worker_id, pn.worker_name, pn.auto_targa, pn.note,
-                       pn.capo_squadra,
+                       pn.capo_squadra, pn.trasferta,
                        w.first_name, w.last_name
                 FROM bb_pianificazione_nostri pn
                 LEFT JOIN bb_workers w ON w.id = pn.worker_id
