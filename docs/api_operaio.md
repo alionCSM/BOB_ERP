@@ -117,14 +117,31 @@ l'ufficio guarda, eventualmente corregge e approva.
 
 ```json
 { "worksite_id": 5059, "data": "2026-09-29", "turno": "Intero",
-  "pranzo": "Noi", "cena": "-", "hotel": "", "targa_auto": "AB123CD",
+  "pranzo": "azienda", "cena": "", "hotel": "", "targa_auto": "AB123CD",
   "trasferta": false, "note": "" }
 ```
 
 `turno`: `Intero` | `Mezzo`.
-`pranzo` e `cena`: `-` | `Loro` (ha pagato l'operaio) | `Noi` (ha pagato
-l'azienda). E' lo stesso vocabolario che l'ufficio usa gia', cosi' in
-approvazione ritrova le cose come le scrive tutti i giorni.
+
+**`pranzo` e `cena`: manda le parole dell'operaio, non quelle dell'ufficio.**
+
+| L'app mostra | L'app manda | A database diventa |
+|---|---|---|
+| Ho pagato io | `io` | `Loro` |
+| Ha pagato l'azienda | `azienda` | `Noi` |
+| Non ho mangiato | `` (vuoto) | `-` |
+
+La traduzione la fa il server, di proposito. "Ho pagato io" diventa "Loro" —
+dal punto di vista di chi tiene i conti, loro sono gli operai — ed e'
+un'inversione facilissima da sbagliare. Sbagliata, sposta i costi dei pasti
+da una parte all'altra senza che nessuno se ne accorga.
+
+Tenendola nel server, chiunque scriva un client — questa app, quella per
+iPhone, qualsiasi cosa domani — manda quello che ha scelto l'operaio e non
+puo' invertirla.
+
+Qualsiasi altro valore diventa `-`: meglio una riga che dice "non pervenuto"
+di una che afferma qualcosa che nessuno ha detto.
 
 **L'importo non si chiede all'operaio.** Lui sa di aver mangiato, non sa
 quanto l'azienda ha pagato quel pasto: chiederglielo vuol dire raccogliere

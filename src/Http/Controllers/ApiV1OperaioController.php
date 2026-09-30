@@ -268,16 +268,25 @@ final class ApiV1OperaioController
             ], 409);
         }
 
-        // Pasti col vocabolario dell'ufficio: "Loro" ha pagato l'operaio,
-        // "Noi" ha pagato l'azienda. L'importo non si chiede — lui sa di aver
-        // mangiato, non quanto e' costato — e lo mette l'ufficio in
-        // approvazione, dove ci sono le fatture.
+        // L'app manda le parole dell'operaio, il database tiene quelle
+        // dell'ufficio. La traduzione sta qui e non nell'app di proposito:
+        // "ho pagato io" diventa "Loro" — dal punto di vista di chi tiene i
+        // conti, loro sono gli operai — ed e' un'inversione facilissima da
+        // sbagliare. Sbagliata, sposta i costi dei pasti da una parte
+        // all'altra senza che nessuno se ne accorga.
+        //
+        // Tenendola qui, chiunque scriva un'app — questa, quella per iPhone,
+        // qualsiasi altra cosa domani — manda quello che ha scelto l'operaio
+        // e non puo' invertirla.
+        //
+        // L'importo non si chiede: lui sa di aver mangiato, non quanto e'
+        // costato. Lo mette l'ufficio, dove ci sono le fatture.
         $id = $repo->crea($operaio, [
             'worksite_id' => $worksiteId,
             'data'        => $data,
             'turno'       => $turno,
-            'pranzo'      => (string)($body['pranzo'] ?? '-'),
-            'cena'        => (string)($body['cena'] ?? '-'),
+            'pranzo'      => $this->chiHaPagato($body['pranzo'] ?? ''),
+            'cena'        => $this->chiHaPagato($body['cena'] ?? ''),
             'hotel'       => trim((string)($body['hotel'] ?? '')),
             'targa_auto'  => strtoupper(trim((string)($body['targa_auto'] ?? ''))),
             'trasferta'   => !empty($body['trasferta']),
@@ -420,6 +429,29 @@ final class ApiV1OperaioController
         ");
         $stmt->execute([':pid' => $pianificazioneId]);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Dalle parole dell'operaio a quelle dell'ufficio.
+     *
+     *   "io"      -> "Loro"  l'ha pagato l'operaio, all'azienda non costa
+     *   "azienda" -> "Noi"   l'ha pagato l'azienda, e va nei costi
+     *   niente    -> "-"     non ha mangiato, o non l'ha detto
+     *
+     * Si accettano anche "Loro" e "Noi" gia' tradotti: sono valori distinti
+     * da quelli dell'app, quindi non c'e' modo di confonderli, e cosi' un
+     * client che manda il vocabolario del database funziona lo stesso.
+     *
+     * Tutto il resto diventa "-": meglio una riga che dice "non pervenuto" di
+     * una che afferma qualcosa che nessuno ha detto.
+     */
+    private function chiHaPagato(mixed $valore): string
+    {
+        return match (strtolower(trim((string)$valore))) {
+            'io', 'operaio', 'loro' => 'Loro',
+            'azienda', 'noi'        => 'Noi',
+            default                 => '-',
+        };
     }
 
     /** Il cantiere esiste ed e' aperto? */
