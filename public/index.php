@@ -727,7 +727,20 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/noleggi/foto/elimina',     [ApiV1Controller::class, 'noleggiFotoElimina'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
-            ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);
+            ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda'])
+
+            // ── L'app dell'operaio: le sue cose e basta ───────────────────
+            // Nessun permesso di modulo: un operaio non ne ha. L'accesso lo
+            // decide una sola domanda, sono i tuoi dati, e la risposta viene
+            // dal worker_id dell'utente collegato — mai da un id passato
+            // nella richiesta, che sarebbe modificabile.
+            ->get('/api/v1/me/cantieri',               [ApiV1OperaioController::class, 'cantieri'])
+            ->get('/api/v1/me/documenti',              [ApiV1OperaioController::class, 'documenti'])
+            ->get('/api/v1/me/presenze',               [ApiV1OperaioController::class, 'presenze'])
+            ->post('/api/v1/me/presenze',              [ApiV1OperaioController::class, 'creaPresenza'])
+            ->post('/api/v1/me/presenze/{id}/ritira',  [ApiV1OperaioController::class, 'ritiraPresenza'])
+            ->get('/api/v1/me/ferie',                  [ApiV1OperaioController::class, 'ferie'])
+            ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie']);
 
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si
