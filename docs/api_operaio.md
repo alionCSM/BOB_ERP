@@ -91,24 +91,48 @@ gia' scaduto. Ordinati per scadenza, i senza scadenza in fondo.
 
 ## GET /api/v1/me/presenze
 
-Le sue dichiarazioni. Senza parametri: da un mese fa a un mese avanti.
+**Tutte le sue giornate**, non solo quelle che ha mandato lui dall'app.
+Senza parametri: da un mese fa a un mese avanti.
 
 Parametri: `dal`, `al` (`aaaa-mm-gg`).
 
 ```json
 { "success": true, "dal": "2026-08-30", "al": "2026-10-30",
   "presenze": [
-    { "id": 8, "data": "2026-09-29", "turno": "Intero",
-      "stato": "in_attesa", "note": null, "motivo": null,
+    { "origine": "dichiarata", "stato": "in_attesa",
+      "id": null, "richiesta_id": 8,
+      "data": "2026-09-29", "turno": "Intero",
+      "note": null, "motivo": null,
+      "pranzo": "Noi", "cena": "-", "hotel": null,
+      "targa_auto": "AB123CD", "trasferta": 0,
       "worksite_id": 5059, "cantiere_nome": "Via Roma",
-      "cantiere_codice": "C-2026-014", "presenza_id": null }
+      "cantiere_codice": "C-2026-014" },
+    { "origine": "registrata", "stato": "registrata",
+      "id": 41022, "richiesta_id": null,
+      "data": "2026-09-26", "turno": "Intero",
+      "note": null, "motivo": null,
+      "pranzo": "-", "cena": "-", "hotel": null,
+      "targa_auto": null, "trasferta": 0,
+      "worksite_id": 5059, "cantiere_nome": "Via Roma",
+      "cantiere_codice": "C-2026-014" }
   ] }
 ```
 
-`stato`: `in_attesa` | `approvata` | `rifiutata`.
+`origine`: `registrata` (una riga vera di `bb_presenze`) | `dichiarata`
+(una richiesta ancora non approvata).
+
+`stato`: `registrata` | `in_attesa` | `rifiutata`.
+
+Non esiste `approvata` in questo elenco, ed e' voluto: appena l'ufficio
+approva, nasce la presenza vera e la giornata ricompare come `registrata`.
+Mandare tutte e due le righe farebbe vedere lo stesso giorno due volte.
+
 `motivo` e' valorizzato solo sulle rifiutate — e' quello che l'operaio deve
-leggere per capire cosa correggere.
-`presenza_id` compare sulle approvate: e' la presenza vera nata da li'.
+leggere per capire cosa correggere. `richiesta_id` serve per ritirarla.
+
+Ordinate dal giorno piu' recente. Lo storico di chi lavorava prima dell'app
+c'e' tutto: sono presenze registrate dall'ufficio, e un elenco che mostrasse
+solo le dichiarazioni gli direbbe di non aver mai lavorato.
 
 ## POST /api/v1/me/presenze
 
@@ -205,9 +229,6 @@ del rilascio sarebbe stato un disastro.
 
 - **Una notifica** all'operaio quando l'ufficio decide: oggi deve riaprire
   l'app per scoprirlo.
-- **Il suggerimento dei giorni non dichiarati**: il problema vero non e'
-  trovare il cantiere, e' ricordarsi di dichiarare. Dopo tre giorni uno non
-  sa piu' dove e' stato.
 - **BOB Zone** e' gia' esposto altrove (`/api/v1/zone/...`) e nell'app ci
   sono gia' Cantieri e Zone. Manca la sezione Disegni.
 

@@ -31,13 +31,64 @@ final class RichiestaPresenzaRepository
     public function __construct(private PDO $conn) {}
 
     /**
-     * Le dichiarazioni di un operaio in un periodo.
+     * Tutte le sue giornate: quelle registrate e quelle ancora per aria.
+     *
+     * L'operaio non distingue fra "presenza" e "dichiarazione": per lui e' il
+     * giorno che ha lavorato. Mostrargli solo le dichiarazioni vorrebbe dire
+     * lasciar sparire dall'elenco tutti i giorni messi dall'ufficio — cioe'
+     * quasi tutto lo storico di chi l'app non ce l'aveva — e fargli credere
+     * di non essere mai stato pagato per quelli.
+     *
+     * Le righe vere di bb_presenze sono la fonte: sono quelle che contano, da
+     * li' escono le buste paga. Delle dichiarazioni si aggiungono solo le NON
+     * approvate: un'approvata ha gia' la sua riga in bb_presenze, e tenerle
+     * entrambe farebbe comparire lo stesso giorno due volte.
+     *
+     * Due query e non una UNION: le colonne non combaciano (la dichiarazione
+     * non ha i prezzi, la presenza non ha il motivo), e forzarle nella stessa
+     * forma a colpi di NULL rende la query illeggibile per risparmiare un
+     * viaggio su un elenco di qualche decina di righe.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function perOperaio(int $workerId, string $dal, string $al): array
+    public function diarioOperaio(int $workerId, string $dal, string $al): array
     {
-        $stmt = $this->conn->prepare("
+        $reg = $this->conn->prepare("
+            SELECT p.id, p.data, p.turno, p.note,
+                   p.pranzo, p.cena, p.hotel, p.targa_auto, p.trasferta,
+                   p.worksite_id,
+                   w.name          AS cantiere_nome,
+                   w.worksite_code AS cantiere_codice
+            FROM   bb_presenze p
+            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+            WHERE  p.worker_id = :wid
+              AND  p.data BETWEEN :dal AND :al
+        ");
+        $reg->execute([':wid' => $workerId, ':dal' => $dal, ':al' => $al]);
+
+        $righe = [];
+        foreach ($reg->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $righe[] = [
+                'origine'         => 'registrata',
+                'stato'           => 'registrata',
+                'id'              => (int)$r['id'],
+                'richiesta_id'    => null,
+                'data'            => (string)$r['data'],
+                'turno'           => $r['turno'],
+                'note'            => $r['note'],
+                'motivo'          => null,
+                'pranzo'          => $r['pranzo'],
+                'cena'            => $r['cena'],
+                'hotel'           => $r['hotel'],
+                'targa_auto'      => $r['targa_auto'],
+                'trasferta'       => (int)$r['trasferta'],
+                'worksite_id'     => $r['worksite_id'] !== null ? (int)$r['worksite_id'] : null,
+                'cantiere_nome'   => $r['cantiere_nome'],
+                'cantiere_codice' => $r['cantiere_codice'],
+            ];
+        }
+
+        $dich = $this->conn->prepare("
             SELECT r.*,
                    w.name          AS cantiere_nome,
                    w.worksite_code AS cantiere_codice
@@ -45,10 +96,39 @@ final class RichiestaPresenzaRepository
             LEFT JOIN bb_worksites w ON w.id = r.worksite_id
             WHERE  r.worker_id = :wid
               AND  r.data BETWEEN :dal AND :al
-            ORDER BY r.data DESC, r.id DESC
+              AND  r.stato <> 'approvata'
         ");
-        $stmt->execute([':wid' => $workerId, ':dal' => $dal, ':al' => $al]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $dich->execute([':wid' => $workerId, ':dal' => $dal, ':al' => $al]);
+
+        foreach ($dich->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $righe[] = [
+                'origine'         => 'dichiarata',
+                'stato'           => (string)$r['stato'],
+                'id'              => null,
+                'richiesta_id'    => (int)$r['id'],
+                'data'            => (string)$r['data'],
+                'turno'           => $r['turno'],
+                'note'            => $r['note'],
+                'motivo'          => $r['motivo'],
+                'pranzo'          => $r['pranzo'],
+                'cena'            => $r['cena'],
+                'hotel'           => $r['hotel'],
+                'targa_auto'      => $r['targa_auto'],
+                'trasferta'       => (int)$r['trasferta'],
+                'worksite_id'     => $r['worksite_id'] !== null ? (int)$r['worksite_id'] : null,
+                'cantiere_nome'   => $r['cantiere_nome'],
+                'cantiere_codice' => $r['cantiere_codice'],
+            ];
+        }
+
+        // Dal piu' recente: l'app apre sull'ultimo giorno, che e' quello su
+        // cui uno ha ancora qualcosa da controllare. A parita' di giorno
+        // prima il registrato, che e' il dato buono.
+        usort($righe, static function (array $a, array $b): int {
+            return [$b['data'], $b['origine']] <=> [$a['data'], $a['origine']];
+        });
+
+        return $righe;
     }
 
     /** Una dichiarazione, solo se e' di questo operaio. */

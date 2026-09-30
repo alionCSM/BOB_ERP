@@ -190,6 +190,14 @@ final class ApiV1OperaioController
 
     // ── GET /api/v1/me/presenze ──────────────────────────────────────────────
 
+    /**
+     * Tutte le sue giornate, non solo quelle che ha mandato lui.
+     *
+     * Chi ha lavorato dieci anni prima dell'app non ha nessuna
+     * dichiarazione: un elenco che mostra solo quelle gli direbbe che non ha
+     * mai lavorato. Le presenze registrate sono la fonte, e alle
+     * dichiarazioni non ancora decise si aggiunge lo stato.
+     */
     public function presenze(Request $request): never
     {
         $operaio = $this->operaio($request);
@@ -205,7 +213,7 @@ final class ApiV1OperaioController
             'success'  => true,
             'dal'      => $dal,
             'al'       => $al,
-            'presenze' => $repo->perOperaio($operaio, $dal, $al),
+            'presenze' => $repo->diarioOperaio($operaio, $dal, $al),
         ]);
     }
 
