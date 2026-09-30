@@ -2547,7 +2547,13 @@ final class WorksitesController
             // tabella assente: si prosegue comunque
         }
 
-        $cmd = 'php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+        // stesso discorso dell'API: alcuni job sono lo stesso script con un
+        // argomento diverso, e l'argomento sta in una chiave a parte perche'
+        // dentro il percorso is_file() qui sopra non troverebbe il file
+        $args = \App\Service\CronRun::JOBS[$job]['args'] ?? '';
+        $cmd  = 'php ' . escapeshellarg($script)
+              . ($args !== '' ? ' ' . escapeshellarg($args) : '')
+              . ' > /dev/null 2>&1 &';
         @shell_exec($cmd);
 
         Response::json(['ok' => true, 'message' => 'Job avviato']);

@@ -349,7 +349,14 @@ final class ApiV1Controller
             // tabella assente: si prosegue comunque
         }
 
-        $cmd = 'php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+        // Alcuni job sono lo stesso script con un argomento diverso — i due
+        // promemoria presenze, per esempio. L'argomento sta in una chiave a
+        // parte e non attaccato al percorso: dentro il percorso, is_file()
+        // qui sopra non troverebbe piu' il file e il job non partirebbe.
+        $args = \App\Service\CronRun::JOBS[$job]['args'] ?? '';
+        $cmd  = 'php ' . escapeshellarg($script)
+              . ($args !== '' ? ' ' . escapeshellarg($args) : '')
+              . ' > /dev/null 2>&1 &';
         @shell_exec($cmd);
 
         AuditLogger::log($this->conn, $user, 'api_cron_run', 'job', null, $job, ['source' => 'app']);
@@ -1191,6 +1198,9 @@ final class ApiV1Controller
             'type'         => (string)($row['type'] ?? 'staff'),
             'role'         => (string)($row['role'] ?? ''),
             'company'      => (string)($row['company'] ?? ''),
+            // serve all'app per la propria interfaccia: le notifiche le
+            // traduce gia' il server, ma le schermate se le traduce lei
+            'lingua'       => \App\Service\Lingua::normalizza($row['lingua'] ?? null),
             'must_change_password' => !empty($row['must_change_password']),
             'photo_data_uri' => $this->photoDataUri($row),
         ];

@@ -70,6 +70,18 @@ final class CronRun
             'descr'  => 'Confronto stato cantieri BOB / Yard',
             'script' => 'includes/cron/yard_worksite_status_check.php',
         ],
+        'presenze_promemoria_primo' => [
+            'label'  => 'Promemoria presenze (20:00)',
+            'descr'  => 'Avvisa chi era pianificato e non ha ancora segnato la presenza',
+            'script' => 'includes/cron/presenze_promemoria.php',
+            'args'   => 'primo',
+        ],
+        'presenze_promemoria_secondo' => [
+            'label'  => 'Promemoria presenze (21:00)',
+            'descr'  => "Secondo avviso, solo a chi ancora non l'ha segnata",
+            'script' => 'includes/cron/presenze_promemoria.php',
+            'args'   => 'secondo',
+        ],
         'programmazione_deadline_check' => [
             'label'  => 'Scadenze programmazione',
             'descr'  => 'Promemoria su mezzi, trasferte e info da completare',

@@ -1294,7 +1294,7 @@ final class UsersController
 
         $stmt = $this->conn->prepare("
             SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.phone, u.photo,
-                   u.role, u.type, u.company, u.company_id, u.created_at,
+                   u.role, u.type, u.company, u.company_id, u.created_at, u.lingua,
                    COALESCE(c.name, u.company, '') AS company_name
             FROM bb_users u
             LEFT JOIN bb_companies c ON c.id = u.company_id
@@ -1328,21 +1328,33 @@ final class UsersController
                 if ($firstName === '' || $lastName === '') {
                     $profileErr = 'Nome e cognome sono obbligatori.';
                 } else {
+                    // La lingua decide in che lingua arrivano le notifiche
+                    // sul telefono. Un valore inventato ricadrebbe
+                    // sull'italiano comunque, ma si controlla qui perche' la
+                    // colonna e' corta e un valore lungo verrebbe troncato.
+                    $lingua = (string)($_POST['lingua'] ?? 'it');
+                    if (!isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+                        $lingua = 'it';
+                    }
+
                     $upd = $this->conn->prepare("
                         UPDATE bb_users
-                        SET first_name = :fn, last_name = :ln, email = :em, phone = :ph
+                        SET first_name = :fn, last_name = :ln, email = :em,
+                            phone = :ph, lingua = :lingua
                         WHERE id = :id
                     ");
                     $upd->execute([
-                        ':fn' => $firstName,
-                        ':ln' => $lastName,
-                        ':em' => $email,
-                        ':ph' => $phone,
-                        ':id' => $userId,
+                        ':fn'     => $firstName,
+                        ':ln'     => $lastName,
+                        ':em'     => $email,
+                        ':ph'     => $phone,
+                        ':lingua' => $lingua,
+                        ':id'     => $userId,
                     ]);
                     $userData['first_name'] = $firstName;
                     $userData['last_name']  = $lastName;
                     $userData['phone']      = $phone;
+                    $userData['lingua']     = $lingua;
                     $profileMsg = 'Profilo aggiornato con successo.';
                 }
             }
@@ -1449,9 +1461,11 @@ final class UsersController
             } catch (\Exception $e) {}
         }
 
+        $lingue = \App\Service\Lingua::DISPONIBILI;
+
         Response::view('users/profile.html.twig', $request, compact(
             'userData', 'fullName', 'initials', 'photo', 'hasPhoto',
-            'roleLabel', 'memberSince',
+            'roleLabel', 'memberSince', 'lingue',
             'profileMsg', 'profileErr', 'pwdMsg', 'pwdErr'
         ));
     }

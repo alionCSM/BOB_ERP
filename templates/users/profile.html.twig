@@ -97,6 +97,22 @@
                         <label class="pr-label">Telefono</label>
                         <input type="text" name="phone" class="pr-input" value="{{ userData.phone }}">
                     </div>
+                    {# In che lingua arrivano le notifiche sul telefono. BOB
+                       resta in italiano: qui dentro ci lavora l'ufficio, e
+                       tradurre tutto il gestionale per cinque lingue sarebbe
+                       un lavoro enorme che non serve a nessuno. Quello che
+                       serve tradurre e' cio' che legge un operaio in
+                       cantiere, e sono poche frasi. #}
+                    <div class="pr-field">
+                        <label class="pr-label">Lingua delle notifiche</label>
+                        <select name="lingua" class="pr-input">
+                            {% for codice, nome in lingue %}
+                                <option value="{{ codice }}"{{ (userData.lingua ?? 'it') == codice ? ' selected' : '' }}>
+                                    {{ nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <div class="pr-field">
                         <label class="pr-label">Username</label>
                         <input type="text" class="pr-input" value="{{ userData.username }}" readonly>
