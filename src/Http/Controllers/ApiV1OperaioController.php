@@ -268,10 +268,19 @@ final class ApiV1OperaioController
             ], 409);
         }
 
+        // Pasti col vocabolario dell'ufficio: "Loro" ha pagato l'operaio,
+        // "Noi" ha pagato l'azienda. L'importo non si chiede — lui sa di aver
+        // mangiato, non quanto e' costato — e lo mette l'ufficio in
+        // approvazione, dove ci sono le fatture.
         $id = $repo->crea($operaio, [
             'worksite_id' => $worksiteId,
             'data'        => $data,
             'turno'       => $turno,
+            'pranzo'      => (string)($body['pranzo'] ?? '-'),
+            'cena'        => (string)($body['cena'] ?? '-'),
+            'hotel'       => trim((string)($body['hotel'] ?? '')),
+            'targa_auto'  => strtoupper(trim((string)($body['targa_auto'] ?? ''))),
+            'trasferta'   => !empty($body['trasferta']),
             'note'        => trim((string)($body['note'] ?? '')),
         ]);
 

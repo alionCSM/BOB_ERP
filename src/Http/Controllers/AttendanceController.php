@@ -191,6 +191,85 @@ final class AttendanceController
 
     // ── Ferie / Permessi ───────────────────────────────────────────────────────
 
+    // ── GET /attendance/richieste ────────────────────────────────────────────
+
+    /**
+     * Le presenze dichiarate dagli operai, da guardare e approvare.
+     *
+     * Senza questa pagina le dichiarazioni si accumulano e non le vede
+     * nessuno: l'operaio manda dall'app convinto di aver fatto, e in busta
+     * paga non compare niente.
+     */
+    public function richieste(Request $request): void
+    {
+        $repo = new \App\Repository\Attendance\RichiestaPresenzaRepository($this->conn);
+
+        $filtri = [
+            'stato'       => in_array($_GET['stato'] ?? '', $repo::STATI, true)
+                             ? (string)$_GET['stato'] : 'in_attesa',
+            'dal'         => trim((string)($_GET['dal'] ?? '')),
+            'al'          => trim((string)($_GET['al'] ?? '')),
+            'worksite_id' => (int)($_GET['worksite_id'] ?? 0),
+        ];
+
+        $righe     = $repo->daApprovare($filtri);
+        $inAttesa  = $repo->quanteInAttesa();
+        $pageTitle = 'Presenze dichiarate';
+
+        $successMsg = $_SESSION['success'] ?? null;
+        $errorMsg   = $_SESSION['error']   ?? null;
+        unset($_SESSION['success'], $_SESSION['error']);
+
+        Response::view('attendance/richieste.html.twig', $request, compact(
+            'righe', 'filtri', 'inAttesa', 'pageTitle', 'successMsg', 'errorMsg'
+        ));
+    }
+
+    // ── POST /attendance/richieste/decidi ────────────────────────────────────
+
+    /**
+     * Approva o rifiuta.
+     *
+     * L'approvazione accetta le correzioni: quello che finisce in bb_presenze
+     * e' quello che l'ufficio ha davanti dopo averlo sistemato, non per forza
+     * quello che aveva scritto l'operaio. La dichiarazione resta com'era,
+     * cosi' resta la traccia di cosa e' stato cambiato.
+     */
+    public function decidiRichiesta(Request $request): never
+    {
+        $repo   = new \App\Repository\Attendance\RichiestaPresenzaRepository($this->conn);
+        $id     = (int)($_POST['id'] ?? 0);
+        $azione = (string)($_POST['azione'] ?? '');
+        $userId = (int)($request->user()->id ?? 0);
+
+        try {
+            if ($azione === 'approva') {
+                $repo->approva($id, [
+                    'turno'         => (string)($_POST['turno'] ?? ''),
+                    'pranzo'        => (string)($_POST['pranzo'] ?? '-'),
+                    'cena'          => (string)($_POST['cena'] ?? '-'),
+                    'pranzo_prezzo' => (string)($_POST['pranzo_prezzo'] ?? ''),
+                    'cena_prezzo'   => (string)($_POST['cena_prezzo'] ?? ''),
+                    'hotel'         => trim((string)($_POST['hotel'] ?? '')),
+                    'targa_auto'    => trim((string)($_POST['targa_auto'] ?? '')),
+                    'trasferta'     => !empty($_POST['trasferta']),
+                    'azienda'       => trim((string)($_POST['azienda'] ?? '')),
+                    'note'          => trim((string)($_POST['note'] ?? '')),
+                ], $userId);
+                $_SESSION['success'] = 'Presenza approvata e registrata.';
+            } elseif ($azione === 'rifiuta') {
+                $motivo = trim((string)($_POST['motivo'] ?? ''));
+                $repo->rifiuta($id, $motivo, $userId)
+                    ? $_SESSION['success'] = 'Dichiarazione rifiutata.'
+                    : $_SESSION['error']   = "Non trovata, o gia' decisa da qualcun altro.";
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Errore: ' . $e->getMessage();
+        }
+
+        Response::redirect('/attendance/richieste?stato=' . urlencode((string)($_POST['torna_stato'] ?? 'in_attesa')));
+    }
+
     public function leaves(Request $request): void
     {
         $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);

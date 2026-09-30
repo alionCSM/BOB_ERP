@@ -116,10 +116,27 @@ Dichiara una giornata. **Non crea una presenza**: crea una dichiarazione che
 l'ufficio guarda, eventualmente corregge e approva.
 
 ```json
-{ "worksite_id": 5059, "data": "2026-09-29", "turno": "Intero", "note": "" }
+{ "worksite_id": 5059, "data": "2026-09-29", "turno": "Intero",
+  "pranzo": "Noi", "cena": "-", "hotel": "", "targa_auto": "AB123CD",
+  "trasferta": false, "note": "" }
 ```
 
-`turno`: `Intero` | `Mezzo`. Risposta: `{ "success": true, "id": 8, "stato": "in_attesa" }`.
+`turno`: `Intero` | `Mezzo`.
+`pranzo` e `cena`: `-` | `Loro` (ha pagato l'operaio) | `Noi` (ha pagato
+l'azienda). E' lo stesso vocabolario che l'ufficio usa gia', cosi' in
+approvazione ritrova le cose come le scrive tutti i giorni.
+
+**L'importo non si chiede all'operaio.** Lui sa di aver mangiato, non sa
+quanto l'azienda ha pagato quel pasto: chiederglielo vuol dire raccogliere
+numeri inventati che poi qualcuno deve correggere uno per uno. Il prezzo lo
+mette l'ufficio in approvazione, dove ci sono le fatture.
+
+`hotel` e `targa_auto` sono testo libero, come in `bb_presenze`.
+
+`trasferta` serve al confronto: se arriva cena o albergo su un giorno che in
+pianificazione non era in trasferta, l'ufficio se lo vede segnalato.
+
+Risposta: `{ "success": true, "id": 8, "stato": "in_attesa" }`.
 
 Rifiuti possibili:
 
@@ -169,11 +186,11 @@ del rilascio sarebbe stato un disastro.
 
 ## Cosa manca ancora
 
-- **La schermata dell'ufficio** per approvare, correggere e rifiutare. Senza,
-  le dichiarazioni si accumulano e nessuno le vede. Il repository e' pronto
-  (`RichiestaPresenzaRepository::daApprovare`, `approva`, `rifiuta`).
 - **Una notifica** all'operaio quando l'ufficio decide: oggi deve riaprire
   l'app per scoprirlo.
+- **Il suggerimento dei giorni non dichiarati**: il problema vero non e'
+  trovare il cantiere, e' ricordarsi di dichiarare. Dopo tre giorni uno non
+  sa piu' dove e' stato.
 - **BOB Zone** e' gia' esposto altrove (`/api/v1/zone/...`) e nell'app ci
   sono gia' Cantieri e Zone. Manca la sezione Disegni.
 
@@ -187,3 +204,23 @@ composer dump-autoload -o
 ```
 
 altrimenti le rotte rispondono 500 perche' la classe non si trova.
+
+
+---
+
+## Lato ufficio
+
+`/attendance/richieste` — le dichiarazioni da guardare, con i campi
+correggibili prima di approvare: quello che finisce in `bb_presenze` e'
+quello che l'ufficio ha davanti dopo averlo sistemato, non per forza quello
+che aveva scritto l'operaio. La dichiarazione resta com'era, cosi' resta la
+traccia di cosa e' cambiato.
+
+Gli avvisi non bloccano niente — decide l'ufficio — ma fanno cadere l'occhio
+sulle righe che meritano un secondo sguardo:
+
+- **cena o albergo senza trasferta** in pianificazione: sono le voci che costano
+- **cantiere diverso** da quello pianificato: puo' essere giusto, capita di
+  spostare qualcuno all'ultimo, ma va guardato
+- **non era in pianificazione** quel giorno: non e' un errore, ma nessuno lo
+  aspettava li'
