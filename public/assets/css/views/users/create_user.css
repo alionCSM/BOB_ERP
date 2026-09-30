@@ -124,3 +124,18 @@
     text-decoration: none; transition: all .12s;
 }
 .cu-btn-back:hover { border-color: #cbd5e1; background: #f8fafc; color: #475569; text-decoration: none; }
+
+/* Azienda dell'operaio, riempita da sola scegliendolo: si legge ma non si
+   tocca, perche' il dato vero sta sulla sua anagrafica e averne due copie
+   modificabili vorrebbe dire non sapere piu' quale vale. */
+.cu-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0369a1;
+    min-height: 16px;
+}
+
+/* un campo nascosto non deve lasciare il suo spazio vuoto nella riga */
+.cu-field[hidden] { display: none; }

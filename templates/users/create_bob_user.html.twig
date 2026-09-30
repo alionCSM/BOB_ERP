@@ -8,7 +8,7 @@
          then pass the above variables to this template. #}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/users/create_user.css">
+<link rel="stylesheet" href="/assets/css/views/users/create_user.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -125,16 +125,64 @@
                             <option value="WORKER"{{ (post.access_profile ?? '') == 'WORKER' ? ' selected' : '' }}>Worker</option>
                         </select>
                     </div>
-                    <div class="cu-field">
-                        <label for="company_id">Azienda</label>
+                    {# "Azienda" vuol dire una cosa diversa per ogni profilo:
+                       per un interno e' la societa' del gruppo, per un'azienda
+                       la consorziata, per un cliente il cliente, e per un
+                       operaio non si sceglie affatto — viene dalla sua
+                       anagrafica. Quattro campi distinti e non uno solo che
+                       cambia contenuto: ognuno scrive in una colonna diversa,
+                       e riusare lo stesso nome renderebbe impossibile capire
+                       da cosa arriva il valore. #}
+                    <div class="cu-field" data-azienda="INTERNAL">
+                        <label for="societa_id">Societa' del gruppo</label>
+                        <select id="societa_id" name="societa_id">
+                            <option value="">— Nessuna —</option>
+                            {% for s in societa %}
+                                <option value="{{ s.id }}"{{ (post.societa_id ?? '') == s.id ? ' selected' : '' }}>
+                                    {{ s.nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="cu-field" data-azienda="COMPANY" hidden>
+                        <label for="company_id">Azienda consorziata</label>
                         <select id="company_id" name="company_id">
                             <option value="">— Nessuna —</option>
                             {% for co in companies %}
-                                <option value="{{ co.id }}"{{ (post.company_id ?? 0)|number_format == co.id ? ' selected' : '' }}>
+                                <option value="{{ co.id }}"{{ (post.company_id ?? '') == co.id ? ' selected' : '' }}>
                                     {{ co.name }}
                                 </option>
                             {% endfor %}
                         </select>
+                    </div>
+
+                    <div class="cu-field" data-azienda="CLIENT" hidden>
+                        <label for="client_id">Cliente</label>
+                        <select id="client_id" name="client_id">
+                            <option value="">— Nessuno —</option>
+                            {% for cl in clients %}
+                                <option value="{{ cl.id }}"{{ (post.client_id ?? '') == cl.id ? ' selected' : '' }}>
+                                    {{ cl.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="cu-field" data-azienda="WORKER" hidden>
+                        <label for="worker_id">Operaio</label>
+                        {# l'azienda sta scritta sull'opzione: la si mostra
+                           sotto appena si sceglie, senza chiederla al server #}
+                        <select id="worker_id" name="worker_id">
+                            <option value="">— Nessuno —</option>
+                            {% for w in workers %}
+                                <option value="{{ w.id }}" data-azienda-operaio="{{ w.company }}"
+                                        {{ (post.worker_id ?? '') == w.id ? ' selected' : '' }}>
+                                    {{ w.nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small id="azienda-operaio" class="cu-hint"></small>
                     </div>
                 </div>
                 <div class="cu-row single">
@@ -179,5 +227,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/users/create_user.js"></script>
+<script src="/assets/js/views/users/create_user.js?v=2"></script>
 {% endblock %}
