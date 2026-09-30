@@ -2,17 +2,19 @@
 /**
  * Promemoria serale: "non hai segnato la presenza".
  *
- * Due passaggi nella stessa sera:
- *   0 20 * * 1-5  /usr/bin/php .../includes/cron/presenze_promemoria.php primo
- *   0 21 * * 1-5  /usr/bin/php .../includes/cron/presenze_promemoria.php secondo
+ * Due passaggi nella stessa sera, TUTTI i giorni:
+ *   0 20 * * *  /usr/bin/php .../includes/cron/presenze_promemoria.php primo
+ *   0 21 * * *  /usr/bin/php .../includes/cron/presenze_promemoria.php secondo
  *
  * Il secondo ricontrolla chi manca davvero: chi ha compilato alle venti e
  * cinque non riceve niente. Si puo' quindi far girare senza preoccuparsi di
  * mandare due volte la stessa cosa alla stessa persona.
  *
- * Da lunedi' a venerdi' nel crontab, ma non fa danni girando di sabato: se
- * nessuno era pianificato, non avvisa nessuno. Il filtro sui giorni serve
- * solo a non tenere acceso un lavoro che non ha niente da fare.
+ * Tutti i giorni e non 1-5: il sabato e la domenica si reggono da soli,
+ * perche' si avvisa solo chi era pianificato. Se non c'e' nessuno in
+ * pianificazione non parte niente, e se invece quel sabato qualcuno lavorava
+ * riceve il promemoria come ogni altro giorno — che con 1-5 nel crontab non
+ * succederebbe.
  *
  * Si puo' passare una data come secondo argomento per rimandarlo su un
  * giorno passato, che serve quando il server e' stato fermo la sera prima:

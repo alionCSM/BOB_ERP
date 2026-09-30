@@ -19,10 +19,19 @@ use PDO;
  * ancora non l'ha fatta. Il secondo si spedisce da solo a chi serve, perche'
  * ricontrolla: chi ha compilato alle venti e cinque non riceve niente.
  *
- * Si avvisa SOLO chi era pianificato quel giorno. Mandarlo a tutti e
- * centoquaranta vorrebbe dire svegliare ogni sera anche chi era in ferie, in
- * malattia o semplicemente non lavorava — e una notifica che arriva quando
- * non serve insegna a ignorare anche quelle che servono.
+ * Si avvisa SOLO chi era pianificato quel giorno, e fra quelli si tolgono
+ * chi ha gia' dichiarato, chi ha gia' una presenza messa dall'ufficio, e chi
+ * era in ferie o in permesso di giornata intera.
+ *
+ * Mandarlo a tutti e centoquaranta vorrebbe dire svegliare ogni sera anche
+ * chi non lavorava — e una notifica che arriva quando non serve insegna a
+ * ignorare anche quelle che servono.
+ *
+ * Il sabato e la domenica si reggono da soli: se nessuno era pianificato,
+ * non si avvisa nessuno, e se invece qualcuno lavorava quel sabato riceve il
+ * promemoria come ogni altro giorno. Per questo il lavoro va messo nel
+ * crontab tutti i giorni e non da lunedi' a venerdi': con 1-5 un sabato
+ * pianificato resterebbe scoperto.
  */
 final class PromemoriaPresenze
 {
@@ -95,11 +104,31 @@ final class PromemoriaPresenze
                     WHERE  pr.worker_id = pn.worker_id
                       AND  pr.data = :giorno3
                    )
+              -- Chi era in ferie o aveva un permesso di giornata intera non
+              -- deve segnare niente, e ricordarglielo la sera del suo giorno
+              -- libero e' il modo piu' veloce per far disinstallare l'app.
+              --
+              -- Il permesso di poche ore non esclude: ha lavorato mezza
+              -- giornata e la presenza va segnata lo stesso. Le ore piene si
+              -- riconoscono da `ore` vuoto, che e' come le scrive l'ufficio.
+              --
+              -- Solo le approvate: una richiesta ancora in attesa non e' un
+              -- giorno libero, e fino a risposta quella giornata va segnata.
+              AND  NOT EXISTS (
+                    SELECT 1 FROM bb_ferie_permessi f
+                    WHERE  f.worker_id = pn.worker_id
+                      AND  f.data_inizio <= :giorno4
+                      AND  f.data_fine   >= :giorno5
+                      AND  f.stato = 'approvata'
+                      AND  (f.tipo = 'ferie' OR f.ore IS NULL)
+                   )
         ");
         $stmt->execute([
             ':giorno'  => $giorno,
             ':giorno2' => $giorno,
             ':giorno3' => $giorno,
+            ':giorno4' => $giorno,
+            ':giorno5' => $giorno,
         ]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
