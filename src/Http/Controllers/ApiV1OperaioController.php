@@ -96,6 +96,62 @@ final class ApiV1OperaioController
         ]);
     }
 
+    // ── GET /api/v1/me/pianificazione ────────────────────────────────────────
+
+    /**
+     * Dove l'operaio e' pianificato.
+     *
+     * E' la risposta alla domanda che l'operaio si fa davvero: non "quale
+     * cantiere cerco", ma "domani dove vado". Cercare un cantiere in un
+     * elenco e' una cosa che gli si chiede solo quando la pianificazione non
+     * dice niente.
+     *
+     * Senza parametri risponde per oggi e domani: la sera si guarda domani,
+     * la mattina si guarda oggi, e mandarle insieme evita la seconda
+     * chiamata proprio nell'ora in cui la linea in cantiere e' peggiore.
+     *
+     * Chi e' capo squadra lo sa da qui: sulla sua riga `sei_capo` e' vero, e
+     * l'app gli mostra la squadra al completo.
+     */
+    public function pianificazione(Request $request): never
+    {
+        $operaio = $this->operaio($request);
+
+        $dal = $this->data($_GET['dal'] ?? '', date('Y-m-d'));
+        $al  = $this->data($_GET['al']  ?? '', date('Y-m-d', strtotime('+1 day')));
+
+        $stmt = $this->conn->prepare("
+            SELECT p.id, p.data, p.cantiere, p.worksite_id,
+                   pn.capo_squadra AS sei_capo,
+                   pn.auto_targa,
+                   w.worksite_code, w.name AS cantiere_nome, w.location
+            FROM   bb_pianificazione_nostri pn
+            JOIN   bb_pianificazione p ON p.id = pn.pianificazione_id
+            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+            WHERE  pn.worker_id = :wid
+              AND  p.data BETWEEN :dal AND :al
+            ORDER BY p.data ASC
+        ");
+        $stmt->execute([':wid' => $operaio, ':dal' => $dal, ':al' => $al]);
+        $giorni = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        // La squadra si manda solo al capo: agli altri non serve sapere chi
+        // altro c'e', e mandare l'elenco dei colleghi a tutti vuol dire
+        // spargere dati di centoquaranta persone su centoquaranta telefoni.
+        foreach ($giorni as &$g) {
+            $g['sei_capo'] = (bool)$g['sei_capo'];
+            $g['squadra']  = $g['sei_capo'] ? $this->squadra((int)$g['id']) : [];
+        }
+        unset($g);
+
+        Response::json([
+            'success'       => true,
+            'dal'           => $dal,
+            'al'            => $al,
+            'pianificazione'=> $giorni,
+        ]);
+    }
+
     // ── GET /api/v1/me/documenti ─────────────────────────────────────────────
 
     /**
@@ -331,6 +387,26 @@ final class ApiV1OperaioController
             ], 403);
         }
         return $workerId;
+    }
+
+    /**
+     * Chi c'e' in squadra quel giorno su quel cantiere.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function squadra(int $pianificazioneId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COALESCE(CONCAT(w.last_name, ' ', w.first_name), pn.worker_name) AS nome,
+                   pn.auto_targa,
+                   pn.capo_squadra
+            FROM   bb_pianificazione_nostri pn
+            LEFT JOIN bb_workers w ON w.id = pn.worker_id
+            WHERE  pn.pianificazione_id = :pid
+            ORDER BY pn.capo_squadra DESC, nome ASC
+        ");
+        $stmt->execute([':pid' => $pianificazioneId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
 
     /** Il cantiere esiste ed e' aperto? */

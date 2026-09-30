@@ -734,6 +734,7 @@ if (str_starts_with($uri, '/api/v1/')) {
             // decide una sola domanda, sono i tuoi dati, e la risposta viene
             // dal worker_id dell'utente collegato — mai da un id passato
             // nella richiesta, che sarebbe modificabile.
+            ->get('/api/v1/me/pianificazione',         [ApiV1OperaioController::class, 'pianificazione'])
             ->get('/api/v1/me/cantieri',               [ApiV1OperaioController::class, 'cantieri'])
             ->get('/api/v1/me/documenti',              [ApiV1OperaioController::class, 'documenti'])
             ->get('/api/v1/me/presenze',               [ApiV1OperaioController::class, 'presenze'])

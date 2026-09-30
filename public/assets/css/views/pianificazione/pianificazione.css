@@ -278,3 +278,60 @@
     .pn-row-tags { display: none; }
     .pn-worker-row, .pn-cons-row { flex-wrap: wrap; }
 }
+
+/* ── Cantiere scelto invece che scritto ─────────────────────────────────── */
+/* Era un campo di testo: quello che ci si scriveva non era collegato a
+   niente, e la pianificazione non si poteva incrociare ne' con le presenze
+   ne' con BOB Zone. Adesso e' una scelta fra i cantieri aperti, col codice
+   davanti perche' due commesse dello stesso cliente si chiamano spesso
+   uguale. */
+.pn-row-name-wrap { flex: 1; min-width: 0; }
+
+.pn-row-name-wrap .ts-control {
+    border: none;
+    background: transparent;
+    padding: 2px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    box-shadow: none;
+    min-height: 0;
+}
+
+.pn-row-name-wrap .ts-control:focus-within { border-bottom: 1.5px solid #3b82f6; }
+.pn-row-name-wrap .ts-wrapper.single .ts-control { cursor: pointer; }
+.pn-row-name-wrap .ts-dropdown { z-index: 60; font-weight: 400; font-size: 13px; }
+
+/* ── Capo squadra ───────────────────────────────────────────────────────── */
+/* Spento e' un contorno grigio che non chiede attenzione; acceso e' pieno e
+   ambra, perche' guardando la squadra la prima cosa che si cerca e' chi
+   comanda. Uno solo per riga: il secondo fa decadere il primo. */
+.pn-worker-capo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+.pn-worker-capo:hover { color: #f59e0b; background: #fffbeb; }
+
+.pn-worker-capo.is-capo {
+    color: #b45309;
+    background: #fef3c7;
+}
+
+.pn-worker-capo.is-capo svg { fill: currentColor; }
+
+/* la riga del capo si riconosce senza cercare la stellina */
+.pn-worker-row[data-capo="1"] {
+    background: #fffbeb;
+    box-shadow: inset 2px 0 0 #f59e0b;
+}

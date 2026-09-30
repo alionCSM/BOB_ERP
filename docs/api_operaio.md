@@ -18,20 +18,58 @@ Tutte le risposte hanno `success`, come il resto di `/api/v1`.
 
 ---
 
+## GET /api/v1/me/pianificazione
+
+**L'endpoint principale.** Risponde alla domanda che l'operaio si fa
+davvero: non "quale cantiere cerco", ma **"domani dove vado"**.
+
+Senza parametri: oggi e domani. La sera si guarda domani, la mattina si
+guarda oggi, e mandarli insieme evita la seconda chiamata proprio nell'ora
+in cui la linea in cantiere e' peggiore.
+
+```json
+{ "success": true, "dal": "2026-09-30", "al": "2026-10-01",
+  "pianificazione": [
+    { "id": 77, "data": "2026-10-01",
+      "worksite_id": 5059, "worksite_code": "C-2026-014",
+      "cantiere_nome": "Via Roma", "location": "Lecco",
+      "cantiere": "Via Roma Lecco",
+      "auto_targa": "AB123CD",
+      "sei_capo": true,
+      "squadra": [
+        { "nome": "Rossi Mario", "auto_targa": "AB123CD", "capo_squadra": 1 },
+        { "nome": "Bianchi Luca", "auto_targa": "", "capo_squadra": 0 }
+      ] } ] }
+```
+
+`worksite_id` puo' essere `null` sulle righe pianificate prima di questa
+funzione, o su un lavoro programmato prima che la commessa fosse aperta: in
+quel caso vale solo `cantiere`, il testo. Senza `worksite_id` l'app non puo'
+precompilare la dichiarazione di presenza — mostra il nome e lascia scegliere.
+
+`squadra` arriva **solo al capo squadra**: agli altri non serve sapere chi
+altro c'e', e mandare l'elenco dei colleghi a tutti vuol dire spargere i dati
+di centoquaranta persone su centoquaranta telefoni.
+
+Parametri: `dal`, `al`.
+
 ## GET /api/v1/me/cantieri
 
-I cantieri su cui l'operaio puo' dichiarare. Sono quelli a cui e' assegnato
-(`bb_worksite_assignments`), non tutti.
+Serve solo quando la pianificazione non dice niente: se l'operaio e'
+pianificato, il cantiere lo sa gia' da `/me/pianificazione` e non deve
+cercare niente.
+
+`recenti` sono i cantieri dove ha lavorato negli ultimi sei mesi, dal piu'
+recente; `aperti` sono tutti quelli in corso, per quando lo mandano da
+un'altra parte. Parametro `q` per cercare fra gli aperti.
 
 ```json
 { "success": true,
-  "cantieri": [
-    { "id": 5059, "worksite_code": "C-2026-014", "name": "Via Roma", "location": "Lecco" }
-  ] }
+  "recenti": [ { "id": 5059, "worksite_code": "C-2026-014", "name": "Via Roma",
+                 "location": "Lecco", "ultima_presenza": "2026-09-26" } ],
+  "aperti":  [ { "id": 5060, "worksite_code": "C-2026-015", "name": "Via Verdi",
+                 "location": "Bergamo" } ] }
 ```
-
-Se l'elenco e' vuoto l'operaio non e' assegnato a niente: l'app dovrebbe
-dirlo, non lasciare una tendina vuota.
 
 ## GET /api/v1/me/documenti
 
