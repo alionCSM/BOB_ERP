@@ -55,8 +55,8 @@ try {
     $esito = $servizio->invia($giorno, $quando);
 
     $messaggio = sprintf(
-        'promemoria %s del %s: avvisati %d',
-        $quando, $giorno, $esito['avvisati']
+        'promemoria %s del %s: avvisati %d per %d giornate mancanti',
+        $quando, $giorno, $esito['avvisati'], $esito['giorni']
     );
 
     $logger->info('presenze_promemoria: ' . $messaggio);
