@@ -270,17 +270,67 @@ final class AttendanceController
         Response::redirect('/attendance/richieste?stato=' . urlencode((string)($_POST['torna_stato'] ?? 'in_attesa')));
     }
 
+    /**
+     * Ferie e permessi, piu' le richieste arrivate dall'app.
+     *
+     * Le richieste stanno qui e non in una pagina loro: e' la stessa
+     * domanda — chi e' via e quando — e chi deve rispondere apre gia'
+     * questa. Una seconda voce di menu vorrebbe dire ricordarsi di
+     * guardarla, e una richiesta di ferie che nessuno guarda e' un operaio
+     * che non sa se prenotare il volo.
+     */
     public function leaves(Request $request): void
     {
         $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);
         $righe = $repo->getAll();
+        $daApprovare = $repo->daApprovare();
         $pageTitle = 'Ferie e Permessi';
 
         $successMsg = $_SESSION['success'] ?? null;
         $errorMsg   = $_SESSION['error']   ?? null;
         unset($_SESSION['success'], $_SESSION['error']);
 
-        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle', 'successMsg', 'errorMsg'));
+        Response::view('attendance/add_ferie.html.twig', $request, compact(
+            'righe', 'daApprovare', 'pageTitle', 'successMsg', 'errorMsg'
+        ));
+    }
+
+    // ── POST /attendance/leaves/decidi ───────────────────────────────────────
+
+    /**
+     * L'ufficio risponde a una richiesta di ferie arrivata dall'app.
+     *
+     * Il rifiuto vuole un motivo. Finisce nell'app dell'operaio, ed e' la
+     * differenza fra "no" e "no, in quella settimana siamo in tre a Lecco":
+     * col secondo uno ripropone altre date invece di venire in ufficio a
+     * chiedere perche'.
+     */
+    public function decidiFerie(Request $request): never
+    {
+        $repo   = new \App\Repository\Attendance\LeaveRepository($this->conn);
+        $id     = (int)($_POST['id'] ?? 0);
+        $azione = (string)($_POST['azione'] ?? '');
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        $userId = (int)($request->user()->id ?? 0);
+
+        try {
+            if ($azione === 'rifiuta' && $motivo === '') {
+                $_SESSION['error'] = "Per rifiutare serve un motivo: lo legge l'operaio.";
+            } elseif ($azione === 'approva' || $azione === 'rifiuta') {
+                $ok = $repo->decidi($id, $azione === 'approva', $motivo, $userId);
+                if ($ok) {
+                    $_SESSION['success'] = $azione === 'approva'
+                        ? 'Ferie approvate.'
+                        : 'Richiesta rifiutata.';
+                } else {
+                    $_SESSION['error'] = "Non trovata, o gia' decisa da qualcun altro.";
+                }
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Errore: ' . $e->getMessage();
+        }
+
+        Response::redirect('/attendance/leaves');
     }
 
     public function saveLeave(Request $request): never

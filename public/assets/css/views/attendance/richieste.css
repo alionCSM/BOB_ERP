@@ -4,6 +4,10 @@
  * Una scheda per dichiarazione e non una tabella: ogni riga porta con se'
  * pasti, albergo, auto e gli avvisi, e in tabella diventerebbero dodici
  * colonne di cui otto vuote quasi sempre. Prefisso ri-.
+ *
+ * Lo stesso foglio lo usa anche la pagina Ferie/Permessi per le richieste
+ * arrivate dall'app: e' la stessa scheda con gli stessi due bottoni, e
+ * copiarla cambiando prefisso avrebbe voluto dire manutenerla due volte.
  */
 
 .ri-filtri {
@@ -195,6 +199,7 @@
     letter-spacing: .03em;
 }
 
+.ri-stato           { background: #fef3c7; color: #92400e; }  /* in attesa */
 .ri-stato-approvata { background: #dcfce7; color: #166534; }
 .ri-stato-rifiutata { background: #fee2e2; color: #991b1b; }
 

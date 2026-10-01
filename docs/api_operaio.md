@@ -223,6 +223,11 @@ del rilascio sarebbe stato un disastro.
 `tipo`: `ferie` | `permesso`. `al` si puo' omettere per un giorno solo.
 `ore` serve ai permessi di poche ore. Nasce `in_attesa`.
 
+L'ufficio la decide da `/attendance/leaves`, in cima alla pagina Ferie e
+Permessi. Finche' e' in attesa non e' un'assenza: non conta negli "assenti
+oggi" e non esclude l'operaio dal promemoria della sera, perche' quel giorno
+li' lui e' al lavoro finche' nessuno gli risponde.
+
 ---
 
 ## Cosa manca ancora
@@ -248,6 +253,8 @@ altrimenti le rotte rispondono 500 perche' la classe non si trova.
 
 ## Lato ufficio
 
+Due pagine, tutte e due sotto **Presenze** nel menu.
+
 `/attendance/richieste` — le dichiarazioni da guardare, con i campi
 correggibili prima di approvare: quello che finisce in `bb_presenze` e'
 quello che l'ufficio ha davanti dopo averlo sistemato, non per forza quello
@@ -262,3 +269,16 @@ sulle righe che meritano un secondo sguardo:
   spostare qualcuno all'ultimo, ma va guardato
 - **non era in pianificazione** quel giorno: non e' un errore, ma nessuno lo
   aspettava li'
+
+`/attendance/leaves` — ferie e permessi, con le richieste arrivate dall'app
+in cima, dalla piu' vecchia: quella ferma da una settimana e' quella che
+scotta, e dopo tre giorni passa in evidenza da sola.
+
+Le date non si cambiano approvando. Se vanno corrette si usa Modifica
+nell'elenco e poi si approva: un'approvazione che sposta i giorni di nascosto
+farebbe tornare l'operaio dalle ferie il giorno sbagliato.
+
+Il rifiuto vuole un motivo, bloccato lato pagina. Finisce nell'app, ed e' la
+differenza fra "no" e "no, in quella settimana siamo in tre a Lecco": col
+secondo uno ripropone altre date invece di venire in ufficio a chiedere
+perche'.

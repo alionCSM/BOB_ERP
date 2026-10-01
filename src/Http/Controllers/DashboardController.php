@@ -117,7 +117,11 @@ final class DashboardController
             $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Presenze oggi', 'sub' => 'nostri + consorziate', 'color' => '#0ea5e9', 'bg' => '#f0f9ff',
                         'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'href' => '/attendance'];
 
-            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi WHERE data_inizio <= :d1 AND data_fine >= :d2");
+            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi
+                                   WHERE data_inizio <= :d1 AND data_fine >= :d2
+                                     -- una richiesta ancora da decidere non e' un assente:
+                                     -- quello la' domani e' al lavoro finche' non gli si risponde
+                                     AND stato = 'approvata'");
             $s->execute([':d1' => $today, ':d2' => $today]);
             $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie e permessi', 'color' => '#b45309', 'bg' => '#fffbeb',
                         'icon' => 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z', 'href' => '/attendance/leaves'];
@@ -585,6 +589,7 @@ final class DashboardController
             [['worksites_drafts'],         'Cantieri in Bozza',   'Bozze da completare e attivare',    '/worksites/drafts',   '#dc2626', '#fef2f2', 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
             [['attendance', 'presenze'],   'Presenze',            'Cerca e inserisci presenze',        '/attendance',         '#0ea5e9', '#f0f9ff', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
             [['attendance', 'presenze'],   'Ferie e Permessi',    'Registra le assenze',               '/attendance/leaves',  '#38bdf8', '#f0f9ff', 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z'],
+            [['attendance', 'presenze'],   'Presenze dichiarate', 'Da guardare e approvare',           '/attendance/richieste','#16a34a', '#f0fdf4', 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'],
             [['pianificazione'],           'Squadre',             'Pianificazione squadre',            '/pianificazione',     '#3b82f6', '#eff6ff', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
             [['programmazione'],           'Programmazione',      'Programma settimanale',             '/programmazione',     '#f59e0b', '#fffbeb', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
             [['equipment'],                'Noleggio Mezzi',      'Mezzi di sollevamento a noleggio',  '/equipment/rentals',  '#b45309', '#fffbeb', 'M3 21h18M6 21V8l12-5v18M10 12h4'],

@@ -634,6 +634,7 @@ if ($uri === '/attendance' || str_starts_with($uri, '/attendance/')) {
            ->post('/attendance/richieste/decidi', [AttendanceController::class, 'decidiRichiesta'])
            ->get('/attendance/leaves',            [AttendanceController::class, 'leaves'])
            ->post('/attendance/leaves/save',      [AttendanceController::class, 'saveLeave'])
+           ->post('/attendance/leaves/decidi',    [AttendanceController::class, 'decidiFerie'])
            ->get('/attendance/export/worker',     [AttendanceController::class, 'exportWorker'])
            ->get('/attendance/export/company',    [AttendanceController::class, 'exportCompany'])
            ->get('/attendance/export/client',     [AttendanceController::class, 'exportClient'])

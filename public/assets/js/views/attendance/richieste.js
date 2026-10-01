@@ -30,22 +30,3 @@ document.addEventListener('change', function (e) {
         if (input) input.value = '';
     }
 });
-
-/**
- * Rifiutare senza motivo non aiuta nessuno: l'operaio si vede la
- * dichiarazione respinta e non sa cosa correggere, quindi la rimanda uguale.
- */
-document.addEventListener('click', function (e) {
-    var btn = e.target.closest && e.target.closest('[value="rifiuta"]');
-    if (!btn) return;
-
-    var form = btn.closest('form');
-    var motivo = form && form.querySelector('.ri-motivo');
-
-    if (motivo && motivo.value.trim() === '') {
-        e.preventDefault();
-        motivo.focus();
-        motivo.classList.add('is-manca');
-        setTimeout(function () { motivo.classList.remove('is-manca'); }, 1200);
-    }
-});

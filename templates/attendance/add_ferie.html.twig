@@ -3,12 +3,17 @@
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
 <link rel="stylesheet" href="/assets/css/views/attendance/presenze.css">
+<link rel="stylesheet" href="/assets/css/views/attendance/richieste.css?v=1">
 {% endblock %}
 
 {% set today = "now"|date('Y-m-d') %}
-{% set ferieCount = righe|filter(r => r.tipo == 'ferie')|length %}
-{% set permessiCount = righe|filter(r => r.tipo == 'permesso')|length %}
-{% set oggiAssenti = righe|filter(r => r.data_inizio <= today and r.data_fine >= today)|length %}
+{# Una richiesta in attesa non e' un'assenza: quello la' domani e' al lavoro
+   finche' qualcuno non gli risponde. Contarla fra gli assenti farebbe
+   programmare la squadra senza di lui per un giorno che nessuno ha concesso. #}
+{% set concesse = righe|filter(r => r.stato != 'in_attesa' and r.stato != 'rifiutata') %}
+{% set ferieCount = concesse|filter(r => r.tipo == 'ferie')|length %}
+{% set permessiCount = concesse|filter(r => r.tipo == 'permesso')|length %}
+{% set oggiAssenti = concesse|filter(r => r.data_inizio <= today and r.data_fine >= today)|length %}
 
 {% block content %}
 <div class="fe-page">
@@ -24,6 +29,12 @@
             </div>
         </div>
         <div class="fe-hero-stats">
+            {% if daApprovare|length %}
+                <div class="fe-stat">
+                    <div class="fe-stat-num">{{ daApprovare|length }}</div>
+                    <div class="fe-stat-lbl">Da decidere</div>
+                </div>
+            {% endif %}
             <div class="fe-stat">
                 <div class="fe-stat-num">{{ oggiAssenti }}</div>
                 <div class="fe-stat-lbl">Assenti oggi</div>
@@ -44,6 +55,85 @@
     {% endif %}
     {% if errorMsg %}
         <div class="fe-toast fe-toast-err"><span>{{ errorMsg }}</span><button type="button" data-dismiss-alert>&times;</button></div>
+    {% endif %}
+
+    {# ── Richieste dall'app ──
+       In cima e non in fondo: un operaio che aspetta risposta per prenotare
+       un volo conta piu' dell'elenco storico, che sta li' e non scappa.
+       Dalla piu' vecchia, perche' quella ferma da una settimana e' quella
+       che scotta. #}
+    {% if daApprovare %}
+        <div class="fe-card">
+            <div class="fe-card-head">
+                <h3 class="fe-card-title">
+                    Richieste dall'app — {{ daApprovare|length }} da decidere
+                </h3>
+            </div>
+            <div class="fe-card-body">
+                {% for r in daApprovare %}
+                    <div class="ri-card{{ r.giorni_in_attesa > 3 ? ' has-avvisi' : '' }}">
+
+                        <div class="ri-card-head">
+                            <div>
+                                <div class="ri-operaio">{{ r.operaio_nome }}</div>
+                                <div class="ri-azienda">{{ r.operaio_azienda ?: '—' }}</div>
+                            </div>
+                            <div class="ri-quando">
+                                <span class="ri-data">
+                                    {% if r.tipo == 'ferie' %}
+                                        <span class="fe-badge fe-badge-ferie">Ferie</span>
+                                    {% else %}
+                                        <span class="fe-badge fe-badge-permesso">Permesso</span>
+                                    {% endif %}
+                                    {{ r.data_inizio|date('d/m/Y') }}
+                                    {% if r.data_fine != r.data_inizio %} → {{ r.data_fine|date('d/m/Y') }}{% endif %}
+                                </span>
+                                <span class="ri-cantiere">
+                                    {% set giorni = date(r.data_fine).diff(date(r.data_inizio)).days + 1 %}
+                                    {{ r.ore ? r.ore ~ ' ore' : giorni ~ (giorni == 1 ? ' giorno' : ' giorni') }}
+                                </span>
+                            </div>
+                        </div>
+
+                        {# Da quanto aspetta. Dopo tre giorni passa in evidenza:
+                           non e' un errore, e' che nessuno le ha guardate. #}
+                        {% if r.giorni_in_attesa > 3 %}
+                            <div class="ri-avvisi">
+                                <div class="ri-avviso">
+                                    <svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                                    In attesa da {{ r.giorni_in_attesa }} giorni
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% if r.note %}<div class="ri-note">{{ r.note }}</div>{% endif %}
+
+                        <form method="POST" action="/attendance/leaves/decidi" class="ri-form">
+                            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                            <input type="hidden" name="id" value="{{ r.id }}">
+                            <div class="ri-azioni">
+                                <input type="text" name="motivo" class="ri-motivo"
+                                       placeholder="Motivo del rifiuto (l'operaio lo legge)">
+                                <button type="submit" name="azione" value="rifiuta" class="ri-btn ri-btn-ko">
+                                    Rifiuta
+                                </button>
+                                <button type="submit" name="azione" value="approva" class="ri-btn ri-btn-ok">
+                                    Approva
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                {% endfor %}
+
+                {# Le date non si toccano da qui: se vanno corrette si usa
+                   Modifica nell'elenco e poi si approva. Un'approvazione che
+                   sposta i giorni di nascosto farebbe tornare l'operaio dalle
+                   ferie il giorno sbagliato. #}
+                <p class="fe-hint" style="margin-top:4px;">
+                    Per cambiare le date prima di approvare, usa Modifica nell'elenco qui sotto.
+                </p>
+            </div>
+        </div>
     {% endif %}
 
     {# ── Form registrazione ── #}
@@ -119,6 +209,7 @@
                 <th>Dal</th>
                 <th>Al</th>
                 <th>Ore</th>
+                <th>Stato</th>
                 <th>Note</th>
                 <th style="text-align:right;">Azioni</th>
             </tr>
@@ -140,6 +231,22 @@
                     <td style="white-space:nowrap;">{{ row.data_inizio|date('d/m/Y') }}</td>
                     <td style="white-space:nowrap;">{{ row.data_fine|date('d/m/Y') }}</td>
                     <td>{{ row.ore ? row.ore ~ ' h' : '—' }}</td>
+                    {# Senza questa colonna una richiesta in attesa era
+                       indistinguibile da una ferie concessa, e chi guardava
+                       la riga dava per buono un permesso che nessuno aveva
+                       dato. #}
+                    <td style="white-space:nowrap;">
+                        {% if row.stato == 'in_attesa' %}
+                            <span class="ri-stato">in attesa</span>
+                        {% elseif row.stato == 'rifiutata' %}
+                            <span class="ri-stato ri-stato-rifiutata" title="{{ row.motivo|e('html_attr') }}">rifiutata</span>
+                        {% else %}
+                            <span class="ri-stato ri-stato-approvata">approvata</span>
+                        {% endif %}
+                        {% if row.richiesta_da_operaio %}
+                            <span class="fe-badge fe-badge-app" title="Arrivata dall'app, non inserita dall'ufficio">app</span>
+                        {% endif %}
+                    </td>
                     <td style="font-size:12px; color:#64748b; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
                     <td>
                         <div style="display:flex; gap:6px; justify-content:flex-end;">
@@ -169,7 +276,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="8" class="fe-empty">Nessuna ferie o permesso registrato. Usa il form qui sopra per iniziare.</td></tr>
+                <tr><td colspan="9" class="fe-empty">Nessuna ferie o permesso registrato. Usa il form qui sopra per iniziare.</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -180,5 +287,6 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/attendance/rifiuto_motivo.js?v=1"></script>
 <script src="/assets/js/views/attendance/add_ferie.js"></script>
 {% endblock %}
