@@ -257,11 +257,15 @@ final class AttendanceController
                     'note'          => trim((string)($_POST['note'] ?? '')),
                 ], $userId);
                 $_SESSION['success'] = 'Presenza approvata e registrata.';
+                $this->avvisaOperaio(fn($a) => $a->presenza($id, true));
             } elseif ($azione === 'rifiuta') {
                 $motivo = trim((string)($_POST['motivo'] ?? ''));
-                $repo->rifiuta($id, $motivo, $userId)
-                    ? $_SESSION['success'] = 'Dichiarazione rifiutata.'
-                    : $_SESSION['error']   = "Non trovata, o gia' decisa da qualcun altro.";
+                if ($repo->rifiuta($id, $motivo, $userId)) {
+                    $_SESSION['success'] = 'Dichiarazione rifiutata.';
+                    $this->avvisaOperaio(fn($a) => $a->presenza($id, false, $motivo));
+                } else {
+                    $_SESSION['error'] = "Non trovata, o gia' decisa da qualcun altro.";
+                }
             }
         } catch (\Throwable $e) {
             $_SESSION['error'] = 'Errore: ' . $e->getMessage();
@@ -317,11 +321,13 @@ final class AttendanceController
             if ($azione === 'rifiuta' && $motivo === '') {
                 $_SESSION['error'] = "Per rifiutare serve un motivo: lo legge l'operaio.";
             } elseif ($azione === 'approva' || $azione === 'rifiuta') {
-                $ok = $repo->decidi($id, $azione === 'approva', $motivo, $userId);
+                $approva = $azione === 'approva';
+                $ok = $repo->decidi($id, $approva, $motivo, $userId);
                 if ($ok) {
-                    $_SESSION['success'] = $azione === 'approva'
+                    $_SESSION['success'] = $approva
                         ? 'Ferie approvate.'
                         : 'Richiesta rifiutata.';
+                    $this->avvisaOperaio(fn($a) => $a->ferie($id, $approva, $motivo));
                 } else {
                     $_SESSION['error'] = "Non trovata, o gia' decisa da qualcun altro.";
                 }
@@ -331,6 +337,35 @@ final class AttendanceController
         }
 
         Response::redirect('/attendance/leaves');
+    }
+
+    /**
+     * Manda l'esito all'operaio, senza poter far fallire la decisione.
+     *
+     * La decisione a questo punto e' gia' sul database e la transazione e'
+     * chiusa: se il push o la notifica si rompono, l'approvazione resta
+     * valida e la pagina deve continuare a dire che e' approvata.
+     * Trasformare un guasto di FCM in "Errore: ..." farebbe riprovare
+     * l'ufficio su una cosa che era andata a buon fine.
+     *
+     * L'operaio in quel caso non riceve niente e lo scopre riaprendo l'app:
+     * seccante, ma e' dove eravamo prima, e nessun dato si perde.
+     *
+     * @param callable(\App\Service\Attendance\AvvisoDecisione): int $cosa
+     */
+    private function avvisaOperaio(callable $cosa): void
+    {
+        try {
+            $cosa(new \App\Service\Attendance\AvvisoDecisione(
+                $this->conn,
+                new \App\Service\Notifications\NotificationService(
+                    $this->conn,
+                    new \App\Infrastructure\Config()
+                )
+            ));
+        } catch (\Throwable $e) {
+            error_log('avviso decisione non mandato: ' . $e->getMessage());
+        }
     }
 
     public function saveLeave(Request $request): never

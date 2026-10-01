@@ -230,10 +230,38 @@ li' lui e' al lavoro finche' nessuno gli risponde.
 
 ---
 
+## Le notifiche all'operaio
+
+Arrivano da `NotificationService`, quindi dentro BOB e come push sui
+telefoni registrati, nella lingua scelta in `bb_users.lingua`.
+
+| Quando | Titolo | Priorita' |
+|---|---|---|
+| presenza approvata | Presenza approvata | normal |
+| presenza rifiutata | Presenza rifiutata | high |
+| ferie o permesso approvati | Richiesta approvata | normal |
+| ferie o permesso rifiutati | Richiesta rifiutata | high |
+
+Il rifiuto e' `high` perche' chiede di fare qualcosa — ridichiarare il
+giorno, riproporre altre date — e se arriva silenzioso l'operaio lo scopre
+quando ormai non serve piu'.
+
+Il **motivo del rifiuto resta nella lingua in cui l'ufficio l'ha scritto**:
+e' testo libero e nessuno lo puo' tradurre. Il resto della frase arriva
+tradotto, quindi un operaio albanese legge "Prezenca e dates 29/09/2026 u
+refuzua: cantiere sbagliato". Vale la pena saperlo quando si scrive il
+motivo: poche parole semplici si capiscono comunque.
+
+Si manda **dopo** che la decisione e' salvata e la transazione e' chiusa. Un
+push spedito dentro la transazione resterebbe spedito anche se il
+salvataggio si ribalta, e il push non si richiama indietro. Se la notifica
+fallisce la decisione resta valida e l'ufficio non se ne accorge: e' finita
+nel log, e l'operaio lo scopre riaprendo l'app, che e' dove eravamo prima.
+
+Chi non ha un telefono registrato riceve comunque la riga dentro BOB.
+
 ## Cosa manca ancora
 
-- **Una notifica** all'operaio quando l'ufficio decide: oggi deve riaprire
-  l'app per scoprirlo.
 - **BOB Zone** e' gia' esposto altrove (`/api/v1/zone/...`) e nell'app ci
   sono gia' Cantieri e Zone. Manca la sezione Disegni.
 
