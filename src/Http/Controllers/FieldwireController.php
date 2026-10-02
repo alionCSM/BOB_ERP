@@ -40,6 +40,91 @@ final class FieldwireController
     private ZoneAnnotationRepository $annRepo;
     private ZoneFileRepository       $fileRepo;
     private ZoneFormRepository       $formRepo;
+    private \App\Service\Zone\Accesso $accesso;
+
+    /** La guardia e' passata per questa richiesta? La controlla assertZone. */
+    private bool $guardiaPassata = false;
+
+    /**
+     * Chi puo' chiamare cosa.
+     *
+     * Una mappa sola invece del controllo ripetuto in quaranta metodi: web e
+     * app passano tutti di qui, e un controllo copiato quaranta volte e' un
+     * controllo che in un punto prima o poi manca.
+     *
+     * Quello che NON e' elencato viene rifiutato. Un metodo nuovo aggiunto
+     * senza pensare ai permessi nasce chiuso e se ne accorge subito chi lo
+     * scrive; nasce aperto e se ne accorge qualcuno fuori, piu' tardi.
+     *
+     * 'ufficio' vuol dire che l'assegnazione al cantiere non basta: accendere
+     * Zone o creare il modello di un modulo sono cose da chi ha il modulo in
+     * BOB, non da chi lavora li'.
+     *
+     * @var array<string, array{0:string,1:int}|string>
+     */
+    private const ACCESSI = [
+        'page'                  => 'pagina',
+        'tasks'                 => ['attivita', 1],
+        'createTask'            => ['attivita', 2],
+        'updateTask'            => ['attivita', 2],
+        'updateTaskStatus'      => ['attivita', 2],
+        'deleteTask'            => ['attivita', 2],
+        'comments'              => ['attivita', 1],
+        'postComment'           => ['attivita', 2],
+        'deleteComment'         => ['attivita', 2],
+        'postPhoto'             => ['attivita', 2],
+        'checklist'             => ['attivita', 1],
+        'addChecklistItem'      => ['attivita', 2],
+        'completeChecklistItem' => ['attivita', 2],
+        'deleteChecklistItem'   => ['attivita', 2],
+        'bobUsers'              => ['attivita', 1],
+
+        'files'                 => ['file', 1],
+        'downloadFile'          => ['file', 1],
+        'fileComments'          => ['file', 1],
+        'uploadFile'            => ['file', 2],
+        'createFolder'          => ['file', 2],
+        'deleteFolder'          => ['file', 2],
+        'deleteFile'            => ['file', 2],
+        'postFileComment'       => ['file', 2],
+
+        'formTemplates'         => ['moduli', 1],
+        'formTemplate'          => ['moduli', 1],
+        'formSubmissions'       => ['moduli', 1],
+        'formSubmission'        => ['moduli', 1],
+        'formFile'              => ['moduli', 1],
+        'submitForm'            => ['moduli', 2],
+        // il modello del modulo lo disegna l'ufficio: chi compila in
+        // cantiere riempie quello che trova, non se lo riscrive
+        'saveFormTemplate'      => 'ufficio',
+        'deleteFormTemplate'    => 'ufficio',
+
+        'disegni'               => ['disegni', 1],
+        'floorplans'            => ['disegni', 1],
+        'annotations'           => ['disegni', 1],
+        'dwgMeta'               => ['disegni', 1],
+        'dwgSvg'                => ['disegni', 1],
+        'saveAnnotation'        => ['disegni', 2],
+        'deleteAnnotation'      => ['disegni', 2],
+        'dwgConvert'            => ['disegni', 2],
+        'pushDisegno'           => 'ufficio',
+        'setCalibration'        => 'ufficio',
+
+        'media'                 => ['foto', 1],
+        'zonePhoto'             => ['foto', 1],
+
+        'report'                => ['report', 1],
+
+        'enable'                => 'ufficio',
+        'disable'               => 'ufficio',
+
+        // Decidere chi entra e' dell'ufficio per definizione: un capo
+        // squadra che puo' assegnare se stesso non e' un permesso, e'
+        // una formalita'.
+        'accessi'               => 'ufficio',
+        'salvaAccesso'          => 'ufficio',
+        'eliminaAccesso'        => 'ufficio',
+    ];
 
     public function __construct(
         private Config             $config,
@@ -51,20 +136,64 @@ final class FieldwireController
         $this->annRepo         = new ZoneAnnotationRepository($conn);
         $this->fileRepo        = new ZoneFileRepository($conn);
         $this->formRepo        = new ZoneFormRepository($conn);
+        $this->accesso         = new \App\Service\Zone\Accesso($conn);
+    }
+
+    /**
+     * Il controllo, prima di qualunque cosa.
+     *
+     * Si chiama con __FUNCTION__ dalla prima riga di ogni metodo: cosi' la
+     * regola sta nella mappa e qui c'e' un posto solo dove sbagliarla.
+     */
+    private function guardia(string $metodo, Request $request): void
+    {
+        $regola = self::ACCESSI[$metodo] ?? null;
+
+        if ($regola === null) {
+            Response::json(['success' => false, 'message' => 'Non consentito'], 403);
+        }
+
+        $utente = $request->user();
+
+        if ($regola === 'ufficio' || $regola === 'pagina') {
+            $daUfficio = $this->accesso->daUfficio($utente);
+
+            if ($regola === 'pagina') {
+                // Chi arriva qui sta navigando col browser: senza accesso
+                // merita un rimando alla dashboard, non un blocco di JSON
+                // in faccia, che sembra un guasto.
+                $w = (int)($request->param('id') ?? 0);
+                if (!$daUfficio && !$this->accesso->qualcosa($utente, $w)) {
+                    Response::redirect('/dashboard?no_permission=1');
+                }
+                $this->guardiaPassata = true;
+                return;
+            }
+
+            if (!$daUfficio) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Serve il permesso Zone di BOB per questa operazione',
+                ], 403);
+            }
+            $this->guardiaPassata = true;
+            return;
+        }
+
+        [$famiglia, $minimo] = $regola;
+        $this->accesso->pretende($utente, (int)($request->param('id') ?? 0), $famiglia, $minimo);
+
+        $this->guardiaPassata = true;
     }
 
     // ─── Pagina BOB Zone ──────────────────────────────────────────────────────
 
     public function page(Request $request): void
     {
-        // La pagina web merita un rimando alla dashboard, non il JSON che
-        // ricevono le chiamate dell'app: chi ci arriva senza permesso sta
-        // navigando col browser, e un blocco di JSON in faccia sembra guasto.
-        $utente = $request->user();
-        if (!$utente || ((int)$utente->id !== 1 && !$utente->canAccess('zone'))) {
-            Response::redirect('/dashboard?no_permission=1');
-        }
+        $this->guardia(__FUNCTION__, $request);
 
+        // il permesso l'ha gia' guardato la guardia, che per questa pagina
+        // rimanda alla dashboard invece di rispondere in JSON
         $worksiteId = (int) ($request->param('id') ?? 0);
         $worksite   = $this->worksiteRepo->findById($worksiteId);
         if (!$worksite) { http_response_code(404); exit; }
@@ -93,6 +222,10 @@ final class FieldwireController
             'taskCounts'           => $counts,
             'fieldwire_project_id' => $worksite['fieldwire_project_id'] ?? null,
             'fieldwire_enabled'    => $this->config->fieldwireEnabled(),
+            // le sezioni che questa persona puo' vedere: nascondere una
+            // scheda che risponderebbe 403 e' meglio che farcela sbattere
+            'accessi'              => $this->accesso->tutti($request->user(), $worksiteId),
+            'daUfficio'            => $this->accesso->daUfficio($request->user()),
         ]);
     }
 
@@ -100,6 +233,8 @@ final class FieldwireController
 
     public function tasks(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             return $this->zoneRepo->allForWorksite($worksiteId);
@@ -108,6 +243,8 @@ final class FieldwireController
 
     public function createTask(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $user       = $request->user();
@@ -132,6 +269,8 @@ final class FieldwireController
 
     public function updateTask(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -172,6 +311,8 @@ final class FieldwireController
 
     public function updateTaskStatus(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -200,6 +341,8 @@ final class FieldwireController
 
     public function deleteTask(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -229,6 +372,8 @@ final class FieldwireController
 
     public function comments(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $taskId = (int) $request->param('taskId');
             return $this->zoneRepo->commentsForTask($taskId);
@@ -237,6 +382,8 @@ final class FieldwireController
 
     public function postComment(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -271,6 +418,8 @@ final class FieldwireController
     /** Upload foto su un task → crea un commento con file_url. Multipart. */
     public function postPhoto(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         // NB: multipart, non JSON. Risponde JSON.
@@ -325,6 +474,8 @@ final class FieldwireController
     /** Stream di una foto BOB Zone (path relativo in ?f=). */
     public function zonePhoto(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         $worksiteId = (int) $request->param('id');
@@ -352,6 +503,8 @@ final class FieldwireController
 
     public function deleteComment(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $commentId  = (int) $request->param('commentId');
@@ -380,6 +533,8 @@ final class FieldwireController
 
     public function checklist(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $taskId = (int) $request->param('taskId');
             return $this->zoneRepo->checklistForTask($taskId);
@@ -388,6 +543,8 @@ final class FieldwireController
 
     public function addChecklistItem(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -416,6 +573,8 @@ final class FieldwireController
 
     public function completeChecklistItem(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -448,6 +607,8 @@ final class FieldwireController
 
     public function deleteChecklistItem(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
@@ -479,6 +640,8 @@ final class FieldwireController
     /** Report PDF (punch list) dei task del cantiere. */
     public function report(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         $worksiteId = (int) $request->param('id');
@@ -505,6 +668,8 @@ final class FieldwireController
 
     public function formTemplates(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             return $this->formRepo->templatesFor((int)$request->param('id'));
         });
@@ -512,6 +677,8 @@ final class FieldwireController
 
     public function formTemplate(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $t = $this->formRepo->find((int)$request->param('tplId'));
             if (!$t) throw new \RuntimeException('Modulo non trovato');
@@ -521,6 +688,8 @@ final class FieldwireController
 
     public function saveFormTemplate(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $user = $request->user();
@@ -550,6 +719,8 @@ final class FieldwireController
 
     public function deleteFormTemplate(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $this->formRepo->delete((int)$request->param('tplId'));
             return ['deleted' => true];
@@ -558,6 +729,8 @@ final class FieldwireController
 
     public function submitForm(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $tplId      = (int) $request->param('tplId');
@@ -600,6 +773,8 @@ final class FieldwireController
 
     public function formSubmissions(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $tplId = isset($_GET['template']) && $_GET['template'] !== '' ? (int)$_GET['template'] : null;
@@ -609,6 +784,8 @@ final class FieldwireController
 
     public function formSubmission(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $sub = $this->formRepo->findSubmission((int)$request->param('subId'));
             if (!$sub) throw new \RuntimeException('Compilazione non trovata');
@@ -621,6 +798,8 @@ final class FieldwireController
     /** Stream firma/foto modulo (?f=). */
     public function formFile(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         $worksiteId = (int) $request->param('id');
@@ -662,6 +841,8 @@ final class FieldwireController
 
     public function files(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = isset($_GET['folder']) && $_GET['folder'] !== '' ? (int)$_GET['folder'] : null;
@@ -681,6 +862,8 @@ final class FieldwireController
 
     public function createFolder(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $body = $this->jsonBody();
@@ -693,6 +876,8 @@ final class FieldwireController
 
     public function deleteFolder(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = (int) $request->param('folderId');
@@ -703,6 +888,8 @@ final class FieldwireController
 
     public function uploadFile(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         header('Content-Type: application/json');
@@ -749,6 +936,8 @@ final class FieldwireController
 
     public function deleteFile(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $fileId     = (int) $request->param('fileId');
@@ -764,6 +953,8 @@ final class FieldwireController
 
     public function downloadFile(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         $worksiteId = (int) $request->param('id');
@@ -793,6 +984,8 @@ final class FieldwireController
 
     public function fileComments(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             return $this->fileRepo->comments((int)$request->param('fileId'));
         });
@@ -800,6 +993,8 @@ final class FieldwireController
 
     public function postFileComment(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $fileId = (int) $request->param('fileId');
             $user   = $request->user();
@@ -815,6 +1010,8 @@ final class FieldwireController
     /** Galleria: tutte le foto caricate sui task del cantiere. */
     public function media(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $stmt = $this->conn->prepare("
@@ -835,6 +1032,8 @@ final class FieldwireController
 
     public function bobUsers(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () {
             $stmt = $this->conn->query("
                 SELECT id, username,
@@ -851,10 +1050,69 @@ final class FieldwireController
         });
     }
 
+    // ─── Chi entra nel cantiere ───────────────────────────────────────────────
+
+    /** Gli assegnati di questo cantiere, coi loro livelli. */
+    public function accessi(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+            return [
+                'famiglie' => \App\Service\Zone\Accesso::FAMIGLIE,
+                'persone'  => (new \App\Repository\Zone\AccessoRepository($this->conn))
+                                  ->perCantiere($w),
+            ];
+        });
+    }
+
+    /** Assegna una persona, o cambia i suoi livelli. */
+    public function salvaAccesso(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w      = (int)$request->param('id');
+            $userId = (int)($_POST['user_id'] ?? 0);
+
+            if (!$userId) {
+                throw new \RuntimeException('Serve la persona da assegnare');
+            }
+
+            $livelli = [];
+            foreach (array_keys(\App\Service\Zone\Accesso::FAMIGLIE) as $f) {
+                $livelli[$f] = (int)($_POST[$f] ?? \App\Service\Zone\Accesso::VEDE);
+            }
+
+            (new \App\Repository\Zone\AccessoRepository($this->conn))->salva(
+                $w, $userId, $livelli, (int)($request->user()->id ?? 0)
+            );
+
+            return ['ok' => true];
+        });
+    }
+
+    /** Toglie una persona dal cantiere. */
+    public function eliminaAccesso(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $tolto = (new \App\Repository\Zone\AccessoRepository($this->conn))->elimina(
+                (int)$request->param('id'),
+                (int)($_POST['user_id'] ?? 0)
+            );
+            return ['ok' => $tolto];
+        });
+    }
+
     // ─── Floorplans (Fieldwire only) ──────────────────────────────────────────
 
     public function floorplans(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             return $this->fwFloorplanRepo->allForWorksite($worksiteId);
@@ -869,6 +1127,8 @@ final class FieldwireController
      */
     public function disegni(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $worksite   = $this->worksiteRepo->findById($worksiteId);
@@ -937,6 +1197,8 @@ final class FieldwireController
     /** Push di un disegno BOB su Fieldwire come sheet (flusso S3). */
     public function pushDisegno(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $docId      = (int) $request->param('docId');
@@ -990,6 +1252,8 @@ final class FieldwireController
     /** Lista annotazioni + calibrazione di un documento (pagina opzionale). */
     public function annotations(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $docId = (int) $request->param('docId');
             $page  = (int) ($_GET['page'] ?? 1);
@@ -1003,6 +1267,8 @@ final class FieldwireController
     /** Crea o aggiorna un'annotazione. Se type=pin con create_task, crea anche il task. */
     public function saveAnnotation(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $docId      = (int) $request->param('docId');
@@ -1051,6 +1317,8 @@ final class FieldwireController
 
     public function deleteAnnotation(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $annId = (int) $request->param('annId');
             $this->annRepo->delete($annId);
@@ -1063,6 +1331,8 @@ final class FieldwireController
     /** Stato + meta del render DWG (svg url, extents, meters_per_unit). */
     public function dwgMeta(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $docId      = (int) $request->param('docId');
@@ -1087,6 +1357,8 @@ final class FieldwireController
     /** Rilancia la conversione DWG→SVG (retry manuale). */
     public function dwgConvert(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $docId = (int) $request->param('docId');
             return (new \App\Service\Fieldwire\DwgConverter($this->conn))->convert($docId);
@@ -1096,6 +1368,8 @@ final class FieldwireController
     /** Stream dell'SVG generato dal DWG. */
     public function dwgSvg(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->assertZone();
 
         $docId = (int) $request->param('docId');
@@ -1119,6 +1393,8 @@ final class FieldwireController
     /** Salva la calibrazione scala (metri per frazione-larghezza). */
     public function setCalibration(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $docId = (int) $request->param('docId');
             $user  = $request->user();
@@ -1135,6 +1411,8 @@ final class FieldwireController
 
     public function enable(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $user       = $request->user();
             $worksiteId = (int) $request->param('id');
@@ -1171,6 +1449,8 @@ final class FieldwireController
 
     public function disable(Request $request): void
     {
+        $this->guardia(__FUNCTION__, $request);
+
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $worksite   = $this->worksiteRepo->findById($worksiteId);
@@ -1296,12 +1576,21 @@ final class FieldwireController
      * L'utente si legge da $GLOBALS: lo riempiono entrambi i middleware, web
      * e API, quindi il metodo funziona identico da tutte e due le parti.
      */
+    /**
+     * L'ultima rete, sotto a jsonResponse.
+     *
+     * Prima chiedeva il modulo `zone` e basta, e con quello solo l'ufficio
+     * entrava: un capo squadra assegnato al suo cantiere si sarebbe preso
+     * 403 qui, prima ancora che qualcuno guardasse i suoi livelli.
+     *
+     * Ora chiede che la guardia sia passata. E' piu' stretto di prima, non
+     * piu' largo: la guardia decide caso per caso — famiglia, livello,
+     * cantiere — e un metodo che arrivasse a rispondere senza esserci
+     * passato viene fermato qui invece di scivolare fuori.
+     */
     private function assertZone(): void
     {
-        $user = $GLOBALS['user'] ?? null;
-
-        if ($user instanceof \App\Domain\User
-            && ((int)$user->id === 1 || $user->canAccess('zone'))) {
+        if ($this->guardiaPassata) {
             return;
         }
 
@@ -1310,7 +1599,7 @@ final class FieldwireController
         header('Content-Type: application/json');
         echo json_encode([
             'ok'    => false,
-            'error' => "Permesso 'zone' richiesto per BOB Zone",
+            'error' => 'Non hai accesso a questa parte del cantiere',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

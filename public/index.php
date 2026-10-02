@@ -520,6 +520,9 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
+           ->get( '/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'accessi'])
+           ->post('/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'salvaAccesso'])
+           ->post('/worksites/{id}/zone/accessi/elimina',                                         [FieldwireController::class, 'eliminaAccesso'])
            ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
            ->get( '/worksites/{id}/zone/media',                                                   [FieldwireController::class, 'media'])
            ->get( '/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'formTemplates'])
@@ -746,7 +749,8 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/me/presenze/{id}/ritira',  [ApiV1OperaioController::class, 'ritiraPresenza'])
             ->get('/api/v1/me/ferie',                  [ApiV1OperaioController::class, 'ferie'])
             ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie'])
-            ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua']);
+            ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua'])
+            ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone']);
 
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si

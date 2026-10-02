@@ -264,6 +264,42 @@ albanese e chi rumeno. Questo serve a chi se la ritrova sbagliata.
 o se la cambia l'operaio da qui o dal profilo web, oppure la si mette a
 mano sul database. Vale la pena che l'app la chieda al primo avvio.
 
+## GET /api/v1/me/zone
+
+I cantieri di cui puo' aprire la Zone, e fin dove su ognuno.
+
+```json
+{ "success": true,
+  "cantieri": [
+    { "id": 5059, "worksite_code": "C-2026-014", "name": "Via Roma",
+      "location": "Lecco", "status": "In corso",
+      "accessi": { "attivita": 2, "file": 1, "moduli": 1,
+                   "disegni": 1, "foto": 2, "report": 0 } }
+  ],
+  "famiglie": { "attivita": "Attivita", "file": "File e documenti",
+                "moduli": "Moduli", "disegni": "Disegni",
+                "foto": "Foto", "report": "Report" } }
+```
+
+Livelli: **0** non vede, **1** vede, **2** vede e modifica.
+
+L'app disegna solo le schede con livello > 0 e nasconde i bottoni di
+scrittura sotto il 2. Il server rifiuta comunque — ogni endpoint della Zone
+si controlla da solo — ma mostrare una scheda che poi risponde 403 sembra un
+guasto, e chi la trova continua a cliccarci.
+
+Senza questo elenco l'app non sa da dove cominciare: gli endpoint sanno dire
+di no, non sanno dire quali cantieri provare.
+
+Non chiede un operaio collegato: la Zone si da' all'utente.
+
+Chi ha il modulo `zone` in BOB non compare qui con tutti i cantieri: questo
+elenco sono le **assegnazioni**. Per l'ufficio il resto di BOB fa gia' il
+suo mestiere.
+
+**Gli endpoint della Zone restano quelli di sempre** (`/api/v1/zone/{id}/...`):
+non cambia niente nelle chiamate, cambia solo chi riceve 403.
+
 ---
 
 ## Le notifiche all'operaio

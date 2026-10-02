@@ -22,8 +22,20 @@ class ScopeService
         }
 
         if ($user->type === 'worker') {
-            $stmt = $connection->prepare('SELECT worksite_id FROM bb_worksite_assignments WHERE worker_id = :wid');
-            $stmt->execute([':wid' => $user->worker_id]);
+            // Due porte per lo stesso cortile: la vecchia assegnazione per
+            // lavoratore, e quella nuova per utente che si fa dalla scheda
+            // del cantiere e porta con se' i livelli di accesso.
+            //
+            // UNION e non una sola: chi e' passato dalla prima resta dov'e',
+            // e togliere di mezzo la vecchia tabella senza sapere cosa ci
+            // sia dentro vorrebbe dire chiudere fuori qualcuno di punto in
+            // bianco.
+            $stmt = $connection->prepare('
+                SELECT worksite_id FROM bb_worksite_assignments WHERE worker_id = :wid
+                UNION
+                SELECT worksite_id FROM bb_zone_accessi          WHERE user_id   = :uid
+            ');
+            $stmt->execute([':wid' => $user->worker_id, ':uid' => $user->id]);
             return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
         }
 

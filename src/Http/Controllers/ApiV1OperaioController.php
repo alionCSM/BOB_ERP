@@ -444,6 +444,42 @@ final class ApiV1OperaioController
         Response::json(['success' => true, 'lingua' => $lingua]);
     }
 
+    // ── GET /api/v1/me/zone ──────────────────────────────────────────────────
+
+    /**
+     * I cantieri di cui puo' aprire la Zone, e fin dove su ognuno.
+     *
+     * Senza questo l'app non sa da dove cominciare: gli endpoint della Zone
+     * sanno dire di no, ma non sanno dire quali cantieri provare, e provarli
+     * tutti per scoprirlo sarebbe assurdo.
+     *
+     * I livelli arrivano insieme all'elenco cosi' l'app disegna solo le
+     * schede che servono, invece di mostrarle tutte e farle rispondere 403
+     * una per una quando uno ci tocca sopra.
+     *
+     * Non chiede un operaio collegato: la Zone si da' all'utente.
+     */
+    public function zone(Request $request): never
+    {
+        $utente  = $request->user();
+        $accesso = new \App\Service\Zone\Accesso($this->conn);
+
+        $cantieri = (new \App\Repository\Zone\AccessoRepository($this->conn))
+            ->cantieriDi((int)($utente->id ?? 0));
+
+        foreach ($cantieri as &$c) {
+            $c['id']      = (int)$c['id'];
+            $c['accessi'] = $accesso->tutti($utente, $c['id']);
+        }
+        unset($c);
+
+        Response::json([
+            'success'  => true,
+            'cantieri' => $cantieri,
+            'famiglie' => \App\Service\Zone\Accesso::FAMIGLIE,
+        ]);
+    }
+
     // ── Supporto ─────────────────────────────────────────────────────────────
 
     /**

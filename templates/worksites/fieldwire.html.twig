@@ -319,16 +319,20 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Side menu #}
         <aside class="bz-sidebar">
             <nav class="bz-nav">
-                <button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>
-                <button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
-                <button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>
-                <button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
-                <button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
+                {# Chi non ha accesso a una sezione non se la vede nemmeno:
+                   lasciare la voce e farla rispondere 403 sembra un guasto,
+                   e chi la trova continua a cliccarci. #}
+                {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>{% endif %}
+                {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>{% endif %}
+                {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
+                {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
+                {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
-                <button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>
-                <a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>
+                {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>{% endif %}
+                {% if accessi.report   > 0 %}<a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>{% endif %}
+                {% if daUfficio %}<button class="bz-nav-item" id="btn-accessi"><i class="fas fa-user-shield"></i><span>Chi accede</span></button>{% endif %}
             </div>
 
             {# ── Info cantiere ── #}
@@ -634,6 +638,36 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
     </div>
 </div>
+
+{# ── Chi accede a questo cantiere ──
+   Solo per l'ufficio. Chi lavora qui non deve poter cambiare i propri
+   permessi: un capo squadra che si assegna da solo non e' un permesso,
+   e' una formalita'. #}
+{% if daUfficio %}
+<div class="bz-overlay hidden" id="accessi-modal">
+    <div class="bz-modal" style="width: 760px;">
+        <h3>Chi accede a questo cantiere</h3>
+
+        <p style="font-size:12px; color:#64748b; margin:-12px 0 18px;">
+            Chi ha il modulo Zone in BOB vede tutto comunque. Qui si danno i
+            cantieri a chi quel modulo non ce l'ha — capi squadra, operai.
+            Non c'entra con la pianificazione: li' si decide chi lavora dove,
+            qui chi legge cosa.
+        </p>
+
+        <div class="bz-modal-field">
+            <label>Aggiungi persona</label>
+            <select id="acc-utente"><option value="">Scegli…</option></select>
+        </div>
+
+        <div id="acc-elenco" style="max-height:46vh; overflow:auto; margin-top:8px;"></div>
+
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="btn-acc-close">Chiudi</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <script nonce="{{ cspNonce }}">
 const WID = {{ worksite_id }};
@@ -2037,5 +2071,6 @@ loadBobUsers();
   }
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
+{% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=1"></script>{% endif %}
 </body>
 </html>
