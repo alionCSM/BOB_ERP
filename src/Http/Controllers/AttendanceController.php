@@ -378,11 +378,12 @@ final class AttendanceController
                 $_SESSION['success'] = "Record eliminato.";
             } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $workerId = (int)($_POST['operaio_id'] ?? 0);
-                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso'], true) ? $_POST['tipo'] : '';
+                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso', 'malattia'], true) ? $_POST['tipo'] : '';
                 $from     = $_POST['data_inizio'] ?? '';
                 $to       = $_POST['data_fine']   ?: $from; // vuoto = giorno singolo
                 $ore      = ($_POST['ore'] ?? '') !== '' ? (float)$_POST['ore'] : null;
                 $note     = trim($_POST['note'] ?? '');
+                $prot     = trim($_POST['protocollo'] ?? '');
                 $id       = (int)($_POST['record_id'] ?? 0);
                 $userId   = (int)($request->user()->id ?? 0);
 
@@ -391,12 +392,20 @@ final class AttendanceController
                 }
 
                 if ($workerId && $tipo && $from) {
+                    // "Ferie aggiornato" e "Malattia registrato" li scrive
+                    // ucfirst, e si leggono male: ogni tipo ha il suo genere
+                    [$nome, $fatto, $salvato] = match ($tipo) {
+                        'permesso' => ['Permesso', 'aggiornato', 'registrato'],
+                        'malattia' => ['Malattia', 'aggiornata', 'registrata'],
+                        default    => ['Ferie',    'aggiornate', 'registrate'],
+                    };
+
                     if ($id > 0) {
-                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note);
-                        $_SESSION['success'] = ucfirst($tipo) . " aggiornato.";
+                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note, $prot);
+                        $_SESSION['success'] = "$nome $fatto.";
                     } else {
-                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId);
-                        $_SESSION['success'] = ucfirst($tipo) . " registrato.";
+                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId, $prot);
+                        $_SESSION['success'] = "$nome $salvato.";
                     }
                 } else {
                     $_SESSION['error'] = "Dati non validi.";

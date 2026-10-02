@@ -103,7 +103,7 @@
 }
 .fe-hint { font-size: 10.5px; color: #94a3b8; margin-top: 3px; display: block; }
 
-/* chips tipo (ferie/permesso) */
+/* chips tipo (ferie/permesso/malattia) */
 .fe-tipo { display: flex; gap: 6px; }
 .fe-tipo-chip {
     flex: 1; padding: 8px 0; text-align: center;
@@ -121,6 +121,13 @@
     background: linear-gradient(135deg, #f59e0b, #d97706);
     border-color: #d97706; color: #fff;
     box-shadow: 0 2px 6px rgba(217,119,6,.25);
+}
+/* Rosso spento e non acceso: la malattia si deve distinguere a colpo
+   d'occhio da ferie e permesso, ma non e' un allarme. */
+.fe-tipo-chip.on-malattia {
+    background: linear-gradient(135deg, #f87171, #dc2626);
+    border-color: #dc2626; color: #fff;
+    box-shadow: 0 2px 6px rgba(220,38,38,.25);
 }
 
 .fe-form-foot { display: flex; justify-content: flex-end; margin-top: 16px; gap: 8px; }
@@ -187,6 +194,7 @@
 .fe-badge-oggi     { background: #dcfce7; color: #15803d; border: 1px solid #86efac; margin-left: 6px; }
 /* Chi l'ha chiesta dall'app: grigio di proposito, non e' una notizia,
    e' solo da dove e' arrivata. */
+.fe-badge-malattia { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 .fe-badge-app      { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; margin-left: 6px; }
 
 .fe-amount { font-weight: 700; white-space: nowrap; }

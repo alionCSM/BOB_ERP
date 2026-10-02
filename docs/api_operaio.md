@@ -199,16 +199,20 @@ approvata la presenza vera e' gia' nata.
 
 ## GET /api/v1/me/ferie
 
-Le sue ferie e permessi, richiesti o registrati dall'ufficio.
+Le sue assenze — ferie, permessi e malattie — richieste o registrate
+dall'ufficio.
 
 ```json
 { "success": true,
   "ferie": [
     { "id": 3, "tipo": "ferie", "data_inizio": "2026-08-10",
       "data_fine": "2026-08-24", "ore": null, "note": null,
+      "protocollo": null,
       "stato": "approvata", "richiesta_da_operaio": 0, "motivo": null }
   ] }
 ```
+
+`protocollo` e' il numero del certificato, e vale solo sulle malattie.
 
 Le righe inserite dall'ufficio prima di questa funzione risultano
 `approvata`: le ha messe chi decide, e ritrovarsele da approvare il giorno
@@ -217,14 +221,26 @@ del rilascio sarebbe stato un disastro.
 ## POST /api/v1/me/ferie
 
 ```json
-{ "tipo": "ferie", "dal": "2026-12-23", "al": "2027-01-06", "ore": null, "note": "" }
+{ "tipo": "ferie", "dal": "2026-12-23", "al": "2027-01-06", "ore": null,
+  "note": "", "protocollo": "" }
 ```
 
-`tipo`: `ferie` | `permesso`. `al` si puo' omettere per un giorno solo.
-`ore` serve ai permessi di poche ore. Nasce `in_attesa`.
+`tipo`: `ferie` | `permesso` | `malattia`. `al` si puo' omettere per un
+giorno solo. `ore` serve ai permessi di poche ore. Nasce `in_attesa`.
 
-L'ufficio la decide da `/attendance/leaves`, in cima alla pagina Ferie e
-Permessi. Finche' e' in attesa non e' un'assenza: non conta negli "assenti
+`protocollo` e' il numero del certificato e si legge **solo** con
+`tipo: malattia`: su una ferie viene buttato via, perche' un numero di
+certificato attaccato a una ferie non vuol dire niente.
+
+**Non e' obbligatorio.** Molti il certificato lo mandano su WhatsApp e lo
+mette l'ufficio: bloccare la dichiarazione per un campo vuoto vorrebbe dire
+che uno a letto con la febbre non riesce ad avvisare. Si aggiunge dopo.
+
+La malattia non si "chiede" — uno sta male e basta — ma passa dalla stessa
+porta perche' l'ufficio deve comunque vederla e riscontrare il certificato.
+`in_attesa` li' non vuol dire "forse", vuol dire "non ancora guardata".
+
+L'ufficio la decide da `/attendance/leaves`, in cima alla pagina Assenze. Finche' e' in attesa non e' un'assenza: non conta negli "assenti
 oggi" e non esclude l'operaio dal promemoria della sera, perche' quel giorno
 li' lui e' al lavoro finche' nessuno gli risponde.
 
@@ -282,6 +298,9 @@ Chi non ha un telefono registrato riceve comunque la riga dentro BOB.
 
 ## Cosa manca ancora
 
+- **La malattia non si vede in pianificazione**: chi e' a casa malato non
+  riceve piu' il promemoria della sera, ma nella schermata delle squadre
+  resta li' come tutti. Chi programma deve ricordarselo.
 - **BOB Zone** e' gia' esposto altrove (`/api/v1/zone/...`) e nell'app ci
   sono gia' Cantieri e Zone. Manca la sezione Disegni.
 
@@ -318,8 +337,8 @@ sulle righe che meritano un secondo sguardo:
 - **non era in pianificazione** quel giorno: non e' un errore, ma nessuno lo
   aspettava li'
 
-`/attendance/leaves` — ferie e permessi, con le richieste arrivate dall'app
-in cima, dalla piu' vecchia: quella ferma da una settimana e' quella che
+`/attendance/leaves` — ferie, permessi e malattie (nel menu: **Assenze**),
+con le richieste arrivate dall'app in cima, dalla piu' vecchia: quella ferma da una settimana e' quella che
 scotta, e dopo tre giorni passa in evidenza da sola.
 
 Le date non si cambiano approvando. Se vanno corrette si usa Modifica

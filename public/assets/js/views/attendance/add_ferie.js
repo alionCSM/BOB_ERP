@@ -19,16 +19,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const oreWrap    = document.querySelector('.ore-wrap');
     const chips      = document.querySelectorAll('.fe-tipo-chip');
 
+    const protWrap = document.querySelector('.prot-wrap');
+
     function setTipo(tipo) {
         tipoSelect.value = tipo;
         chips.forEach(c => {
-            c.classList.remove('on-ferie', 'on-permesso');
-            if (c.dataset.tipo === tipo) c.classList.add(tipo === 'ferie' ? 'on-ferie' : 'on-permesso');
+            c.classList.remove('on-ferie', 'on-permesso', 'on-malattia');
+            if (c.dataset.tipo === tipo) c.classList.add('on-' + tipo);
         });
+
         // Ore ha senso solo per il permesso a ore
         const isPermesso = tipo === 'permesso';
         oreWrap.classList.toggle('hidden', !isPermesso);
         if (!isPermesso) document.querySelector('input[name="ore"]').value = '';
+
+        // Il certificato solo sulla malattia. Svuotato quando si nasconde:
+        // un numero rimasto da una scelta precedente partirebbe lo stesso
+        // al salvataggio e finirebbe attaccato a una ferie.
+        const isMalattia = tipo === 'malattia';
+        protWrap.classList.toggle('hidden', !isMalattia);
+        if (!isMalattia) document.querySelector('input[name="protocollo"]').value = '';
     }
     chips.forEach(c => c.addEventListener('click', () => setTipo(c.dataset.tipo)));
     setTipo('ferie');
@@ -53,6 +63,8 @@ document.addEventListener('DOMContentLoaded', function () {
             al.value  = this.dataset.al;
             document.querySelector('input[name="ore"]').value     = this.dataset.ore || '';
             document.querySelector('textarea[name="note"]').value = this.dataset.note || '';
+            // dopo setTipo, che svuota il campo quando non serve
+            document.querySelector('input[name="protocollo"]').value = this.dataset.protocollo || '';
 
             operaioSelect.addOption({ value: this.dataset.operaio, text: this.dataset.operaioNome });
             operaioSelect.setValue(this.dataset.operaio);
@@ -69,8 +81,9 @@ document.addEventListener('DOMContentLoaded', function () {
         setTipo('ferie');
         dal.value = '';
         al.value  = '';
-        document.querySelector('input[name="ore"]').value     = '';
-        document.querySelector('textarea[name="note"]').value = '';
+        document.querySelector('input[name="ore"]').value       = '';
+        document.querySelector('input[name="protocollo"]').value = '';
+        document.querySelector('textarea[name="note"]').value   = '';
         operaioSelect.clear();
         formTitle.textContent = 'Registra nuova assenza';
         cancelBtn.classList.remove('visible');

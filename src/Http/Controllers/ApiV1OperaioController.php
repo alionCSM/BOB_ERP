@@ -339,17 +339,21 @@ final class ApiV1OperaioController
     // ── POST /api/v1/me/ferie ────────────────────────────────────────────────
 
     /**
-     * Richiesta di ferie o permesso.
+     * Richiesta di ferie, permesso o malattia.
      *
      * Nasce in attesa, al contrario di quelle che inserisce l'ufficio: quelle
      * le mette chi decide, questa la manda chi chiede.
+     *
+     * La malattia non si "chiede" — uno sta male e basta — ma passa dalla
+     * stessa porta perche' l'ufficio deve comunque vederla e riscontrare il
+     * certificato. In attesa non e' "forse", e' "non ancora guardata".
      */
     public function creaFerie(Request $request): never
     {
         $operaio = $this->operaio($request);
         $body    = $this->corpo();
 
-        $tipo = in_array($body['tipo'] ?? '', ['ferie', 'permesso'], true)
+        $tipo = in_array($body['tipo'] ?? '', ['ferie', 'permesso', 'malattia'], true)
             ? (string)$body['tipo'] : '';
         $dal  = $this->data($body['dal'] ?? '', '');
         $al   = $this->data($body['al']  ?? '', '');
@@ -373,12 +377,20 @@ final class ApiV1OperaioController
 
         $ore = ($body['ore'] ?? '') !== '' ? (float)$body['ore'] : null;
 
+        // Il numero del certificato vale solo sulla malattia. Non si
+        // pretende: molti lo mandano su WhatsApp e lo mette l'ufficio, e
+        // bloccare la dichiarazione per un campo vuoto vorrebbe dire che
+        // uno a letto con la febbre non riesce ad avvisare.
+        $protocollo = $tipo === 'malattia'
+            ? trim((string)($body['protocollo'] ?? ''))
+            : '';
+
         $stmt = $this->conn->prepare("
             INSERT INTO bb_ferie_permessi
                 (worker_id, tipo, data_inizio, data_fine, ore, note,
-                 stato, richiesta_da_operaio, created_by)
+                 protocollo, stato, richiesta_da_operaio, created_by)
             VALUES (:wid, :tipo, :dal, :al, :ore, :note,
-                    'in_attesa', 1, NULL)
+                    :prot, 'in_attesa', 1, NULL)
         ");
         $stmt->execute([
             ':wid'  => $operaio,
@@ -387,6 +399,7 @@ final class ApiV1OperaioController
             ':al'   => $al,
             ':ore'  => $ore,
             ':note' => trim((string)($body['note'] ?? '')) ?: null,
+            ':prot' => $protocollo !== '' ? $protocollo : null,
         ]);
 
         Response::json([

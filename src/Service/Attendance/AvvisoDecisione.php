@@ -75,7 +75,7 @@ final class AvvisoDecisione
     }
 
     /**
-     * Esito di una richiesta di ferie o permesso.
+     * Esito di una richiesta di ferie, permesso o malattia.
      *
      * @return int a quanti utenti e' arrivata
      */
@@ -106,6 +106,22 @@ final class AvvisoDecisione
                     'dal' => $this->giorno($dal),
                     'al'  => $this->giorno($al),
                   ]);
+
+            // La malattia ha parole sue. Nessuno "approva" un'influenza:
+            // l'ufficio la registra, e sentirsi dire "richiesta approvata"
+            // da malati suona come se ci fosse stato un dubbio.
+            if ((string)$d['tipo'] === 'malattia') {
+                $this->manda(
+                    (int)$d['user_id'],
+                    $lingua,
+                    $approvata ? 'esito_malattia_ok' : 'esito_malattia_ko',
+                    $approvata ? 'malattia_registrata' : 'malattia_rifiutata',
+                    ['periodo' => $periodo, 'motivo' => $motivo],
+                    $approvata,
+                );
+                $mandate++;
+                continue;
+            }
 
             $this->manda(
                 (int)$d['user_id'],

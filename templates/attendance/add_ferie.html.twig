@@ -13,6 +13,7 @@
 {% set concesse = righe|filter(r => r.stato != 'in_attesa' and r.stato != 'rifiutata') %}
 {% set ferieCount = concesse|filter(r => r.tipo == 'ferie')|length %}
 {% set permessiCount = concesse|filter(r => r.tipo == 'permesso')|length %}
+{% set malattieCount = concesse|filter(r => r.tipo == 'malattia')|length %}
 {% set oggiAssenti = concesse|filter(r => r.data_inizio <= today and r.data_fine >= today)|length %}
 
 {% block content %}
@@ -24,8 +25,8 @@
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
             </div>
             <div>
-                <h1 class="fe-hero-title">Ferie e Permessi</h1>
-                <p class="fe-hero-sub">Registra e gestisci le assenze degli operai</p>
+                <h1 class="fe-hero-title">Assenze</h1>
+                <p class="fe-hero-sub">Ferie, permessi e malattie</p>
             </div>
         </div>
         <div class="fe-hero-stats">
@@ -46,6 +47,10 @@
             <div class="fe-stat">
                 <div class="fe-stat-num">{{ permessiCount }}</div>
                 <div class="fe-stat-lbl">Permessi</div>
+            </div>
+            <div class="fe-stat">
+                <div class="fe-stat-num">{{ malattieCount }}</div>
+                <div class="fe-stat-lbl">Malattie</div>
             </div>
         </div>
     </div>
@@ -82,6 +87,8 @@
                                 <span class="ri-data">
                                     {% if r.tipo == 'ferie' %}
                                         <span class="fe-badge fe-badge-ferie">Ferie</span>
+                                    {% elseif r.tipo == 'malattia' %}
+                                        <span class="fe-badge fe-badge-malattia">Malattia</span>
                                     {% else %}
                                         <span class="fe-badge fe-badge-permesso">Permesso</span>
                                     {% endif %}
@@ -91,6 +98,7 @@
                                 <span class="ri-cantiere">
                                     {% set giorni = date(r.data_fine).diff(date(r.data_inizio)).days + 1 %}
                                     {{ r.ore ? r.ore ~ ' ore' : giorni ~ (giorni == 1 ? ' giorno' : ' giorni') }}
+                                    {% if r.protocollo %} · cert. {{ r.protocollo }}{% endif %}
                                 </span>
                             </div>
                         </div>
@@ -117,8 +125,11 @@
                                 <button type="submit" name="azione" value="rifiuta" class="ri-btn ri-btn-ko">
                                     Rifiuta
                                 </button>
+                                {# Una malattia non si approva, si registra:
+                                   "Approva" su un'influenza fa sembrare che
+                                   ci fosse un dubbio da sciogliere. #}
                                 <button type="submit" name="azione" value="approva" class="ri-btn ri-btn-ok">
-                                    Approva
+                                    {{ r.tipo == 'malattia' ? 'Registra' : 'Approva' }}
                                 </button>
                             </div>
                         </form>
@@ -150,10 +161,12 @@
                         <div class="fe-tipo">
                             <button type="button" class="fe-tipo-chip on-ferie" data-tipo="ferie">Ferie</button>
                             <button type="button" class="fe-tipo-chip" data-tipo="permesso">Permesso</button>
+                            <button type="button" class="fe-tipo-chip" data-tipo="malattia">Malattia</button>
                         </div>
                         <select name="tipo" id="tipoSelect" class="hidden">
                             <option value="ferie" selected>Ferie</option>
                             <option value="permesso">Permesso</option>
+                            <option value="malattia">Malattia</option>
                         </select>
                     </div>
                     <div style="grid-column: span 2; min-width: 220px;">
@@ -173,6 +186,14 @@
                         <span class="fe-label">Ore</span>
                         <input type="number" name="ore" step="0.5" min="0.5" max="12" class="fe-input" placeholder="es. 4">
                         <span class="fe-hint">Vuoto = giornata intera</span>
+                    </div>
+                    {# Il numero del certificato ha una colonna sua e non sta
+                       nelle note, perche' in ufficio lo cercano: in una nota
+                       libera si cerca a occhio. #}
+                    <div class="prot-wrap hidden">
+                        <span class="fe-label">N. certificato</span>
+                        <input type="text" name="protocollo" class="fe-input" maxlength="32" placeholder="es. 1234567890">
+                        <span class="fe-hint">Si puo' aggiungere dopo</span>
                     </div>
                 </div>
                 <div style="margin-top: 14px;">
@@ -221,6 +242,8 @@
                     <td style="white-space:nowrap;">
                         {% if row.tipo == 'ferie' %}
                             <span class="fe-badge fe-badge-ferie">Ferie</span>
+                        {% elseif row.tipo == 'malattia' %}
+                            <span class="fe-badge fe-badge-malattia">Malattia</span>
                         {% else %}
                             <span class="fe-badge fe-badge-permesso">Permesso</span>
                         {% endif %}
@@ -247,7 +270,9 @@
                             <span class="fe-badge fe-badge-app" title="Arrivata dall'app, non inserita dall'ufficio">app</span>
                         {% endif %}
                     </td>
-                    <td style="font-size:12px; color:#64748b; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">{{ row.note }}</td>
+                    <td style="font-size:12px; color:#64748b; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ row.note|e('html_attr') }}">
+                        {% if row.protocollo %}<strong>cert. {{ row.protocollo }}</strong>{% if row.note %} · {% endif %}{% endif %}{{ row.note }}
+                    </td>
                     <td>
                         <div style="display:flex; gap:6px; justify-content:flex-end;">
                             <button type="button" class="fe-btn fe-btn-edit edit-btn"
@@ -258,7 +283,8 @@
                                     data-dal="{{ row.data_inizio }}"
                                     data-al="{{ row.data_fine }}"
                                     data-ore="{{ row.ore }}"
-                                    data-note="{{ row.note|e('html_attr') }}">
+                                    data-note="{{ row.note|e('html_attr') }}"
+                                    data-protocollo="{{ row.protocollo|e('html_attr') }}">
                                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 Modifica
                             </button>

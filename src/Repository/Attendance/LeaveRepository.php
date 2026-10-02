@@ -102,14 +102,14 @@ class LeaveRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function insert(int $workerId, string $tipo, string $from, string $to, ?float $ore, string $note, int $createdBy): void
+    public function insert(int $workerId, string $tipo, string $from, string $to, ?float $ore, string $note, int $createdBy, string $protocollo = ''): void
     {
         $stmt = $this->conn->prepare("
             INSERT INTO bb_ferie_permessi
                 (worker_id, tipo, data_inizio, data_fine, ore, note, created_by,
-                 stato, decisa_at, decisa_da)
+                 protocollo, stato, decisa_at, decisa_da)
             VALUES (:wid, :tipo, :dal, :al, :ore, :note, :uid,
-                    'approvata', NOW(), :uid2)
+                    :prot, 'approvata', NOW(), :uid2)
         ");
         $stmt->execute([
             ':wid'  => $workerId,
@@ -118,6 +118,9 @@ class LeaveRepository
             ':al'   => $to,
             ':ore'  => $ore,
             ':note' => $note !== '' ? $note : null,
+            // il numero del certificato vale solo sulla malattia: lasciarlo
+            // su una ferie sarebbe un dato che non vuol dire niente
+            ':prot' => ($tipo === 'malattia' && $protocollo !== '') ? $protocollo : null,
             // l'assenza messa dall'ufficio nasce gia' approvata: l'ha decisa
             // chi la sta scrivendo, e farla passare da "in attesa" vorrebbe
             // dire chiedergli di approvare se stesso
@@ -126,12 +129,12 @@ class LeaveRepository
         ]);
     }
 
-    public function update(int $id, int $workerId, string $tipo, string $from, string $to, ?float $ore, string $note): void
+    public function update(int $id, int $workerId, string $tipo, string $from, string $to, ?float $ore, string $note, string $protocollo = ''): void
     {
         $stmt = $this->conn->prepare("
             UPDATE bb_ferie_permessi
             SET worker_id = :wid, tipo = :tipo, data_inizio = :dal,
-                data_fine = :al, ore = :ore, note = :note
+                data_fine = :al, ore = :ore, note = :note, protocollo = :prot
             WHERE id = :id
         ");
         $stmt->execute([
@@ -141,6 +144,7 @@ class LeaveRepository
             ':al'   => $to,
             ':ore'  => $ore,
             ':note' => $note !== '' ? $note : null,
+            ':prot' => ($tipo === 'malattia' && $protocollo !== '') ? $protocollo : null,
             ':id'   => $id,
         ]);
     }

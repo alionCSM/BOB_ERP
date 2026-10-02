@@ -144,6 +144,12 @@ final class PromemoriaPresenze
               -- giornata e la presenza va segnata lo stesso. Le ore piene si
               -- riconoscono da `ore` vuoto, che e' come le scrive l'ufficio.
               --
+              -- La malattia e' sempre di giornata intera, ma si nomina lo
+              -- stesso invece di affidarsi a `ore` vuoto: chiedere di segnare
+              -- la presenza a uno che sta a casa malato e' la notifica
+              -- peggiore che possiamo mandare, e non deve dipendere da una
+              -- colonna che qualcuno un giorno potrebbe riempire.
+              --
               -- Solo le approvate: una richiesta ancora in attesa non e' un
               -- giorno libero, e fino a risposta quella giornata va segnata.
               AND  NOT EXISTS (
@@ -152,7 +158,7 @@ final class PromemoriaPresenze
                       AND  f.data_inizio <= p.data
                       AND  f.data_fine   >= p.data
                       AND  f.stato = 'approvata'
-                      AND  (f.tipo = 'ferie' OR f.ore IS NULL)
+                      AND  (f.tipo IN ('ferie', 'malattia') OR f.ore IS NULL)
                    )
             ORDER BY u.id, p.data
         ");
