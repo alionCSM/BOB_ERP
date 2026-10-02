@@ -300,6 +300,27 @@ suo mestiere.
 **Gli endpoint della Zone restano quelli di sempre** (`/api/v1/zone/{id}/...`):
 non cambia niente nelle chiamate, cambia solo chi riceve 403.
 
+### Come si assegna
+
+Dalla scheda del cantiere, **Assegna utente**. Assegnare il cantiere e dare
+la sua Zone sono la stessa cosa: non si assegna qualcuno a un cantiere per
+poi non fargli vedere niente. Nasce vedendo tutto senza toccare niente, e da
+"Chi accede" si alza o si abbassa sezione per sezione.
+
+### Il resto del cantiere non si apre
+
+Preventivi, fatture, noleggi, ordini stanno sotto il modulo `worksites`, che
+un operaio non ha, e **tutto il prefisso `/worksites` e' chiuso dal
+middleware** prima ancora di arrivare al controller. Un operaio assegnato non
+puo' aprire la pagina web del cantiere nemmeno scrivendo l'indirizzo a mano.
+
+Dall'app arriva solo alla Zone, perche' solo quella passa da `/api/v1/zone/`,
+e li' ogni endpoint guarda i suoi livelli.
+
+Dove va e con chi, invece, lo dice `/me/pianificazione`, che e' un'altra
+strada e non c'entra niente con questa: li' si vede la squadra del giorno e
+chi e' il capo.
+
 ---
 
 ## Le notifiche all'operaio

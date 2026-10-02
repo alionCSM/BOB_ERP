@@ -28,27 +28,48 @@ final class AccessoRepository
         // con i backtick: `file` e' una parola che MySQL conosce, e una
         // colonna che si chiama come una parola del linguaggio e' il tipo di
         // sorpresa che si scopre in produzione
-        $campi = implode('`, a.`', array_keys(Accesso::FAMIGLIE));
-        $stmt  = $this->conn->prepare("
-            SELECT a.id, a.user_id, a.`$campi`,
+        // Si parte da bb_worksite_users, non dagli accessi: l'assegnazione
+        // al cantiere e' il fatto, i livelli sono un dettaglio che su una
+        // riga vecchia puo' mancare. Partendo dagli accessi, chi era gia'
+        // assegnato da prima non comparirebbe e nessuno potrebbe dargliene.
+        //
+        // A chi non ce l'ha i livelli valgono zero, non "vede": far
+        // comparire un accesso che nessuno ha dato, su assegnazioni di
+        // chissa' quando, e' il modo giusto per aprire una porta senza
+        // accorgersene. Si alzano a mano, e si vede subito chi e' a zero.
+        // una riga per famiglia, scritta per esteso: un implode furbo qui
+        // genera SQL che sembra giusto e non lo e'
+        $campi = '';
+        foreach (array_keys(Accesso::FAMIGLIE) as $f) {
+            $campi .= "COALESCE(a.`$f`, 0) AS `$f`,
+                   ";
+        }
+
+        $stmt = $this->conn->prepare("
+            SELECT u.id AS user_id,
+                   $campi
                    u.username,
                    TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS nome,
-                   u.type, u.company
-            FROM   bb_zone_accessi a
-            JOIN   bb_users u ON u.id = a.user_id
-            WHERE  a.worksite_id = :w
+                   u.type, u.company,
+                   a.id IS NOT NULL AS ha_livelli
+            FROM   bb_worksite_users wu
+            JOIN   bb_users u ON u.id = wu.user_id
+            LEFT JOIN bb_zone_accessi a
+                   ON a.worksite_id = wu.worksite_id AND a.user_id = wu.user_id
+            WHERE  wu.worksite_id = :w
               AND  u.removed = 'N'
+              AND  u.active  = 'Y'
             ORDER BY nome, u.username
         ");
         $stmt->execute([':w' => $worksiteId]);
 
         return array_map(static function (array $r): array {
             foreach (array_keys(Accesso::FAMIGLIE) as $f) {
-                $r[$f] = (int)$r[$f];
+                $r[$f] = (int)($r[$f] ?? 0);
             }
-            $r['id']      = (int)$r['id'];
-            $r['user_id'] = (int)$r['user_id'];
-            $r['nome']    = $r['nome'] !== '' ? $r['nome'] : $r['username'];
+            $r['user_id']    = (int)$r['user_id'];
+            $r['ha_livelli'] = (bool)$r['ha_livelli'];
+            $r['nome']       = $r['nome'] !== '' ? $r['nome'] : $r['username'];
             return $r;
         }, $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -104,16 +125,34 @@ final class AccessoRepository
             $parametri[':' . $f] = $this->livelloValido($livelli[$f] ?? Accesso::VEDE);
         }
         $stmt->execute($parametri);
+
+        // Assegnare un cantiere e dare la sua Zone sono la stessa cosa: non
+        // si assegna qualcuno a un cantiere per poi non fargli vedere
+        // niente. Le due tabelle restano due perche' bb_worksite_users la
+        // legge mezzo BOB da anni, ma si scrivono sempre insieme — da qui,
+        // che e' l'unico posto che le tocca.
+        $this->conn->prepare(
+            'INSERT IGNORE INTO bb_worksite_users (worksite_id, user_id) VALUES (:w, :u)'
+        )->execute([':w' => $worksiteId, ':u' => $userId]);
     }
 
-    /** Toglie una persona dal cantiere. */
+    /** Toglie una persona dal cantiere, da tutte e due le tabelle. */
     public function elimina(int $worksiteId, int $userId): bool
     {
         $stmt = $this->conn->prepare(
             'DELETE FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u'
         );
         $stmt->execute([':w' => $worksiteId, ':u' => $userId]);
-        return $stmt->rowCount() > 0;
+        $tolto = $stmt->rowCount() > 0;
+
+        $altro = $this->conn->prepare(
+            'DELETE FROM bb_worksite_users WHERE worksite_id = :w AND user_id = :u'
+        );
+        $altro->execute([':w' => $worksiteId, ':u' => $userId]);
+
+        // basta che sia sparito da una delle due: le righe vecchie di
+        // bb_worksite_users non hanno un accesso Zone da togliere
+        return $tolto || $altro->rowCount() > 0;
     }
 
     /**

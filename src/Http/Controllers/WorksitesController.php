@@ -2193,14 +2193,23 @@ final class WorksitesController
             Response::error('Utente non valido.', 400);
         }
 
-        $stmt = $conn->prepare("
-            INSERT IGNORE INTO bb_worksite_users (worksite_id, user_id)
-            VALUES (:wid, :uid)
-        ");
-        $stmt->execute([
-            ':wid' => $worksiteId,
-            ':uid' => $userId,
-        ]);
+        // Assegnare il cantiere vuol dire dargli la Zone: non si assegna
+        // qualcuno a un cantiere per poi non fargli vedere niente. Nasce
+        // vedendo tutto senza toccare niente — il caso piu' comune e il piu'
+        // innocuo da sbagliare — e da "Chi accede" si alza o si abbassa
+        // sezione per sezione.
+        //
+        // Il resto del cantiere non si apre: i preventivi, le fatture e i
+        // noleggi stanno sotto il modulo `worksites`, che un operaio non ha,
+        // e tutto il prefisso /worksites e' chiuso prima di arrivare qui.
+        $livelli = [];
+        foreach (array_keys(\App\Service\Zone\Accesso::FAMIGLIE) as $f) {
+            $livelli[$f] = \App\Service\Zone\Accesso::VEDE;
+        }
+
+        (new \App\Repository\Zone\AccessoRepository($conn))->salva(
+            $worksiteId, $userId, $livelli, (int)($user->id ?? 0)
+        );
 
         Response::redirect("/worksites/{$worksiteId}");
     }
@@ -2224,15 +2233,11 @@ final class WorksitesController
             Response::error('Non autorizzato.', 403);
         }
 
-        $stmt = $conn->prepare("
-            DELETE FROM bb_worksite_users
-            WHERE worksite_id = :wid
-              AND user_id = :uid
-        ");
-        $stmt->execute([
-            ':wid' => $worksiteId,
-            ':uid' => $userId,
-        ]);
+        // via da tutte e due: una Zone che resta aperta su un cantiere da
+        // cui uno e' stato tolto e' il tipo di permesso che nessuno va piu'
+        // a guardare
+        (new \App\Repository\Zone\AccessoRepository($conn))
+            ->elimina($worksiteId, $userId);
 
         Response::redirect("/worksites/{$worksiteId}");
     }
