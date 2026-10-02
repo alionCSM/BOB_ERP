@@ -396,6 +396,41 @@ final class ApiV1OperaioController
         ]);
     }
 
+    // ── POST /api/v1/me/lingua ───────────────────────────────────────────────
+
+    /**
+     * In che lingua l'operaio vuole le notifiche.
+     *
+     * Unico endpoint di /me/ che non chiede un operaio collegato: la lingua
+     * sta sull'utente, non sul lavoratore, e vale anche per chi usa l'app
+     * senza essere un operaio.
+     *
+     * La mette gia' l'ufficio quando crea l'account, perche' centoquaranta
+     * persone che entrano nel web ad aggiustarsela non succede. Questo serve
+     * a chi se la ritrova sbagliata: l'alternativa e' una telefonata in
+     * ufficio per una tendina.
+     */
+    public function cambiaLingua(Request $request): never
+    {
+        $userId = (int)($request->user()->id ?? 0);
+        // minuscole: 'IT' e' la stessa lingua di 'it', e rifiutarla
+        // vorrebbe dire far sbagliare un client per una maiuscola
+        $lingua = strtolower(trim((string)($this->corpo()['lingua'] ?? '')));
+
+        if (!isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+            Response::json([
+                'success'    => false,
+                'message'    => 'Lingua non disponibile',
+                'disponibili' => \App\Service\Lingua::DISPONIBILI,
+            ], 422);
+        }
+
+        $stmt = $this->conn->prepare('UPDATE bb_users SET lingua = :l WHERE id = :id');
+        $stmt->execute([':l' => $lingua, ':id' => $userId]);
+
+        Response::json(['success' => true, 'lingua' => $lingua]);
+    }
+
     // ── Supporto ─────────────────────────────────────────────────────────────
 
     /**

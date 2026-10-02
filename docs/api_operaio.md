@@ -228,6 +228,26 @@ Permessi. Finche' e' in attesa non e' un'assenza: non conta negli "assenti
 oggi" e non esclude l'operaio dal promemoria della sera, perche' quel giorno
 li' lui e' al lavoro finche' nessuno gli risponde.
 
+## POST /api/v1/me/lingua
+
+```json
+{ "lingua": "sq" }
+```
+
+`it` | `en` | `sq` | `ro` | `mo`. Maiuscole accettate. Qualsiasi altra cosa
+e' **422**, con l'elenco di quelle che esistono.
+
+Unico endpoint di `/me/` che non chiede un operaio collegato: la lingua sta
+sull'utente, non sul lavoratore.
+
+La mette gia' l'ufficio quando crea l'account — centoquaranta persone che
+entrano nel web ad aggiustarsela non succede, e in ufficio sanno gia' chi e'
+albanese e chi rumeno. Questo serve a chi se la ritrova sbagliata.
+
+**Per gli account che esistono gia' non c'e' una schermata lato ufficio**:
+o se la cambia l'operaio da qui o dal profilo web, oppure la si mette a
+mano sul database. Vale la pena che l'app la chieda al primo avvio.
+
 ---
 
 ## Le notifiche all'operaio

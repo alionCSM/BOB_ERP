@@ -1087,6 +1087,16 @@ final class UsersController
             }
             $sendEmail  = !empty($_POST['send_email']);
 
+            // La lingua si sceglie qui, non si lascia all'operaio.
+            // Centoquaranta persone che entrano nel web ad aggiustarsela non
+            // succede: resterebbero tutte in italiano, e le notifiche
+            // tradotte non le leggerebbe nessuno. In ufficio sanno gia' chi e'
+            // albanese e chi rumeno, e l'operaio puo' sempre cambiarla.
+            $lingua = (string)($_POST['lingua'] ?? 'it');
+            if (!isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+                $lingua = 'it';
+            }
+
             if ($username === '' || $email === '' || $firstName === '' || $lastName === '') {
                 $error = 'Username, email, nome e cognome sono obbligatori.';
             } else {
@@ -1180,13 +1190,13 @@ final class UsersController
                         INSERT INTO bb_users (
                             username, password, first_name, last_name, email, phone,
                             company, type, role, access_profile, company_id,
-                            worker_id, client_id,
+                            worker_id, client_id, lingua,
                             active, confirmed, must_change_password,
                             created_by, created_at
                         ) VALUES (
                             :username, :password, :first_name, :last_name, :email, :phone,
                             :company, :type, :role, :access_profile, :company_id,
-                            :worker_id, :client_id,
+                            :worker_id, :client_id, :lingua,
                             'Y', 1, 1,
                             :created_by, NOW()
                         )
@@ -1205,6 +1215,7 @@ final class UsersController
                         ':company_id'     => $companyId,
                         ':worker_id'      => $workerId,
                         ':client_id'      => $clientId,
+                        ':lingua'         => $lingua,
                         ':created_by'     => (int)($auth['user_id'] ?? 0),
                     ]);
 
@@ -1252,8 +1263,10 @@ final class UsersController
             }
         }
 
+        $lingue = \App\Service\Lingua::DISPONIBILI;
+
         Response::view('users/create_bob_user.html.twig', $request, compact(
-            'companies', 'societa', 'clients', 'workers', 'ruoli',
+            'companies', 'societa', 'clients', 'workers', 'ruoli', 'lingue',
             'success', 'error', 'tempPassword', 'post'
         ));
     }

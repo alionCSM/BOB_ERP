@@ -185,7 +185,7 @@
                         <small id="azienda-operaio" class="cu-hint"></small>
                     </div>
                 </div>
-                <div class="cu-row single">
+                <div class="cu-row">
                     {# A database "role" e' un ENUM con sei valori: era un campo
                        di testo libero, e scrivendoci qualcosa di diverso la
                        creazione falliva con un errore del database invece di
@@ -196,6 +196,22 @@
                             {% for chiave, etichetta in ruoli %}
                                 <option value="{{ chiave }}"{{ (post.role ?? 'user') == chiave ? ' selected' : '' }}>
                                     {{ etichetta }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {# La lingua si sceglie qui e non si lascia all'operaio:
+                       centoquaranta persone che entrano nel web ad
+                       aggiustarsela non succede, resterebbero tutte in
+                       italiano e le notifiche tradotte non le leggerebbe
+                       nessuno. In ufficio sanno gia' chi e' albanese e chi
+                       rumeno. L'operaio puo' sempre cambiarla dal profilo. #}
+                    <div class="cu-field">
+                        <label for="lingua">Lingua delle notifiche</label>
+                        <select id="lingua" name="lingua">
+                            {% for codice, nome in lingue %}
+                                <option value="{{ codice }}"{{ (post.lingua ?? 'it') == codice ? ' selected' : '' }}>
+                                    {{ nome }}
                                 </option>
                             {% endfor %}
                         </select>
