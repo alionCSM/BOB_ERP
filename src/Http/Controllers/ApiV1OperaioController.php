@@ -110,8 +110,14 @@ final class ApiV1OperaioController
      * la mattina si guarda oggi, e mandarle insieme evita la seconda
      * chiamata proprio nell'ora in cui la linea in cantiere e' peggiore.
      *
-     * Chi e' capo squadra lo sa da qui: sulla sua riga `sei_capo` e' vero, e
-     * l'app gli mostra la squadra al completo.
+     * Chi e' capo squadra lo sa da qui: sulla sua riga `sei_capo` e' vero.
+     *
+     * La squadra la vedono tutti, non solo il capo. Prima arrivava solo a
+     * lui, per non spargere i dati di centoquaranta persone su
+     * centoquaranta telefoni — ma qui non ci sono centoquaranta persone:
+     * ci sono i tre o quattro con cui uno sale in macchina domattina, e che
+     * vedra' comunque fra sei ore. Sapere la sera con chi si va, e chi
+     * comanda, e' mezzo motivo per cui l'app serve.
      */
     public function pianificazione(Request $request): never
     {
@@ -136,15 +142,19 @@ final class ApiV1OperaioController
         $stmt->execute([':wid' => $operaio, ':dal' => $dal, ':al' => $al]);
         $giorni = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        // La squadra si manda solo al capo: agli altri non serve sapere chi
-        // altro c'e', e mandare l'elenco dei colleghi a tutti vuol dire
-        // spargere dati di centoquaranta persone su centoquaranta telefoni.
+        // Una query per giornata e non un join: le giornate sono due, e un
+        // join con GROUP_CONCAT per risparmiare una chiamata renderebbe
+        // illeggibile la query principale.
+        $squadre = [];
         foreach ($giorni as &$g) {
             $g['sei_capo']  = (bool)$g['sei_capo'];
             // l'app la usa per sapere se proporre cena e albergo; l'ufficio
             // la usa in approvazione per accorgersi di chi li dichiara senza
             $g['trasferta'] = (bool)$g['trasferta'];
-            $g['squadra']  = $g['sei_capo'] ? $this->squadra((int)$g['id']) : [];
+
+            $pid = (int)$g['id'];
+            $squadre[$pid] ??= $this->squadra($pid);
+            $g['squadra'] = $squadre[$pid];
         }
         unset($g);
 

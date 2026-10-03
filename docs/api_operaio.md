@@ -47,9 +47,13 @@ funzione, o su un lavoro programmato prima che la commessa fosse aperta: in
 quel caso vale solo `cantiere`, il testo. Senza `worksite_id` l'app non puo'
 precompilare la dichiarazione di presenza — mostra il nome e lascia scegliere.
 
-`squadra` arriva **solo al capo squadra**: agli altri non serve sapere chi
-altro c'e', e mandare l'elenco dei colleghi a tutti vuol dire spargere i dati
-di centoquaranta persone su centoquaranta telefoni.
+`squadra` arriva **a tutti**, non solo al capo. Non sono centoquaranta
+persone: sono i tre o quattro con cui uno sale in macchina domattina, e che
+vedra' comunque fra sei ore. Sapere la sera con chi si va, e chi comanda, e'
+mezzo motivo per cui l'app serve.
+
+`capo_squadra` sulla riga di ciascuno dice chi comanda; `sei_capo` in cima
+dice se sei tu.
 
 Parametri: `dal`, `al`.
 
