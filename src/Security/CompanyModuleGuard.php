@@ -31,11 +31,19 @@ final class CompanyModuleGuard
      * societa'. In particolare /societa deve restare aperto: e' la via per
      * rimettere a posto i moduli quando sono stati configurati male, e
      * senza di essa ci si chiuderebbe fuori da BOB.
+     *
+     * Qui dentro c'e' anche /io, le pagine che un operaio apre dal telefono.
+     * Non sono di una societa': sono le sue giornate, le sue ferie, la sua
+     * squadra, e il confine che le protegge e' il lavoratore collegato
+     * all'utente, non il modulo acceso su un'azienda. Gli operai per di piu'
+     * la societa' non la scelgono nemmeno, quindi qui non ci sarebbe niente
+     * da confrontare.
      */
     private const SEMPRE_APERTI = [
         '/',
         '/dashboard',
         '/profile',
+        '/io',
         '/logout',
         '/change-password',
         '/confirm-email',
