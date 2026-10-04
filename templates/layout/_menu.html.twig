@@ -194,6 +194,27 @@
         {# ── CANTIERI ── #}
         {% set worksitesActive = currentPath starts with '/worksites' %}
         {% if user.type == 'worker' %}
+            {# Per un operaio il menu e' tutto qui. In cima quello che
+               guarda ogni giorno, i cantieri in fondo: li apre quando deve
+               cercare un disegno, non tutte le mattine. #}
+            <li>
+                <a href="/io" class="side-menu {{ currentPath == '/io' ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="sun"></i></div>
+                    <div class="side-menu__title">Oggi e domani</div>
+                </a>
+            </li>
+            <li>
+                <a href="/io/presenze" class="side-menu {{ currentPath starts with '/io/presenze' ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="calendar-check"></i></div>
+                    <div class="side-menu__title">Le mie presenze</div>
+                </a>
+            </li>
+            <li>
+                <a href="/io/assenze" class="side-menu {{ currentPath starts with '/io/assenze' ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="palmtree"></i></div>
+                    <div class="side-menu__title">Ferie e assenze</div>
+                </a>
+            </li>
             <li>
                 <a href="/worksites/my" class="side-menu {{ worksitesActive ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="hard-hat"></i></div>

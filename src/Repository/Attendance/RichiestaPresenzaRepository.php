@@ -142,6 +142,52 @@ final class RichiestaPresenzaRepository
     }
 
     /**
+     * I giorni che gli mancano: pianificato, ma niente dichiarato e niente
+     * registrato.
+     *
+     * Stessa regola del promemoria della sera, cosi' quello che la notifica
+     * gli dice e quello che vede aprendo la pagina sono la stessa cosa. Se
+     * divergessero, uno dei due starebbe mentendo.
+     *
+     * @return array<int, array<string, mixed>> una riga per giorno, dal piu' vecchio
+     */
+    public function giorniSenzaNiente(int $workerId, string $dal, string $al): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT p.data,
+                   p.worksite_id,
+                   w.name          AS cantiere_nome,
+                   w.worksite_code AS cantiere_codice
+            FROM   bb_pianificazione p
+            JOIN   bb_pianificazione_nostri pn ON pn.pianificazione_id = p.id
+            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
+            WHERE  pn.worker_id = :wid
+              AND  p.data BETWEEN :dal AND :al
+              AND  NOT EXISTS (
+                    SELECT 1 FROM bb_presenze_richieste r
+                    WHERE  r.worker_id = pn.worker_id AND r.data = p.data
+                   )
+              AND  NOT EXISTS (
+                    SELECT 1 FROM bb_presenze pr
+                    WHERE  pr.worker_id = pn.worker_id AND pr.data = p.data
+                   )
+              -- chi era in ferie, in malattia o in permesso di giornata
+              -- intera non deve segnare niente
+              AND  NOT EXISTS (
+                    SELECT 1 FROM bb_ferie_permessi f
+                    WHERE  f.worker_id = pn.worker_id
+                      AND  f.data_inizio <= p.data
+                      AND  f.data_fine   >= p.data
+                      AND  f.stato = 'approvata'
+                      AND  (f.tipo IN ('ferie', 'malattia') OR f.ore IS NULL)
+                   )
+            ORDER BY p.data ASC
+        ");
+        $stmt->execute([':wid' => $workerId, ':dal' => $dal, ':al' => $al]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * C'e' gia' una dichiarazione in attesa per lo stesso giorno e cantiere?
      *
      * Si controlla solo sulle "in attesa": una rifiutata si deve poter

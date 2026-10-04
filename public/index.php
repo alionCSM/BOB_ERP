@@ -171,6 +171,32 @@ if (in_array($uri, ['/change-password', '/confirm-email'], true)) {
     $router->dispatch($request, $container);
 }
 
+// ── BOB per chi sta in cantiere ──────────────────────────────────────────────
+// Le stesse cose dell'app, aperte nel browser del telefono: funziona su
+// Android e iPhone senza installare niente. Nessun modulo richiesto — un
+// operaio non ne ha nessuno — e il prefisso /io sta fuori dalla mappa dei
+// moduli apposta.
+if ($uri === '/io' || str_starts_with($uri, '/io/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    // caricato a mano come gli altri controller recenti: cosi' le rotte
+    // funzionano anche se al deploy sfugge il dump-autoload
+    require_once APP_ROOT . '/src/Http/Controllers/OperaioController.php';
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get( '/io',                       [OperaioController::class, 'oggi'])
+           ->get( '/io/presenze',              [OperaioController::class, 'presenze'])
+           ->post('/io/presenze',              [OperaioController::class, 'dichiara'])
+           ->post('/io/presenze/{id}/ritira',  [OperaioController::class, 'ritira'])
+           ->get( '/io/assenze',               [OperaioController::class, 'assenze'])
+           ->post('/io/assenze',               [OperaioController::class, 'chiediAssenza']);
+
+    $router->dispatch($request, $container);
+}
+
 // ── Poti Noleggi — autocarrate ───────────────────────────────────────────────
 if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
     require_once APP_ROOT . '/includes/middleware.php';

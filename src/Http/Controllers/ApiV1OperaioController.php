@@ -49,50 +49,17 @@ final class ApiV1OperaioController
      */
     public function cantieri(Request $request): never
     {
-        $operaio = $this->operaio($request);
-        $cerca   = trim((string)($_GET['q'] ?? ''));
-
-        // ── Dove e' stato di recente ────────────────────────────────────
-        // Sei mesi: piu' indietro sono cantieri chiusi che non servono a
-        // nessuno, e allungano una tendina che si guarda col pollice.
-        $stmt = $this->conn->prepare("
-            SELECT w.id, w.worksite_code, w.name, w.location,
-                   MAX(p.data) AS ultima_presenza
-            FROM   bb_presenze p
-            JOIN   bb_worksites w ON w.id = p.worksite_id
-            WHERE  p.worker_id = :wid
-              AND  p.data >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-            GROUP BY w.id, w.worksite_code, w.name, w.location
-            ORDER BY ultima_presenza DESC
-            LIMIT 15
-        ");
-        $stmt->execute([':wid' => $operaio]);
-        $recenti = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        // ── Tutti gli aperti, per quando lo mandano altrove ─────────────
-        $sql  = "SELECT id, worksite_code, name, location
-                 FROM   bb_worksites
-                 WHERE  status IN ('In corso', 'A rischio')";
-        $args = [];
-
-        if ($cerca !== '') {
-            $sql .= " AND (name LIKE :q1 OR worksite_code LIKE :q2 OR location LIKE :q3)";
-            foreach (['q1', 'q2', 'q3'] as $seg) {
-                $args[':' . $seg] = '%' . $cerca . '%';
-            }
-        }
-        $sql .= ' ORDER BY name ASC LIMIT 200';
-
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute($args);
-        $aperti = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $elenchi = $this->dati()->cantieri(
+            $this->operaio($request),
+            trim((string)($_GET['q'] ?? ''))
+        );
 
         Response::json([
             'success' => true,
             // quelli suoi, gia' ordinati dall'ultimo giorno lavorato
-            'recenti' => $recenti,
+            'recenti' => $elenchi['recenti'],
             // tutti gli aperti, per cercare quando lo mandano da un'altra parte
-            'aperti'  => $aperti,
+            'aperti'  => $elenchi['aperti'],
         ]);
     }
 
@@ -121,48 +88,14 @@ final class ApiV1OperaioController
      */
     public function pianificazione(Request $request): never
     {
-        $operaio = $this->operaio($request);
-
         $dal = $this->data($_GET['dal'] ?? '', date('Y-m-d'));
         $al  = $this->data($_GET['al']  ?? '', date('Y-m-d', strtotime('+1 day')));
 
-        $stmt = $this->conn->prepare("
-            SELECT p.id, p.data, p.cantiere, p.worksite_id,
-                   pn.capo_squadra AS sei_capo,
-                   pn.trasferta,
-                   pn.auto_targa,
-                   w.worksite_code, w.name AS cantiere_nome, w.location
-            FROM   bb_pianificazione_nostri pn
-            JOIN   bb_pianificazione p ON p.id = pn.pianificazione_id
-            LEFT JOIN bb_worksites w ON w.id = p.worksite_id
-            WHERE  pn.worker_id = :wid
-              AND  p.data BETWEEN :dal AND :al
-            ORDER BY p.data ASC
-        ");
-        $stmt->execute([':wid' => $operaio, ':dal' => $dal, ':al' => $al]);
-        $giorni = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-        // Una query per giornata e non un join: le giornate sono due, e un
-        // join con GROUP_CONCAT per risparmiare una chiamata renderebbe
-        // illeggibile la query principale.
-        $squadre = [];
-        foreach ($giorni as &$g) {
-            $g['sei_capo']  = (bool)$g['sei_capo'];
-            // l'app la usa per sapere se proporre cena e albergo; l'ufficio
-            // la usa in approvazione per accorgersi di chi li dichiara senza
-            $g['trasferta'] = (bool)$g['trasferta'];
-
-            $pid = (int)$g['id'];
-            $squadre[$pid] ??= $this->squadra($pid);
-            $g['squadra'] = $squadre[$pid];
-        }
-        unset($g);
-
         Response::json([
-            'success'       => true,
-            'dal'           => $dal,
-            'al'            => $al,
-            'pianificazione'=> $giorni,
+            'success'        => true,
+            'dal'            => $dal,
+            'al'             => $al,
+            'pianificazione' => $this->dati()->pianificazione($this->operaio($request), $dal, $al),
         ]);
     }
 
@@ -303,8 +236,8 @@ final class ApiV1OperaioController
             'worksite_id' => $worksiteId,
             'data'        => $data,
             'turno'       => $turno,
-            'pranzo'      => $this->chiHaPagato($body['pranzo'] ?? ''),
-            'cena'        => $this->chiHaPagato($body['cena'] ?? ''),
+            'pranzo'      => $this->dati()->chiHaPagato($body['pranzo'] ?? ''),
+            'cena'        => $this->dati()->chiHaPagato($body['cena'] ?? ''),
             'hotel'       => trim((string)($body['hotel'] ?? '')),
             'targa_auto'  => strtoupper(trim((string)($body['targa_auto'] ?? ''))),
             'trasferta'   => !empty($body['trasferta']),
@@ -513,48 +446,7 @@ final class ApiV1OperaioController
         return $workerId;
     }
 
-    /**
-     * Chi c'e' in squadra quel giorno su quel cantiere.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function squadra(int $pianificazioneId): array
-    {
-        $stmt = $this->conn->prepare("
-            SELECT COALESCE(CONCAT(w.last_name, ' ', w.first_name), pn.worker_name) AS nome,
-                   pn.auto_targa,
-                   pn.capo_squadra
-            FROM   bb_pianificazione_nostri pn
-            LEFT JOIN bb_workers w ON w.id = pn.worker_id
-            WHERE  pn.pianificazione_id = :pid
-            ORDER BY pn.capo_squadra DESC, nome ASC
-        ");
-        $stmt->execute([':pid' => $pianificazioneId]);
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
-    }
 
-    /**
-     * Dalle parole dell'operaio a quelle dell'ufficio.
-     *
-     *   "io"      -> "Loro"  l'ha pagato l'operaio, all'azienda non costa
-     *   "azienda" -> "Noi"   l'ha pagato l'azienda, e va nei costi
-     *   niente    -> "-"     non ha mangiato, o non l'ha detto
-     *
-     * Si accettano anche "Loro" e "Noi" gia' tradotti: sono valori distinti
-     * da quelli dell'app, quindi non c'e' modo di confonderli, e cosi' un
-     * client che manda il vocabolario del database funziona lo stesso.
-     *
-     * Tutto il resto diventa "-": meglio una riga che dice "non pervenuto" di
-     * una che afferma qualcosa che nessuno ha detto.
-     */
-    private function chiHaPagato(mixed $valore): string
-    {
-        return match (strtolower(trim((string)$valore))) {
-            'io', 'operaio', 'loro' => 'Loro',
-            'azienda', 'noi'        => 'Noi',
-            default                 => '-',
-        };
-    }
 
     /** Il cantiere esiste ed e' aperto? */
     private function cantiereAperto(int $worksiteId): bool
@@ -578,6 +470,12 @@ final class ApiV1OperaioController
     }
 
     /** @return array<string, mixed> */
+    /** I dati dell'operaio, gli stessi che legge il web. */
+    private function dati(): \App\Service\Operaio\Dati
+    {
+        return new \App\Service\Operaio\Dati($this->conn);
+    }
+
     private function corpo(): array
     {
         $grezzo = file_get_contents('php://input') ?: '';

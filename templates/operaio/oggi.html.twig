@@ -1,0 +1,96 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+{% endblock %}
+
+{#
+  Dove vai, con chi, chi comanda.
+
+  La prima schermata risponde alla domanda che uno si fa davvero la sera —
+  "domani dove vado?" — e non gliene fa nessuna. Oggi e domani insieme:
+  la sera si guarda domani, la mattina si guarda oggi.
+#}
+{% block content %}
+<div class="op">
+
+    <h1 class="op-titolo">Ciao {{ user.first_name }}</h1>
+    <p class="op-sotto">Oggi e domani</p>
+
+    {# I giorni che gli mancano in cima, con il link per rimediare: e' la
+       cosa che costa soldi a tutti se resta li'. #}
+    {% if daDichiarare %}
+        <div class="op-avviso op-avviso-att">
+            <div>
+                <b>Ti manca{{ daDichiarare|length > 1 ? 'no' : '' }}
+                   {{ daDichiarare|length }} giornat{{ daDichiarare|length > 1 ? 'e' : 'a' }}</b>
+                da segnare:
+                {% for g in daDichiarare %}{{ g.data|date('d/m') }}{{ not loop.last ? ', ' : '' }}{% endfor %}.
+                <a href="/io/presenze">Segnale adesso</a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% for g in giorni %}
+        <div class="op-card{{ g.data == oggi ? ' oggi' : '' }}">
+
+            <div class="op-giorno">
+                {{ g.data == oggi ? 'Oggi' : 'Domani' }} · {{ g.data|date('d/m/Y') }}
+            </div>
+
+            <div class="op-cantiere">
+                {{ g.cantiere_nome ?: g.cantiere ?: 'Cantiere da definire' }}
+            </div>
+            {% if g.location or g.worksite_code %}
+                <div class="op-luogo">
+                    {{ g.worksite_code }}{{ g.worksite_code and g.location ? ' · ' : '' }}{{ g.location }}
+                </div>
+            {% endif %}
+
+            <div class="op-righe">
+                {% if g.auto_targa %}
+                    <div class="op-riga"><span class="op-et">Auto</span><b>{{ g.auto_targa }}</b></div>
+                {% endif %}
+                {% if g.trasferta %}
+                    <div class="op-riga">
+                        <span class="op-et">Trasferta</span>
+                        <span class="op-tag op-tag-trasferta">Si dorme fuori</span>
+                    </div>
+                {% endif %}
+                {% if g.sei_capo %}
+                    <div class="op-riga">
+                        <span class="op-et">Squadra</span>
+                        <span class="op-tag op-tag-ok">Sei tu il capo</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            {# La squadra la vedono tutti: sono i tre o quattro con cui uno
+               sale in macchina domattina, non centoquaranta sconosciuti. #}
+            {% if g.squadra|length > 1 %}
+                <div class="op-squadra">
+                    <div class="op-squadra-t">Con te ci sono</div>
+                    {% for p in g.squadra %}
+                        <div class="op-persona">
+                            <span class="{{ p.sei_tu ? 'op-tu' : '' }}">{{ p.sei_tu ? 'Tu' : p.nome }}</span>
+                            {% if p.capo_squadra %}<span class="op-capo">capo</span>{% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="op-card">
+            <div class="op-vuoto">
+                Per oggi e domani non risulti in nessuna squadra.<br>
+                Se non torna, chiedi in ufficio.
+            </div>
+        </div>
+    {% endfor %}
+
+    <div class="op-sez">Cosa puoi fare</div>
+    <a href="/io/presenze" class="op-btn op-btn-primo" style="margin-bottom:10px;">Le mie presenze</a>
+    <a href="/io/assenze"  class="op-btn op-btn-secondo">Ferie e assenze</a>
+
+</div>
+{% endblock %}

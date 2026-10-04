@@ -1,0 +1,248 @@
+/*
+ * BOB per chi sta in cantiere.
+ *
+ * Scritto per un telefono tenuto con una mano sola, spesso con i guanti,
+ * spesso al sole. Da qui tutto il resto: niente sotto i 15px, niente da
+ * toccare sotto i 48px, contrasto alto e nessun grigio chiaro su bianco.
+ *
+ * Una colonna sola a qualsiasi larghezza. Su un tablet resta stretta invece
+ * di allargarsi: una riga di testo lunga quaranta centimetri non la legge
+ * nessuno, e qui si legge in piedi.
+ */
+
+.op {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 16px 16px 72px;
+    font-size: 16px;
+    color: #0f172a;
+}
+
+/* ── Intestazione ─────────────────────────────────────────────────────── */
+
+.op-titolo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    margin: 4px 0 2px;
+}
+.op-sotto {
+    font-size: 14px;
+    color: #475569;
+    margin: 0 0 18px;
+}
+
+/* ── Avvisi ───────────────────────────────────────────────────────────── */
+
+.op-avviso {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 13px 15px;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 1.45;
+    margin-bottom: 14px;
+}
+.op-avviso-ok  { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+.op-avviso-ko  { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
+.op-avviso-att { background: #fef3c7; color: #78350f; border: 1px solid #fde68a; }
+
+.op-avviso a { color: inherit; font-weight: 700; }
+
+/* ── Schede ───────────────────────────────────────────────────────────── */
+
+.op-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+/* La giornata di oggi si riconosce prima di leggerla. */
+.op-card.oggi { border-color: #2563eb; border-width: 2px; }
+
+.op-giorno {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: #2563eb;
+    margin-bottom: 6px;
+}
+.op-cantiere  { font-size: 19px; font-weight: 800; line-height: 1.25; }
+.op-luogo     { font-size: 14.5px; color: #475569; margin-top: 2px; }
+
+.op-righe { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; }
+.op-riga  { display: flex; gap: 9px; font-size: 15px; align-items: baseline; }
+.op-riga b { font-weight: 700; }
+.op-et {
+    flex: 0 0 86px;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #64748b;
+}
+
+/* ── Squadra ──────────────────────────────────────────────────────────── */
+
+.op-squadra { margin-top: 13px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+.op-squadra-t {
+    font-size: 12.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: #64748b; margin-bottom: 8px;
+}
+.op-persona {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; font-size: 15.5px;
+}
+.op-tu { font-weight: 800; }
+.op-capo {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .05em; background: #fef3c7; color: #92400e;
+    padding: 2px 8px; border-radius: 999px;
+}
+
+/* ── Etichette ────────────────────────────────────────────────────────── */
+
+.op-tag {
+    display: inline-block; font-size: 11.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding: 3px 10px; border-radius: 999px;
+}
+.op-tag-attesa    { background: #fef3c7; color: #92400e; }
+.op-tag-ok        { background: #dcfce7; color: #166534; }
+.op-tag-ko        { background: #fee2e2; color: #991b1b; }
+.op-tag-trasferta { background: #ede9fe; color: #5b21b6; }
+.op-tag-ferie     { background: #dbeafe; color: #1d4ed8; }
+.op-tag-permesso  { background: #fef3c7; color: #b45309; }
+.op-tag-malattia  { background: #fee2e2; color: #b91c1c; }
+
+/* ── Campi ────────────────────────────────────────────────────────────── */
+
+.op-campo { margin-bottom: 14px; }
+.op-campo > label {
+    display: block; font-size: 13px; font-weight: 700;
+    color: #334155; margin-bottom: 6px;
+}
+
+/* 16px non e' estetica: sotto, iOS ingrandisce la pagina da solo quando si
+   tocca il campo, e dopo il modulo resta storto. */
+/* :not() sulle spunte e sui radio: senza, la larghezza piena e l'altezza
+   minima prendevano anche loro, e una casella da spuntare veniva fuori
+   larga 24 e alta 50. */
+.op-campo input:not([type="checkbox"]):not([type="radio"]),
+.op-campo select,
+.op-campo textarea {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+    font-family: inherit;
+    color: #0f172a;
+    background: #fff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 11px;
+    padding: 13px 14px;
+    outline: none;
+    min-height: 50px;
+}
+.op-campo textarea { min-height: 84px; resize: vertical; }
+.op-campo input:not([type="checkbox"]):not([type="radio"]):focus,
+.op-campo select:focus,
+.op-campo textarea:focus { border-color: #2563eb; }
+
+.op-aiuto { display: block; font-size: 13px; color: #64748b; margin-top: 5px; }
+
+/* ── Scelte a bottoni ─────────────────────────────────────────────────── */
+
+/* Tre bottoni larghi invece di una tendina: si scelgono col pollice senza
+   aprire niente, e si vede da fermi cosa c'e' dentro. */
+.op-scelte { display: flex; gap: 7px; align-items: stretch; }
+.op-scelta { flex: 1 1 0; position: relative; display: flex; min-width: 0; }
+.op-scelta input { position: absolute; opacity: 0; pointer-events: none; }
+/* flex e non block: un'etichetta che va a capo faceva crescere solo il suo
+   bottone, e la riga restava sfalsata. Cosi' si allungano tutti insieme. */
+.op-scelta span {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; cursor: pointer;
+    padding: 11px 6px; min-height: 50px; box-sizing: border-box;
+    border: 1.5px solid #cbd5e1; border-radius: 11px;
+    background: #fff; color: #475569;
+    font-size: 14.5px; font-weight: 700; line-height: 1.35;
+    hyphens: auto;
+}
+.op-scelta input:checked + span {
+    background: #2563eb; border-color: #2563eb; color: #fff;
+}
+.op-scelta input:focus-visible + span { outline: 3px solid #93c5fd; }
+
+/* ── Spunta ───────────────────────────────────────────────────────────── */
+
+/* label.op-spunta e non .op-spunta: contro `.op-campo > label`, che e'
+   piu' specifico, il display:flex veniva perso — la casella restava
+   attaccata al testo e niente si allineava. */
+label.op-spunta {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 14px; border: 1.5px solid #cbd5e1; border-radius: 11px;
+    font-size: 15.5px; font-weight: 600; cursor: pointer; min-height: 50px;
+    box-sizing: border-box;
+}
+label.op-spunta input { width: 24px; height: 24px; min-height: 0; flex: 0 0 24px; margin: 0; }
+
+/* ── Bottoni ──────────────────────────────────────────────────────────── */
+
+.op-btn {
+    display: block; width: 100%; box-sizing: border-box;
+    padding: 16px; min-height: 54px;
+    border: none; border-radius: 12px;
+    font-size: 16.5px; font-weight: 800; font-family: inherit;
+    cursor: pointer; text-align: center; text-decoration: none;
+}
+.op-btn-primo    { background: #2563eb; color: #fff; }
+.op-btn-secondo  { background: #fff; color: #334155; border: 1.5px solid #cbd5e1; }
+.op-btn-piccolo  { width: auto; padding: 9px 16px; min-height: 44px; font-size: 14px; }
+
+/* ── Elenco ───────────────────────────────────────────────────────────── */
+
+.op-voce {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 14px 15px; margin-bottom: 10px;
+}
+.op-voce-testa {
+    display: flex; justify-content: space-between;
+    align-items: center; gap: 10px;
+}
+.op-data   { font-size: 16.5px; font-weight: 800; }
+.op-dove   { font-size: 14.5px; color: #475569; margin-top: 3px; }
+.op-motivo {
+    margin-top: 9px; padding: 10px 12px; background: #fef2f2;
+    border-radius: 9px; font-size: 14.5px; color: #991b1b;
+}
+
+.op-vuoto {
+    text-align: center; padding: 36px 16px;
+    color: #64748b; font-size: 15px;
+}
+
+/* ── Sezioni ──────────────────────────────────────────────────────────── */
+
+.op-sez {
+    font-size: 13px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .07em; color: #64748b;
+    margin: 26px 0 11px;
+}
+
+details.op-apri > summary {
+    list-style: none; cursor: pointer;
+    padding: 16px; min-height: 54px; box-sizing: border-box;
+    background: #2563eb; color: #fff; border-radius: 12px;
+    font-size: 16.5px; font-weight: 800; text-align: center;
+}
+details.op-apri > summary::-webkit-details-marker { display: none; }
+details.op-apri[open] > summary { border-radius: 12px 12px 0 0; }
+details.op-apri[open] > .op-card { border-radius: 0 0 12px 12px; border-top: none; margin-bottom: 14px; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .op-scelta span, .op-btn { transition: background-color .12s, border-color .12s; }
+}

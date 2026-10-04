@@ -1,0 +1,127 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+{% endblock %}
+
+{#
+  Ferie, permessi e malattia.
+
+  Tutto nella stessa pagina perche' per chi la usa e' la stessa domanda:
+  "quel giorno non ci sono". Cambia solo il perche', e il perche' decide
+  quali campi servono.
+#}
+{% block content %}
+<div class="op">
+
+    <h1 class="op-titolo">Ferie e assenze</h1>
+    <p class="op-sotto">Quello che hai chiesto e quello che ti hanno dato</p>
+
+    {% if successMsg %}<div class="op-avviso op-avviso-ok">{{ successMsg }}</div>{% endif %}
+    {% if errorMsg %}<div class="op-avviso op-avviso-ko">{{ errorMsg }}</div>{% endif %}
+
+    <details class="op-apri">
+        <summary>Chiedi ferie o avvisa</summary>
+        <div class="op-card">
+            <form method="POST" action="/io/assenze">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                <div class="op-campo">
+                    <label>Di cosa si tratta</label>
+                    <div class="op-scelte">
+                        <label class="op-scelta">
+                            <input type="radio" name="tipo" value="ferie" checked data-tipo>
+                            <span>Ferie</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="tipo" value="permesso" data-tipo>
+                            <span>Permesso</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="tipo" value="malattia" data-tipo>
+                            <span>Malattia</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="op-campo">
+                    <label for="a-dal">Dal</label>
+                    <input type="date" id="a-dal" name="dal" required>
+                </div>
+
+                <div class="op-campo">
+                    <label for="a-al">Al</label>
+                    <input type="date" id="a-al" name="al">
+                    <span class="op-aiuto">Lascia vuoto se e' un giorno solo</span>
+                </div>
+
+                {# Le ore solo sul permesso, il certificato solo sulla
+                   malattia: i campi che non servono non si vedono, e quello
+                   che resta scritto in uno nascosto non parte. #}
+                <div class="op-campo" data-solo="permesso" hidden>
+                    <label for="a-ore">Quante ore</label>
+                    <input type="number" id="a-ore" name="ore" step="0.5" min="0.5" max="12" placeholder="es. 4">
+                    <span class="op-aiuto">Vuoto = giornata intera</span>
+                </div>
+
+                <div class="op-campo" data-solo="malattia" hidden>
+                    <label for="a-prot">Numero del certificato</label>
+                    <input type="text" id="a-prot" name="protocollo" maxlength="32" placeholder="es. 1234567890">
+                    <span class="op-aiuto">Se non ce l'hai adesso, lo aggiunge l'ufficio</span>
+                </div>
+
+                <div class="op-campo">
+                    <label for="a-note">Note</label>
+                    <textarea id="a-note" name="note" placeholder="Se c'e' qualcosa da dire"></textarea>
+                </div>
+
+                <button type="submit" class="op-btn op-btn-primo">Manda in ufficio</button>
+            </form>
+        </div>
+    </details>
+
+    <div class="op-sez">Le tue assenze</div>
+
+    {% for r in righe %}
+        <div class="op-voce">
+            <div class="op-voce-testa">
+                <div>
+                    <div class="op-data">
+                        {{ r.data_inizio|date('d/m/Y') }}{% if r.data_fine != r.data_inizio %} → {{ r.data_fine|date('d/m/Y') }}{% endif %}
+                    </div>
+                    <div class="op-dove">
+                        <span class="op-tag op-tag-{{ r.tipo }}">{{ r.tipo }}</span>
+                        {% if r.ore %} · {{ r.ore }} ore{% endif %}
+                        {% if r.protocollo %} · cert. {{ r.protocollo }}{% endif %}
+                    </div>
+                </div>
+                {% if r.stato == 'approvata' %}
+                    <span class="op-tag op-tag-ok">{{ r.tipo == 'malattia' ? 'registrata' : 'approvata' }}</span>
+                {% elseif r.stato == 'rifiutata' %}
+                    <span class="op-tag op-tag-ko">{{ r.tipo == 'malattia' ? 'non accettata' : 'rifiutata' }}</span>
+                {% else %}
+                    <span class="op-tag op-tag-attesa">in attesa</span>
+                {% endif %}
+            </div>
+
+            {% if r.motivo %}
+                <div class="op-motivo">{{ r.motivo }}</div>
+            {% endif %}
+            {% if r.note %}
+                <div class="op-dove" style="margin-top:8px;">{{ r.note }}</div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="op-vuoto">
+            Non hai nessuna ferie, permesso o malattia registrata.
+        </div>
+    {% endfor %}
+
+    <a href="/io" class="op-btn op-btn-secondo" style="margin-top:18px;">Torna indietro</a>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/operaio/assenze.js?v=1"></script>
+{% endblock %}

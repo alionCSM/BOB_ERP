@@ -1,0 +1,184 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+{% endblock %}
+
+{#
+  Le mie presenze: quelle registrate e quelle ancora per aria.
+
+  Il modulo sta dentro un <details> chiuso: chi apre questa pagina il piu'
+  delle volte vuole solo controllare, e dichiarare e' il gesto raro. Chiuso,
+  l'elenco si vede subito; aperto, resta in cima dove serve.
+#}
+{% block content %}
+<div class="op">
+
+    <h1 class="op-titolo">Le mie presenze</h1>
+    <p class="op-sotto">Ultimi due mesi</p>
+
+    {% if successMsg %}<div class="op-avviso op-avviso-ok">{{ successMsg }}</div>{% endif %}
+    {% if errorMsg %}<div class="op-avviso op-avviso-ko">{{ errorMsg }}</div>{% endif %}
+
+    <details class="op-apri">
+        <summary>Segna una giornata</summary>
+        <div class="op-card">
+            <form method="POST" action="/io/presenze">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                <div class="op-campo">
+                    <label for="p-data">Che giorno</label>
+                    {# max=oggi: si dichiara quello che si e' fatto, e il
+                       telefono non lascia nemmeno scegliere oltre #}
+                    <input type="date" id="p-data" name="data" max="{{ oggi }}" value="{{ oggi }}" required>
+                </div>
+
+                <div class="op-campo">
+                    <label for="p-cantiere">Dove hai lavorato</label>
+                    <select id="p-cantiere" name="worksite_id" required>
+                        <option value="">Scegli il cantiere…</option>
+                        {% if cantieri.recenti %}
+                            <optgroup label="Dove sei stato di recente">
+                                {% for c in cantieri.recenti %}
+                                    <option value="{{ c.id }}">{{ c.worksite_code }} — {{ c.name }}{{ c.location ? ' (' ~ c.location ~ ')' : '' }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        {% endif %}
+                        <optgroup label="Tutti i cantieri aperti">
+                            {% for c in cantieri.aperti %}
+                                <option value="{{ c.id }}">{{ c.worksite_code }} — {{ c.name }}{{ c.location ? ' (' ~ c.location ~ ')' : '' }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="op-campo">
+                    <label>Quanto hai lavorato</label>
+                    <div class="op-scelte">
+                        <label class="op-scelta">
+                            <input type="radio" name="turno" value="Intero" checked>
+                            <span>Giornata intera</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="turno" value="Mezzo">
+                            <span>Mezza giornata</span>
+                        </label>
+                    </div>
+                </div>
+
+                {# "Ho pagato io" / "Ha pagato l'azienda": le parole sono
+                   dell'operaio, la traduzione in Loro/Noi la fa il server.
+                   Il prezzo non si chiede: lui sa di aver mangiato, non
+                   quanto e' costato, e chiederglielo raccoglie numeri
+                   inventati che poi qualcuno corregge uno per uno. #}
+                <div class="op-campo">
+                    <label>Pranzo — chi ha pagato?</label>
+                    <div class="op-scelte">
+                        <label class="op-scelta">
+                            <input type="radio" name="pranzo" value="" checked>
+                            <span>Non l'ho fatto</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="pranzo" value="io">
+                            <span>Io</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="pranzo" value="azienda">
+                            <span>L'azienda</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="op-campo">
+                    <label>Cena — chi ha pagato?</label>
+                    <div class="op-scelte">
+                        <label class="op-scelta">
+                            <input type="radio" name="cena" value="" checked>
+                            <span>Non l'ho fatto</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="cena" value="io">
+                            <span>Io</span>
+                        </label>
+                        <label class="op-scelta">
+                            <input type="radio" name="cena" value="azienda">
+                            <span>L'azienda</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="op-campo">
+                    <label class="op-spunta">
+                        <input type="checkbox" name="trasferta" value="1">
+                        <span>Ho dormito fuori</span>
+                    </label>
+                </div>
+
+                <div class="op-campo">
+                    <label for="p-hotel">Albergo</label>
+                    <input type="text" id="p-hotel" name="hotel" placeholder="Nome, se hai dormito fuori">
+                </div>
+
+                <div class="op-campo">
+                    <label for="p-auto">Auto</label>
+                    <input type="text" id="p-auto" name="targa_auto" placeholder="Targa">
+                </div>
+
+                <div class="op-campo">
+                    <label for="p-note">Note</label>
+                    <textarea id="p-note" name="note" placeholder="Se c'e' qualcosa da dire all'ufficio"></textarea>
+                </div>
+
+                <button type="submit" class="op-btn op-btn-primo">Manda in ufficio</button>
+                <span class="op-aiuto" style="text-align:center;">
+                    La controlla l'ufficio prima di registrarla.
+                </span>
+            </form>
+        </div>
+    </details>
+
+    <div class="op-sez">Le tue giornate</div>
+
+    {% for r in righe %}
+        <div class="op-voce">
+            <div class="op-voce-testa">
+                <div>
+                    <div class="op-data">{{ r.data|date('d/m/Y') }}</div>
+                    <div class="op-dove">
+                        {{ r.cantiere_codice ? r.cantiere_codice ~ ' · ' : '' }}{{ r.cantiere_nome ?: 'cantiere non indicato' }}
+                        {% if r.turno == 'Mezzo' %} · mezza giornata{% endif %}
+                    </div>
+                </div>
+                {% if r.stato == 'registrata' %}
+                    <span class="op-tag op-tag-ok">registrata</span>
+                {% elseif r.stato == 'in_attesa' %}
+                    <span class="op-tag op-tag-attesa">in attesa</span>
+                {% else %}
+                    <span class="op-tag op-tag-ko">rifiutata</span>
+                {% endif %}
+            </div>
+
+            {% if r.motivo %}
+                <div class="op-motivo"><b>Rifiutata:</b> {{ r.motivo }}</div>
+            {% endif %}
+
+            {# Si ritira solo finche' l'ufficio non ha deciso: dopo vorrebbe
+               dire cancellare una decisione di qualcun altro. #}
+            {% if r.stato == 'in_attesa' %}
+                <form method="POST" action="/io/presenze/{{ r.richiesta_id }}/ritira"
+                      style="margin-top:11px;" data-confirm="Ritirare questa giornata?">
+                    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                    <button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Ritira</button>
+                </form>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="op-vuoto">
+            Nessuna giornata negli ultimi due mesi.
+        </div>
+    {% endfor %}
+
+    <a href="/io" class="op-btn op-btn-secondo" style="margin-top:18px;">Torna indietro</a>
+
+</div>
+{% endblock %}
