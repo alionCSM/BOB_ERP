@@ -18,6 +18,23 @@
     color: #0f172a;
 }
 
+/* Su uno schermo largo le colonne si affiancano, ma ognuna resta stretta:
+   una riga di testo lunga quaranta centimetri non la legge nessuno. Sotto
+   i 900px tornano una sopra l'altra, nell'ordine in cui stanno nel codice
+   — prima quello che manca, poi lo storico. */
+.op-colonne { display: grid; gap: 0; }
+
+@media (min-width: 900px) {
+    .op { max-width: 1000px; }
+    .op-colonne {
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+        align-items: start;
+    }
+    /* il primo blocco di ogni colonna non deve staccarsi dall'intestazione */
+    .op-colonne > div > .op-sez:first-child { margin-top: 0; }
+}
+
 /* ── Intestazione ─────────────────────────────────────────────────────── */
 
 .op-titolo {
@@ -34,15 +51,26 @@
 
 /* ── Avvisi ───────────────────────────────────────────────────────────── */
 
+/* L'esito si legge dove si guarda — in cima, dopo il ritorno dal
+   salvataggio — e non sparisce da solo: uno che manda la giornata e poi
+   alza gli occhi dal telefono per tre secondi deve ritrovarlo li'. Una
+   notifica che svanisce costringe a rifare il gesto per sapere se e'
+   andata. */
 .op-avviso {
     display: flex;
-    gap: 10px;
+    gap: 11px;
     align-items: flex-start;
-    padding: 13px 15px;
+    padding: 14px 16px;
     border-radius: 12px;
-    font-size: 15px;
+    font-size: 15.5px;
+    font-weight: 600;
     line-height: 1.45;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+}
+.op-avviso-i {
+    flex: 0 0 22px; width: 22px; height: 22px; margin-top: 1px;
+    fill: none; stroke: currentColor; stroke-width: 2.5;
+    stroke-linecap: round; stroke-linejoin: round;
 }
 .op-avviso-ok  { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
 .op-avviso-ko  { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
@@ -177,6 +205,50 @@
 }
 .op-scelta input:focus-visible + span { outline: 3px solid #93c5fd; }
 
+/* ── Le giornate che mancano ──────────────────────────────────────────── */
+
+/* Una riga, un bottone, finito. E' il gesto che si fa piu' spesso di
+   tutti, e non deve costare un modulo. */
+.op-manca {
+    display: flex; align-items: center; gap: 12px;
+    background: #fff; border: 1px solid #e2e8f0;
+    border-left: 4px solid #f59e0b;
+    border-radius: 12px; padding: 13px 14px; margin-bottom: 10px;
+}
+.op-manca-d { flex: 1; min-width: 0; }
+.op-manca-g { font-size: 17px; font-weight: 800; }
+.op-manca-c {
+    font-size: 14px; color: #475569; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* .op-btn.op-btn-stretto e non .op-btn-stretto: la regola larga di .op-btn
+   sta piu' in basso nel file, e a parita' di specificita' vinceva lei — il
+   bottone si allargava fino a coprire la data accanto. */
+.op-btn.op-btn-stretto {
+    width: auto; flex: 0 0 auto;
+    padding: 13px 16px; font-size: 14.5px;
+}
+
+.op-nota {
+    font-size: 14px; color: #64748b; line-height: 1.45;
+    margin: 0 0 18px; padding: 0 2px;
+}
+
+/* ── I campi che quasi sempre restano vuoti ───────────────────────────── */
+
+details.op-extra { margin-bottom: 16px; }
+details.op-extra > summary {
+    list-style: none; cursor: pointer;
+    padding: 13px 14px; min-height: 50px; box-sizing: border-box;
+    display: flex; align-items: center; gap: 9px;
+    border: 1.5px dashed #cbd5e1; border-radius: 11px;
+    font-size: 15px; font-weight: 700; color: #475569;
+}
+details.op-extra > summary::-webkit-details-marker { display: none; }
+details.op-extra > summary::before { content: '+'; font-size: 19px; font-weight: 800; }
+details.op-extra[open] > summary { margin-bottom: 14px; }
+details.op-extra[open] > summary::before { content: '–'; }
+
 /* ── La proposta del cantiere ─────────────────────────────────────────── */
 
 /* Una riga sola da confermare al posto di una tendina con trecento voci.
@@ -265,6 +337,23 @@ label.op-spunta input { width: 24px; height: 24px; min-height: 0; flex: 0 0 24px
     letter-spacing: .07em; color: #64748b;
     margin: 26px 0 11px;
 }
+.op-testa { margin-bottom: 18px; }
+
+/* I due bottoni in fondo a "oggi": uno sotto l'altro sul telefono, di
+   fianco quando c'e' spazio. */
+.op-azioni { display: grid; gap: 10px; }
+@media (min-width: 560px) { .op-azioni { grid-template-columns: 1fr 1fr; } }
+
+.op-torna { margin-top: 18px; }
+
+/* Il bottone dentro l'avviso delle giornate mancanti: l'avviso dice cosa
+   manca, il bottone fa rimediare senza doverlo andare a cercare. */
+.op-avviso-b {
+    display: inline-block; margin-top: 10px;
+    text-decoration: none; min-height: 44px; padding: 11px 18px;
+}
+.op-centro { text-align: center; }
+.op-voce-azione { margin-top: 11px; }
 
 details.op-apri > summary {
     list-style: none; cursor: pointer;

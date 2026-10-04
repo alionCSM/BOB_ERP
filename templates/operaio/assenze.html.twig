@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=3">
 {% endblock %}
 
 {#
@@ -14,12 +14,26 @@
 {% block content %}
 <div class="op">
 
-    <h1 class="op-titolo">Ferie e assenze</h1>
-    <p class="op-sotto">Quello che hai chiesto e quello che ti hanno dato</p>
+    <div class="op-testa">
+        <h1 class="op-titolo">Ferie e assenze</h1>
+        <p class="op-sotto">Quello che hai chiesto e quello che ti hanno dato</p>
+    </div>
 
-    {% if successMsg %}<div class="op-avviso op-avviso-ok">{{ successMsg }}</div>{% endif %}
-    {% if errorMsg %}<div class="op-avviso op-avviso-ko">{{ errorMsg }}</div>{% endif %}
+    {% if successMsg %}
+        <div class="op-avviso op-avviso-ok" role="status">
+            <svg viewBox="0 0 24 24" class="op-avviso-i"><path d="M20 6L9 17l-5-5"/></svg>
+            <div>{{ successMsg }}</div>
+        </div>
+    {% endif %}
+    {% if errorMsg %}
+        <div class="op-avviso op-avviso-ko" role="alert">
+            <svg viewBox="0 0 24 24" class="op-avviso-i"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+            <div>{{ errorMsg }}</div>
+        </div>
+    {% endif %}
 
+    <div class="op-colonne">
+    <div>
     <details class="op-apri">
         <summary>Chiedi ferie o avvisa</summary>
         <div class="op-card">
@@ -80,6 +94,9 @@
         </div>
     </details>
 
+    </div>
+
+    <div>
     <div class="op-sez">Le tue assenze</div>
 
     {% for r in righe %}
@@ -117,7 +134,10 @@
         </div>
     {% endfor %}
 
-    <a href="/io" class="op-btn op-btn-secondo" style="margin-top:18px;">Torna indietro</a>
+    </div>
+    </div>
+
+    <a href="/io" class="op-btn op-btn-secondo op-torna">Torna indietro</a>
 
 </div>
 {% endblock %}

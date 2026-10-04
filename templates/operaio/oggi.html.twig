@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=3">
 {% endblock %}
 
 {#
@@ -14,23 +14,26 @@
 {% block content %}
 <div class="op">
 
-    <h1 class="op-titolo">Ciao {{ user.first_name }}</h1>
-    <p class="op-sotto">Oggi e domani</p>
+    <div class="op-testa">
+        <h1 class="op-titolo">Ciao {{ user.first_name }}</h1>
+        <p class="op-sotto">Oggi e domani</p>
+    </div>
 
-    {# I giorni che gli mancano in cima, con il link per rimediare: e' la
+    {# I giorni che mancano in cima, con il bottone per rimediare: e' la
        cosa che costa soldi a tutti se resta li'. #}
     {% if daDichiarare %}
         <div class="op-avviso op-avviso-att">
+            <svg viewBox="0 0 24 24" class="op-avviso-i"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
             <div>
-                <b>Ti manca{{ daDichiarare|length > 1 ? 'no' : '' }}
-                   {{ daDichiarare|length }} giornat{{ daDichiarare|length > 1 ? 'e' : 'a' }}</b>
-                da segnare:
-                {% for g in daDichiarare %}{{ g.data|date('d/m') }}{{ not loop.last ? ', ' : '' }}{% endfor %}.
-                <a href="/io/presenze">Segnale adesso</a>
+                Ti manca{{ daDichiarare|length > 1 ? 'no' : '' }}
+                {{ daDichiarare|length }} giornat{{ daDichiarare|length > 1 ? 'e' : 'a' }}:
+                {% for g in daDichiarare %}{{ g.data|date('d/m') }}{{ not loop.last ? ', ' : '' }}{% endfor %}
+                <a href="/io/presenze" class="op-btn op-btn-primo op-btn-stretto op-avviso-b">Segnale</a>
             </div>
         </div>
     {% endif %}
 
+    <div class="op-colonne">
     {% for g in giorni %}
         <div class="op-card{{ g.data == oggi ? ' oggi' : '' }}">
 
@@ -87,10 +90,13 @@
             </div>
         </div>
     {% endfor %}
+    </div>
 
     <div class="op-sez">Cosa puoi fare</div>
-    <a href="/io/presenze" class="op-btn op-btn-primo" style="margin-bottom:10px;">Le mie presenze</a>
-    <a href="/io/assenze"  class="op-btn op-btn-secondo">Ferie e assenze</a>
+    <div class="op-azioni">
+        <a href="/io/presenze" class="op-btn op-btn-primo">Le mie presenze</a>
+        <a href="/io/assenze"  class="op-btn op-btn-secondo">Ferie e assenze</a>
+    </div>
 
 </div>
 {% endblock %}

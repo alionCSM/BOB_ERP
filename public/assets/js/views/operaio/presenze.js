@@ -76,5 +76,18 @@ document.addEventListener('DOMContentLoaded', function () {
         ts.focus();
     });
 
+    // "Scegli" sulle giornate senza cantiere: apre il modulo gia' su quel
+    // giorno, invece di farlo ridigitare dopo che gliel'abbiamo appena
+    // mostrato scritto sopra il bottone
+    var modulo = document.getElementById('op-modulo');
+    document.querySelectorAll('[data-apri-modulo]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            data.value = b.getAttribute('data-apri-modulo');
+            if (modulo) modulo.open = true;
+            chiedi();
+            modulo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
     chiedi();
 });

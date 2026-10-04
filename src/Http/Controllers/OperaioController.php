@@ -70,6 +70,13 @@ final class OperaioController
         Response::view('operaio/presenze.html.twig', $request, [
             'pageTitle'  => 'Le mie presenze',
             'righe'      => $repo->diarioOperaio($operaio, $dal, $al),
+            // I giorni che gli mancano, col cantiere dove risultava: quelli
+            // si segnano con un tocco solo. Il modulo serve per il resto.
+            'daSegnare'  => $repo->giorniSenzaNiente(
+                                $operaio,
+                                date('Y-m-d', strtotime('-13 days')),
+                                date('Y-m-d')
+                            ),
             // i cantieri non si mandano con la pagina: li chiede il
             // telefono quando servono, uno alla volta
             'oggi'       => date('Y-m-d'),
@@ -192,7 +199,10 @@ final class OperaioController
                 'note'        => trim((string)($_POST['note'] ?? '')),
             ]);
 
-            $_SESSION['success'] = 'Mandata in ufficio. La vedi qui sotto come "in attesa".';
+            // Nomina il giorno: "fatto" non dice se e' andata quella
+            // giusta, e chi ne manda tre di fila non ha modo di saperlo.
+            $_SESSION['success'] = 'Giornata del ' . date('d/m/Y', strtotime($data))
+                . ' mandata in ufficio. La trovi qui sotto come "in attesa".';
         } catch (\Throwable $e) {
             $_SESSION['error'] = $e->getMessage();
         }
@@ -210,7 +220,7 @@ final class OperaioController
         $fatto = (new RichiestaPresenzaRepository($this->conn))->ritira($operaio, $id);
 
         $_SESSION[$fatto ? 'success' : 'error'] = $fatto
-            ? 'Ritirata.'
+            ? 'Giornata ritirata. Puoi rimandarla quando vuoi.'
             : "Non si puo' piu' ritirare: l'ufficio l'ha gia' guardata.";
 
         Response::redirect('/io/presenze');
@@ -286,7 +296,13 @@ final class OperaioController
                 ':prot' => $prot !== '' ? $prot : null,
             ]);
 
-            $_SESSION['success'] = 'Richiesta mandata in ufficio.';
+            $parole = ['ferie' => 'Ferie', 'permesso' => 'Permesso', 'malattia' => 'Malattia'];
+            $quando = $dal === $al
+                ? 'del ' . date('d/m/Y', strtotime($dal))
+                : 'dal ' . date('d/m/Y', strtotime($dal)) . ' al ' . date('d/m/Y', strtotime($al));
+
+            $_SESSION['success'] = $parole[$tipo] . ' ' . $quando
+                . ': richiesta mandata in ufficio.';
         } catch (\Throwable $e) {
             $_SESSION['error'] = $e->getMessage();
         }
