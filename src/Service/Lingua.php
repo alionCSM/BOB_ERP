@@ -57,6 +57,8 @@ final class Lingua
             'cosa_malattia'        => 'malattia',
 
             // ── Le pagine di /io ──────────────────────────
+            'lingua_lbl'               => 'Lingua',
+            'lingua_aiuto'             => 'Le tue pagine e le notifiche arrivano in questa lingua.',
             'menu_oggi'                => 'Oggi e domani',
             'menu_presenze'            => 'Le mie presenze',
             'menu_assenze'             => 'Ferie e assenze',
@@ -197,6 +199,8 @@ final class Lingua
             'cosa_malattia'        => 'sick leave',
 
             // ── Le pagine di /io ──────────────────────────
+            'lingua_lbl'               => 'Language',
+            'lingua_aiuto'             => 'Your pages and notifications come in this language.',
             'menu_oggi'                => 'Today and tomorrow',
             'menu_presenze'            => 'My attendance',
             'menu_assenze'             => 'Leave and absence',
@@ -337,6 +341,8 @@ final class Lingua
             'cosa_malattia'        => 'semundje',
 
             // ── Le pagine di /io ──────────────────────────
+            'lingua_lbl'               => 'Gjuha',
+            'lingua_aiuto'             => 'Faqet e tua dhe njoftimet vijne ne kete gjuhe.',
             'menu_oggi'                => 'Sot dhe neser',
             'menu_presenze'            => 'Prezencat e mia',
             'menu_assenze'             => 'Pushime dhe mungesa',
@@ -477,6 +483,8 @@ final class Lingua
             'cosa_malattia'        => 'boala',
 
             // ── Le pagine di /io ──────────────────────────
+            'lingua_lbl'               => 'Limba',
+            'lingua_aiuto'             => 'Paginile tale si notificarile vin in aceasta limba.',
             'menu_oggi'                => 'Azi si maine',
             'menu_presenze'            => 'Prezentele mele',
             'menu_assenze'             => 'Concediu si absente',

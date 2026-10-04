@@ -68,32 +68,7 @@ final class OperaioController
             'giorni'       => $giorni,
             'oggi'         => date('Y-m-d'),
             'daDichiarare' => $daDichiarare,
-            'lingue'       => \App\Service\Lingua::DISPONIBILI,
-            'linguaOra'    => \App\Service\Lingua::normalizza($request->user()->lingua ?? null),
         ]);
-    }
-
-    // ── POST /io/lingua ──────────────────────────────────────────────────────
-
-    /**
-     * In che lingua gli parla BOB.
-     *
-     * Sta in fondo a /io e non dentro il profilo, che e' una pagina
-     * dell'ufficio piena di roba che a un operaio non serve. I nomi delle
-     * lingue sono scritti ognuno nella sua — Shqip, Romana — cosi' uno li
-     * riconosce anche se tutto il resto della pagina e' in una lingua che
-     * non capisce. E' il caso di chi apre BOB la prima volta.
-     */
-    public function cambiaLingua(Request $request): never
-    {
-        $lingua = strtolower(trim((string)($_POST['lingua'] ?? '')));
-
-        if (isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
-            $stmt = $this->conn->prepare('UPDATE bb_users SET lingua = :l WHERE id = :id');
-            $stmt->execute([':l' => $lingua, ':id' => (int)($request->user()->id ?? 0)]);
-        }
-
-        Response::redirect('/io');
     }
 
     // ── GET /io/presenze ─────────────────────────────────────────────────────

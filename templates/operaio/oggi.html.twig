@@ -98,17 +98,5 @@
         <a href="/io/assenze"  class="op-btn op-btn-secondo">{{ t('menu_assenze') }}</a>
     </div>
 
-    {# I nomi stanno ognuno nella sua lingua — Shqip, Romana — cosi' uno si
-       riconosce anche quando tutto il resto e' scritto in una lingua che non
-       capisce. E' il caso di chi apre BOB la prima volta. #}
-    <form method="POST" action="/io/lingua" class="op-lingue">
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-        {% for codice, nome in lingue %}
-            <button type="submit" name="lingua" value="{{ codice }}"
-                    class="op-lingua{{ codice == linguaOra ? ' scelta' : '' }}"
-                    lang="{{ codice }}">{{ nome }}</button>
-        {% endfor %}
-    </form>
-
 </div>
 {% endblock %}

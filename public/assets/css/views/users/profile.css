@@ -48,6 +48,9 @@
 .pr-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .pr-field { display: flex; flex-direction: column; gap: 6px; }
 .pr-label { font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+/* L'aiuto sotto il campo della lingua: dice cosa cambia davvero,
+   perche' "Lingua" da solo non lo lascia capire. */
+.pr-hint { display: block; margin-top: 5px; font-size: 12.5px; color: #64748b; line-height: 1.4; }
 .pr-input {
     height: 42px; padding: 0 14px;
     border: 1.5px solid #e2e8f0; border-radius: 10px;
