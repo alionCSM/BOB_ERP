@@ -34,3 +34,36 @@ document.addEventListener('DOMContentLoaded', function () {
     tipi.forEach(function (t) { t.addEventListener('change', aggiorna); });
     aggiorna();
 });
+
+/**
+ * L'anno e la ricerca nell'elenco.
+ *
+ * Stesso comportamento delle presenze: l'anno si manda da solo al cambio,
+ * la ricerca filtra quello che e' gia' in pagina. Un anno sono poche
+ * decine di righe, e una ricerca che risponde subito vale piu' di una
+ * completa che aspetta la linea del cantiere.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    var anno = document.getElementById('op-anno-sel');
+    if (anno) {
+        anno.addEventListener('change', function () { anno.form.submit(); });
+    }
+
+    var filtro = document.getElementById('op-filtro');
+    var elenco = document.getElementById('op-elenco');
+    var niente = document.getElementById('op-niente');
+    if (!filtro || !elenco) return;
+
+    filtro.addEventListener('input', function () {
+        var q = filtro.value.trim().toLowerCase();
+        var visti = 0;
+
+        elenco.querySelectorAll('.op-voce').forEach(function (v) {
+            var ok = q === '' || (v.getAttribute('data-cerca') || '').indexOf(q) !== -1;
+            v.hidden = !ok;
+            if (ok) visti++;
+        });
+
+        if (niente) niente.hidden = visti > 0;
+    });
+});

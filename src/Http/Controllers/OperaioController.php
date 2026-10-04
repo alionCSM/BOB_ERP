@@ -243,9 +243,22 @@ final class OperaioController
 
     public function assenze(Request $request): void
     {
+        $operaio = $this->operaio($request);
+        $repo    = new LeaveRepository($this->conn);
+
+        $anno = (int)($_GET['anno'] ?? 0);
+        if ($anno < 2000 || $anno > (int)date('Y') + 1) {
+            $anno = (int)date('Y');
+        }
+
+        $righe = $repo->perWorkerEAnno($operaio, $anno);
+
         Response::view('operaio/assenze.html.twig', $request, [
             'pageTitle'  => 'Ferie e assenze',
-            'righe'      => (new LeaveRepository($this->conn))->getByWorker($this->operaio($request)),
+            'righe'      => $righe,
+            'anno'       => $anno,
+            'anni'       => $repo->anniConAssenze($operaio),
+            'contiAnno'  => $this->contiAssenze($righe),
             'oggi'       => date('Y-m-d'),
             'successMsg' => $this->presoDallaSessione('success'),
             'errorMsg'   => $this->presoDallaSessione('error'),
@@ -324,6 +337,83 @@ final class OperaioController
     }
 
     // ── Supporto ─────────────────────────────────────────────────────────────
+
+    /**
+     * I conti dell'anno: ferie, permessi, malattia, e cosa aspetta risposta.
+     *
+     * I giorni sono quelli del calendario, da data_inizio a data_fine
+     * compresi: per chi li ha presi, due settimane di ferie sono quattordici
+     * giorni via da casa. Se in ufficio li contano come giornate lavorative
+     * il numero sara' piu' basso del loro, ed e' una riga da cambiare.
+     *
+     * I permessi a ore stanno nelle ore e non nei giorni: sommarli ai giorni
+     * farebbe un totale che non vuol dire niente.
+     *
+     * Contano solo le approvate — cioe' quelle che ha davvero preso. Quello
+     * che aspetta risposta ha un suo numero a parte, perche' e' un'altra
+     * domanda: "mi hanno risposto?".
+     *
+     * @param array<int, array<string, mixed>> $righe
+     * @return array<string, int|float>
+     */
+    private function contiAssenze(array $righe): array
+    {
+        $c = ['ferie' => 0, 'permessi_ore' => 0.0, 'permessi_giorni' => 0,
+              'malattia' => 0, 'attesa' => 0];
+
+        foreach ($righe as $r) {
+            if (($r['stato'] ?? '') === 'in_attesa') {
+                $c['attesa']++;
+                continue;
+            }
+            if (($r['stato'] ?? '') === 'rifiutata') {
+                continue;
+            }
+
+            $giorni = $this->giorniFra((string)$r['data_inizio'], (string)$r['data_fine']);
+
+            if ($r['tipo'] === 'permesso') {
+                if ($r['ore'] !== null && $r['ore'] !== '') {
+                    $c['permessi_ore'] += (float)$r['ore'];
+                } else {
+                    $c['permessi_giorni'] += $giorni;
+                }
+            } elseif ($r['tipo'] === 'malattia') {
+                $c['malattia'] += $giorni;
+            } else {
+                $c['ferie'] += $giorni;
+            }
+        }
+
+        return $c;
+    }
+
+    /**
+     * Giorni fra due date, compresi tutti e due.
+     *
+     * Con i secondi divisi per 86400 non torna due volte l'anno: dal 28 al
+     * 30 marzo passano 47 ore e non 48, perche' le lancette vanno avanti, e
+     * il conto dava due giorni invece di tre. A ottobre, quando tornano
+     * indietro, succede il contrario.
+     *
+     * Le date si leggono in UTC, dove le ore non si spostano mai, cosi' il
+     * conto e' sempre quello che vede una persona sul calendario.
+     */
+    private function giorniFra(string $dal, string $al): int
+    {
+        try {
+            $utc = new \DateTimeZone('UTC');
+            $a = new \DateTimeImmutable($dal, $utc);
+            $b = new \DateTimeImmutable($al,  $utc);
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        if ($b < $a) {
+            return 0;
+        }
+        return (int)$a->diff($b)->days + 1;
+    }
 
     /**
      * I conti del mese, fatti dove si fanno gli altri conti.

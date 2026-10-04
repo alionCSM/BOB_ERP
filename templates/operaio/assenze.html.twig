@@ -99,8 +99,57 @@
     <div>
     <div class="op-sez">Le tue assenze</div>
 
+    {# Le ferie si contano per anno: nessuno chiede quante ne ha prese a
+       marzo. L'elenco mostra solo gli anni in cui ha qualcosa. #}
+    <form method="GET" class="op-mese">
+        <select name="anno" id="op-anno-sel" aria-label="Anno">
+            {% for a in anni %}
+                <option value="{{ a }}"{{ a == anno ? ' selected' : '' }}>{{ a }}</option>
+            {% else %}
+                <option value="{{ anno }}" selected>{{ anno }}</option>
+            {% endfor %}
+        </select>
+        <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Vai</button></noscript>
+    </form>
+
+    <div class="op-conti">
+        <div class="op-conto">
+            <div class="op-conto-n">{{ contiAnno.ferie }}</div>
+            <div class="op-conto-e">Giorni ferie</div>
+        </div>
+        {% if contiAnno.permessi_ore or contiAnno.permessi_giorni %}
+            <div class="op-conto">
+                <div class="op-conto-n">
+                    {{ contiAnno.permessi_ore ? contiAnno.permessi_ore|number_format(contiAnno.permessi_ore == contiAnno.permessi_ore|round ? 0 : 1, ',', '.') ~ 'h' : contiAnno.permessi_giorni }}
+                </div>
+                <div class="op-conto-e">Permessi</div>
+            </div>
+        {% endif %}
+        {% if contiAnno.malattia %}
+            <div class="op-conto">
+                <div class="op-conto-n">{{ contiAnno.malattia }}</div>
+                <div class="op-conto-e">Giorni malattia</div>
+            </div>
+        {% endif %}
+        {% if contiAnno.attesa %}
+            <div class="op-conto">
+                <div class="op-conto-n">{{ contiAnno.attesa }}</div>
+                <div class="op-conto-e">In attesa</div>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if righe|length > 5 %}
+        <div class="op-campo op-cerca">
+            <input type="search" id="op-filtro" placeholder="Cerca tipo, data o stato…"
+                   autocomplete="off" aria-label="Cerca fra le assenze">
+        </div>
+    {% endif %}
+
+    <div id="op-elenco">
+
     {% for r in righe %}
-        <div class="op-voce">
+        <div class="op-voce" data-cerca="{{ (r.tipo ~ ' ' ~ r.data_inizio|date('d/m/Y') ~ ' ' ~ r.data_fine|date('d/m/Y') ~ ' ' ~ r.stato ~ ' ' ~ (r.protocollo ?: ''))|lower|e('html_attr') }}">
             <div class="op-voce-testa">
                 <div>
                     <div class="op-data">
@@ -130,9 +179,11 @@
         </div>
     {% else %}
         <div class="op-vuoto">
-            Non hai nessuna ferie, permesso o malattia registrata.
+            Nessuna ferie, permesso o malattia in questo anno.
         </div>
     {% endfor %}
+    </div>
+    <div class="op-vuoto" id="op-niente" hidden>Nessuna assenza trovata.</div>
 
     </div>
     </div>
@@ -143,5 +194,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/operaio/assenze.js?v=1"></script>
+<script src="/assets/js/views/operaio/assenze.js?v=2"></script>
 {% endblock %}

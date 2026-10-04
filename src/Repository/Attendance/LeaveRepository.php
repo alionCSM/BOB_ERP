@@ -102,6 +102,48 @@ class LeaveRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Gli anni in cui ha qualcosa, dal piu' recente.
+     *
+     * Le ferie si contano per anno, non per mese: la domanda e' "quante ne
+     * ho prese quest'anno", e nessuno chiede quante ne ha prese a marzo.
+     *
+     * @return array<int, int>
+     */
+    public function anniConAssenze(int $workerId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT DISTINCT YEAR(data_inizio) AS anno
+            FROM   bb_ferie_permessi
+            WHERE  worker_id = :wid
+            ORDER BY anno DESC
+        ");
+        $stmt->execute([':wid' => $workerId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /**
+     * Le sue assenze di un anno.
+     *
+     * Chi inizia a dicembre e finisce a gennaio compare in tutti e due gli
+     * anni: tagliare a meta' una ferie di Natale per farla stare in un anno
+     * solo vorrebbe dire mostrarne meta' e nascondere l'altra.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function perWorkerEAnno(int $workerId, int $anno): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT * FROM bb_ferie_permessi
+            WHERE worker_id = :wid
+              AND (YEAR(data_inizio) = :a1 OR YEAR(data_fine) = :a2)
+            ORDER BY data_inizio DESC, id DESC
+        ");
+        // tre segnaposto distinti: le prepared non sono emulate
+        $stmt->execute([':wid' => $workerId, ':a1' => $anno, ':a2' => $anno]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function insert(int $workerId, string $tipo, string $from, string $to, ?float $ore, string $note, int $createdBy, string $protocollo = ''): void
     {
         $stmt = $this->conn->prepare("
