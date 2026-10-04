@@ -385,6 +385,21 @@ label.op-spunta input { width: 24px; height: 24px; min-height: 0; flex: 0 0 24px
 
 .op-torna { margin-top: 18px; }
 
+/* La scelta della lingua, in fondo e piccola: si usa una volta sola nella
+   vita, ma deve essere raggiungibile da chi non capisce niente del resto
+   della pagina. */
+.op-lingue {
+    display: flex; flex-wrap: wrap; gap: 7px;
+    margin-top: 26px; padding-top: 18px; border-top: 1px solid #e2e8f0;
+}
+.op-lingua {
+    padding: 10px 14px; min-height: 44px;
+    background: #fff; border: 1.5px solid #cbd5e1; border-radius: 10px;
+    font-size: 14px; font-weight: 700; font-family: inherit;
+    color: #475569; cursor: pointer;
+}
+.op-lingua.scelta { background: #2563eb; border-color: #2563eb; color: #fff; }
+
 /* Il bottone dentro l'avviso delle giornate mancanti: l'avviso dice cosa
    manca, il bottone fa rimediare senza doverlo andare a cercare. */
 .op-avviso-b {

@@ -18,6 +18,8 @@ class User {
     public $company_id;
     public $type;
     public $access_profile;
+    /** In che lingua gli parla BOB. Vedi App\Service\Lingua. */
+    public $lingua = 'it';
 
 
     public function __construct($db, $id = null) {
@@ -47,6 +49,10 @@ class User {
             $this->worker_id = $row['worker_id'] ?? null;
             $this->client_id = $row['client_id'] ?? null;
             $this->must_change_password = (int)($row['must_change_password'] ?? 0);
+            // Senza questa riga la lingua restava vuota e tutti leggevano in
+            // italiano, compresi quelli a cui l'avevamo impostata: la query
+            // prende tutto, ma qui si assegna campo per campo.
+            $this->lingua = \App\Service\Lingua::normalizza($row['lingua'] ?? null);
         }
 
     }

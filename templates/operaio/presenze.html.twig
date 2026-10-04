@@ -2,7 +2,7 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=5">
 {% endblock %}
 
 {#
@@ -20,8 +20,8 @@
 <div class="op">
 
     <div class="op-testa">
-        <h1 class="op-titolo">Le mie presenze</h1>
-        <p class="op-sotto">Ultimi due mesi</p>
+        <h1 class="op-titolo">{{ t('menu_presenze') }}</h1>
+        <p class="op-sotto">{{ t('ultimi_due_mesi') }}</p>
     </div>
 
     {% if successMsg %}
@@ -42,7 +42,7 @@
 
             {# ── Quello che manca: un tocco e basta ── #}
             {% if daSegnare %}
-                <div class="op-sez">Da segnare — {{ daSegnare|length }}</div>
+                <div class="op-sez">{{ t('da_segnare') }} — {{ daSegnare|length }}</div>
 
                 {% for g in daSegnare %}
                     <div class="op-manca">
@@ -52,7 +52,7 @@
                                 {% if g.worksite_id %}
                                     {{ g.cantiere_codice }} — {{ g.cantiere_nome }}
                                 {% else %}
-                                    Cantiere da scegliere
+                                    {{ t('cantiere_da_scegliere') }}
                                 {% endif %}
                             </div>
                         </div>
@@ -66,63 +66,62 @@
                                 <input type="hidden" name="worksite_id" value="{{ g.worksite_id }}">
                                 <input type="hidden" name="turno" value="Intero">
                                 <button type="submit" class="op-btn op-btn-primo op-btn-stretto">
-                                    Giornata intera
+                                    {{ t('giornata_intera') }}
                                 </button>
                             </form>
                         {% else %}
                             <button type="button" class="op-btn op-btn-secondo op-btn-stretto"
-                                    data-apri-modulo="{{ g.data }}">Scegli</button>
+                                    data-apri-modulo="{{ g.data }}">{{ t('scegli') }}</button>
                         {% endif %}
                     </div>
                 {% endfor %}
 
                 <p class="op-nota">
-                    Mezza giornata, o hai mangiato fuori? Usa
-                    <b>Segna un altro giorno</b> qui sotto.
+                    {{ t('nota_mezza') }}
                 </p>
             {% endif %}
 
             {# ── Il modulo, per tutto il resto ── #}
             <details class="op-apri" id="op-modulo">
-                <summary>{{ daSegnare ? 'Segna un altro giorno' : 'Segna una giornata' }}</summary>
+                <summary>{{ daSegnare ? t('segna_altro') : t('segna_giornata') }}</summary>
                 <div class="op-card">
                     <form method="POST" action="/io/presenze">
                         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
                         <div class="op-campo">
-                            <label for="p-data">Che giorno</label>
+                            <label for="p-data">{{ t('che_giorno') }}</label>
                             <input type="date" id="p-data" name="data" max="{{ oggi }}" value="{{ oggi }}" required>
                         </div>
 
                         <div class="op-campo">
-                            <label>Dove hai lavorato</label>
+                            <label>{{ t('dove_lavorato') }}</label>
 
                             <div id="p-proposta" class="op-proposta" hidden>
-                                <div class="op-proposta-t">Quel giorno eri qui</div>
+                                <div class="op-proposta-t">{{ t('eri_qui') }}</div>
                                 <div class="op-proposta-n"></div>
-                                <button type="button" class="op-proposta-no">Non era questo cantiere</button>
+                                <button type="button" class="op-proposta-no">{{ t('non_era_questo') }}</button>
                             </div>
 
                             <div id="p-cerca" hidden>
                                 {# senza name: la scelta la scrive nel campo
                                    nascosto qui sotto, che e' l'unico che parte #}
-                                <select id="p-cantiere" placeholder="Scrivi il nome o il codice…"></select>
-                                <span class="op-aiuto">Scrivi almeno due lettere e aspetta un attimo</span>
+                                <select id="p-cantiere" placeholder="{{ t('cerca_cantiere') }}"></select>
+                                <span class="op-aiuto">{{ t('due_lettere') }}</span>
                             </div>
 
                             <input type="hidden" name="worksite_id" id="p-scelto" value="">
                         </div>
 
                         <div class="op-campo">
-                            <label>Quanto hai lavorato</label>
+                            <label>{{ t('quanto_lavorato') }}</label>
                             <div class="op-scelte">
                                 <label class="op-scelta">
                                     <input type="radio" name="turno" value="Intero" checked>
-                                    <span>Giornata intera</span>
+                                    <span>{{ t('giornata_intera') }}</span>
                                 </label>
                                 <label class="op-scelta">
                                     <input type="radio" name="turno" value="Mezzo">
-                                    <span>Mezza giornata</span>
+                                    <span>{{ t('mezza_giornata') }}</span>
                                 </label>
                             </div>
                         </div>
@@ -132,40 +131,40 @@
                            quattro campi vuoti da scorrere ogni volta sono
                            quattro campi di troppo. #}
                         <details class="op-extra">
-                            <summary>Pasti, albergo, auto</summary>
+                            <summary>{{ t('extra') }}</summary>
 
                             <div class="op-campo">
-                                <label>Pranzo — chi ha pagato?</label>
+                                <label>{{ t('pranzo_chi') }}</label>
                                 <div class="op-scelte">
                                     <label class="op-scelta">
                                         <input type="radio" name="pranzo" value="" checked>
-                                        <span>Non l'ho fatto</span>
+                                        <span>{{ t('non_fatto') }}</span>
                                     </label>
                                     <label class="op-scelta">
                                         <input type="radio" name="pranzo" value="io">
-                                        <span>Io</span>
+                                        <span>{{ t('io') }}</span>
                                     </label>
                                     <label class="op-scelta">
                                         <input type="radio" name="pranzo" value="azienda">
-                                        <span>L'azienda</span>
+                                        <span>{{ t('azienda') }}</span>
                                     </label>
                                 </div>
                             </div>
 
                             <div class="op-campo">
-                                <label>Cena — chi ha pagato?</label>
+                                <label>{{ t('cena_chi') }}</label>
                                 <div class="op-scelte">
                                     <label class="op-scelta">
                                         <input type="radio" name="cena" value="" checked>
-                                        <span>Non l'ho fatto</span>
+                                        <span>{{ t('non_fatto') }}</span>
                                     </label>
                                     <label class="op-scelta">
                                         <input type="radio" name="cena" value="io">
-                                        <span>Io</span>
+                                        <span>{{ t('io') }}</span>
                                     </label>
                                     <label class="op-scelta">
                                         <input type="radio" name="cena" value="azienda">
-                                        <span>L'azienda</span>
+                                        <span>{{ t('azienda') }}</span>
                                     </label>
                                 </div>
                             </div>
@@ -173,28 +172,28 @@
                             <div class="op-campo">
                                 <label class="op-spunta">
                                     <input type="checkbox" name="trasferta" value="1">
-                                    <span>Ho dormito fuori</span>
+                                    <span>{{ t('dormito_fuori') }}</span>
                                 </label>
                             </div>
 
                             <div class="op-campo">
-                                <label for="p-hotel">Albergo</label>
-                                <input type="text" id="p-hotel" name="hotel" placeholder="Nome, se hai dormito fuori">
+                                <label for="p-hotel">{{ t('albergo') }}</label>
+                                <input type="text" id="p-hotel" name="hotel" placeholder="{{ t('albergo_ph') }}">
                             </div>
 
                             <div class="op-campo">
-                                <label for="p-auto">Auto</label>
-                                <input type="text" id="p-auto" name="targa_auto" placeholder="Targa">
+                                <label for="p-auto">{{ t('auto') }}</label>
+                                <input type="text" id="p-auto" name="targa_auto" placeholder="{{ t('targa') }}">
                             </div>
 
                             <div class="op-campo">
-                                <label for="p-note">Note</label>
-                                <textarea id="p-note" name="note" placeholder="Se c'e' qualcosa da dire all'ufficio"></textarea>
+                                <label for="p-note">{{ t('note') }}</label>
+                                <textarea id="p-note" name="note" placeholder="{{ t('note_ph') }}"></textarea>
                             </div>
                         </details>
 
-                        <button type="submit" class="op-btn op-btn-primo">Manda in ufficio</button>
-                        <span class="op-aiuto op-centro">La controlla l'ufficio prima di registrarla.</span>
+                        <button type="submit" class="op-btn op-btn-primo">{{ t('manda') }}</button>
+                        <span class="op-aiuto op-centro">{{ t('controlla_ufficio') }}</span>
                     </form>
                 </div>
             </details>
@@ -203,13 +202,13 @@
 
         {# ── Lo storico, un mese per volta ── #}
         <div>
-            <div class="op-sez">Le tue giornate</div>
+            <div class="op-sez">{{ t('tue_giornate') }}</div>
 
             {# Il mese si sceglie da un elenco di mesi in cui ha davvero
                lavorato: chi e' entrato a marzo non deve scorrere gennaio e
                febbraio vuoti. Si manda da solo al cambio, senza bottone. #}
             <form method="GET" class="op-mese">
-                <select name="mese" id="op-mese-sel" aria-label="Mese">
+                <select name="mese" id="op-mese-sel" aria-label="{{ t('mese') }}">
                     {% for m in mesi %}
                         <option value="{{ m.mese }}"{{ m.mese == mese ? ' selected' : '' }}>
                             {# col giorno attaccato: '2026-10' da solo strtotime lo interpreta a modo suo #}
@@ -224,39 +223,39 @@
                         <option value="{{ mese }}" selected>{{ mese }}</option>
                     {% endfor %}
                 </select>
-                <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Vai</button></noscript>
+                <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">{{ t('vai') }}</button></noscript>
             </form>
 
             {# I numeri che uno controlla a fine mese, in cima e grossi. #}
             <div class="op-conti">
                 <div class="op-conto">
                     <div class="op-conto-n">{{ totali.giornate|number_format(totali.giornate == totali.giornate|round ? 0 : 1, ',', '.') }}</div>
-                    <div class="op-conto-e">Giornate</div>
+                    <div class="op-conto-e">{{ t('giornate') }}</div>
                 </div>
                 {% if totali.attesa %}
                     <div class="op-conto">
                         <div class="op-conto-n">{{ totali.attesa }}</div>
-                        <div class="op-conto-e">In attesa</div>
+                        <div class="op-conto-e">{{ t('in_attesa_n') }}</div>
                     </div>
                 {% endif %}
                 {% if totali.trasferte %}
                     <div class="op-conto">
                         <div class="op-conto-n">{{ totali.trasferte }}</div>
-                        <div class="op-conto-e">Trasferte</div>
+                        <div class="op-conto-e">{{ t('trasferte') }}</div>
                     </div>
                 {% endif %}
                 {% if totali.rifiutate %}
                     <div class="op-conto">
                         <div class="op-conto-n">{{ totali.rifiutate }}</div>
-                        <div class="op-conto-e">Rifiutate</div>
+                        <div class="op-conto-e">{{ t('rifiutate') }}</div>
                     </div>
                 {% endif %}
             </div>
 
             {% if righe|length > 5 %}
                 <div class="op-campo op-cerca">
-                    <input type="search" id="op-filtro" placeholder="Cerca cantiere o giorno…"
-                           autocomplete="off" aria-label="Cerca fra le giornate">
+                    <input type="search" id="op-filtro" placeholder="{{ t('cerca_giornata') }}"
+                           autocomplete="off" aria-label="{{ t('cerca_giornata') }}">
                 </div>
             {% endif %}
 
@@ -267,38 +266,38 @@
                         <div>
                             <div class="op-data">{{ r.data|date('d/m/Y') }}</div>
                             <div class="op-dove">
-                                {{ r.cantiere_codice ? r.cantiere_codice ~ ' · ' : '' }}{{ r.cantiere_nome ?: 'cantiere non indicato' }}
-                                {% if r.turno == 'Mezzo' %} · mezza giornata{% endif %}
+                                {{ r.cantiere_codice ? r.cantiere_codice ~ ' · ' : '' }}{{ r.cantiere_nome ?: t('cantiere_non_indicato') }}
+                                {% if r.turno == 'Mezzo' %} · {{ t('mezza_g') }}{% endif %}
                             </div>
                         </div>
                         {% if r.stato == 'registrata' %}
-                            <span class="op-tag op-tag-ok">registrata</span>
+                            <span class="op-tag op-tag-ok">{{ t('registrata') }}</span>
                         {% elseif r.stato == 'in_attesa' %}
-                            <span class="op-tag op-tag-attesa">in attesa</span>
+                            <span class="op-tag op-tag-attesa">{{ t('in_attesa') }}</span>
                         {% else %}
-                            <span class="op-tag op-tag-ko">rifiutata</span>
+                            <span class="op-tag op-tag-ko">{{ t('rifiutata') }}</span>
                         {% endif %}
                     </div>
 
                     {% if r.motivo %}
-                        <div class="op-motivo"><b>Rifiutata:</b> {{ r.motivo }}</div>
+                        <div class="op-motivo"><b>{{ t('rifiutata_due') }}</b> {{ r.motivo }}</div>
                     {% endif %}
 
                     {# Si ritira solo finche' l'ufficio non ha deciso: dopo
                        vorrebbe dire cancellare una decisione altrui. #}
                     {% if r.stato == 'in_attesa' %}
                         <form method="POST" action="/io/presenze/{{ r.richiesta_id }}/ritira"
-                              class="op-voce-azione" data-confirm="Ritirare questa giornata?">
+                              class="op-voce-azione" data-confirm="{{ t('ritirare_conferma') }}">
                             <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                            <button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Ritira</button>
+                            <button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">{{ t('ritira') }}</button>
                         </form>
                     {% endif %}
                 </div>
             {% else %}
-                <div class="op-vuoto">Nessuna giornata in questo mese.</div>
+                <div class="op-vuoto">{{ t('nessuna_giornata') }}</div>
             {% endfor %}
             </div>
-            <div class="op-vuoto" id="op-niente" hidden>Nessuna giornata trovata.</div>
+            <div class="op-vuoto" id="op-niente" hidden>{{ t('nessuna_trovata') }}</div>
         </div>
     </div>
 

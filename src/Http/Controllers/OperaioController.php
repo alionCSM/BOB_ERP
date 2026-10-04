@@ -27,6 +27,20 @@ final class OperaioController
 {
     public function __construct(private \PDO $conn) {}
 
+    /**
+     * Un messaggio nella lingua di chi lo legge.
+     *
+     * Le pagine sono tradotte: lasciare in italiano proprio la frase che
+     * dice cos'e' andato storto vorrebbe dire tradurre tutto tranne la
+     * parte che serve capire.
+     *
+     * @param array<string, string|int> $valori
+     */
+    private function dire(Request $request, string $chiave, array $valori = []): string
+    {
+        return \App\Service\Lingua::testo($chiave, $request->user()->lingua ?? null, $valori);
+    }
+
     // ── GET /io ──────────────────────────────────────────────────────────────
 
     /**
@@ -54,7 +68,32 @@ final class OperaioController
             'giorni'       => $giorni,
             'oggi'         => date('Y-m-d'),
             'daDichiarare' => $daDichiarare,
+            'lingue'       => \App\Service\Lingua::DISPONIBILI,
+            'linguaOra'    => \App\Service\Lingua::normalizza($request->user()->lingua ?? null),
         ]);
+    }
+
+    // ── POST /io/lingua ──────────────────────────────────────────────────────
+
+    /**
+     * In che lingua gli parla BOB.
+     *
+     * Sta in fondo a /io e non dentro il profilo, che e' una pagina
+     * dell'ufficio piena di roba che a un operaio non serve. I nomi delle
+     * lingue sono scritti ognuno nella sua — Shqip, Romana — cosi' uno li
+     * riconosce anche se tutto il resto della pagina e' in una lingua che
+     * non capisce. E' il caso di chi apre BOB la prima volta.
+     */
+    public function cambiaLingua(Request $request): never
+    {
+        $lingua = strtolower(trim((string)($_POST['lingua'] ?? '')));
+
+        if (isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+            $stmt = $this->conn->prepare('UPDATE bb_users SET lingua = :l WHERE id = :id');
+            $stmt->execute([':l' => $lingua, ':id' => (int)($request->user()->id ?? 0)]);
+        }
+
+        Response::redirect('/io');
     }
 
     // ── GET /io/presenze ─────────────────────────────────────────────────────
@@ -183,21 +222,21 @@ final class OperaioController
 
         try {
             if (!$worksiteId || $data === '') {
-                throw new RuntimeException('Scegli il cantiere e il giorno.');
+                throw new RuntimeException($this->dire($request, 'msg_scegli_tutto'));
             }
             // Si dichiara quello che si e' fatto, non quello che si fara':
             // una giornata futura non e' una presenza, e' un proposito.
             if ($data > date('Y-m-d')) {
-                throw new RuntimeException("Non puoi dichiarare un giorno che deve ancora arrivare.");
+                throw new RuntimeException($this->dire($request, 'msg_giorno_futuro'));
             }
             // L'unico limite su quale cantiere: non quelli assegnati, che
             // sono un'altra cosa, ma uno aperto. Il middleware lascia
             // passare la scelta proprio perche' il controllo e' qui.
             if (!$dati->cantiereAperto($worksiteId)) {
-                throw new RuntimeException("Quel cantiere non e' aperto. Se sbaglio, dillo in ufficio.");
+                throw new RuntimeException($this->dire($request, 'msg_cantiere_chiuso'));
             }
             if ($repo->giaInAttesa($operaio, $data, $worksiteId)) {
-                throw new RuntimeException("Hai gia' mandato questa giornata: e' in attesa.");
+                throw new RuntimeException($this->dire($request, 'msg_gia_mandata'));
             }
 
             $repo->crea($operaio, [
@@ -214,10 +253,16 @@ final class OperaioController
 
             // Nomina il giorno: "fatto" non dice se e' andata quella
             // giusta, e chi ne manda tre di fila non ha modo di saperlo.
-            $_SESSION['success'] = 'Giornata del ' . date('d/m/Y', strtotime($data))
-                . ' mandata in ufficio. La trovi qui sotto come "in attesa".';
-        } catch (\Throwable $e) {
+            $_SESSION['success'] = $this->dire($request, 'msg_mandata', [
+                'data' => date('d/m/Y', strtotime($data)),
+            ]);
+        } catch (\RuntimeException $e) {
+            // i messaggi che scriviamo noi sono gia' nella sua lingua
             $_SESSION['error'] = $e->getMessage();
+        } catch (\Throwable $e) {
+            // tutto il resto e' un guasto: la frase attorno almeno si
+            // capisce, anche se il dettaglio resta tecnico e in inglese
+            $_SESSION['error'] = $this->dire($request, 'msg_errore', ['errore' => $e->getMessage()]);
         }
 
         Response::redirect('/io/presenze');
@@ -232,9 +277,9 @@ final class OperaioController
 
         $fatto = (new RichiestaPresenzaRepository($this->conn))->ritira($operaio, $id);
 
-        $_SESSION[$fatto ? 'success' : 'error'] = $fatto
-            ? 'Giornata ritirata. Puoi rimandarla quando vuoi.'
-            : "Non si puo' piu' ritirare: l'ufficio l'ha gia' guardata.";
+        $_SESSION[$fatto ? 'success' : 'error'] = $this->dire(
+            $request, $fatto ? 'msg_ritirata' : 'msg_non_ritirabile'
+        );
 
         Response::redirect('/io/presenze');
     }
@@ -286,7 +331,7 @@ final class OperaioController
 
         try {
             if ($tipo === '' || $dal === '') {
-                throw new RuntimeException('Scegli il tipo e il giorno di inizio.');
+                throw new RuntimeException($this->dire($request, 'msg_scegli_tipo'));
             }
 
             // un giorno solo: chiedere di ripetere la stessa data e' un campo
@@ -322,15 +367,24 @@ final class OperaioController
                 ':prot' => $prot !== '' ? $prot : null,
             ]);
 
-            $parole = ['ferie' => 'Ferie', 'permesso' => 'Permesso', 'malattia' => 'Malattia'];
             $quando = $dal === $al
-                ? 'del ' . date('d/m/Y', strtotime($dal))
-                : 'dal ' . date('d/m/Y', strtotime($dal)) . ' al ' . date('d/m/Y', strtotime($al));
+                ? $this->dire($request, 'per_il', ['data' => date('d/m/Y', strtotime($dal))])
+                : $this->dire($request, 'da_a', [
+                    'dal' => date('d/m/Y', strtotime($dal)),
+                    'al'  => date('d/m/Y', strtotime($al)),
+                  ]);
 
-            $_SESSION['success'] = $parole[$tipo] . ' ' . $quando
-                . ': richiesta mandata in ufficio.';
-        } catch (\Throwable $e) {
+            $_SESSION['success'] = $this->dire($request, 'msg_richiesta_mandata', [
+                'cosa'   => $this->dire($request, $tipo),
+                'quando' => $quando,
+            ]);
+        } catch (\RuntimeException $e) {
+            // i messaggi che scriviamo noi sono gia' nella sua lingua
             $_SESSION['error'] = $e->getMessage();
+        } catch (\Throwable $e) {
+            // tutto il resto e' un guasto: la frase attorno almeno si
+            // capisce, anche se il dettaglio resta tecnico e in inglese
+            $_SESSION['error'] = $this->dire($request, 'msg_errore', ['errore' => $e->getMessage()]);
         }
 
         Response::redirect('/io/assenze');
@@ -461,7 +515,9 @@ final class OperaioController
             // Succede agli account creati senza scegliere il lavoratore.
             // Dirlo chiaramente e' meglio di una schermata vuota: chi lo
             // legge sa cosa chiedere in ufficio.
-            $_SESSION['error'] = "Il tuo utente non e' collegato a nessun operaio. Dillo in ufficio.";
+            $_SESSION['error'] = \App\Service\Lingua::testo(
+                'msg_non_collegato', $request->user()->lingua ?? null
+            );
             Response::redirect('/dashboard');
         }
         return $workerId;

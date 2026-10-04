@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=5">
 {% endblock %}
 
 {#
@@ -15,8 +15,8 @@
 <div class="op">
 
     <div class="op-testa">
-        <h1 class="op-titolo">Ferie e assenze</h1>
-        <p class="op-sotto">Quello che hai chiesto e quello che ti hanno dato</p>
+        <h1 class="op-titolo">{{ t('menu_assenze') }}</h1>
+        <p class="op-sotto">{{ t('chiesto_e_dato') }}</p>
     </div>
 
     {% if successMsg %}
@@ -35,61 +35,61 @@
     <div class="op-colonne">
     <div>
     <details class="op-apri">
-        <summary>Chiedi ferie o avvisa</summary>
+        <summary>{{ t('chiedi_ferie') }}</summary>
         <div class="op-card">
             <form method="POST" action="/io/assenze">
                 <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
                 <div class="op-campo">
-                    <label>Di cosa si tratta</label>
+                    <label>{{ t('di_cosa') }}</label>
                     <div class="op-scelte">
                         <label class="op-scelta">
                             <input type="radio" name="tipo" value="ferie" checked data-tipo>
-                            <span>Ferie</span>
+                            <span>{{ t('ferie') }}</span>
                         </label>
                         <label class="op-scelta">
                             <input type="radio" name="tipo" value="permesso" data-tipo>
-                            <span>Permesso</span>
+                            <span>{{ t('permesso') }}</span>
                         </label>
                         <label class="op-scelta">
                             <input type="radio" name="tipo" value="malattia" data-tipo>
-                            <span>Malattia</span>
+                            <span>{{ t('malattia') }}</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="op-campo">
-                    <label for="a-dal">Dal</label>
+                    <label for="a-dal">{{ t('dal') }}</label>
                     <input type="date" id="a-dal" name="dal" required>
                 </div>
 
                 <div class="op-campo">
-                    <label for="a-al">Al</label>
+                    <label for="a-al">{{ t('al') }}</label>
                     <input type="date" id="a-al" name="al">
-                    <span class="op-aiuto">Lascia vuoto se e' un giorno solo</span>
+                    <span class="op-aiuto">{{ t('vuoto_un_giorno') }}</span>
                 </div>
 
                 {# Le ore solo sul permesso, il certificato solo sulla
                    malattia: i campi che non servono non si vedono, e quello
                    che resta scritto in uno nascosto non parte. #}
                 <div class="op-campo" data-solo="permesso" hidden>
-                    <label for="a-ore">Quante ore</label>
+                    <label for="a-ore">{{ t('quante_ore') }}</label>
                     <input type="number" id="a-ore" name="ore" step="0.5" min="0.5" max="12" placeholder="es. 4">
-                    <span class="op-aiuto">Vuoto = giornata intera</span>
+                    <span class="op-aiuto">{{ t('vuoto_intera') }}</span>
                 </div>
 
                 <div class="op-campo" data-solo="malattia" hidden>
-                    <label for="a-prot">Numero del certificato</label>
+                    <label for="a-prot">{{ t('n_certificato') }}</label>
                     <input type="text" id="a-prot" name="protocollo" maxlength="32" placeholder="es. 1234567890">
-                    <span class="op-aiuto">Se non ce l'hai adesso, lo aggiunge l'ufficio</span>
+                    <span class="op-aiuto">{{ t('cert_dopo') }}</span>
                 </div>
 
                 <div class="op-campo">
-                    <label for="a-note">Note</label>
-                    <textarea id="a-note" name="note" placeholder="Se c'e' qualcosa da dire"></textarea>
+                    <label for="a-note">{{ t('note') }}</label>
+                    <textarea id="a-note" name="note" placeholder="{{ t('note_qualcosa') }}"></textarea>
                 </div>
 
-                <button type="submit" class="op-btn op-btn-primo">Manda in ufficio</button>
+                <button type="submit" class="op-btn op-btn-primo">{{ t('manda') }}</button>
             </form>
         </div>
     </details>
@@ -97,52 +97,52 @@
     </div>
 
     <div>
-    <div class="op-sez">Le tue assenze</div>
+    <div class="op-sez">{{ t('tue_assenze') }}</div>
 
     {# Le ferie si contano per anno: nessuno chiede quante ne ha prese a
        marzo. L'elenco mostra solo gli anni in cui ha qualcosa. #}
     <form method="GET" class="op-mese">
-        <select name="anno" id="op-anno-sel" aria-label="Anno">
+        <select name="anno" id="op-anno-sel" aria-label="{{ t('anno') }}">
             {% for a in anni %}
                 <option value="{{ a }}"{{ a == anno ? ' selected' : '' }}>{{ a }}</option>
             {% else %}
                 <option value="{{ anno }}" selected>{{ anno }}</option>
             {% endfor %}
         </select>
-        <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Vai</button></noscript>
+        <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">{{ t('vai') }}</button></noscript>
     </form>
 
     <div class="op-conti">
         <div class="op-conto">
             <div class="op-conto-n">{{ contiAnno.ferie }}</div>
-            <div class="op-conto-e">Giorni ferie</div>
+            <div class="op-conto-e">{{ t('giorni_ferie') }}</div>
         </div>
         {% if contiAnno.permessi_ore or contiAnno.permessi_giorni %}
             <div class="op-conto">
                 <div class="op-conto-n">
                     {{ contiAnno.permessi_ore ? contiAnno.permessi_ore|number_format(contiAnno.permessi_ore == contiAnno.permessi_ore|round ? 0 : 1, ',', '.') ~ 'h' : contiAnno.permessi_giorni }}
                 </div>
-                <div class="op-conto-e">Permessi</div>
+                <div class="op-conto-e">{{ t('permessi') }}</div>
             </div>
         {% endif %}
         {% if contiAnno.malattia %}
             <div class="op-conto">
                 <div class="op-conto-n">{{ contiAnno.malattia }}</div>
-                <div class="op-conto-e">Giorni malattia</div>
+                <div class="op-conto-e">{{ t('giorni_malattia') }}</div>
             </div>
         {% endif %}
         {% if contiAnno.attesa %}
             <div class="op-conto">
                 <div class="op-conto-n">{{ contiAnno.attesa }}</div>
-                <div class="op-conto-e">In attesa</div>
+                <div class="op-conto-e">{{ t('in_attesa_n') }}</div>
             </div>
         {% endif %}
     </div>
 
     {% if righe|length > 5 %}
         <div class="op-campo op-cerca">
-            <input type="search" id="op-filtro" placeholder="Cerca tipo, data o stato…"
-                   autocomplete="off" aria-label="Cerca fra le assenze">
+            <input type="search" id="op-filtro" placeholder="{{ t('cerca_assenza') }}"
+                   autocomplete="off" aria-label="{{ t('cerca_assenza') }}">
         </div>
     {% endif %}
 
@@ -156,17 +156,17 @@
                         {{ r.data_inizio|date('d/m/Y') }}{% if r.data_fine != r.data_inizio %} → {{ r.data_fine|date('d/m/Y') }}{% endif %}
                     </div>
                     <div class="op-dove">
-                        <span class="op-tag op-tag-{{ r.tipo }}">{{ r.tipo }}</span>
-                        {% if r.ore %} · {{ r.ore }} ore{% endif %}
-                        {% if r.protocollo %} · cert. {{ r.protocollo }}{% endif %}
+                        <span class="op-tag op-tag-{{ r.tipo }}">{{ t(r.tipo) }}</span>
+                        {% if r.ore %} · {{ r.ore }} {{ t('ore') }}{% endif %}
+                        {% if r.protocollo %} · {{ t('cert') }} {{ r.protocollo }}{% endif %}
                     </div>
                 </div>
                 {% if r.stato == 'approvata' %}
-                    <span class="op-tag op-tag-ok">{{ r.tipo == 'malattia' ? 'registrata' : 'approvata' }}</span>
+                    <span class="op-tag op-tag-ok">{{ r.tipo == 'malattia' ? t('registrata') : t('approvata') }}</span>
                 {% elseif r.stato == 'rifiutata' %}
-                    <span class="op-tag op-tag-ko">{{ r.tipo == 'malattia' ? 'non accettata' : 'rifiutata' }}</span>
+                    <span class="op-tag op-tag-ko">{{ r.tipo == 'malattia' ? t('non_accettata') : t('rifiutata') }}</span>
                 {% else %}
-                    <span class="op-tag op-tag-attesa">in attesa</span>
+                    <span class="op-tag op-tag-attesa">{{ t('in_attesa') }}</span>
                 {% endif %}
             </div>
 
@@ -179,16 +179,16 @@
         </div>
     {% else %}
         <div class="op-vuoto">
-            Nessuna ferie, permesso o malattia in questo anno.
+            {{ t('nessuna_assenza') }}
         </div>
     {% endfor %}
     </div>
-    <div class="op-vuoto" id="op-niente" hidden>Nessuna assenza trovata.</div>
+    <div class="op-vuoto" id="op-niente" hidden>{{ t('nessuna_assenza_trovata') }}</div>
 
     </div>
     </div>
 
-    <a href="/io" class="op-btn op-btn-secondo op-torna">Torna indietro</a>
+    <a href="/io" class="op-btn op-btn-secondo op-torna">{{ t('torna') }}</a>
 
 </div>
 {% endblock %}

@@ -87,6 +87,22 @@ final class TwigRenderer
             return $appUrl . '/' . ltrim($path, '/');
         }));
 
+        // {{ t('presenze_titolo') }} — il testo nella lingua di chi guarda.
+        //
+        // BOB resta in italiano: chi lo usa sta in ufficio e l'italiano lo
+        // parla. Tradotte sono le pagine di /io, che aprono centoquaranta
+        // operai di cui molti l'italiano lo masticano appena — e una
+        // presenza sbagliata perche' uno non ha capito "mezza giornata"
+        // costa a tutti.
+        //
+        // La lingua viene dall'utente collegato, non da un parametro
+        // nell'indirizzo: e' una sua impostazione, non una scelta di
+        // pagina, e passarla in giro vorrebbe dire ricordarsene ogni volta.
+        $this->twig->addFunction(new TwigFunction('t', static function (string $chiave, array $valori = []): string {
+            $utente = $GLOBALS['user'] ?? null;
+            return \App\Service\Lingua::testo($chiave, $utente->lingua ?? null, $valori);
+        }));
+
         // {{ date_fmt('2025-01-15 10:30:00') }}
         $this->twig->addFunction(new TwigFunction('date_fmt', static function (string $dt, string $fmt = 'd/m/Y H:i'): string {
             return date($fmt, strtotime($dt));

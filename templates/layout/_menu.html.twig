@@ -200,25 +200,25 @@
             <li>
                 <a href="/io" class="side-menu {{ currentPath == '/io' ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="sun"></i></div>
-                    <div class="side-menu__title">Oggi e domani</div>
+                    <div class="side-menu__title">{{ t('menu_oggi') }}</div>
                 </a>
             </li>
             <li>
                 <a href="/io/presenze" class="side-menu {{ currentPath starts with '/io/presenze' ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="calendar-check"></i></div>
-                    <div class="side-menu__title">Le mie presenze</div>
+                    <div class="side-menu__title">{{ t('menu_presenze') }}</div>
                 </a>
             </li>
             <li>
                 <a href="/io/assenze" class="side-menu {{ currentPath starts with '/io/assenze' ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="palmtree"></i></div>
-                    <div class="side-menu__title">Ferie e assenze</div>
+                    <div class="side-menu__title">{{ t('menu_assenze') }}</div>
                 </a>
             </li>
             <li>
                 <a href="/worksites/my" class="side-menu {{ worksitesActive ? 'side-menu--active' : '' }}">
                     <div class="side-menu__icon"><i data-lucide="hard-hat"></i></div>
-                    <div class="side-menu__title">I miei cantieri</div>
+                    <div class="side-menu__title">{{ t('menu_cantieri') }}</div>
                 </a>
             </li>
             <li class="side-nav__devider my-6"></li>

@@ -39,7 +39,12 @@
     </div>
     {% endif %}
 
-    {% if not isCompanyScopedUser %}
+{# Servizi e Job automatici sono roba di chi manda avanti BOB: lanciare un
+   cron o aprire un servizio non e' una cosa che un operaio, un cliente o un
+   partner debba nemmeno vedere. Prima erano nascosti solo ai partner, e a
+   operai e clienti comparivano. #}
+{% set interno = not isCompanyScopedUser and user.type not in ['worker', 'client'] %}
+    {% if interno %}
     <div class="intro-x dropdown mr-4 sm:mr-6">
         <div class="dropdown-toggle notification cursor-pointer" role="button" aria-expanded="false" data-tw-toggle="dropdown">
             <i data-lucide="settings" class="notification__icon dark:text-slate-500"></i>

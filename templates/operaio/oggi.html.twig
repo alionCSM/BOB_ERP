@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=4">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=5">
 {% endblock %}
 
 {#
@@ -15,8 +15,8 @@
 <div class="op">
 
     <div class="op-testa">
-        <h1 class="op-titolo">Ciao {{ user.first_name }}</h1>
-        <p class="op-sotto">Oggi e domani</p>
+        <h1 class="op-titolo">{{ t('ciao', { nome: user.first_name }) }}</h1>
+        <p class="op-sotto">{{ t('menu_oggi') }}</p>
     </div>
 
     {# I giorni che mancano in cima, con il bottone per rimediare: e' la
@@ -25,10 +25,11 @@
         <div class="op-avviso op-avviso-att">
             <svg viewBox="0 0 24 24" class="op-avviso-i"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
             <div>
-                Ti manca{{ daDichiarare|length > 1 ? 'no' : '' }}
-                {{ daDichiarare|length }} giornat{{ daDichiarare|length > 1 ? 'e' : 'a' }}:
+                {{ daDichiarare|length > 1
+                     ? t('ti_mancano', { n: daDichiarare|length })
+                     : t('ti_manca_una', { n: daDichiarare|length }) }}
                 {% for g in daDichiarare %}{{ g.data|date('d/m') }}{{ not loop.last ? ', ' : '' }}{% endfor %}
-                <a href="/io/presenze" class="op-btn op-btn-primo op-btn-stretto op-avviso-b">Segnale</a>
+                <a href="/io/presenze" class="op-btn op-btn-primo op-btn-stretto op-avviso-b">{{ t('segnale') }}</a>
             </div>
         </div>
     {% endif %}
@@ -38,11 +39,11 @@
         <div class="op-card{{ g.data == oggi ? ' oggi' : '' }}">
 
             <div class="op-giorno">
-                {{ g.data == oggi ? 'Oggi' : 'Domani' }} · {{ g.data|date('d/m/Y') }}
+                {{ g.data == oggi ? t('oggi_lbl') : t('domani_lbl') }} · {{ g.data|date('d/m/Y') }}
             </div>
 
             <div class="op-cantiere">
-                {{ g.cantiere_nome ?: g.cantiere ?: 'Cantiere da definire' }}
+                {{ g.cantiere_nome ?: g.cantiere ?: t('cantiere_da_definire') }}
             </div>
             {% if g.location or g.worksite_code %}
                 <div class="op-luogo">
@@ -52,18 +53,18 @@
 
             <div class="op-righe">
                 {% if g.auto_targa %}
-                    <div class="op-riga"><span class="op-et">Auto</span><b>{{ g.auto_targa }}</b></div>
+                    <div class="op-riga"><span class="op-et">{{ t('auto') }}</span><b>{{ g.auto_targa }}</b></div>
                 {% endif %}
                 {% if g.trasferta %}
                     <div class="op-riga">
-                        <span class="op-et">Trasferta</span>
-                        <span class="op-tag op-tag-trasferta">Si dorme fuori</span>
+                        <span class="op-et">{{ t('trasferta') }}</span>
+                        <span class="op-tag op-tag-trasferta">{{ t('dorme_fuori') }}</span>
                     </div>
                 {% endif %}
                 {% if g.sei_capo %}
                     <div class="op-riga">
-                        <span class="op-et">Squadra</span>
-                        <span class="op-tag op-tag-ok">Sei tu il capo</span>
+                        <span class="op-et">{{ t('squadra') }}</span>
+                        <span class="op-tag op-tag-ok">{{ t('sei_capo') }}</span>
                     </div>
                 {% endif %}
             </div>
@@ -72,11 +73,11 @@
                sale in macchina domattina, non centoquaranta sconosciuti. #}
             {% if g.squadra|length > 1 %}
                 <div class="op-squadra">
-                    <div class="op-squadra-t">Con te ci sono</div>
+                    <div class="op-squadra-t">{{ t('con_te') }}</div>
                     {% for p in g.squadra %}
                         <div class="op-persona">
-                            <span class="{{ p.sei_tu ? 'op-tu' : '' }}">{{ p.sei_tu ? 'Tu' : p.nome }}</span>
-                            {% if p.capo_squadra %}<span class="op-capo">capo</span>{% endif %}
+                            <span class="{{ p.sei_tu ? 'op-tu' : '' }}">{{ p.sei_tu ? t('tu') : p.nome }}</span>
+                            {% if p.capo_squadra %}<span class="op-capo">{{ t('capo') }}</span>{% endif %}
                         </div>
                     {% endfor %}
                 </div>
@@ -85,18 +86,29 @@
     {% else %}
         <div class="op-card">
             <div class="op-vuoto">
-                Per oggi e domani non risulti in nessuna squadra.<br>
-                Se non torna, chiedi in ufficio.
+                {{ t('nessuna_squadra') }}
             </div>
         </div>
     {% endfor %}
     </div>
 
-    <div class="op-sez">Cosa puoi fare</div>
+    <div class="op-sez">{{ t('cosa_puoi_fare') }}</div>
     <div class="op-azioni">
-        <a href="/io/presenze" class="op-btn op-btn-primo">Le mie presenze</a>
-        <a href="/io/assenze"  class="op-btn op-btn-secondo">Ferie e assenze</a>
+        <a href="/io/presenze" class="op-btn op-btn-primo">{{ t('menu_presenze') }}</a>
+        <a href="/io/assenze"  class="op-btn op-btn-secondo">{{ t('menu_assenze') }}</a>
     </div>
+
+    {# I nomi stanno ognuno nella sua lingua — Shqip, Romana — cosi' uno si
+       riconosce anche quando tutto il resto e' scritto in una lingua che non
+       capisce. E' il caso di chi apre BOB la prima volta. #}
+    <form method="POST" action="/io/lingua" class="op-lingue">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {% for codice, nome in lingue %}
+            <button type="submit" name="lingua" value="{{ codice }}"
+                    class="op-lingua{{ codice == linguaOra ? ' scelta' : '' }}"
+                    lang="{{ codice }}">{{ nome }}</button>
+        {% endfor %}
+    </form>
 
 </div>
 {% endblock %}

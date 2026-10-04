@@ -194,7 +194,8 @@ if ($uri === '/io' || str_starts_with($uri, '/io/')) {
            ->post('/io/presenze',              [OperaioController::class, 'dichiara'])
            ->post('/io/presenze/{id}/ritira',  [OperaioController::class, 'ritira'])
            ->get( '/io/assenze',               [OperaioController::class, 'assenze'])
-           ->post('/io/assenze',               [OperaioController::class, 'chiediAssenza']);
+           ->post('/io/assenze',               [OperaioController::class, 'chiediAssenza'])
+           ->post('/io/lingua',                [OperaioController::class, 'cambiaLingua']);
 
     $router->dispatch($request, $container);
 }
