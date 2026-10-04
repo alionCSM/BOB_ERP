@@ -423,6 +423,201 @@ final class ApiV1OperaioController
         ]);
     }
 
+    // ── GET /api/v1/me/home ──────────────────────────────────────────────────
+
+    /**
+     * La prima schermata dell'app, in una chiamata sola.
+     *
+     * /api/v1/dashboard non serve a un operaio: tutto quello che calcola sta
+     * dietro ai permessi di modulo, e un operaio non ne ha nessuno — gli
+     * torna vuota. Questa risponde alle domande che si fa davvero: dove vado
+     * adesso, cosa mi manca, mi hanno risposto.
+     *
+     * Una chiamata sola perche' la linea in cantiere va piano e tre giri
+     * all'apertura si sentono tutti.
+     *
+     * Il menu lo decide il server, con le etichette gia' tradotte. L'app
+     * disegna quello che riceve e **salta le voci che non conosce**: cosi'
+     * quando in BOB nasce una sezione nuova le installazioni vecchie la
+     * ignorano invece di rompersi, e non si deve costringere centoquaranta
+     * persone ad aggiornare per cambiare un permesso.
+     */
+    public function home(Request $request): never
+    {
+        $utente  = $request->user();
+        $operaio = (int)($utente->worker_id ?? 0);
+        $lingua  = \App\Service\Lingua::normalizza($utente->lingua ?? null);
+
+        if (!$operaio) {
+            Response::json([
+                'success' => false,
+                'code'    => 'non_collegato',
+                'message' => \App\Service\Lingua::testo('msg_non_collegato', $lingua),
+            ], 403);
+        }
+
+        $dati = $this->dati();
+        $oggi = date('Y-m-d');
+
+        // La giornata che ha in testa: oggi finche' c'e', poi domani.
+        $giorni    = $dati->pianificazione($operaio, $oggi, date('Y-m-d', strtotime('+1 day')));
+        $prossimo  = $giorni[0] ?? null;
+
+        $repo      = new RichiestaPresenzaRepository($this->conn);
+        $daSegnare = $repo->giorniSenzaNiente($operaio, date('Y-m-d', strtotime('-13 days')), $oggi);
+
+        $attesaPresenze = $this->conn->prepare(
+            "SELECT COUNT(*) FROM bb_presenze_richieste WHERE worker_id = :w AND stato = 'in_attesa'"
+        );
+        $attesaPresenze->execute([':w' => $operaio]);
+
+        $attesaAssenze = $this->conn->prepare(
+            "SELECT COUNT(*) FROM bb_ferie_permessi WHERE worker_id = :w AND stato = 'in_attesa'"
+        );
+        $attesaAssenze->execute([':w' => $operaio]);
+
+        $cantieriZone = (new \App\Repository\Zone\AccessoRepository($this->conn))
+            ->cantieriDi((int)$utente->id);
+
+        $menu = [
+            ['chiave' => 'oggi',      'titolo' => \App\Service\Lingua::testo('menu_oggi', $lingua)],
+            ['chiave' => 'presenze',  'titolo' => \App\Service\Lingua::testo('menu_presenze', $lingua)],
+            ['chiave' => 'assenze',   'titolo' => \App\Service\Lingua::testo('menu_assenze', $lingua)],
+            ['chiave' => 'documenti', 'titolo' => \App\Service\Lingua::testo('documenti', $lingua)],
+        ];
+        // I cantieri compaiono solo a chi ne ha almeno uno: una voce che
+        // porta a un elenco vuoto e' una voce che fa chiedere "e qui cosa
+        // dovrei vedere?".
+        if ($cantieriZone) {
+            $menu[] = ['chiave' => 'cantieri', 'titolo' => \App\Service\Lingua::testo('menu_cantieri', $lingua)];
+        }
+
+        Response::json([
+            'success' => true,
+            'utente'  => [
+                'nome'     => trim((string)($utente->first_name ?? '')),
+                'lingua'   => $lingua,
+                'sei_capo' => (bool)($prossimo['sei_capo'] ?? false),
+            ],
+            'prossimo'   => $prossimo ? [
+                'data'      => $prossimo['data'],
+                'e_oggi'    => $prossimo['data'] === $oggi,
+                'cantiere'  => $prossimo['cantiere_nome'] ?: $prossimo['cantiere'],
+                'codice'    => $prossimo['worksite_code'],
+                'luogo'     => $prossimo['location'],
+                'auto'      => $prossimo['auto_targa'],
+                'trasferta' => (bool)$prossimo['trasferta'],
+                'squadra'   => $prossimo['squadra'],
+            ] : null,
+            'da_segnare' => count($daSegnare),
+            'in_attesa'  => [
+                'presenze' => (int)$attesaPresenze->fetchColumn(),
+                'assenze'  => (int)$attesaAssenze->fetchColumn(),
+            ],
+            'cantieri' => count($cantieriZone),
+            'menu'     => $menu,
+        ]);
+    }
+
+    // ── POST /api/v1/me/password ─────────────────────────────────────────────
+
+    /**
+     * Cambia la propria password.
+     *
+     * Senza questo un operaio nuovo non entra proprio: nasce con
+     * must_change_password e il middleware risponde 403 a tutto, mandandolo
+     * a una pagina web. Con centoquaranta persone, "apri il browser e
+     * cambiala li'" e' il punto dove se ne perde meta'.
+     *
+     * Stesse regole del web — otto caratteri, conferma, e non una password
+     * gia' finita in una violazione nota — perche' due posti che cambiano
+     * la stessa cosa con due metri diversi sono un metro solo, il piu'
+     * largo dei due.
+     *
+     * Unico endpoint che risponde anche con must_change_password addosso:
+     * e' l'eccezione dichiarata nel middleware, se no non si uscirebbe mai
+     * da quella condizione.
+     */
+    public function cambiaPassword(Request $request): never
+    {
+        $corpo    = $this->corpo();
+        $password = (string)($corpo['password'] ?? '');
+        $conferma = (string)($corpo['conferma'] ?? $corpo['confirm_password'] ?? '');
+
+        if (strlen($password) < 8) {
+            Response::json([
+                'success' => false,
+                'message' => 'La password deve avere almeno 8 caratteri',
+            ], 422);
+        }
+        if ($password !== $conferma) {
+            Response::json([
+                'success' => false,
+                'message' => 'Le due password non coincidono',
+            ], 422);
+        }
+        if (function_exists('isPasswordPwned') && isPasswordPwned($password)) {
+            Response::json([
+                'success' => false,
+                'message' => "Questa password e' finita in una violazione nota. Scegline un'altra.",
+            ], 422);
+        }
+
+        $stmt = $this->conn->prepare(
+            'UPDATE bb_users SET password = :pwd, must_change_password = 0 WHERE id = :id'
+        );
+        $stmt->execute([
+            ':pwd' => password_hash($password, PASSWORD_DEFAULT),
+            ':id'  => (int)($request->user()->id ?? 0),
+        ]);
+
+        Response::json(['success' => true]);
+    }
+
+    // ── GET /api/v1/me/documenti/{id}/file ───────────────────────────────────
+
+    /**
+     * Il file di un suo documento.
+     *
+     * L'elenco diceva che il documento c'e' e quando scade, ma il file no:
+     * uno in cantiere davanti a un controllo vedeva scritto "Visita medica,
+     * valida fino al..." e non aveva niente da far vedere.
+     *
+     * Solo i suoi: l'id arriva dalla richiesta, quindi il worker_id nella
+     * query non e' un filtro di comodo, e' il controllo.
+     */
+    public function documentoFile(Request $request): never
+    {
+        $operaio = $this->operaio($request);
+
+        $stmt = $this->conn->prepare(
+            'SELECT path FROM bb_worker_documents WHERE id = :id AND worker_id = :wid'
+        );
+        $stmt->execute([':id' => (int)$request->param('id'), ':wid' => $operaio]);
+        $path = $stmt->fetchColumn();
+
+        if (!$path) {
+            Response::json(['success' => false, 'message' => 'Documento non trovato'], 404);
+        }
+
+        $radice = realpath(dirname(APP_ROOT) . '/cloud');
+        $file   = realpath($radice . '/' . $path);
+
+        // Il realpath e il confronto col prefisso non sono formalita': senza,
+        // un path con ../ dentro tirerebbe fuori file da mezzo server.
+        if (!$file || !is_file($file) || !str_starts_with($file, $radice)) {
+            Response::json(['success' => false, 'message' => 'File non disponibile'], 404);
+        }
+
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . basename($file) . '"');
+        header('Content-Length: ' . filesize($file));
+        header('Cache-Control: private, no-store');
+        readfile($file);
+        exit;
+    }
+
     // ── Supporto ─────────────────────────────────────────────────────────────
 
     /**

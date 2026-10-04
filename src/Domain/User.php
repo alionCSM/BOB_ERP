@@ -18,6 +18,8 @@ class User {
     public $company_id;
     public $type;
     public $access_profile;
+    public $first_name;
+    public $last_name;
     /** In che lingua gli parla BOB. Vedi App\Service\Lingua. */
     public $lingua = 'it';
 
@@ -53,6 +55,11 @@ class User {
             // italiano, compresi quelli a cui l'avevamo impostata: la query
             // prende tutto, ma qui si assegna campo per campo.
             $this->lingua = \App\Service\Lingua::normalizza($row['lingua'] ?? null);
+            // Il nome non c'era, e {{ user.first_name }} nei template usciva
+            // vuoto: la pagina dell'operaio salutava con "Ciao " e basta. La
+            // query prende tutto, ma qui si assegna campo per campo.
+            $this->first_name = $row['first_name'] ?? '';
+            $this->last_name  = $row['last_name']  ?? '';
         }
 
     }

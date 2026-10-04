@@ -778,7 +778,10 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/me/ferie',                  [ApiV1OperaioController::class, 'ferie'])
             ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie'])
             ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua'])
-            ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone']);
+            ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone'])
+            ->get('/api/v1/me/home',                   [ApiV1OperaioController::class, 'home'])
+            ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
+            ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
 
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si

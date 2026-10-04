@@ -18,6 +18,77 @@ Tutte le risposte hanno `success`, come il resto di `/api/v1`.
 
 ---
 
+## GET /api/v1/me/home
+
+**La prima schermata, in una chiamata sola.** Dove vado adesso, cosa mi
+manca, mi hanno risposto.
+
+```json
+{ "success": true,
+  "utente":   { "nome": "Mario", "lingua": "sq", "sei_capo": true },
+  "prossimo": { "data": "2026-10-05", "e_oggi": false,
+                "cantiere": "Via Roma", "codice": "C-2026-014",
+                "luogo": "Lecco", "auto": "AB123CD", "trasferta": false,
+                "squadra": [ { "nome": "Rossi Mario", "sei_tu": true,
+                               "capo_squadra": 1, "auto_targa": "AB123CD" } ] },
+  "da_segnare": 2,
+  "in_attesa":  { "presenze": 1, "assenze": 0 },
+  "cantieri":   3,
+  "menu": [
+    { "chiave": "oggi",      "titolo": "Sot dhe neser" },
+    { "chiave": "presenze",  "titolo": "Prezencat e mia" },
+    { "chiave": "assenze",   "titolo": "Pushime dhe mungesa" },
+    { "chiave": "documenti", "titolo": "Dokumentet" },
+    { "chiave": "cantieri",  "titolo": "Kantieret e mi" }
+  ] }
+```
+
+Una chiamata sola perche' la linea in cantiere va piano, e tre giri
+all'apertura si sentono tutti.
+
+**`/api/v1/dashboard` a un operaio non serve**: tutto quello che calcola sta
+dietro ai permessi di modulo, e un operaio non ne ha nessuno — gli torna
+vuota. Quella e' per l'ufficio.
+
+### Il menu lo decide il server
+
+Le etichette arrivano gia' tradotte, e **l'app salta le `chiave` che non
+conosce**. Cosi' quando in BOB nasce una sezione nuova le installazioni
+vecchie la ignorano invece di rompersi, e non si deve costringere
+centoquaranta persone ad aggiornare per cambiare un permesso.
+
+`cantieri` compare solo a chi ne ha almeno uno assegnato: una voce che porta
+a un elenco vuoto fa chiedere "e qui cosa dovrei vedere?".
+
+`prossimo` e' `null` se non e' in nessuna squadra oggi e domani.
+
+## POST /api/v1/me/password
+
+```json
+{ "password": "...", "conferma": "..." }
+```
+
+Otto caratteri, le due devono coincidere, e non puo' essere una password
+gia' finita in una violazione nota — le stesse regole del web, perche' due
+posti che cambiano la stessa cosa con due metri diversi sono un metro solo,
+il piu' largo dei due.
+
+**E' l'unico endpoint che risponde anche con `must_change_password`
+addosso.** Senza l'eccezione, l'unica via d'uscita da quella condizione
+sarebbe aprire il browser — e per chi usa solo l'app non e' una via
+d'uscita. Un utente nuovo nasce cosi', quindi e' la prima cosa che l'app
+deve saper fare dopo il login.
+
+Rifiuti: **422** con il motivo in chiaro.
+
+## GET /api/v1/me/documenti/{id}/file
+
+Il PDF del documento, inline. Solo i suoi: l'id arriva dalla richiesta,
+quindi il `worker_id` nella query non e' un filtro di comodo, e' il
+controllo.
+
+**404** se il documento non e' suo o il file non c'e'.
+
 ## GET /api/v1/me/pianificazione
 
 **L'endpoint principale.** Risponde alla domanda che l'operaio si fa
