@@ -763,6 +763,8 @@ function openForms() {
     if (!window._bzFormsInited) {
         BZForms.init({
             worksiteId: WID, csrf: CSRF,
+            puoCompilare: puoScrivere('moduli'),
+            daUfficio: DA_UFFICIO,
             wsName: {{ worksite.name|json_encode|raw }},
             wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
             clientName: {{ (clientName ?? '')|json_encode|raw }}
@@ -2083,7 +2085,7 @@ loadBobUsers();
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
