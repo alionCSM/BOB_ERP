@@ -189,6 +189,8 @@ if ($uri === '/io' || str_starts_with($uri, '/io/')) {
 
     $router->get( '/io',                       [OperaioController::class, 'oggi'])
            ->get( '/io/presenze',              [OperaioController::class, 'presenze'])
+           ->get( '/io/cantiere-del-giorno',   [OperaioController::class, 'cantiereDelGiorno'])
+           ->get( '/io/cantieri',              [OperaioController::class, 'cercaCantieri'])
            ->post('/io/presenze',              [OperaioController::class, 'dichiara'])
            ->post('/io/presenze/{id}/ritira',  [OperaioController::class, 'ritira'])
            ->get( '/io/assenze',               [OperaioController::class, 'assenze'])

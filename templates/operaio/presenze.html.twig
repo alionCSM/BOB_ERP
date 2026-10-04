@@ -1,7 +1,8 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=1">
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=2">
 {% endblock %}
 
 {#
@@ -33,23 +34,27 @@
                     <input type="date" id="p-data" name="data" max="{{ oggi }}" value="{{ oggi }}" required>
                 </div>
 
+                {# Il cantiere non si sceglie da una tendina con dentro
+                   trecento voci: lo dice la pianificazione di quel giorno,
+                   e uno conferma. La ricerca compare solo se la
+                   pianificazione non sa rispondere, o se non e' quello. #}
                 <div class="op-campo">
-                    <label for="p-cantiere">Dove hai lavorato</label>
-                    <select id="p-cantiere" name="worksite_id" required>
-                        <option value="">Scegli il cantiere…</option>
-                        {% if cantieri.recenti %}
-                            <optgroup label="Dove sei stato di recente">
-                                {% for c in cantieri.recenti %}
-                                    <option value="{{ c.id }}">{{ c.worksite_code }} — {{ c.name }}{{ c.location ? ' (' ~ c.location ~ ')' : '' }}</option>
-                                {% endfor %}
-                            </optgroup>
-                        {% endif %}
-                        <optgroup label="Tutti i cantieri aperti">
-                            {% for c in cantieri.aperti %}
-                                <option value="{{ c.id }}">{{ c.worksite_code }} — {{ c.name }}{{ c.location ? ' (' ~ c.location ~ ')' : '' }}</option>
-                            {% endfor %}
-                        </optgroup>
-                    </select>
+                    <label>Dove hai lavorato</label>
+
+                    <div id="p-proposta" class="op-proposta" hidden>
+                        <div class="op-proposta-t">Quel giorno eri qui</div>
+                        <div class="op-proposta-n"></div>
+                        <button type="button" class="op-proposta-no">Non era questo cantiere</button>
+                    </div>
+
+                    <div id="p-cerca" hidden>
+                        {# senza name: la scelta la scrive nel campo
+                           nascosto qui sotto, che e' l'unico che parte #}
+                        <select id="p-cantiere" placeholder="Scrivi il nome o il codice…"></select>
+                        <span class="op-aiuto">Scrivi almeno due lettere e aspetta un attimo</span>
+                    </div>
+
+                    <input type="hidden" name="worksite_id" id="p-scelto" value="">
                 </div>
 
                 <div class="op-campo">
@@ -181,4 +186,9 @@
     <a href="/io" class="op-btn op-btn-secondo" style="margin-top:18px;">Torna indietro</a>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/operaio/presenze.js?v=1"></script>
 {% endblock %}

@@ -70,11 +70,76 @@ final class OperaioController
         Response::view('operaio/presenze.html.twig', $request, [
             'pageTitle'  => 'Le mie presenze',
             'righe'      => $repo->diarioOperaio($operaio, $dal, $al),
-            'cantieri'   => (new Dati($this->conn))->cantieri($operaio),
+            // i cantieri non si mandano con la pagina: li chiede il
+            // telefono quando servono, uno alla volta
             'oggi'       => date('Y-m-d'),
             'successMsg' => $this->presoDallaSessione('success'),
             'errorMsg'   => $this->presoDallaSessione('error'),
         ]);
+    }
+
+    // ── GET /io/cantiere-del-giorno ──────────────────────────────────────────
+
+    /**
+     * Dove risultava quel giorno, secondo la pianificazione.
+     *
+     * E' la risposta giusta nove volte su dieci, e chiederla invece di farla
+     * cercare cambia tutto: uno apre, vede "quel giorno eri a Via Roma",
+     * conferma e ha finito. La ricerca resta per il decimo caso.
+     */
+    public function cantiereDelGiorno(Request $request): never
+    {
+        $data = trim((string)($_GET['data'] ?? ''));
+
+        if ($data === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            Response::json(['trovato' => false]);
+        }
+
+        $giorni = (new Dati($this->conn))
+            ->pianificazione($this->operaio($request), $data, $data);
+
+        // Senza worksite_id non si puo' precompilare niente: sono le righe
+        // pianificate prima che la commessa fosse aperta, dove il cantiere
+        // e' solo un testo scritto a mano.
+        foreach ($giorni as $g) {
+            if (!empty($g['worksite_id'])) {
+                Response::json([
+                    'trovato' => true,
+                    'id'      => (int)$g['worksite_id'],
+                    'codice'  => (string)($g['worksite_code'] ?? ''),
+                    'nome'    => (string)($g['cantiere_nome'] ?? ''),
+                    'luogo'   => (string)($g['location'] ?? ''),
+                ]);
+            }
+        }
+
+        Response::json(['trovato' => false]);
+    }
+
+    // ── GET /io/cantieri ─────────────────────────────────────────────────────
+
+    /**
+     * Cerca fra i cantieri aperti.
+     *
+     * Solo su richiesta e solo dopo che ha scritto qualcosa: mandare
+     * trecento cantieri a un telefono perche' uno ha aperto una tendina e'
+     * sprecare la linea di chi sta in cantiere, dove va gia' piano.
+     */
+    public function cercaCantieri(Request $request): never
+    {
+        $q = trim((string)($_GET['q'] ?? ''));
+
+        if (mb_strlen($q) < 2) {
+            Response::json([]);
+        }
+
+        $elenchi = (new Dati($this->conn))->cantieri($this->operaio($request), $q);
+
+        Response::json(array_map(static fn(array $c): array => [
+            'id'    => (int)$c['id'],
+            'testo' => trim(($c['worksite_code'] ?? '') . ' — ' . ($c['name'] ?? '')
+                       . ($c['location'] ? ' (' . $c['location'] . ')' : '')),
+        ], $elenchi['aperti']));
     }
 
     // ── POST /io/presenze ────────────────────────────────────────────────────
