@@ -115,6 +115,24 @@ final class Dati
     }
 
     /**
+     * Il cantiere e' aperto?
+     *
+     * E' l'unico limite su quale cantiere un operaio puo' dichiarare: non
+     * quelli a cui e' assegnato, perche' lo mandano dove serve e la mattina
+     * dopo e' da un'altra parte. Su un cantiere chiuso invece non ci va
+     * nessuno, e una presenza li' sarebbe un errore di battitura o peggio.
+     */
+    public function cantiereAperto(int $worksiteId): bool
+    {
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) FROM bb_worksites
+             WHERE id = :ws AND status IN ('In corso', 'A rischio')"
+        );
+        $stmt->execute([':ws' => $worksiteId]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    /**
      * I cantieri fra cui puo' scegliere quando dichiara una giornata.
      *
      * `recenti` sono quelli dove ha gia' lavorato negli ultimi sei mesi: nove

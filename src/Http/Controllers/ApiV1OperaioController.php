@@ -203,7 +203,7 @@ final class ApiV1OperaioController
         // sembrava piu' sicuro, ma quell'assegnazione in BOB non la scrive
         // nessuno — avrebbe rifiutato tutto — e comunque un operaio mandato
         // per un giorno da un'altra parte deve poterlo dichiarare.
-        if (!$this->cantiereAperto($worksiteId)) {
+        if (!$this->dati()->cantiereAperto($worksiteId)) {
             Response::json([
                 'success' => false,
                 'message' => 'Cantiere non trovato o non aperto',
@@ -448,16 +448,6 @@ final class ApiV1OperaioController
 
 
 
-    /** Il cantiere esiste ed e' aperto? */
-    private function cantiereAperto(int $worksiteId): bool
-    {
-        $stmt = $this->conn->prepare(
-            "SELECT COUNT(*) FROM bb_worksites
-             WHERE id = :ws AND status IN ('In corso', 'A rischio')"
-        );
-        $stmt->execute([':ws' => $worksiteId]);
-        return (int)$stmt->fetchColumn() > 0;
-    }
 
     /** Data in formato aaaa-mm-gg, o il ripiego se non lo e'. */
     private function data(mixed $valore, string $ripiego): string

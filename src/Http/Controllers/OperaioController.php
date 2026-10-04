@@ -105,6 +105,12 @@ final class OperaioController
             if ($data > date('Y-m-d')) {
                 throw new RuntimeException("Non puoi dichiarare un giorno che deve ancora arrivare.");
             }
+            // L'unico limite su quale cantiere: non quelli assegnati, che
+            // sono un'altra cosa, ma uno aperto. Il middleware lascia
+            // passare la scelta proprio perche' il controllo e' qui.
+            if (!$dati->cantiereAperto($worksiteId)) {
+                throw new RuntimeException("Quel cantiere non e' aperto. Se sbaglio, dillo in ufficio.");
+            }
             if ($repo->giaInAttesa($operaio, $data, $worksiteId)) {
                 throw new RuntimeException("Hai gia' mandato questa giornata: e' in attesa.");
             }

@@ -111,13 +111,30 @@ class RoutePolicyMap
     ];
 
     /** @var string[] */
+    /**
+     * Dove puo' andare un operaio.
+     *
+     * Lista bianca: tutto il resto e' 403. Un operaio in BOB vede le sue
+     * cose e basta — niente preventivi, niente fatture, niente noleggi.
+     */
     private array $workerAllowedPatterns = [
         '#^/$#',
         '#^/dashboard#',
         '#^/change-password$#',
         '#^/profile#',
         '#^/logout#',
-        '#^/my_worksites#',
+        '#^/notifications#',
+        // le sue giornate, le sue ferie, la sua squadra
+        '#^/io(/|$)#',
+        // i cantieri che gli sono stati assegnati, e la Zone di quelli.
+        // Solo /worksites/my e /worksites/{id}/zone: il resto della scheda
+        // cantiere — preventivi, fatture, ordini — resta dell'ufficio.
+        '#^/worksites/my(/|$)#',
+        '#^/worksites/\d+/zone(/|$)#',
+        // c'era /my_worksites, che non e' mai esistito come rotta: il menu
+        // ha sempre puntato a /worksites/my, quindi "I miei cantieri" dava
+        // "Access denied" da sempre. Nessuno se n'era accorto perche'
+        // nessun operaio era mai entrato in BOB.
     ];
 
     public function isCompanyScopedRouteAllowed(string $uri): bool
