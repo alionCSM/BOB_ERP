@@ -64,12 +64,25 @@ final class OperaioController
         $operaio = $this->operaio($request);
         $repo    = new RichiestaPresenzaRepository($this->conn);
 
-        $dal = date('Y-m-d', strtotime('-2 months'));
-        $al  = date('Y-m-d');
+        // Un mese per volta, non due a scorrimento: la domanda vera e'
+        // "quante giornate ho fatto a settembre", e con un elenco continuo
+        // uno si mette a contare a mano.
+        $mese = (string)($_GET['mese'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}$/', $mese)) {
+            $mese = date('Y-m');
+        }
+
+        $dal = $mese . '-01';
+        $al  = date('Y-m-t', strtotime($dal));
+
+        $righe = $repo->diarioOperaio($operaio, $dal, $al);
 
         Response::view('operaio/presenze.html.twig', $request, [
             'pageTitle'  => 'Le mie presenze',
-            'righe'      => $repo->diarioOperaio($operaio, $dal, $al),
+            'righe'      => $righe,
+            'mese'       => $mese,
+            'mesi'       => $repo->mesiConGiornate($operaio),
+            'totali'     => $this->totali($righe),
             // I giorni che gli mancano, col cantiere dove risultava: quelli
             // si segnano con un tocco solo. Il modulo serve per il resto.
             'daSegnare'  => $repo->giorniSenzaNiente(
@@ -311,6 +324,37 @@ final class OperaioController
     }
 
     // ── Supporto ─────────────────────────────────────────────────────────────
+
+    /**
+     * I conti del mese, fatti dove si fanno gli altri conti.
+     *
+     * Le giornate si sommano a mezzi: una mezza giornata vale 0,5, ed e'
+     * cosi' che le conta chi fa le buste paga. Un elenco che dice "12 righe"
+     * quando due sono mezze giornate fa litigare a fine mese.
+     *
+     * Le rifiutate non contano: non sono giornate, sono richieste respinte.
+     * Restano nell'elenco perche' uno deve vedere cos'e' stato rifiutato e
+     * perche', ma nel totale no.
+     *
+     * @param array<int, array<string, mixed>> $righe
+     * @return array<string, int|float>
+     */
+    private function totali(array $righe): array
+    {
+        $t = ['giornate' => 0.0, 'attesa' => 0, 'rifiutate' => 0, 'trasferte' => 0];
+
+        foreach ($righe as $r) {
+            if ($r['stato'] === 'rifiutata') {
+                $t['rifiutate']++;
+                continue;
+            }
+            $t['giornate'] += ($r['turno'] ?? '') === 'Mezzo' ? 0.5 : 1.0;
+            if ($r['stato'] === 'in_attesa')  { $t['attesa']++; }
+            if (!empty($r['trasferta']))      { $t['trasferte']++; }
+        }
+
+        return $t;
+    }
 
     /**
      * L'operaio collegato all'utente.

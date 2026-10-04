@@ -142,6 +142,43 @@ final class RichiestaPresenzaRepository
     }
 
     /**
+     * I mesi in cui ha lavorato, dal piu' recente.
+     *
+     * Serve a riempire il menu dei mesi senza indovinare: chi e' entrato a
+     * marzo non deve vedere gennaio e febbraio vuoti, e chi c'e' da dieci
+     * anni non deve scorrere centoventi voci per arrivare a questo.
+     *
+     * @return array<int, array{mese: string, giornate: float}>
+     */
+    public function mesiConGiornate(int $workerId): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT mese, SUM(peso) AS giornate FROM (
+                SELECT DATE_FORMAT(p.data, '%Y-%m') AS mese,
+                       CASE WHEN p.turno = 'Mezzo' THEN 0.5 ELSE 1 END AS peso
+                FROM   bb_presenze p
+                WHERE  p.worker_id = :wid
+                UNION ALL
+                SELECT DATE_FORMAT(r.data, '%Y-%m'),
+                       CASE WHEN r.turno = 'Mezzo' THEN 0.5 ELSE 1 END
+                FROM   bb_presenze_richieste r
+                WHERE  r.worker_id = :wid2
+                  AND  r.stato <> 'approvata'
+            ) AS tutto
+            GROUP BY mese
+            ORDER BY mese DESC
+            LIMIT 36
+        ");
+        // due segnaposto per lo stesso valore: le prepared non sono emulate
+        $stmt->execute([':wid' => $workerId, ':wid2' => $workerId]);
+
+        return array_map(static fn(array $r): array => [
+            'mese'     => (string)$r['mese'],
+            'giornate' => (float)$r['giornate'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
      * I giorni che gli mancano: pianificato, ma niente dichiarato e niente
      * registrato.
      *

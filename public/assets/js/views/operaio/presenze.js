@@ -91,3 +91,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
     chiedi();
 });
+
+/**
+ * Il mese e la ricerca nell'elenco.
+ *
+ * Il mese si manda da solo al cambio: un bottone "Vai" accanto a una tendina
+ * e' un tocco in piu' per fare la cosa che uno ha gia' detto di voler fare.
+ * Chi ha JavaScript spento vede il bottone, che sta in un <noscript>.
+ *
+ * La ricerca filtra quello che c'e' gia' in pagina, senza richiamare il
+ * server: il mese limita le righe a una trentina, e su un telefono in
+ * cantiere una ricerca che va a colpo sicuro vale piu' di una che e'
+ * completa ma aspetta la linea.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    var mese = document.getElementById('op-mese-sel');
+    if (mese) {
+        mese.addEventListener('change', function () { mese.form.submit(); });
+    }
+
+    var filtro = document.getElementById('op-filtro');
+    var elenco = document.getElementById('op-elenco');
+    var niente = document.getElementById('op-niente');
+    if (!filtro || !elenco) return;
+
+    filtro.addEventListener('input', function () {
+        var q = filtro.value.trim().toLowerCase();
+        var visti = 0;
+
+        elenco.querySelectorAll('.op-voce').forEach(function (v) {
+            var ok = q === '' || (v.getAttribute('data-cerca') || '').indexOf(q) !== -1;
+            v.hidden = !ok;
+            if (ok) visti++;
+        });
+
+        if (niente) niente.hidden = visti > 0;
+    });
+});

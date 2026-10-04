@@ -137,6 +137,9 @@
     display: inline-block; font-size: 11.5px; font-weight: 800;
     text-transform: uppercase; letter-spacing: .05em;
     padding: 3px 10px; border-radius: 999px;
+    /* un'etichetta che va a capo sembra rotta: "IN / ATTESA" su due righe
+       dentro una pillola non lo legge volentieri nessuno */
+    white-space: nowrap;
 }
 .op-tag-attesa    { background: #fef3c7; color: #92400e; }
 .op-tag-ok        { background: #dcfce7; color: #166534; }
@@ -248,6 +251,42 @@ details.op-extra > summary::-webkit-details-marker { display: none; }
 details.op-extra > summary::before { content: '+'; font-size: 19px; font-weight: 800; }
 details.op-extra[open] > summary { margin-bottom: 14px; }
 details.op-extra[open] > summary::before { content: '–'; }
+
+/* ── Il mese e i suoi conti ───────────────────────────────────────────── */
+
+.op-mese { margin-bottom: 12px; display: flex; gap: 8px; }
+.op-mese select {
+    flex: 1; font-size: 16px; font-family: inherit; color: #0f172a;
+    background: #fff; border: 1.5px solid #cbd5e1; border-radius: 11px;
+    padding: 13px 14px; min-height: 50px; box-sizing: border-box; outline: none;
+}
+.op-mese select:focus { border-color: #2563eb; }
+
+/* I numeri che uno controlla a fine mese: grossi, e per primi. Se li
+   deve contare a mano sull'elenco, l'elenco non serve. */
+.op-conti {
+    /* 72 e non 84: con quattro conti, a 84 il quarto finiva da solo su una
+       riga sua. Cosi' ci stanno tutti e quattro anche su un telefono. */
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: 8px; margin-bottom: 14px;
+}
+.op-conto {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 12px 10px; text-align: center;
+}
+.op-conto-n { font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; }
+.op-conto-e {
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: #64748b; margin-top: 3px;
+}
+
+.op-cerca { margin-bottom: 12px; }
+.op-cerca input {
+    width: 100%; box-sizing: border-box; font-size: 16px; font-family: inherit;
+    color: #0f172a; background: #fff; border: 1.5px solid #cbd5e1;
+    border-radius: 11px; padding: 13px 14px; min-height: 50px; outline: none;
+}
+.op-cerca input:focus { border-color: #2563eb; }
 
 /* ── La proposta del cantiere ─────────────────────────────────────────── */
 

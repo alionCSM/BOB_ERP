@@ -2,7 +2,7 @@
 
 {% block head %}
 <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=3">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=4">
 {% endblock %}
 
 {#
@@ -201,12 +201,68 @@
 
         </div>
 
-        {# ── Lo storico ── #}
+        {# ── Lo storico, un mese per volta ── #}
         <div>
             <div class="op-sez">Le tue giornate</div>
 
+            {# Il mese si sceglie da un elenco di mesi in cui ha davvero
+               lavorato: chi e' entrato a marzo non deve scorrere gennaio e
+               febbraio vuoti. Si manda da solo al cambio, senza bottone. #}
+            <form method="GET" class="op-mese">
+                <select name="mese" id="op-mese-sel" aria-label="Mese">
+                    {% for m in mesi %}
+                        <option value="{{ m.mese }}"{{ m.mese == mese ? ' selected' : '' }}>
+                            {# col giorno attaccato: '2026-10' da solo strtotime lo interpreta a modo suo #}
+                            {{ (m.mese ~ '-01')|date('F Y')|replace({
+                                'January':'Gennaio','February':'Febbraio','March':'Marzo',
+                                'April':'Aprile','May':'Maggio','June':'Giugno','July':'Luglio',
+                                'August':'Agosto','September':'Settembre','October':'Ottobre',
+                                'November':'Novembre','December':'Dicembre'
+                            }) }}
+                        </option>
+                    {% else %}
+                        <option value="{{ mese }}" selected>{{ mese }}</option>
+                    {% endfor %}
+                </select>
+                <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">Vai</button></noscript>
+            </form>
+
+            {# I numeri che uno controlla a fine mese, in cima e grossi. #}
+            <div class="op-conti">
+                <div class="op-conto">
+                    <div class="op-conto-n">{{ totali.giornate|number_format(totali.giornate == totali.giornate|round ? 0 : 1, ',', '.') }}</div>
+                    <div class="op-conto-e">Giornate</div>
+                </div>
+                {% if totali.attesa %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.attesa }}</div>
+                        <div class="op-conto-e">In attesa</div>
+                    </div>
+                {% endif %}
+                {% if totali.trasferte %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.trasferte }}</div>
+                        <div class="op-conto-e">Trasferte</div>
+                    </div>
+                {% endif %}
+                {% if totali.rifiutate %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.rifiutate }}</div>
+                        <div class="op-conto-e">Rifiutate</div>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if righe|length > 5 %}
+                <div class="op-campo op-cerca">
+                    <input type="search" id="op-filtro" placeholder="Cerca cantiere o giorno…"
+                           autocomplete="off" aria-label="Cerca fra le giornate">
+                </div>
+            {% endif %}
+
+            <div id="op-elenco">
             {% for r in righe %}
-                <div class="op-voce">
+                <div class="op-voce" data-cerca="{{ (r.data|date('d/m/Y') ~ ' ' ~ (r.cantiere_codice ?: '') ~ ' ' ~ (r.cantiere_nome ?: '') ~ ' ' ~ r.stato)|lower|e('html_attr') }}">
                     <div class="op-voce-testa">
                         <div>
                             <div class="op-data">{{ r.data|date('d/m/Y') }}</div>
@@ -239,8 +295,10 @@
                     {% endif %}
                 </div>
             {% else %}
-                <div class="op-vuoto">Nessuna giornata negli ultimi due mesi.</div>
+                <div class="op-vuoto">Nessuna giornata in questo mese.</div>
             {% endfor %}
+            </div>
+            <div class="op-vuoto" id="op-niente" hidden>Nessuna giornata trovata.</div>
         </div>
     </div>
 
@@ -249,5 +307,5 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/operaio/presenze.js?v=2"></script>
+<script src="/assets/js/views/operaio/presenze.js?v=3"></script>
 {% endblock %}
