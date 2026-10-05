@@ -67,6 +67,7 @@ final class AvvisoDecisione
                     'motivo' => $motivo,
                 ],
                 $approvata,
+                '/io/presenze',
             );
             $mandate++;
         }
@@ -154,12 +155,15 @@ final class AvvisoDecisione
         string $corpo,
         array $valori,
         bool $approvata,
+        // la pagina giusta: l'app la apre quando si tocca la notifica, il
+        // web la apre dal campanello
+        string $link = '/io/assenze',
     ): void {
         $this->notifiche->create(
             $userId,
             Lingua::testo($titolo, $lingua),
             Lingua::testo($corpo, $lingua, $valori),
-            '/',
+            $link,
             'attendance',
             // Un rifiuto chiede di fare qualcosa — ridichiarare il giorno,
             // riproporre altre date — e se arriva silenzioso l'operaio lo
