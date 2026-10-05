@@ -412,6 +412,9 @@ final class ApiV1OperaioController
 
         foreach ($cantieri as &$c) {
             $c['id']      = (int)$c['id'];
+            // il ruolo decide cosa l'app mostra; `accessi` resta per le
+            // versioni dell'app che conoscono solo i livelli
+            $c['ruolo']   = $accesso->ruolo($utente, $c['id']);
             $c['accessi'] = $accesso->tutti($utente, $c['id']);
         }
         unset($c);
