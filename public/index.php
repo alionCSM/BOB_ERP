@@ -784,6 +784,8 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie'])
             ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua'])
             ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone'])
+            ->get('/api/v1/me/attivita',               [ApiV1OperaioController::class, 'mieAttivita'])
+            ->get('/api/v1/me/da-compilare',           [ApiV1OperaioController::class, 'daCompilare'])
             ->get('/api/v1/me/home',                   [ApiV1OperaioController::class, 'home'])
             ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
             ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
@@ -829,6 +831,7 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->post('/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'postFileComment'])
         // moduli: si compilano in cantiere, i template si fanno da ufficio
         ->get( '/api/v1/zone/{id}/forms',                            [FieldwireController::class, 'formTemplates'])
+        ->get( '/api/v1/zone/{id}/forms/assegnazioni',               [FieldwireController::class, 'assegnazioniModuli'])
         ->get( '/api/v1/zone/{id}/forms/submissions',                [FieldwireController::class, 'formSubmissions'])
         ->get( '/api/v1/zone/{id}/forms/submission/{subId}',         [FieldwireController::class, 'formSubmission'])
         ->get( '/api/v1/zone/{id}/forms/{tplId}',                    [FieldwireController::class, 'formTemplate'])

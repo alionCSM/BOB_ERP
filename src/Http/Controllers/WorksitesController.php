@@ -2219,9 +2219,26 @@ final class WorksitesController
             $livelli[$f] = \App\Service\Zone\Accesso::VEDE;
         }
 
+        $gia = $conn->prepare('SELECT 1 FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
+        $gia->execute([':w' => $worksiteId, ':u' => $userId]);
+        $nuovo = !$gia->fetchColumn();
+
         (new \App\Repository\Zone\AccessoRepository($conn))->salva(
             $worksiteId, $userId, $livelli, (int)($user->id ?? 0)
         );
+
+        // gli si dice che c'e' un cantiere nuovo da vedere; se l'avviso non
+        // parte, l'assegnazione resta
+        if ($nuovo) {
+            try {
+                (new \App\Service\Zone\AvvisiZona(
+                    $conn,
+                    new \App\Service\Notifications\NotificationService($conn, new \App\Infrastructure\Config())
+                ))->accesso($worksiteId, $userId, (int)($user->id ?? 0));
+            } catch (\Throwable $e) {
+                error_log('[Zone avviso accesso] ' . $e->getMessage());
+            }
+        }
 
         Response::redirect("/worksites/{$worksiteId}");
     }

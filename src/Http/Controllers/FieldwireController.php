@@ -271,11 +271,8 @@ final class FieldwireController
             $this->scriviVisibilitaTask($taskId, $ruolo, $body, true);
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
-            // notifica all'assegnatario
-            if (!empty($body['assignee_user_id'])) {
-                $this->notifyAssignee($worksiteId, (int)$body['assignee_user_id'],
-                    $body['name'] ?? 'Task', (int)($user?->id ?? 0));
-            }
+            // avvisa a chi tocca: la persona, la squadra, i capi, il cliente
+            $this->avvisa(fn($a) => $a->attivita($taskId, (int)($user?->id ?? 0)));
 
             return $this->zoneRepo->find($taskId);
         });
@@ -297,12 +294,11 @@ final class FieldwireController
             $this->zoneRepo->update($taskId, $merged);
             $this->scriviVisibilitaTask($taskId, $ruolo, $body, false);
 
-            // notifica se l'assegnatario e' cambiato
-            $newAssignee = !empty($body['assignee_user_id']) ? (int)$body['assignee_user_id'] : null;
-            $oldAssignee = !empty($existing['assignee_user_id']) ? (int)$existing['assignee_user_id'] : null;
-            if ($newAssignee && $newAssignee !== $oldAssignee) {
-                $this->notifyAssignee($worksiteId, $newAssignee,
-                    $merged['name'] ?? 'Task', (int)($request->user()?->id ?? 0));
+            // avvisa se e' cambiato a chi tocca
+            $dopo = $this->zoneRepo->find($taskId) ?? [];
+            if ((int)($dopo['assignee_user_id'] ?? 0) !== (int)($existing['assignee_user_id'] ?? 0)
+                || ($dopo['assegnata_a'] ?? '') !== ($existing['assegnata_a'] ?? '')) {
+                $this->avvisa(fn($a) => $a->attivita($taskId, (int)($request->user()?->id ?? 0)));
             }
 
             // push update su Fieldwire se collegato
@@ -1176,10 +1172,17 @@ final class FieldwireController
                 $livelli[$f] = (int)($_POST[$f] ?? \App\Service\Zone\Accesso::VEDE);
             }
 
+            $c = $this->conn->prepare('SELECT 1 FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
+            $c->execute([':w' => $w, ':u' => $userId]);
+            $nuovo = !$c->fetchColumn();
+
             (new \App\Repository\Zone\AccessoRepository($this->conn))->salva(
                 $w, $userId, $livelli, (int)($request->user()->id ?? 0),
                 isset($_POST['ruolo']) ? (string)$_POST['ruolo'] : null
             );
+            if ($nuovo) {
+                $this->avvisa(fn($a) => $a->accesso($w, $userId, (int)($request->user()->id ?? 0)));
+            }
 
             return ['ok' => true];
         });
@@ -1620,28 +1623,6 @@ final class FieldwireController
     }
 
     /** Inserisce una notifica BOB per l'operaio/utente assegnato a un task. */
-    private function notifyAssignee(int $worksiteId, int $assigneeUserId, string $taskName, int $byUserId): void
-    {
-        if ($assigneeUserId <= 0 || $assigneeUserId === $byUserId) return; // non notificare se stessi
-        try {
-            $ws = $this->worksiteRepo->findById($worksiteId);
-            $wsName = $ws['name'] ?? ('Cantiere #' . $worksiteId);
-            // NotificationService: notifica in-app + push FCM (app Android)
-            (new \App\Service\Notifications\NotificationService($this->conn, $this->config))
-                ->create(
-                    $assigneeUserId,
-                    'Nuovo task assegnato — BOB Zone',
-                    'Ti è stato assegnato "' . mb_substr($taskName, 0, 120) . '" nel cantiere ' . $wsName,
-                    '/worksites/' . $worksiteId . '/zone',
-                    'bob_zone',
-                    'normal',
-                    $byUserId ?: null
-                );
-        } catch (\Throwable $e) {
-            error_log('[FW notifyAssignee] ' . $e->getMessage());
-        }
-    }
-
     private function makeClient(): FieldwireClient
     {
         if (!$this->config->fieldwireEnabled()) {
@@ -1714,8 +1695,21 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $attivo = !empty($this->jsonBody()['attivo']);
+            $w = (int)$request->param('id');
+            $prima = $this->conn->prepare('SELECT zone_cliente FROM bb_worksites WHERE id = :w');
+            $prima->execute([':w' => $w]);
+            $eraAcceso = (bool)$prima->fetchColumn();
+
             $this->conn->prepare('UPDATE bb_worksites SET zone_cliente = :a WHERE id = :w')
-                ->execute([':a' => $attivo ? 1 : 0, ':w' => (int)$request->param('id')]);
+                ->execute([':a' => $attivo ? 1 : 0, ':w' => $w]);
+
+            if ($attivo && !$eraAcceso) {
+                $cl = $this->conn->prepare("SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w AND ruolo = 'cliente'");
+                $cl->execute([':w' => $w]);
+                foreach ($cl->fetchAll(\PDO::FETCH_COLUMN) as $uid) {
+                    $this->avvisa(fn($a) => $a->accesso($w, (int)$uid, (int)($request->user()->id ?? 0)));
+                }
+            }
             return ['zone_cliente' => $attivo];
         });
     }
@@ -1846,7 +1840,9 @@ final class FieldwireController
                 ':f' => $frequenza, ':s' => $scadenza, ':v' => $vis,
                 ':by' => (int)($request->user()->id ?? 0) ?: null,
             ]);
-            return ['id' => (int)$this->conn->lastInsertId()];
+            $id = (int)$this->conn->lastInsertId();
+            $this->avvisa(fn($a) => $a->modulo($id, (int)($request->user()->id ?? 0)));
+            return ['id' => $id];
         });
     }
 
@@ -1860,6 +1856,24 @@ final class FieldwireController
                 ->execute([':a' => (int)$request->param('aId'), ':w' => (int)$request->param('id')]);
             return ['ok' => true];
         });
+    }
+
+    /**
+     * Manda un avviso della Zone senza poter rompere quello che si e'
+     * appena salvato: se il push fallisce, il dato resta.
+     *
+     * @param callable(\App\Service\Zone\AvvisiZona): void $cosa
+     */
+    private function avvisa(callable $cosa): void
+    {
+        try {
+            $cosa(new \App\Service\Zone\AvvisiZona(
+                $this->conn,
+                new \App\Service\Notifications\NotificationService($this->conn, $this->config)
+            ));
+        } catch (\Throwable $e) {
+            error_log('[Zone avviso] ' . $e->getMessage());
+        }
     }
 
     /** L'assegnazione, se e' di questo cantiere e tocca a chi chiede. */
