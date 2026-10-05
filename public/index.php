@@ -839,6 +839,7 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/form-file',                        [FieldwireController::class, 'formFile'])
         // disegni: solo da guardare, con i pin dei task sopra
         ->get( '/api/v1/zone/{id}/disegni',                          [FieldwireController::class, 'disegni'])
+        ->get( '/api/v1/zone/{id}/disegni/{docId}/file',             [FieldwireController::class, 'fileDisegno'])
         ->get( '/api/v1/zone/{id}/floorplans',                       [FieldwireController::class, 'floorplans'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/annotations',      [FieldwireController::class, 'annotations'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg',              [FieldwireController::class, 'dwgMeta'])

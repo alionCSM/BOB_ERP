@@ -101,6 +101,7 @@ final class FieldwireController
         'deleteFormTemplate'    => 'ufficio',
 
         'disegni'               => ['disegni', 1],
+        'fileDisegno'           => ['disegni', 1],
         'floorplans'            => ['disegni', 1],
         'annotations'           => ['disegni', 1],
         'dwgMeta'               => ['disegni', 1],
@@ -2085,6 +2086,40 @@ final class FieldwireController
             || !\App\Service\Zone\Accesso::vedeVisibilita($ruolo, $this->visibilitaFile($file, $this->cartelleVisibili($w, $ruolo)))) {
             Response::json(['ok' => false, 'error' => 'File non trovato'], 404);
         }
+    }
+
+    /**
+     * Il file di un disegno, per l'app: la pagina web lo prende da
+     * /worksites/{id}/disegni/{doc}/view, che va con la sessione del browser
+     * e non col token. Stesse regole della Zone: lo apre chi lo vede.
+     */
+    public function fileDisegno(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+        $docId = (int)$request->param('docId');
+        $this->documentoVisibile($request, $docId);
+
+        $st = $this->conn->prepare('SELECT file_path, file_name FROM bb_worksite_documents WHERE id = :id AND is_deleted = 0');
+        $st->execute([':id' => $docId]);
+        $d = $st->fetch(\PDO::FETCH_ASSOC);
+
+        $root = realpath(\CloudPath::getRoot());
+        $real = $d ? realpath(\CloudPath::getRoot() . DIRECTORY_SEPARATOR . $d['file_path']) : false;
+        if (!$d || $real === false || $root === false || strpos($real, $root) !== 0 || !is_file($real)) {
+            http_response_code(404);
+            exit('Disegno non trovato');
+        }
+
+        $ext  = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+        $mime = ['pdf' => 'application/pdf', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg'][$ext]
+            ?? 'application/octet-stream';
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: inline; filename="' . basename((string)$d['file_name']) . '"');
+        header('Content-Length: ' . filesize($real));
+        header('Cache-Control: private, no-store');
+        readfile($real);
+        exit;
     }
 
     /** Un disegno: di questo cantiere, e visibile a chi chiede. */
