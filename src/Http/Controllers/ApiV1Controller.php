@@ -80,14 +80,9 @@ final class ApiV1Controller
             Response::json(['success' => false, 'message' => 'Account disattivato. Contatta l\'amministratore.'], 403);
         }
 
-        if (!empty($row['must_change_password'])) {
-            Response::json([
-                'success' => false,
-                'code'    => 'must_change_password',
-                'message' => "La password e' scaduta: devi cambiarla dal browser prima di usare l'app.",
-                'url'     => rtrim((string)($_ENV['APP_URL'] ?? ''), '/') . '/change-password',
-            ], 403);
-        }
+        // Password da cambiare: il token si da' lo stesso. Il middleware lo
+        // lascia passare solo su /api/v1/me/password, e senza token l'app
+        // non arriverebbe mai li'.
 
         // IP gia' fidato: token subito. Altrimenti codice via email (come web)
         if ($user->isKnownLogin($ip)) {
