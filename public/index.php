@@ -936,6 +936,7 @@ if ($uri === '/pianificazione' || str_starts_with($uri, '/pianificazione/')) {
     $router->get('/pianificazione',          [ProgrammazioneController::class, 'pianificazione'])
            ->post('/pianificazione/save',    [ProgrammazioneController::class, 'save'])
            ->post('/pianificazione/copy',    [ProgrammazioneController::class, 'copy'])
+           ->post('/pianificazione/invia',   [ProgrammazioneController::class, 'invia'])
            ->get('/pianificazione/get',      [ProgrammazioneController::class, 'get'])
            ->get('/pianificazione/print',    [ProgrammazioneController::class, 'print']);
 

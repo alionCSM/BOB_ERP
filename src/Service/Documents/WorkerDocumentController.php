@@ -38,6 +38,7 @@ class WorkerDocumentController
         $payload = $this->uploadValidator->validate($post, $files);
         assertCompanyScopeWorkerAccess($this->conn, $user, (int)$payload['worker_id']);
         $this->service->upload($payload);
+        $this->avvisaOperaio((int)$payload['worker_id'], (string)$payload['document_type'], true);
     }
 
     public function updateFromRequest(User $user, int $userId, array $post, array $files): void
@@ -50,6 +51,24 @@ class WorkerDocumentController
 
         assertCompanyScopeWorkerAccess($this->conn, $user, (int)$current['worker_id']);
         $this->service->update($payload, $userId);
+        $this->avvisaOperaio((int)$current['worker_id'], (string)$payload['document_type'], false);
+    }
+
+    /**
+     * L'operaio sa che c'e' un documento suo nuovo, o rifatto: una visita
+     * medica rinnovata, un attestato. Il documento a questo punto e' gia'
+     * salvato: se l'avviso non parte, il caricamento resta valido.
+     */
+    private function avvisaOperaio(int $workerId, string $tipo, bool $nuovo): void
+    {
+        try {
+            (new \App\Service\Operaio\AvvisiOperaio(
+                $this->conn,
+                new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+            ))->documento($workerId, $tipo, $nuovo);
+        } catch (\Throwable $e) {
+            error_log('avviso documento non mandato: ' . $e->getMessage());
+        }
     }
 
     public function deleteById(User $user, int $docId): void

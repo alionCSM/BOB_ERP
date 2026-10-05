@@ -387,3 +387,32 @@
 }
 
 .pn-tras-tutti:hover { background: #faf5ff; border-color: #ddd6fe; }
+
+/* Rientro previsto della trasferta: si vede solo se qualcuno dorme fuori */
+.pn-rientro {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 8px;
+    padding: 6px 10px;
+    border: 1px solid #ddd6fe;
+    border-radius: 7px;
+    background: #faf5ff;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6d28d9;
+}
+.pn-row.ha-trasferta .pn-rientro { display: flex; }
+.pn-rientro input {
+    border: 1px solid #ddd6fe;
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: #1e293b;
+    background: #fff;
+}
+.pn-tag-violet { background: #f5f3ff; color: #6d28d9; }
+
+/* Invio alle squadre */
+.pn-btn:disabled { opacity: .5; cursor: default; }
+.pn-invio-stato { font-size: 11px; color: #64748b; }

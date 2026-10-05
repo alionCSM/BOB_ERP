@@ -507,6 +507,7 @@ final class ApiV1OperaioController
                 'luogo'     => $prossimo['location'],
                 'auto'      => $prossimo['auto_targa'],
                 'trasferta' => (bool)$prossimo['trasferta'],
+                'rientro'   => $prossimo['rientro_previsto'] ?? null,
                 'squadra'   => $prossimo['squadra'],
             ] : null,
             'da_segnare' => count($daSegnare),
