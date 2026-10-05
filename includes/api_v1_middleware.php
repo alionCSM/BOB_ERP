@@ -37,19 +37,29 @@ function api_v1_json(array $data, int $status = 200): never
 /** @var \User $user */
 $user = $GLOBALS['user'];
 
-// ── Forced password change → 403 JSON (il client mostra la schermata dedicata)
+// ── Password da cambiare → 403 JSON, il client mostra la sua schermata
 //
-// Tranne la rotta che serve a cambiarla: altrimenti l'unica via d'uscita da
-// questa condizione sarebbe aprire il browser, e per chi usa solo l'app non
-// e' una via d'uscita.
+// Tranne la rotta che serve a cambiarla, se no da questa condizione non si
+// uscirebbe mai da dentro l'app.
+//
+// La risposta dice al client DOVE cambiarla: prima dava solo l'indirizzo
+// web, e un'app che legge quello non puo' fare altro che mandare la gente
+// sul browser. Con centoquaranta operai, e' li' che se ne perde meta'.
+//
+// L'indirizzo web resta per i client vecchi, che quello conoscono.
 $uriOra = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
 
 if (!empty($user->must_change_password) && $uriOra !== '/api/v1/me/password') {
     api_v1_json([
-        'success' => false,
-        'code'    => 'must_change_password',
-        'message' => "La password e' scaduta: devi cambiarla prima di continuare.",
-        'url'     => rtrim((string)($_ENV['APP_URL'] ?? ''), '/') . '/change-password',
+        'success'  => false,
+        'code'     => 'must_change_password',
+        'message'  => \App\Service\Lingua::testo('password_da_cambiare', $user->lingua ?? null),
+        // dove cambiarla senza uscire dall'app
+        'endpoint' => '/api/v1/me/password',
+        'campi'    => ['password', 'conferma'],
+        'min'      => 8,
+        // per i client vecchi, che conoscono solo questo
+        'url'      => rtrim((string)($_ENV['APP_URL'] ?? ''), '/') . '/change-password',
     ], 403);
 }
 

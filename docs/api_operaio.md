@@ -73,6 +73,23 @@ gia' finita in una violazione nota — le stesse regole del web, perche' due
 posti che cambiano la stessa cosa con due metri diversi sono un metro solo,
 il piu' largo dei due.
 
+Quando la password va cambiata, **ogni altro endpoint risponde 403** e la
+risposta dice dove andare:
+
+```json
+{ "success": false,
+  "code": "must_change_password",
+  "message": "Para se te fillosh, zgjidh nje fjalekalim tendin.",
+  "endpoint": "/api/v1/me/password",
+  "campi": ["password", "conferma"],
+  "min": 8,
+  "url": "https://bob.csmontaggi.it/change-password" }
+```
+
+`message` arriva nella lingua dell'utente. `url` c'e' ancora solo per i
+client vecchi, che conoscono solo quello: **un'app nuova usa `endpoint` e non
+manda nessuno sul browser.**
+
 **E' l'unico endpoint che risponde anche con `must_change_password`
 addosso.** Senza l'eccezione, l'unica via d'uscita da quella condizione
 sarebbe aprire il browser — e per chi usa solo l'app non e' una via
