@@ -329,7 +329,8 @@ document.addEventListener('click', function(e) {
 // societa' nella barra in alto. Le righe dell'offerta non venivano
 // serializzate al salvataggio, e il controllo scattava invece quando si
 // cambiava societa'.
-document.getElementById('form-offerta').addEventListener('submit', function (e) {
+var formOfferta = document.getElementById('form-offerta');
+if (formOfferta) formOfferta.addEventListener('submit', function (e) {
     // Count rows where exactly one of (descrizione, importo) is filled —
     // those would otherwise be silently dropped on save. Warn the operator
     // before continuing.

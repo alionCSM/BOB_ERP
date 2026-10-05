@@ -38,7 +38,13 @@ function api_v1_json(array $data, int $status = 200): never
 $user = $GLOBALS['user'];
 
 // ── Forced password change → 403 JSON (il client mostra la schermata dedicata)
-if (!empty($user->must_change_password)) {
+//
+// Tranne la rotta che serve a cambiarla: altrimenti l'unica via d'uscita da
+// questa condizione sarebbe aprire il browser, e per chi usa solo l'app non
+// e' una via d'uscita.
+$uriOra = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/', '/');
+
+if (!empty($user->must_change_password) && $uriOra !== '/api/v1/me/password') {
     api_v1_json([
         'success' => false,
         'code'    => 'must_change_password',

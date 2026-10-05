@@ -48,7 +48,13 @@ final class ProgrammazioneController
         unset($w);
 
         $nosTriCount    = count(array_filter($allWorkers, static fn($w) => $w['is_nostro']));
-        $workersJson    = json_encode($allWorkers, JSON_UNESCAPED_UNICODE);
+
+        // Si mandano tutti, col contrassegno is_nostro gia' calcolato: la
+        // pagina offre solo i nostri nel selettore, ma per leggere una
+        // pianificazione vecchia le servono anche gli altri — se in passato
+        // qualcuno ci ha messo un operaio di una consorziata, quella riga
+        // deve continuare a comparire col nome invece di sparire in silenzio.
+        $workersJson = json_encode($allWorkers, JSON_UNESCAPED_UNICODE);
 
         // Consorziate companies with active worker count
         $stmt = $this->conn->query("
@@ -63,11 +69,25 @@ final class ProgrammazioneController
         $consorziate    = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         $consorziateJson = json_encode($consorziate, JSON_UNESCAPED_UNICODE);
 
+        // I cantieri aperti, col codice davanti al nome. Il codice serve
+        // perche' due commesse dello stesso cliente si chiamano spesso
+        // uguale, e chi pianifica distingue per codice — e' quello che sta
+        // scritto sui documenti che ha in mano.
+        $stmt = $this->conn->query("
+            SELECT id, worksite_code, name, location
+            FROM   bb_worksites
+            WHERE  status IN ('In corso', 'A rischio')
+            ORDER BY worksite_code DESC, name ASC
+        ");
+        $cantieriAttivi     = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $cantieriAttiviJson = json_encode($cantieriAttivi, JSON_UNESCAPED_UNICODE);
+
         $pageTitle = 'Pianificazione Squadre';
 
         Response::view('pianificazione/index.html.twig', $request, compact(
             'allWorkers', 'nosTriCount', 'workersJson',
-            'consorziate', 'consorziateJson', 'pageTitle'
+            'consorziate', 'consorziateJson',
+            'cantieriAttivi', 'cantieriAttiviJson', 'pageTitle'
         ));
     }
 
@@ -464,14 +484,26 @@ final class ProgrammazioneController
 
             $sortOrder = 0;
             foreach ($cantieri as $c) {
-                $cantiere = trim($c['cantiere'] ?? '');
-                if ($cantiere === '') continue;
+                $cantiere   = trim($c['cantiere'] ?? '');
+                $worksiteId = (int)($c['worksite_id'] ?? 0) ?: null;
+
+                // Il testo resta come etichetta, e si accetta una riga che ha
+                // solo quello: capita di pianificare un lavoro prima che il
+                // cantiere sia a sistema, e bloccarlo vorrebbe dire non poter
+                // programmare finche' l'ufficio non ha aperto la commessa.
+                if ($cantiere === '' && !$worksiteId) continue;
 
                 $stmt = $this->conn->prepare("
-                    INSERT INTO bb_pianificazione (data, cantiere, sort_order, created_by)
-                    VALUES (:data, :cantiere, :sort, :uid)
+                    INSERT INTO bb_pianificazione (data, cantiere, worksite_id, sort_order, created_by)
+                    VALUES (:data, :cantiere, :ws, :sort, :uid)
                 ");
-                $stmt->execute([':data' => $date, ':cantiere' => $cantiere, ':sort' => $sortOrder++, ':uid' => $userId]);
+                $stmt->execute([
+                    ':data'     => $date,
+                    ':cantiere' => $cantiere,
+                    ':ws'       => $worksiteId,
+                    ':sort'     => $sortOrder++,
+                    ':uid'      => $userId,
+                ]);
                 $pid = (int)$this->conn->lastInsertId();
 
                 foreach ($c['nostri'] ?? [] as $n) {
@@ -479,10 +511,20 @@ final class ProgrammazioneController
                     $wname = trim($n['worker_name'] ?? '');
                     if ($wid <= 0 && $wname === '') continue;
                     $stmt = $this->conn->prepare("
-                        INSERT INTO bb_pianificazione_nostri (pianificazione_id, worker_id, worker_name, auto_targa, note)
-                        VALUES (:pid, :wid, :wname, :targa, :note)
+                        INSERT INTO bb_pianificazione_nostri
+                            (pianificazione_id, worker_id, worker_name, auto_targa, note,
+                             capo_squadra, trasferta)
+                        VALUES (:pid, :wid, :wname, :targa, :note, :capo, :tras)
                     ");
-                    $stmt->execute([':pid' => $pid, ':wid' => $wid > 0 ? $wid : null, ':wname' => $wname ?: null, ':targa' => trim($n['auto_targa'] ?? ''), ':note' => trim($n['note'] ?? '')]);
+                    $stmt->execute([
+                        ':pid'   => $pid,
+                        ':wid'   => $wid > 0 ? $wid : null,
+                        ':wname' => $wname ?: null,
+                        ':targa' => trim($n['auto_targa'] ?? ''),
+                        ':note'  => trim($n['note'] ?? ''),
+                        ':capo'  => !empty($n['capo_squadra']) ? 1 : 0,
+                        ':tras'  => !empty($n['trasferta']) ? 1 : 0,
+                    ]);
                 }
 
                 foreach ($c['consorziate'] ?? [] as $cons) {
@@ -524,7 +566,7 @@ final class ProgrammazioneController
             Response::json(['ok' => false, 'error' => 'Nessun piano trovato per ' . $fromDate]);
         }
 
-        $stmt = $this->conn->prepare("SELECT id, cantiere, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
+        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
         $stmt->execute([':data' => $fromDate]);
         $sourceCantieri = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -535,15 +577,15 @@ final class ProgrammazioneController
             $stmt->execute([':data' => $toDate]);
 
             foreach ($sourceCantieri as $sc) {
-                $stmt = $this->conn->prepare("INSERT INTO bb_pianificazione (data, cantiere, sort_order, created_by) VALUES (:data, :cantiere, :sort, :uid)");
-                $stmt->execute([':data' => $toDate, ':cantiere' => $sc['cantiere'], ':sort' => $sc['sort_order'], ':uid' => $userId]);
+                $stmt = $this->conn->prepare("INSERT INTO bb_pianificazione (data, cantiere, worksite_id, sort_order, created_by) VALUES (:data, :cantiere, :ws, :sort, :uid)");
+                $stmt->execute([':data' => $toDate, ':cantiere' => $sc['cantiere'], ':ws' => $sc['worksite_id'] ?? null, ':sort' => $sc['sort_order'], ':uid' => $userId]);
                 $newPid = (int)$this->conn->lastInsertId();
 
-                $stmt2 = $this->conn->prepare("SELECT worker_id, worker_name, auto_targa, note FROM bb_pianificazione_nostri WHERE pianificazione_id = :pid");
+                $stmt2 = $this->conn->prepare("SELECT worker_id, worker_name, auto_targa, note, capo_squadra, trasferta FROM bb_pianificazione_nostri WHERE pianificazione_id = :pid");
                 $stmt2->execute([':pid' => $sc['id']]);
                 foreach ($stmt2->fetchAll(\PDO::FETCH_ASSOC) as $n) {
-                    $ins = $this->conn->prepare("INSERT INTO bb_pianificazione_nostri (pianificazione_id, worker_id, worker_name, auto_targa, note) VALUES (:pid, :wid, :wn, :t, :n)");
-                    $ins->execute([':pid' => $newPid, ':wid' => $n['worker_id'], ':wn' => $n['worker_name'], ':t' => $n['auto_targa'], ':n' => $n['note']]);
+                    $ins = $this->conn->prepare("INSERT INTO bb_pianificazione_nostri (pianificazione_id, worker_id, worker_name, auto_targa, note, capo_squadra, trasferta) VALUES (:pid, :wid, :wn, :t, :n, :capo, :tras)");
+                    $ins->execute([':pid' => $newPid, ':wid' => $n['worker_id'], ':wn' => $n['worker_name'], ':t' => $n['auto_targa'], ':n' => $n['note'], ':capo' => $n['capo_squadra'], ':tras' => $n['trasferta']]);
                 }
 
                 $stmt3 = $this->conn->prepare("SELECT azienda_nome, quantita, note FROM bb_pianificazione_consorziate WHERE pianificazione_id = :pid");
@@ -571,7 +613,7 @@ final class ProgrammazioneController
             Response::json(['ok' => false, 'error' => 'Data mancante']);
         }
 
-        $stmt = $this->conn->prepare("SELECT id, cantiere, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
+        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
         $stmt->execute([':data' => $date]);
         $cantieri = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -581,11 +623,14 @@ final class ProgrammazioneController
 
             $stmt2 = $this->conn->prepare("
                 SELECT pn.worker_id, pn.worker_name, pn.auto_targa, pn.note,
+                       pn.capo_squadra, pn.trasferta,
                        w.first_name, w.last_name
                 FROM bb_pianificazione_nostri pn
                 LEFT JOIN bb_workers w ON w.id = pn.worker_id
                 WHERE pn.pianificazione_id = :pid
-                ORDER BY COALESCE(w.last_name, pn.worker_name), w.first_name
+                -- il capo per primo: e' quello che si cerca guardando la squadra
+                ORDER BY pn.capo_squadra DESC,
+                         COALESCE(w.last_name, pn.worker_name), w.first_name
             ");
             $stmt2->execute([':pid' => $pid]);
 
@@ -595,6 +640,7 @@ final class ProgrammazioneController
             $result[] = [
                 'id'          => $pid,
                 'cantiere'    => $c['cantiere'],
+                'worksite_id' => $c['worksite_id'] !== null ? (int)$c['worksite_id'] : null,
                 'nostri'      => $stmt2->fetchAll(\PDO::FETCH_ASSOC),
                 'consorziate' => $stmt3->fetchAll(\PDO::FETCH_ASSOC),
             ];
@@ -612,7 +658,7 @@ final class ProgrammazioneController
             Response::error('Data mancante', 400);
         }
 
-        $stmt = $this->conn->prepare("SELECT id, cantiere, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
+        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
         $stmt->execute([':data' => $date]);
         $cantieri = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 

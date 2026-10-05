@@ -9,7 +9,7 @@
          then pass the above variables to this template. #}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/users/profile.css">
+<link rel="stylesheet" href="/assets/css/views/users/profile.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -96,6 +96,29 @@
                     <div class="pr-field">
                         <label class="pr-label">Telefono</label>
                         <input type="text" name="phone" class="pr-input" value="{{ userData.phone }}">
+                    </div>
+                    {# L'unico posto dove si sceglie la lingua.
+
+                       L'etichetta e l'aiuto sono tradotti, il resto della
+                       pagina no: questa riga e' l'unica che deve trovare
+                       anche chi l'italiano non lo legge, ed e' il motivo per
+                       cui viene qui. I nomi delle lingue stanno gia' ognuno
+                       nella sua — Shqip, Romana — quindi si riconoscono da
+                       soli.
+
+                       Decide le notifiche e le pagine di /io, non il resto
+                       di BOB, che resta in italiano perche' lo usa
+                       l'ufficio. #}
+                    <div class="pr-field">
+                        <label class="pr-label">{{ t('lingua_lbl') }}</label>
+                        <select name="lingua" class="pr-input">
+                            {% for codice, nome in lingue %}
+                                <option value="{{ codice }}"{{ (userData.lingua ?? 'it') == codice ? ' selected' : '' }}>
+                                    {{ nome }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <span class="pr-hint">{{ t('lingua_aiuto') }}</span>
                     </div>
                     <div class="pr-field">
                         <label class="pr-label">Username</label>

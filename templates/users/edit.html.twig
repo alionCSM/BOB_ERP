@@ -422,6 +422,8 @@
                                         <td>
                                             {% if f.tipo == 'ferie' %}
                                                 <span style="display:inline-block; padding:2px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#dbeafe; color:#1d4ed8;">Ferie</span>
+                                            {% elseif f.tipo == 'malattia' %}
+                                                <span style="display:inline-block; padding:2px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#fee2e2; color:#b91c1c;">Malattia</span>
                                             {% else %}
                                                 <span style="display:inline-block; padding:2px 12px; border-radius:999px; font-size:11px; font-weight:700; background:#fef3c7; color:#b45309;">Permesso</span>
                                             {% endif %}

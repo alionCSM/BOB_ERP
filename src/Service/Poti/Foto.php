@@ -91,7 +91,7 @@ final class Foto
         $relativo = \CloudPath::relativeToRoot($dest);
 
         $stmt = $this->conn->prepare("
-            INSERT INTO pn_foto
+            INSERT INTO bb_poti_foto
                 (group_company_id, entita, entita_id, momento, percorso, mime, dimensione, created_by)
             VALUES (:cid, :ent, :eid, :mom, :perc, :mime, :dim, :uid)
         ");
@@ -222,7 +222,7 @@ final class Foto
         $segnaposti = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $this->conn->prepare("
             SELECT id, entita_id, momento
-            FROM   pn_foto
+            FROM   bb_poti_foto
             WHERE  group_company_id = ? AND entita = ? AND entita_id IN ({$segnaposti})
             ORDER BY id ASC
         ");
@@ -242,7 +242,7 @@ final class Foto
     public function trova(int $companyId, int $id): ?array
     {
         $stmt = $this->conn->prepare(
-            'SELECT * FROM pn_foto WHERE id = :id AND group_company_id = :cid'
+            'SELECT * FROM bb_poti_foto WHERE id = :id AND group_company_id = :cid'
         );
         $stmt->execute([':id' => $id, ':cid' => $companyId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -256,7 +256,7 @@ final class Foto
             return false;
         }
 
-        $stmt = $this->conn->prepare('DELETE FROM pn_foto WHERE id = :id AND group_company_id = :cid');
+        $stmt = $this->conn->prepare('DELETE FROM bb_poti_foto WHERE id = :id AND group_company_id = :cid');
         $stmt->execute([':id' => $id, ':cid' => $companyId]);
 
         // il file dopo la riga: se sparisse il file e restasse la riga, la

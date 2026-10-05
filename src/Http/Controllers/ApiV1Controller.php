@@ -349,7 +349,14 @@ final class ApiV1Controller
             // tabella assente: si prosegue comunque
         }
 
-        $cmd = 'php ' . escapeshellarg($script) . ' > /dev/null 2>&1 &';
+        // Alcuni job sono lo stesso script con un argomento diverso — i due
+        // promemoria presenze, per esempio. L'argomento sta in una chiave a
+        // parte e non attaccato al percorso: dentro il percorso, is_file()
+        // qui sopra non troverebbe piu' il file e il job non partirebbe.
+        $args = \App\Service\CronRun::JOBS[$job]['args'] ?? '';
+        $cmd  = 'php ' . escapeshellarg($script)
+              . ($args !== '' ? ' ' . escapeshellarg($args) : '')
+              . ' > /dev/null 2>&1 &';
         @shell_exec($cmd);
 
         AuditLogger::log($this->conn, $user, 'api_cron_run', 'job', null, $job, ['source' => 'app']);
@@ -945,9 +952,13 @@ final class ApiV1Controller
             $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Presenze oggi', 'sub' => 'nostri + consorziate', 'color' => '#0ea5e9', 'bg' => '#f0f9ff',
                         'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'href' => '/attendance'];
 
-            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi WHERE data_inizio <= :d1 AND data_fine >= :d2");
+            $s = $conn->prepare("SELECT COUNT(*) FROM bb_ferie_permessi
+                                   WHERE data_inizio <= :d1 AND data_fine >= :d2
+                                     -- una richiesta ancora da decidere non e' un assente:
+                                     -- quello la' domani e' al lavoro finche' non gli si risponde
+                                     AND stato = 'approvata'");
             $s->execute([':d1' => $today, ':d2' => $today]);
-            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie e permessi', 'color' => '#b45309', 'bg' => '#fffbeb',
+            $stats[] = ['num' => (int)$s->fetchColumn(), 'label' => 'Assenti oggi', 'sub' => 'ferie, permessi e malattie', 'color' => '#b45309', 'bg' => '#fffbeb',
                         'icon' => 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z', 'href' => '/attendance/leaves'];
         }
 
@@ -1082,7 +1093,8 @@ final class ApiV1Controller
             [['worksites'],              'Cantieri',          'Elenco e gestione cantieri',    '/worksites',          '#ea580c', '#fff7ed', 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1'],
             [['worksites_drafts'],       'Cantieri in Bozza', 'Bozze da completare e attivare','/worksites/drafts',   '#dc2626', '#fef2f2', 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
             [['attendance','presenze'],  'Presenze',          'Cerca e inserisci presenze',    '/attendance',         '#0ea5e9', '#f0f9ff', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
-            [['attendance','presenze'],  'Ferie e Permessi',  'Registra le assenze',           '/attendance/leaves',  '#38bdf8', '#f0f9ff', 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z'],
+            [['attendance','presenze'],  'Assenze',           'Ferie, permessi e malattie',           '/attendance/leaves',  '#38bdf8', '#f0f9ff', 'M12 7v5l3 3M12 21a9 9 0 100-18 9 9 0 000 18z'],
+            [['attendance','presenze'],  'Presenze dichiarate','Da guardare e approvare',      '/attendance/richieste','#16a34a', '#f0fdf4', 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11'],
             [['pianificazione'],         'Squadre',           'Pianificazione squadre',        '/pianificazione',     '#3b82f6', '#eff6ff', 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
             [['programmazione'],         'Programmazione',    'Programma settimanale',         '/programmazione',     '#f59e0b', '#fffbeb', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
             [['equipment'],              'Noleggio Mezzi',    'Mezzi di sollevamento a noleggio','/equipment/rentals', '#b45309', '#fffbeb', 'M3 21h18M6 21V8l12-5v18M10 12h4'],
@@ -1191,6 +1203,9 @@ final class ApiV1Controller
             'type'         => (string)($row['type'] ?? 'staff'),
             'role'         => (string)($row['role'] ?? ''),
             'company'      => (string)($row['company'] ?? ''),
+            // serve all'app per la propria interfaccia: le notifiche le
+            // traduce gia' il server, ma le schermate se le traduce lei
+            'lingua'       => \App\Service\Lingua::normalizza($row['lingua'] ?? null),
             'must_change_password' => !empty($row['must_change_password']),
             'photo_data_uri' => $this->photoDataUri($row),
         ];

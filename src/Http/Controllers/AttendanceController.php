@@ -191,17 +191,181 @@ final class AttendanceController
 
     // ── Ferie / Permessi ───────────────────────────────────────────────────────
 
+    // ── GET /attendance/richieste ────────────────────────────────────────────
+
+    /**
+     * Le presenze dichiarate dagli operai, da guardare e approvare.
+     *
+     * Senza questa pagina le dichiarazioni si accumulano e non le vede
+     * nessuno: l'operaio manda dall'app convinto di aver fatto, e in busta
+     * paga non compare niente.
+     */
+    public function richieste(Request $request): void
+    {
+        $repo = new \App\Repository\Attendance\RichiestaPresenzaRepository($this->conn);
+
+        $filtri = [
+            'stato'       => in_array($_GET['stato'] ?? '', $repo::STATI, true)
+                             ? (string)$_GET['stato'] : 'in_attesa',
+            'dal'         => trim((string)($_GET['dal'] ?? '')),
+            'al'          => trim((string)($_GET['al'] ?? '')),
+            'worksite_id' => (int)($_GET['worksite_id'] ?? 0),
+        ];
+
+        $righe     = $repo->daApprovare($filtri);
+        $inAttesa  = $repo->quanteInAttesa();
+        $pageTitle = 'Presenze dichiarate';
+
+        $successMsg = $_SESSION['success'] ?? null;
+        $errorMsg   = $_SESSION['error']   ?? null;
+        unset($_SESSION['success'], $_SESSION['error']);
+
+        Response::view('attendance/richieste.html.twig', $request, compact(
+            'righe', 'filtri', 'inAttesa', 'pageTitle', 'successMsg', 'errorMsg'
+        ));
+    }
+
+    // ── POST /attendance/richieste/decidi ────────────────────────────────────
+
+    /**
+     * Approva o rifiuta.
+     *
+     * L'approvazione accetta le correzioni: quello che finisce in bb_presenze
+     * e' quello che l'ufficio ha davanti dopo averlo sistemato, non per forza
+     * quello che aveva scritto l'operaio. La dichiarazione resta com'era,
+     * cosi' resta la traccia di cosa e' stato cambiato.
+     */
+    public function decidiRichiesta(Request $request): never
+    {
+        $repo   = new \App\Repository\Attendance\RichiestaPresenzaRepository($this->conn);
+        $id     = (int)($_POST['id'] ?? 0);
+        $azione = (string)($_POST['azione'] ?? '');
+        $userId = (int)($request->user()->id ?? 0);
+
+        try {
+            if ($azione === 'approva') {
+                $repo->approva($id, [
+                    'turno'         => (string)($_POST['turno'] ?? ''),
+                    'pranzo'        => (string)($_POST['pranzo'] ?? '-'),
+                    'cena'          => (string)($_POST['cena'] ?? '-'),
+                    'pranzo_prezzo' => (string)($_POST['pranzo_prezzo'] ?? ''),
+                    'cena_prezzo'   => (string)($_POST['cena_prezzo'] ?? ''),
+                    'hotel'         => trim((string)($_POST['hotel'] ?? '')),
+                    'targa_auto'    => trim((string)($_POST['targa_auto'] ?? '')),
+                    'trasferta'     => !empty($_POST['trasferta']),
+                    'azienda'       => trim((string)($_POST['azienda'] ?? '')),
+                    'note'          => trim((string)($_POST['note'] ?? '')),
+                ], $userId);
+                $_SESSION['success'] = 'Presenza approvata e registrata.';
+                $this->avvisaOperaio(fn($a) => $a->presenza($id, true));
+            } elseif ($azione === 'rifiuta') {
+                $motivo = trim((string)($_POST['motivo'] ?? ''));
+                if ($repo->rifiuta($id, $motivo, $userId)) {
+                    $_SESSION['success'] = 'Dichiarazione rifiutata.';
+                    $this->avvisaOperaio(fn($a) => $a->presenza($id, false, $motivo));
+                } else {
+                    $_SESSION['error'] = "Non trovata, o gia' decisa da qualcun altro.";
+                }
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Errore: ' . $e->getMessage();
+        }
+
+        Response::redirect('/attendance/richieste?stato=' . urlencode((string)($_POST['torna_stato'] ?? 'in_attesa')));
+    }
+
+    /**
+     * Ferie e permessi, piu' le richieste arrivate dall'app.
+     *
+     * Le richieste stanno qui e non in una pagina loro: e' la stessa
+     * domanda — chi e' via e quando — e chi deve rispondere apre gia'
+     * questa. Una seconda voce di menu vorrebbe dire ricordarsi di
+     * guardarla, e una richiesta di ferie che nessuno guarda e' un operaio
+     * che non sa se prenotare il volo.
+     */
     public function leaves(Request $request): void
     {
         $repo  = new \App\Repository\Attendance\LeaveRepository($this->conn);
         $righe = $repo->getAll();
+        $daApprovare = $repo->daApprovare();
         $pageTitle = 'Ferie e Permessi';
 
         $successMsg = $_SESSION['success'] ?? null;
         $errorMsg   = $_SESSION['error']   ?? null;
         unset($_SESSION['success'], $_SESSION['error']);
 
-        Response::view('attendance/add_ferie.html.twig', $request, compact('righe', 'pageTitle', 'successMsg', 'errorMsg'));
+        Response::view('attendance/add_ferie.html.twig', $request, compact(
+            'righe', 'daApprovare', 'pageTitle', 'successMsg', 'errorMsg'
+        ));
+    }
+
+    // ── POST /attendance/leaves/decidi ───────────────────────────────────────
+
+    /**
+     * L'ufficio risponde a una richiesta di ferie arrivata dall'app.
+     *
+     * Il rifiuto vuole un motivo. Finisce nell'app dell'operaio, ed e' la
+     * differenza fra "no" e "no, in quella settimana siamo in tre a Lecco":
+     * col secondo uno ripropone altre date invece di venire in ufficio a
+     * chiedere perche'.
+     */
+    public function decidiFerie(Request $request): never
+    {
+        $repo   = new \App\Repository\Attendance\LeaveRepository($this->conn);
+        $id     = (int)($_POST['id'] ?? 0);
+        $azione = (string)($_POST['azione'] ?? '');
+        $motivo = trim((string)($_POST['motivo'] ?? ''));
+        $userId = (int)($request->user()->id ?? 0);
+
+        try {
+            if ($azione === 'rifiuta' && $motivo === '') {
+                $_SESSION['error'] = "Per rifiutare serve un motivo: lo legge l'operaio.";
+            } elseif ($azione === 'approva' || $azione === 'rifiuta') {
+                $approva = $azione === 'approva';
+                $ok = $repo->decidi($id, $approva, $motivo, $userId);
+                if ($ok) {
+                    $_SESSION['success'] = $approva
+                        ? 'Ferie approvate.'
+                        : 'Richiesta rifiutata.';
+                    $this->avvisaOperaio(fn($a) => $a->ferie($id, $approva, $motivo));
+                } else {
+                    $_SESSION['error'] = "Non trovata, o gia' decisa da qualcun altro.";
+                }
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['error'] = 'Errore: ' . $e->getMessage();
+        }
+
+        Response::redirect('/attendance/leaves');
+    }
+
+    /**
+     * Manda l'esito all'operaio, senza poter far fallire la decisione.
+     *
+     * La decisione a questo punto e' gia' sul database e la transazione e'
+     * chiusa: se il push o la notifica si rompono, l'approvazione resta
+     * valida e la pagina deve continuare a dire che e' approvata.
+     * Trasformare un guasto di FCM in "Errore: ..." farebbe riprovare
+     * l'ufficio su una cosa che era andata a buon fine.
+     *
+     * L'operaio in quel caso non riceve niente e lo scopre riaprendo l'app:
+     * seccante, ma e' dove eravamo prima, e nessun dato si perde.
+     *
+     * @param callable(\App\Service\Attendance\AvvisoDecisione): int $cosa
+     */
+    private function avvisaOperaio(callable $cosa): void
+    {
+        try {
+            $cosa(new \App\Service\Attendance\AvvisoDecisione(
+                $this->conn,
+                new \App\Service\Notifications\NotificationService(
+                    $this->conn,
+                    new \App\Infrastructure\Config()
+                )
+            ));
+        } catch (\Throwable $e) {
+            error_log('avviso decisione non mandato: ' . $e->getMessage());
+        }
     }
 
     public function saveLeave(Request $request): never
@@ -214,11 +378,12 @@ final class AttendanceController
                 $_SESSION['success'] = "Record eliminato.";
             } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $workerId = (int)($_POST['operaio_id'] ?? 0);
-                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso'], true) ? $_POST['tipo'] : '';
+                $tipo     = in_array($_POST['tipo'] ?? '', ['ferie', 'permesso', 'malattia'], true) ? $_POST['tipo'] : '';
                 $from     = $_POST['data_inizio'] ?? '';
                 $to       = $_POST['data_fine']   ?: $from; // vuoto = giorno singolo
                 $ore      = ($_POST['ore'] ?? '') !== '' ? (float)$_POST['ore'] : null;
                 $note     = trim($_POST['note'] ?? '');
+                $prot     = trim($_POST['protocollo'] ?? '');
                 $id       = (int)($_POST['record_id'] ?? 0);
                 $userId   = (int)($request->user()->id ?? 0);
 
@@ -227,12 +392,20 @@ final class AttendanceController
                 }
 
                 if ($workerId && $tipo && $from) {
+                    // "Ferie aggiornato" e "Malattia registrato" li scrive
+                    // ucfirst, e si leggono male: ogni tipo ha il suo genere
+                    [$nome, $fatto, $salvato] = match ($tipo) {
+                        'permesso' => ['Permesso', 'aggiornato', 'registrato'],
+                        'malattia' => ['Malattia', 'aggiornata', 'registrata'],
+                        default    => ['Ferie',    'aggiornate', 'registrate'],
+                    };
+
                     if ($id > 0) {
-                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note);
-                        $_SESSION['success'] = ucfirst($tipo) . " aggiornato.";
+                        $repo->update($id, $workerId, $tipo, $from, $to, $ore, $note, $prot);
+                        $_SESSION['success'] = "$nome $fatto.";
                     } else {
-                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId);
-                        $_SESSION['success'] = ucfirst($tipo) . " registrato.";
+                        $repo->insert($workerId, $tipo, $from, $to, $ore, $note, $userId, $prot);
+                        $_SESSION['success'] = "$nome $salvato.";
                     }
                 } else {
                     $_SESSION['error'] = "Dati non validi.";

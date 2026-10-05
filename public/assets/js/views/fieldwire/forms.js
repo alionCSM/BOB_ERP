@@ -7,6 +7,11 @@
     'use strict';
 
     let WID = 0, CSRF = '';
+    // Chi puo' fare cosa. Compilare un modulo e' scrivere, quindi vuole il
+    // livello "vede e modifica"; disegnare il modello e' dell'ufficio, come
+    // sul server. Il server rifiuta comunque: qui si evita solo di mettere
+    // davanti a qualcuno un bottone che gli rispondera' di no.
+    let PUO_COMPILARE = false, DA_UFFICIO = false;
     let META = { wsName: '', wsCode: '', clientName: '' };
     let root = null;
     let view = 'list';          // list | builder | fill | submission | submissions
@@ -31,6 +36,8 @@
 
     function init(cfg) {
         WID = cfg.worksiteId; CSRF = cfg.csrf;
+        PUO_COMPILARE = !!cfg.puoCompilare;
+        DA_UFFICIO    = !!cfg.daUfficio;
         META = { wsName: cfg.wsName || '', wsCode: cfg.wsCode || '', clientName: cfg.clientName || '' };
         root = document.getElementById('bz-forms-root');
     }
@@ -74,11 +81,11 @@
                     <button class="bzf-tab active" data-tab="templates">Moduli</button>
                     <button class="bzf-tab" data-tab="submissions">Compilazioni</button>
                 </div>
-                <button class="bzf-btn-primary" id="bzf-new"><i class="fas fa-plus"></i> Nuovo modulo</button>
+                ${DA_UFFICIO ? '<button class="bzf-btn-primary" id="bzf-new"><i class="fas fa-plus"></i> Nuovo modulo</button>' : ''}
             </div>
             <div id="bzf-content"></div>
         `;
-        root.querySelector('#bzf-new').addEventListener('click', () => openBuilder(null));
+        root.querySelector('#bzf-new')?.addEventListener('click', () => openBuilder(null));
         root.querySelectorAll('.bzf-tab').forEach(b => b.addEventListener('click', () => {
             root.querySelectorAll('.bzf-tab').forEach(x => x.classList.remove('active'));
             b.classList.add('active');
@@ -90,7 +97,12 @@
 
     function renderTemplates(tpls) {
         const c = root.querySelector('#bzf-content');
-        if (!tpls.length) { c.innerHTML = '<div class="bzf-empty">Nessun modulo. Creane uno con "Nuovo modulo".</div>'; return; }
+        if (!tpls.length) {
+            c.innerHTML = DA_UFFICIO
+                ? '<div class="bzf-empty">Nessun modulo. Creane uno con "Nuovo modulo".</div>'
+                : '<div class="bzf-empty">Nessun modulo per questo cantiere.</div>';
+            return;
+        }
         c.innerHTML = '<div class="bzf-grid">' + tpls.map(t => `
             <div class="bzf-card">
                 <div class="bzf-card-top">
@@ -100,9 +112,9 @@
                 ${t.description ? `<div class="bzf-card-desc">${esc(t.description)}</div>` : ''}
                 <div class="bzf-card-meta">${t.sub_count} compilazioni</div>
                 <div class="bzf-card-actions">
-                    <button class="bzf-btn-primary" data-fill="${t.id}"><i class="fas fa-pen-to-square"></i> Compila</button>
-                    <button class="bzf-btn-ghost" data-edit="${t.id}"><i class="fas fa-sliders"></i></button>
-                    <button class="bzf-btn-ghost danger" data-del="${t.id}"><i class="fas fa-trash"></i></button>
+                    ${PUO_COMPILARE ? `<button class="bzf-btn-primary" data-fill="${t.id}"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
+                    ${DA_UFFICIO ? `<button class="bzf-btn-ghost" data-edit="${t.id}"><i class="fas fa-sliders"></i></button>` : ''}
+                    ${DA_UFFICIO ? `<button class="bzf-btn-ghost danger" data-del="${t.id}"><i class="fas fa-trash"></i></button>` : ''}
                 </div>
             </div>`).join('') + '</div>';
         c.querySelectorAll('[data-fill]').forEach(b => b.addEventListener('click', () => openFill(parseInt(b.dataset.fill))));

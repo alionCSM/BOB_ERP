@@ -1,0 +1,310 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+<link rel="stylesheet" href="/assets/css/views/operaio/operaio.css?v=5">
+{% endblock %}
+
+{#
+  Le mie presenze.
+
+  Tre blocchi, in ordine di quanto servono: quello che manca, il modulo per
+  tutto il resto, lo storico.
+
+  Il primo e' il cuore. Per una giornata normale — intera, niente pasti,
+  niente albergo — non si compila niente: il giorno lo sappiamo, il cantiere
+  lo sappiamo dalla pianificazione, e resta un bottone. Nove volte su dieci
+  finisce li'. Il modulo sotto esiste per la decima.
+#}
+{% block content %}
+<div class="op">
+
+    <div class="op-testa">
+        <h1 class="op-titolo">{{ t('menu_presenze') }}</h1>
+        <p class="op-sotto">{{ t('ultimi_due_mesi') }}</p>
+    </div>
+
+    {% if successMsg %}
+        <div class="op-avviso op-avviso-ok" role="status">
+            <svg viewBox="0 0 24 24" class="op-avviso-i"><path d="M20 6L9 17l-5-5"/></svg>
+            <div>{{ successMsg }}</div>
+        </div>
+    {% endif %}
+    {% if errorMsg %}
+        <div class="op-avviso op-avviso-ko" role="alert">
+            <svg viewBox="0 0 24 24" class="op-avviso-i"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+            <div>{{ errorMsg }}</div>
+        </div>
+    {% endif %}
+
+    <div class="op-colonne">
+        <div>
+
+            {# ── Quello che manca: un tocco e basta ── #}
+            {% if daSegnare %}
+                <div class="op-sez">{{ t('da_segnare') }} — {{ daSegnare|length }}</div>
+
+                {% for g in daSegnare %}
+                    <div class="op-manca">
+                        <div class="op-manca-d">
+                            <div class="op-manca-g">{{ g.data|date('d/m') }}</div>
+                            <div class="op-manca-c">
+                                {% if g.worksite_id %}
+                                    {{ g.cantiere_codice }} — {{ g.cantiere_nome }}
+                                {% else %}
+                                    {{ t('cantiere_da_scegliere') }}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {# Col cantiere noto si manda e basta. Senza, si apre
+                           il modulo gia' su quel giorno. #}
+                        {% if g.worksite_id %}
+                            <form method="POST" action="/io/presenze">
+                                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                                <input type="hidden" name="data" value="{{ g.data }}">
+                                <input type="hidden" name="worksite_id" value="{{ g.worksite_id }}">
+                                <input type="hidden" name="turno" value="Intero">
+                                <button type="submit" class="op-btn op-btn-primo op-btn-stretto">
+                                    {{ t('giornata_intera') }}
+                                </button>
+                            </form>
+                        {% else %}
+                            <button type="button" class="op-btn op-btn-secondo op-btn-stretto"
+                                    data-apri-modulo="{{ g.data }}">{{ t('scegli') }}</button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                <p class="op-nota">
+                    {{ t('nota_mezza') }}
+                </p>
+            {% endif %}
+
+            {# ── Il modulo, per tutto il resto ── #}
+            <details class="op-apri" id="op-modulo">
+                <summary>{{ daSegnare ? t('segna_altro') : t('segna_giornata') }}</summary>
+                <div class="op-card">
+                    <form method="POST" action="/io/presenze">
+                        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+                        <div class="op-campo">
+                            <label for="p-data">{{ t('che_giorno') }}</label>
+                            <input type="date" id="p-data" name="data" max="{{ oggi }}" value="{{ oggi }}" required>
+                        </div>
+
+                        <div class="op-campo">
+                            <label>{{ t('dove_lavorato') }}</label>
+
+                            <div id="p-proposta" class="op-proposta" hidden>
+                                <div class="op-proposta-t">{{ t('eri_qui') }}</div>
+                                <div class="op-proposta-n"></div>
+                                <button type="button" class="op-proposta-no">{{ t('non_era_questo') }}</button>
+                            </div>
+
+                            <div id="p-cerca" hidden>
+                                {# senza name: la scelta la scrive nel campo
+                                   nascosto qui sotto, che e' l'unico che parte #}
+                                <select id="p-cantiere" placeholder="{{ t('cerca_cantiere') }}"></select>
+                                <span class="op-aiuto">{{ t('due_lettere') }}</span>
+                            </div>
+
+                            <input type="hidden" name="worksite_id" id="p-scelto" value="">
+                        </div>
+
+                        <div class="op-campo">
+                            <label>{{ t('quanto_lavorato') }}</label>
+                            <div class="op-scelte">
+                                <label class="op-scelta">
+                                    <input type="radio" name="turno" value="Intero" checked>
+                                    <span>{{ t('giornata_intera') }}</span>
+                                </label>
+                                <label class="op-scelta">
+                                    <input type="radio" name="turno" value="Mezzo">
+                                    <span>{{ t('mezza_giornata') }}</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {# Pasti, albergo, auto e note stanno chiusi: nove
+                           giornate su dieci non hanno niente da metterci, e
+                           quattro campi vuoti da scorrere ogni volta sono
+                           quattro campi di troppo. #}
+                        <details class="op-extra">
+                            <summary>{{ t('extra') }}</summary>
+
+                            <div class="op-campo">
+                                <label>{{ t('pranzo_chi') }}</label>
+                                <div class="op-scelte">
+                                    <label class="op-scelta">
+                                        <input type="radio" name="pranzo" value="" checked>
+                                        <span>{{ t('non_fatto') }}</span>
+                                    </label>
+                                    <label class="op-scelta">
+                                        <input type="radio" name="pranzo" value="io">
+                                        <span>{{ t('io') }}</span>
+                                    </label>
+                                    <label class="op-scelta">
+                                        <input type="radio" name="pranzo" value="azienda">
+                                        <span>{{ t('azienda') }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="op-campo">
+                                <label>{{ t('cena_chi') }}</label>
+                                <div class="op-scelte">
+                                    <label class="op-scelta">
+                                        <input type="radio" name="cena" value="" checked>
+                                        <span>{{ t('non_fatto') }}</span>
+                                    </label>
+                                    <label class="op-scelta">
+                                        <input type="radio" name="cena" value="io">
+                                        <span>{{ t('io') }}</span>
+                                    </label>
+                                    <label class="op-scelta">
+                                        <input type="radio" name="cena" value="azienda">
+                                        <span>{{ t('azienda') }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="op-campo">
+                                <label class="op-spunta">
+                                    <input type="checkbox" name="trasferta" value="1">
+                                    <span>{{ t('dormito_fuori') }}</span>
+                                </label>
+                            </div>
+
+                            <div class="op-campo">
+                                <label for="p-hotel">{{ t('albergo') }}</label>
+                                <input type="text" id="p-hotel" name="hotel" placeholder="{{ t('albergo_ph') }}">
+                            </div>
+
+                            <div class="op-campo">
+                                <label for="p-auto">{{ t('auto') }}</label>
+                                <input type="text" id="p-auto" name="targa_auto" placeholder="{{ t('targa') }}">
+                            </div>
+
+                            <div class="op-campo">
+                                <label for="p-note">{{ t('note') }}</label>
+                                <textarea id="p-note" name="note" placeholder="{{ t('note_ph') }}"></textarea>
+                            </div>
+                        </details>
+
+                        <button type="submit" class="op-btn op-btn-primo">{{ t('manda') }}</button>
+                        <span class="op-aiuto op-centro">{{ t('controlla_ufficio') }}</span>
+                    </form>
+                </div>
+            </details>
+
+        </div>
+
+        {# ── Lo storico, un mese per volta ── #}
+        <div>
+            <div class="op-sez">{{ t('tue_giornate') }}</div>
+
+            {# Il mese si sceglie da un elenco di mesi in cui ha davvero
+               lavorato: chi e' entrato a marzo non deve scorrere gennaio e
+               febbraio vuoti. Si manda da solo al cambio, senza bottone. #}
+            <form method="GET" class="op-mese">
+                <select name="mese" id="op-mese-sel" aria-label="{{ t('mese') }}">
+                    {% for m in mesi %}
+                        <option value="{{ m.mese }}"{{ m.mese == mese ? ' selected' : '' }}>
+                            {# col giorno attaccato: '2026-10' da solo strtotime lo interpreta a modo suo #}
+                            {{ (m.mese ~ '-01')|date('F Y')|replace({
+                                'January':'Gennaio','February':'Febbraio','March':'Marzo',
+                                'April':'Aprile','May':'Maggio','June':'Giugno','July':'Luglio',
+                                'August':'Agosto','September':'Settembre','October':'Ottobre',
+                                'November':'Novembre','December':'Dicembre'
+                            }) }}
+                        </option>
+                    {% else %}
+                        <option value="{{ mese }}" selected>{{ mese }}</option>
+                    {% endfor %}
+                </select>
+                <noscript><button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">{{ t('vai') }}</button></noscript>
+            </form>
+
+            {# I numeri che uno controlla a fine mese, in cima e grossi. #}
+            <div class="op-conti">
+                <div class="op-conto">
+                    <div class="op-conto-n">{{ totali.giornate|number_format(totali.giornate == totali.giornate|round ? 0 : 1, ',', '.') }}</div>
+                    <div class="op-conto-e">{{ t('giornate') }}</div>
+                </div>
+                {% if totali.attesa %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.attesa }}</div>
+                        <div class="op-conto-e">{{ t('in_attesa_n') }}</div>
+                    </div>
+                {% endif %}
+                {% if totali.trasferte %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.trasferte }}</div>
+                        <div class="op-conto-e">{{ t('trasferte') }}</div>
+                    </div>
+                {% endif %}
+                {% if totali.rifiutate %}
+                    <div class="op-conto">
+                        <div class="op-conto-n">{{ totali.rifiutate }}</div>
+                        <div class="op-conto-e">{{ t('rifiutate') }}</div>
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if righe|length > 5 %}
+                <div class="op-campo op-cerca">
+                    <input type="search" id="op-filtro" placeholder="{{ t('cerca_giornata') }}"
+                           autocomplete="off" aria-label="{{ t('cerca_giornata') }}">
+                </div>
+            {% endif %}
+
+            <div id="op-elenco">
+            {% for r in righe %}
+                <div class="op-voce" data-cerca="{{ (r.data|date('d/m/Y') ~ ' ' ~ (r.cantiere_codice ?: '') ~ ' ' ~ (r.cantiere_nome ?: '') ~ ' ' ~ r.stato)|lower|e('html_attr') }}">
+                    <div class="op-voce-testa">
+                        <div>
+                            <div class="op-data">{{ r.data|date('d/m/Y') }}</div>
+                            <div class="op-dove">
+                                {{ r.cantiere_codice ? r.cantiere_codice ~ ' · ' : '' }}{{ r.cantiere_nome ?: t('cantiere_non_indicato') }}
+                                {% if r.turno == 'Mezzo' %} · {{ t('mezza_g') }}{% endif %}
+                            </div>
+                        </div>
+                        {% if r.stato == 'registrata' %}
+                            <span class="op-tag op-tag-ok">{{ t('registrata') }}</span>
+                        {% elseif r.stato == 'in_attesa' %}
+                            <span class="op-tag op-tag-attesa">{{ t('in_attesa') }}</span>
+                        {% else %}
+                            <span class="op-tag op-tag-ko">{{ t('rifiutata') }}</span>
+                        {% endif %}
+                    </div>
+
+                    {% if r.motivo %}
+                        <div class="op-motivo"><b>{{ t('rifiutata_due') }}</b> {{ r.motivo }}</div>
+                    {% endif %}
+
+                    {# Si ritira solo finche' l'ufficio non ha deciso: dopo
+                       vorrebbe dire cancellare una decisione altrui. #}
+                    {% if r.stato == 'in_attesa' %}
+                        <form method="POST" action="/io/presenze/{{ r.richiesta_id }}/ritira"
+                              class="op-voce-azione" data-confirm="{{ t('ritirare_conferma') }}">
+                            <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                            <button type="submit" class="op-btn op-btn-secondo op-btn-piccolo">{{ t('ritira') }}</button>
+                        </form>
+                    {% endif %}
+                </div>
+            {% else %}
+                <div class="op-vuoto">{{ t('nessuna_giornata') }}</div>
+            {% endfor %}
+            </div>
+            <div class="op-vuoto" id="op-niente" hidden>{{ t('nessuna_trovata') }}</div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/operaio/presenze.js?v=3"></script>
+{% endblock %}

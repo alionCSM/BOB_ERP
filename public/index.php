@@ -171,6 +171,34 @@ if (in_array($uri, ['/change-password', '/confirm-email'], true)) {
     $router->dispatch($request, $container);
 }
 
+// ── BOB per chi sta in cantiere ──────────────────────────────────────────────
+// Le stesse cose dell'app, aperte nel browser del telefono: funziona su
+// Android e iPhone senza installare niente. Nessun modulo richiesto — un
+// operaio non ne ha nessuno — e il prefisso /io sta fuori dalla mappa dei
+// moduli apposta.
+if ($uri === '/io' || str_starts_with($uri, '/io/')) {
+    require_once APP_ROOT . '/includes/middleware.php';
+    $container = \App\Infrastructure\ContainerFactory::build($connection);
+
+    // caricato a mano come gli altri controller recenti: cosi' le rotte
+    // funzionano anche se al deploy sfugge il dump-autoload
+    require_once APP_ROOT . '/src/Http/Controllers/OperaioController.php';
+
+    $request = new \App\Http\Request();
+    $router  = new \App\Http\Router();
+
+    $router->get( '/io',                       [OperaioController::class, 'oggi'])
+           ->get( '/io/presenze',              [OperaioController::class, 'presenze'])
+           ->get( '/io/cantiere-del-giorno',   [OperaioController::class, 'cantiereDelGiorno'])
+           ->get( '/io/cantieri',              [OperaioController::class, 'cercaCantieri'])
+           ->post('/io/presenze',              [OperaioController::class, 'dichiara'])
+           ->post('/io/presenze/{id}/ritira',  [OperaioController::class, 'ritira'])
+           ->get( '/io/assenze',               [OperaioController::class, 'assenze'])
+           ->post('/io/assenze',               [OperaioController::class, 'chiediAssenza']);
+
+    $router->dispatch($request, $container);
+}
+
 // ── Poti Noleggi — autocarrate ───────────────────────────────────────────────
 if ($uri === '/autocarrate' || str_starts_with($uri, '/autocarrate/')) {
     require_once APP_ROOT . '/includes/middleware.php';
@@ -520,6 +548,9 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/complete',              [FieldwireController::class, 'completeChecklistItem'])
            ->post('/worksites/{id}/zone/tasks/{taskId}/checklist/{itemId}/delete',                [FieldwireController::class, 'deleteChecklistItem'])
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
+           ->get( '/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'accessi'])
+           ->post('/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'salvaAccesso'])
+           ->post('/worksites/{id}/zone/accessi/elimina',                                         [FieldwireController::class, 'eliminaAccesso'])
            ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
            ->get( '/worksites/{id}/zone/media',                                                   [FieldwireController::class, 'media'])
            ->get( '/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'formTemplates'])
@@ -629,8 +660,12 @@ if ($uri === '/attendance' || str_starts_with($uri, '/attendance/')) {
            ->post('/attendance/fines/save',       [AttendanceController::class, 'saveFine'])
            ->get('/attendance/refunds',           [AttendanceController::class, 'refunds'])
            ->post('/attendance/refunds/save',     [AttendanceController::class, 'saveRefund'])
+           // presenze dichiarate dagli operai dall'app, da approvare
+           ->get('/attendance/richieste',         [AttendanceController::class, 'richieste'])
+           ->post('/attendance/richieste/decidi', [AttendanceController::class, 'decidiRichiesta'])
            ->get('/attendance/leaves',            [AttendanceController::class, 'leaves'])
            ->post('/attendance/leaves/save',      [AttendanceController::class, 'saveLeave'])
+           ->post('/attendance/leaves/decidi',    [AttendanceController::class, 'decidiFerie'])
            ->get('/attendance/export/worker',     [AttendanceController::class, 'exportWorker'])
            ->get('/attendance/export/company',    [AttendanceController::class, 'exportCompany'])
            ->get('/attendance/export/client',     [AttendanceController::class, 'exportClient'])
@@ -727,7 +762,26 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/noleggi/foto/elimina',     [ApiV1Controller::class, 'noleggiFotoElimina'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
-            ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda']);
+            ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda'])
+
+            // ── L'app dell'operaio: le sue cose e basta ───────────────────
+            // Nessun permesso di modulo: un operaio non ne ha. L'accesso lo
+            // decide una sola domanda, sono i tuoi dati, e la risposta viene
+            // dal worker_id dell'utente collegato — mai da un id passato
+            // nella richiesta, che sarebbe modificabile.
+            ->get('/api/v1/me/pianificazione',         [ApiV1OperaioController::class, 'pianificazione'])
+            ->get('/api/v1/me/cantieri',               [ApiV1OperaioController::class, 'cantieri'])
+            ->get('/api/v1/me/documenti',              [ApiV1OperaioController::class, 'documenti'])
+            ->get('/api/v1/me/presenze',               [ApiV1OperaioController::class, 'presenze'])
+            ->post('/api/v1/me/presenze',              [ApiV1OperaioController::class, 'creaPresenza'])
+            ->post('/api/v1/me/presenze/{id}/ritira',  [ApiV1OperaioController::class, 'ritiraPresenza'])
+            ->get('/api/v1/me/ferie',                  [ApiV1OperaioController::class, 'ferie'])
+            ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie'])
+            ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua'])
+            ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone'])
+            ->get('/api/v1/me/home',                   [ApiV1OperaioController::class, 'home'])
+            ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
+            ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
 
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si

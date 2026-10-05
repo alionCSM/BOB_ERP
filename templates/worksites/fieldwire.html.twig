@@ -319,16 +319,20 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Side menu #}
         <aside class="bz-sidebar">
             <nav class="bz-nav">
-                <button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>
-                <button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>
-                <button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>
-                <button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>
-                <button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>
+                {# Chi non ha accesso a una sezione non se la vede nemmeno:
+                   lasciare la voce e farla rispondere 403 sembra un guasto,
+                   e chi la trova continua a cliccarci. #}
+                {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>{% endif %}
+                {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>{% endif %}
+                {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
+                {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
+                {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
-                <button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>
-                <a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>
+                {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>{% endif %}
+                {% if accessi.report   > 0 %}<a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>{% endif %}
+                {% if daUfficio %}<button class="bz-nav-item" id="btn-accessi"><i class="fas fa-user-shield"></i><span>Chi accede</span></button>{% endif %}
             </div>
 
             {# ── Info cantiere ── #}
@@ -347,7 +351,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
 
             <div class="bz-nav-spacer"></div>
-            <div class="bz-nav-fw">
+            {# Collegare un cantiere a Fieldwire e' una cosa da ufficio: a chi
+               ci lavora dentro non serve, e il bottone chiede conferma per
+               un'operazione che non saprebbe valutare. #}
+            <div class="bz-nav-fw"{{ daUfficio ? '' : ' hidden' }}>
                 {% if fieldwire_project_id %}
                     <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire collegato</span>
                 {% elseif fieldwire_enabled %}
@@ -417,10 +424,15 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <div class="bz-disegni">
                 <div class="bz-disegni-bar">
                     <div class="bz-disegni-title"><i class="fas fa-drafting-compass"></i> Disegni del cantiere</div>
+                    {# Caricare ed eliminare disegni passa da /worksites/{id}/disegni,
+                       che sta fuori da /zone e dal modulo cantieri: per un
+                       operaio e' 403 comunque. Meglio non mostrarlo. #}
+                    {% if daUfficio %}
                     <label class="bz-upload-btn">
                         <i class="fas fa-upload"></i> Carica disegno
                         <input type="file" id="dz-file-input" accept=".pdf,.dwg,.png,.jpg,.jpeg" hidden>
                     </label>
+                    {% endif %}
                 </div>
                 <div class="bz-disegni-grid" id="bz-disegni-grid">
                     <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
@@ -456,9 +468,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     <div class="bz-files-bar">
                         <div class="bz-files-title" id="bz-files-title">Tutti i file</div>
                         <div style="display:flex;gap:8px;">
+                            {% if accessi.file > 1 %}
                             <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica file
                                 <input type="file" id="bz-file-input" hidden>
                             </label>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="bz-files-list" id="bz-files-list">
@@ -635,9 +649,47 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     </div>
 </div>
 
+{# ── Chi accede a questo cantiere ──
+   Solo per l'ufficio. Chi lavora qui non deve poter cambiare i propri
+   permessi: un capo squadra che si assegna da solo non e' un permesso,
+   e' una formalita'. #}
+{% if daUfficio %}
+<div class="bz-overlay hidden" id="accessi-modal">
+    <div class="bz-modal" style="width: 760px;">
+        <h3>Chi accede a questo cantiere</h3>
+
+        <p style="font-size:12px; color:#64748b; margin:-12px 0 18px;">
+            Chi ha il modulo Zone in BOB vede tutto comunque. Qui si danno i
+            cantieri a chi quel modulo non ce l'ha — capi squadra, operai.
+            Non c'entra con la pianificazione: li' si decide chi lavora dove,
+            qui chi legge cosa.
+        </p>
+
+        <div class="bz-modal-field">
+            <label>Aggiungi persona</label>
+            <select id="acc-utente"><option value="">Scegli…</option></select>
+        </div>
+
+        <div id="acc-elenco" style="max-height:46vh; overflow:auto; margin-top:8px;"></div>
+
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="btn-acc-close">Chiudi</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script nonce="{{ cspNonce }}">
 const WID = {{ worksite_id }};
 const CSRF = '{{ csrfToken }}';
+
+// I permessi anche qui: meta' dei bottoni li disegna il JavaScript, e un
+// controllo fatto solo in Twig non li tocca. Il server rifiuta comunque —
+// ogni endpoint si guarda da solo — ma un bottone che risponde 403 sembra
+// un guasto, e chi lo trova continua a premerlo.
+const ACC = {{ accessi|json_encode|raw }};
+const DA_UFFICIO = {{ daUfficio ? 'true' : 'false' }};
+const puoScrivere = (sezione) => (ACC[sezione] || 0) > 1;
 const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
 const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
 
@@ -711,6 +763,8 @@ function openForms() {
     if (!window._bzFormsInited) {
         BZForms.init({
             worksiteId: WID, csrf: CSRF,
+            puoCompilare: puoScrivere('moduli'),
+            daUfficio: DA_UFFICIO,
             wsName: {{ worksite.name|json_encode|raw }},
             wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
             clientName: {{ (clientName ?? '')|json_encode|raw }}
@@ -1242,13 +1296,17 @@ function renderDisegni(items, fwReady) {
             ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
             <div class="bz-dz-actions">
                 ${d.annotatable
-                    ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
+                    ? (puoScrivere('disegni')
+                        ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
+                        : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)
                     : (d.is_dwg
-                        ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
+                        ? (puoScrivere('disegni')
+                            ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
+                            : '')
                         : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)}
                 <a class="bz-dz-btn" href="${d.view_url}" download><i class="fas fa-download"></i></a>
-                ${fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
-                <button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>
+                ${DA_UFFICIO && fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
+                ${DA_UFFICIO ? `<button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>` : ''}
             </div>
         </div>`).join('');
 }
@@ -2027,7 +2085,7 @@ loadBobUsers();
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -2037,5 +2095,6 @@ loadBobUsers();
   }
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
+{% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=1"></script>{% endif %}
 </body>
 </html>

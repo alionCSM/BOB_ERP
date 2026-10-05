@@ -110,7 +110,7 @@ function addRow(data) {
     row.innerHTML =
         '<div class="pn-row-head">' +
             '<svg class="pn-row-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>' +
-            '<input type="text" class="pn-row-name" placeholder="Nome cantiere..." value="' + esc(cantiere) + '">' +
+            '<div class="pn-row-name-wrap"><select class="pn-row-name" placeholder="Cerca cantiere..."></select></div>' +
             '<div class="pn-row-tags"></div>' +
             '<button class="pn-row-remove" title="Rimuovi cantiere">' +
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
@@ -118,7 +118,16 @@ function addRow(data) {
         '</div>' +
         '<div class="pn-row-body">' +
             '<div class="pn-section">' +
-                '<div class="pn-section-label">Nostri operai</div>' +
+                '<div class="pn-section-label">' +
+                    'Nostri operai' +
+                    // Quasi sempre la trasferta e' di tutta la squadra: senza
+                    // questo si spunterebbe una riga per volta ogni giorno,
+                    // per ogni cantiere. Con cinque persone sono cinque tocchi
+                    // che diventano uno.
+                    '<button class="pn-tras-tutti" title="Metti la trasferta a tutta la squadra">' +
+                        'trasferta a tutti' +
+                    '</button>' +
+                '</div>' +
                 '<div class="pn-workers" id="workers-' + id + '"></div>' +
                 '<div class="pn-select-wrap"><select id="ws-' + id + '" multiple placeholder="Cerca operaio..."></select></div>' +
             '</div>' +
@@ -140,7 +149,9 @@ function addRow(data) {
             toggleRow(id);
         }
     });
-    nameInput.addEventListener('focus', function () {
+    // il campo adesso e' una scelta e non un testo: si apre la riga quando
+    // ci si clicca sopra, come faceva prima col fuoco sul campo
+    nameInput.addEventListener('click', function () {
         this.closest('.pn-row').classList.add('open');
     });
     removeBtn.addEventListener('click', function (e) {
@@ -148,19 +159,111 @@ function addRow(data) {
         removeRow(id);
     });
 
+    // Accende o spegne: se c'e' gia' qualcuno in trasferta il tocco la toglie
+    // a tutti, altrimenti la mette a tutti. Un pulsante che sa solo accendere
+    // costringerebbe a spegnere riga per riga per correggere un errore.
+    row.querySelector('.pn-tras-tutti').addEventListener('click', function (e) {
+        e.stopPropagation();
+        const righe = row.querySelectorAll('.pn-worker-row');
+        if (!righe.length) return;
+
+        const qualcuno = [...righe].some(r => r.dataset.trasferta === '1');
+        righe.forEach(function (r) {
+            if (qualcuno) { delete r.dataset.trasferta; } else { r.dataset.trasferta = '1'; }
+            r.querySelector('.pn-worker-tras')?.classList.toggle('is-tras', !qualcuno);
+        });
+        updateRowTags(id);
+    });
+
     document.getElementById('pianoList').appendChild(row);
+    initCantiereTS(id, data?.worksite_id || null, cantiere);
     initWorkerTS(id, data?.nostri || []);
     initConsTS(id, data?.consorziate || []);
     updateRowTags(id);
     updateStats();
 
-    if (!data) nameInput.focus();
+    if (!data) cantiereInstances['r' + id]?.focus();
+}
+
+/**
+ * Scelta del cantiere fra quelli aperti.
+ *
+ * Prima era un campo di testo, e quello che ci si scriveva non era collegato
+ * a niente: la pianificazione sapeva chi andava dove, ma quel "dove" non era
+ * la stessa cosa che BOB chiama cantiere, quindi non si poteva incrociare
+ * ne' con le presenze ne' con BOB Zone.
+ *
+ * Il codice sta davanti al nome perche' due commesse dello stesso cliente si
+ * chiamano spesso uguale, e chi pianifica distingue per codice: e' quello
+ * che sta scritto sui documenti che ha in mano.
+ *
+ * Si puo' ancora scrivere un nome libero: capita di programmare un lavoro
+ * prima che la commessa sia aperta, e impedirlo vorrebbe dire non poter
+ * pianificare finche' l'ufficio non ha finito le sue pratiche. Quelle righe
+ * restano senza collegamento, ed e' giusto che si vedano diverse.
+ */
+function initCantiereTS(rowId, worksiteId, testoLibero) {
+    const el = document.querySelector('#row-' + rowId + ' .pn-row-name');
+    if (!el) return;
+
+    const opzioni = ALL_CANTIERI.map(c => ({
+        id:      String(c.id),
+        display: (c.worksite_code ? c.worksite_code + ' — ' : '') + c.name +
+                 (c.location ? ' (' + c.location + ')' : ''),
+    }));
+
+    // un cantiere gia' scelto che non e' piu' fra gli aperti resta
+    // selezionabile: chiuderlo non deve cancellare la pianificazione passata
+    let iniziale = worksiteId ? String(worksiteId) : '';
+    if (iniziale && !opzioni.some(o => o.id === iniziale)) {
+        opzioni.push({ id: iniziale, display: testoLibero || ('Cantiere ' + iniziale) });
+    }
+    // riga vecchia con solo il testo: si tiene com'e' finche' non la si tocca
+    if (!iniziale && testoLibero) {
+        iniziale = 'libero_' + rowId;
+        opzioni.push({ id: iniziale, display: testoLibero });
+    }
+
+    cantiereInstances['r' + rowId] = new TomSelect(el, {
+        valueField:  'id',
+        labelField:  'display',
+        searchField: ['display'],
+        options:     opzioni,
+        items:       iniziale ? [iniziale] : [],
+        maxItems:    1,
+        create: function (input, callback) {
+            callback({ id: 'libero_' + Date.now(), display: input.trim() });
+        },
+        createFilter: function (input) { return input.trim().length >= 3; },
+        placeholder: 'Cerca cantiere per codice o nome...',
+        onChange() { updateRowTags(rowId); updateStats(); },
+    });
+}
+
+const cantiereInstances = {};
+
+/** L'etichetta del cantiere scelto su una riga, come si legge a video. */
+function nomeCantiere(row) {
+    const id = row.id.replace('row-', '');
+    const ts = cantiereInstances['r' + id];
+    if (!ts) return '';
+    const scelto = ts.getValue();
+    return scelto ? (ts.options[scelto]?.display || '') : '';
+}
+
+/** L'id del cantiere vero, o null se e' una riga scritta a mano. */
+function idCantiere(row) {
+    const id = row.id.replace('row-', '');
+    const ts = cantiereInstances['r' + id];
+    const scelto = ts ? ts.getValue() : '';
+    // "libero_..." e' un nome battuto a mano: non e' un cantiere di BOB
+    return scelto && !String(scelto).startsWith('libero_') ? parseInt(scelto) : null;
 }
 
 function getAssignedMap() {
     const map = {};
     document.querySelectorAll('.pn-row').forEach(row => {
-        const name = row.querySelector('.pn-row-name')?.value?.trim() || '?';
+        const name = nomeCantiere(row) || '?';
         row.querySelectorAll('.pn-worker-row').forEach(wr => {
             if (wr.dataset.custom !== '1') map[wr.dataset.wid] = name;
         });
@@ -176,7 +279,12 @@ function initWorkerTS(rowId, preselected) {
         valueField:   'id',
         labelField:   'display',
         searchField:  ['display'],
-        options:      ALL_WORKERS.map(w => ({ id: w.id, display: w.last_name + ' ' + w.first_name })),
+        // Solo i nostri: gli operai delle consorziate si aggiungono
+        // dall'altra parte, come azienda e numero di persone, e qui
+        // finivano nell'elenco sbagliato. Chi e' gia' stato salvato resta
+        // comunque leggibile, perche' ALL_WORKERS li contiene ancora tutti.
+        options:      ALL_WORKERS.filter(w => w.is_nostro)
+                                 .map(w => ({ id: w.id, display: w.last_name + ' ' + w.first_name })),
         items:        preselected.filter(p => p.worker_id).map(p => p.worker_id),
         plugins:      ['remove_button'],
         maxItems:     null,
@@ -229,12 +337,12 @@ function initWorkerTS(rowId, preselected) {
     // Add preselected workers (both DB workers and custom names)
     preselected.forEach(p => {
         if (p.worker_id) {
-            addWorkerRow(rowId, p.worker_id, p.auto_targa, p.note);
+            addWorkerRow(rowId, p.worker_id, p.auto_targa, p.note, '', p.capo_squadra == 1, p.trasferta == 1);
         } else if (p.worker_name) {
             const customId = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
             ts.addOption({ id: customId, display: p.worker_name });
             ts.addItem(customId, true);
-            addWorkerRow(rowId, customId, p.auto_targa, p.note, p.worker_name);
+            addWorkerRow(rowId, customId, p.auto_targa, p.note, p.worker_name, p.capo_squadra == 1, p.trasferta == 1);
         }
     });
 }
@@ -255,7 +363,7 @@ function clearWarn(rowId) {
     document.getElementById('warn-' + rowId)?.remove();
 }
 
-function addWorkerRow(rowId, workerId, targa, note, customName) {
+function addWorkerRow(rowId, workerId, targa, note, customName, capo, trasferta) {
     const isCustom = String(workerId).startsWith('custom_');
     let name;
     if (isCustom) {
@@ -274,12 +382,57 @@ function addWorkerRow(rowId, workerId, targa, note, customName) {
     row.dataset.workerName = name;
     if (isCustom) row.dataset.custom = '1';
 
+    if (capo) row.dataset.capo = '1';
+    if (trasferta) row.dataset.trasferta = '1';
+
+    // Il capo si segna sulla riga dell'operaio e non in un campo a parte in
+    // testata: e' uno di quelli che ci vanno, e un campo separato lascerebbe
+    // scriverci un nome che nella squadra non c'e'.
     row.innerHTML =
+        '<button class="pn-worker-capo' + (capo ? ' is-capo' : '') + '" ' +
+                'title="Capo squadra">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4-6.2-4.6-6.2 4.6 2.4-7.4L2 9.4h7.6z"/></svg>' +
+        '</button>' +
         '<span class="pn-worker-name">' + (isCustom ? '✎ ' : '') + esc(name) + '</span>' +
         '<input type="text" class="pn-worker-targa" placeholder="Targa" value="' + esc(targa || '') + '" data-field="targa">' +
+        // Per operaio e non per squadra: quasi sempre partono tutti e
+        // dormono tutti fuori, ma capita quello che abita vicino e la sera
+        // torna a casa. Il caso frequente si fa col "copia a tutti" qui
+        // sopra, cosi' resta un tocco solo.
+        '<button class="pn-worker-tras' + (trasferta ? ' is-tras' : '') + '" ' +
+                'title="Trasferta: dorme fuori">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/><path d="M9 9v.01M9 13v.01M9 17v.01"/></svg>' +
+        '</button>' +
         '<button class="pn-worker-remove">' +
             '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
         '</button>';
+
+    // Uno solo per squadra: nominandone un secondo il primo decade, invece di
+    // lasciare due capi e nessuno che sappia chi comanda.
+    row.querySelector('.pn-worker-capo').addEventListener('click', function () {
+        const eraCapo = row.dataset.capo === '1';
+        const dentro  = document.getElementById('workers-' + rowId);
+
+        dentro.querySelectorAll('.pn-worker-row').forEach(function (altra) {
+            delete altra.dataset.capo;
+            altra.querySelector('.pn-worker-capo')?.classList.remove('is-capo');
+        });
+
+        if (!eraCapo) {
+            row.dataset.capo = '1';
+            this.classList.add('is-capo');
+        }
+        updateRowTags(rowId);
+    });
+
+    row.querySelector('.pn-worker-tras').addEventListener('click', function () {
+        const acceso = row.dataset.trasferta === '1';
+        if (acceso) { delete row.dataset.trasferta; } else { row.dataset.trasferta = '1'; }
+        this.classList.toggle('is-tras', !acceso);
+        updateRowTags(rowId);
+    });
 
     row.querySelector('.pn-worker-remove').addEventListener('click', function () {
         removeWorkerFromRow(rowId, workerId);
@@ -447,18 +600,21 @@ function removeRow(id) {
 function collectData() {
     const result = { data: getDate(), cantieri: [] };
     document.querySelectorAll('.pn-row').forEach(row => {
-        const cantiere = row.querySelector('.pn-row-name')?.value?.trim();
-        if (!cantiere) return;
+        const cantiere   = nomeCantiere(row);
+        const worksiteId = idCantiere(row);
+        if (!cantiere && !worksiteId) return;
 
         const nostri = [];
         row.querySelectorAll('.pn-worker-row').forEach(wr => {
             const wid      = wr.dataset.wid;
             const isCustom = wr.dataset.custom === '1';
             nostri.push({
-                worker_id:   isCustom ? 0 : parseInt(wid),
-                worker_name: isCustom ? (wr.dataset.workerName || '') : '',
-                auto_targa:  wr.querySelector('[data-field=targa]')?.value?.trim() || '',
-                note:        '',
+                worker_id:    isCustom ? 0 : parseInt(wid),
+                worker_name:  isCustom ? (wr.dataset.workerName || '') : '',
+                auto_targa:   wr.querySelector('[data-field=targa]')?.value?.trim() || '',
+                note:         '',
+                capo_squadra: wr.dataset.capo === '1',
+                trasferta:    wr.dataset.trasferta === '1',
             });
         });
 
@@ -473,7 +629,13 @@ function collectData() {
             });
         });
 
-        result.cantieri.push({ db_id: row.dataset.dbId || '', cantiere, nostri, consorziate });
+        result.cantieri.push({
+            db_id: row.dataset.dbId || '',
+            cantiere,
+            worksite_id: worksiteId,
+            nostri,
+            consorziate,
+        });
     });
     return result;
 }

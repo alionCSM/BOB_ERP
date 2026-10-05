@@ -1023,8 +1023,46 @@ final class UsersController
             Response::error('Accesso negato.', 403);
         }
 
-        $stmtC     = $this->conn->query("SELECT id, name FROM bb_companies ORDER BY name ASC");
-        $companies = $stmtC->fetchAll(\PDO::FETCH_ASSOC);
+        // Quattro elenchi, uno per profilo: il campo "Azienda" vuol dire una
+        // cosa diversa a seconda di chi si sta creando, e mostrare sempre le
+        // consorziate portava ad assegnare un interno a un'azienda cliente.
+        //
+        // Arrivano tutti insieme alla pagina invece di chiederli via rete al
+        // cambio di profilo: sono elenchi corti e fermi, e una chiamata in
+        // piu' a ogni tocco del menu non aggiungerebbe niente.
+        $companies = $this->conn
+            ->query("SELECT id, name FROM bb_companies ORDER BY name ASC")
+            ->fetchAll(\PDO::FETCH_ASSOC);
+
+        $societa = $this->conn
+            ->query("SELECT id, nome FROM bb_group_companies WHERE attiva = 1
+                     ORDER BY ordinamento ASC, nome ASC")
+            ->fetchAll(\PDO::FETCH_ASSOC);
+
+        $clients = $this->conn
+            ->query("SELECT id, name FROM bb_clients ORDER BY name ASC")
+            ->fetchAll(\PDO::FETCH_ASSOC);
+
+        // l'azienda dell'operaio viaggia con lui: e' quella che il form
+        // riempie da solo quando lo si sceglie
+        $workers = $this->conn
+            ->query("SELECT id, CONCAT(last_name, ' ', first_name) AS nome, company
+                     FROM bb_workers WHERE active = 'Y'
+                     ORDER BY last_name ASC, first_name ASC")
+            ->fetchAll(\PDO::FETCH_ASSOC);
+
+        // Gli stessi sei valori dell'ENUM a database. Elencati qui e non
+        // liberi: il campo era di testo, e un ruolo inventato faceva fallire
+        // la INSERT con un errore del database invece di una risposta
+        // comprensibile.
+        $ruoli = [
+            'admin'            => 'Amministratore',
+            'manager'          => 'Responsabile',
+            'user'             => 'Utente',
+            'offerte'          => 'Offerte',
+            'document_manager' => 'Gestione documenti',
+            'company_viewer'   => 'Sola lettura azienda',
+        ];
 
         $success      = '';
         $error        = '';
@@ -1041,8 +1079,23 @@ final class UsersController
             $type       = $_POST['type']            ?? 'user';
             $accessProf = $_POST['access_profile']  ?? 'INTERNAL';
             $companyId  = !empty($_POST['company_id']) ? (int)$_POST['company_id'] : null;
-            $role       = trim($_POST['role']       ?? 'user');
+            // si verifica anche qui: l'elenco chiuso nel form si aggira
+            // scrivendo a mano la richiesta, e la colonna non perdona
+            $role       = trim($_POST['role'] ?? 'user');
+            if (!isset($ruoli[$role])) {
+                $role = 'user';
+            }
             $sendEmail  = !empty($_POST['send_email']);
+
+            // La lingua si sceglie qui, non si lascia all'operaio.
+            // Centoquaranta persone che entrano nel web ad aggiustarsela non
+            // succede: resterebbero tutte in italiano, e le notifiche
+            // tradotte non le leggerebbe nessuno. In ufficio sanno gia' chi e'
+            // albanese e chi rumeno, e l'operaio puo' sempre cambiarla.
+            $lingua = (string)($_POST['lingua'] ?? 'it');
+            if (!isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+                $lingua = 'it';
+            }
 
             if ($username === '' || $email === '' || $firstName === '' || $lastName === '') {
                 $error = 'Username, email, nome e cognome sono obbligatori.';
@@ -1065,22 +1118,85 @@ final class UsersController
                     $rawPassword  = bin2hex(random_bytes(6));
                     $passwordHash = password_hash($rawPassword, PASSWORD_DEFAULT);
 
+                    // ── A cosa e' legato l'utente ────────────────────────
+                    // "Azienda" cambia significato col profilo, e con esso
+                    // cambia la colonna da riempire. Prima finiva sempre in
+                    // company_id come consorziata, e worker_id e client_id
+                    // restavano vuoti: il middleware pero' li pretende, e un
+                    // utente operaio o cliente creato da qui prendeva 403 su
+                    // ogni pagina. Era rotto in silenzio.
                     $companyName = '';
-                    if ($companyId) {
-                        $cStmt = $this->conn->prepare("SELECT name FROM bb_companies WHERE id = :id LIMIT 1");
-                        $cStmt->execute([':id' => $companyId]);
-                        $companyName = (string)($cStmt->fetchColumn() ?: '');
+                    $workerId    = null;
+                    $clientId    = null;
+                    $societaId   = null;
+
+                    switch ($accessProf) {
+                        case 'WORKER':
+                            // L'azienda non si sceglie: e' quella scritta
+                            // sull'anagrafica dell'operaio, e scriverne
+                            // un'altra vorrebbe dire avere due verita'.
+                            $workerId = !empty($_POST['worker_id']) ? (int)$_POST['worker_id'] : null;
+                            if ($workerId) {
+                                $w = $this->conn->prepare(
+                                    'SELECT company FROM bb_workers WHERE id = :id LIMIT 1'
+                                );
+                                $w->execute([':id' => $workerId]);
+                                $companyName = (string)($w->fetchColumn() ?: '');
+                            }
+                            $companyId = null;
+                            break;
+
+                        case 'CLIENT':
+                            $clientId = !empty($_POST['client_id']) ? (int)$_POST['client_id'] : null;
+                            if ($clientId) {
+                                $c = $this->conn->prepare(
+                                    'SELECT name FROM bb_clients WHERE id = :id LIMIT 1'
+                                );
+                                $c->execute([':id' => $clientId]);
+                                $companyName = (string)($c->fetchColumn() ?: '');
+                            }
+                            $companyId = null;
+                            break;
+
+                        case 'INTERNAL':
+                            // Societa' del gruppo: non e' company_id, che
+                            // indica una consorziata. L'assegnazione vive in
+                            // bb_user_companies, che e' la tabella da cui
+                            // dipendono la scelta societa' al login e i
+                            // permessi per societa'.
+                            $societaId = !empty($_POST['societa_id']) ? (int)$_POST['societa_id'] : null;
+                            if ($societaId) {
+                                $s = $this->conn->prepare(
+                                    'SELECT nome FROM bb_group_companies WHERE id = :id LIMIT 1'
+                                );
+                                $s->execute([':id' => $societaId]);
+                                $companyName = (string)($s->fetchColumn() ?: '');
+                            }
+                            $companyId = null;
+                            break;
+
+                        default: // COMPANY: consorziata
+                            if ($companyId) {
+                                $cStmt = $this->conn->prepare(
+                                    'SELECT name FROM bb_companies WHERE id = :id LIMIT 1'
+                                );
+                                $cStmt->execute([':id' => $companyId]);
+                                $companyName = (string)($cStmt->fetchColumn() ?: '');
+                            }
+                            break;
                     }
 
                     $stmt = $this->conn->prepare("
                         INSERT INTO bb_users (
                             username, password, first_name, last_name, email, phone,
                             company, type, role, access_profile, company_id,
+                            worker_id, client_id, lingua,
                             active, confirmed, must_change_password,
                             created_by, created_at
                         ) VALUES (
                             :username, :password, :first_name, :last_name, :email, :phone,
                             :company, :type, :role, :access_profile, :company_id,
+                            :worker_id, :client_id, :lingua,
                             'Y', 1, 1,
                             :created_by, NOW()
                         )
@@ -1097,12 +1213,26 @@ final class UsersController
                         ':company'        => $companyName,
                         ':access_profile' => $accessProf,
                         ':company_id'     => $companyId,
+                        ':worker_id'      => $workerId,
+                        ':client_id'      => $clientId,
+                        ':lingua'         => $lingua,
                         ':created_by'     => (int)($auth['user_id'] ?? 0),
                     ]);
 
                     $newUserId    = (int)$this->conn->lastInsertId();
                     $tempPassword = $rawPassword;
                     $post         = [];
+
+                    // Un interno senza riga qui ricadrebbe sul Consorzio a
+                    // ogni accesso, qualunque societa' si fosse scelta nel
+                    // form: e' questa tabella che decide dove entra.
+                    if ($societaId) {
+                        $uc = $this->conn->prepare(
+                            'INSERT INTO bb_user_companies (user_id, group_company_id, is_default)
+                             VALUES (:uid, :gc, 1)'
+                        );
+                        $uc->execute([':uid' => $newUserId, ':gc' => $societaId]);
+                    }
 
                     if ($sendEmail && $email !== '') {
                         try {
@@ -1133,8 +1263,11 @@ final class UsersController
             }
         }
 
+        $lingue = \App\Service\Lingua::DISPONIBILI;
+
         Response::view('users/create_bob_user.html.twig', $request, compact(
-            'companies', 'success', 'error', 'tempPassword', 'post'
+            'companies', 'societa', 'clients', 'workers', 'ruoli', 'lingue',
+            'success', 'error', 'tempPassword', 'post'
         ));
     }
 
@@ -1174,7 +1307,7 @@ final class UsersController
 
         $stmt = $this->conn->prepare("
             SELECT u.id, u.username, u.email, u.first_name, u.last_name, u.phone, u.photo,
-                   u.role, u.type, u.company, u.company_id, u.created_at,
+                   u.role, u.type, u.company, u.company_id, u.created_at, u.lingua,
                    COALESCE(c.name, u.company, '') AS company_name
             FROM bb_users u
             LEFT JOIN bb_companies c ON c.id = u.company_id
@@ -1208,21 +1341,33 @@ final class UsersController
                 if ($firstName === '' || $lastName === '') {
                     $profileErr = 'Nome e cognome sono obbligatori.';
                 } else {
+                    // La lingua decide in che lingua arrivano le notifiche
+                    // sul telefono. Un valore inventato ricadrebbe
+                    // sull'italiano comunque, ma si controlla qui perche' la
+                    // colonna e' corta e un valore lungo verrebbe troncato.
+                    $lingua = (string)($_POST['lingua'] ?? 'it');
+                    if (!isset(\App\Service\Lingua::DISPONIBILI[$lingua])) {
+                        $lingua = 'it';
+                    }
+
                     $upd = $this->conn->prepare("
                         UPDATE bb_users
-                        SET first_name = :fn, last_name = :ln, email = :em, phone = :ph
+                        SET first_name = :fn, last_name = :ln, email = :em,
+                            phone = :ph, lingua = :lingua
                         WHERE id = :id
                     ");
                     $upd->execute([
-                        ':fn' => $firstName,
-                        ':ln' => $lastName,
-                        ':em' => $email,
-                        ':ph' => $phone,
-                        ':id' => $userId,
+                        ':fn'     => $firstName,
+                        ':ln'     => $lastName,
+                        ':em'     => $email,
+                        ':ph'     => $phone,
+                        ':lingua' => $lingua,
+                        ':id'     => $userId,
                     ]);
                     $userData['first_name'] = $firstName;
                     $userData['last_name']  = $lastName;
                     $userData['phone']      = $phone;
+                    $userData['lingua']     = $lingua;
                     $profileMsg = 'Profilo aggiornato con successo.';
                 }
             }
@@ -1329,9 +1474,11 @@ final class UsersController
             } catch (\Exception $e) {}
         }
 
+        $lingue = \App\Service\Lingua::DISPONIBILI;
+
         Response::view('users/profile.html.twig', $request, compact(
             'userData', 'fullName', 'initials', 'photo', 'hasPhoto',
-            'roleLabel', 'memberSince',
+            'roleLabel', 'memberSince', 'lingue',
             'profileMsg', 'profileErr', 'pwdMsg', 'pwdErr'
         ));
     }

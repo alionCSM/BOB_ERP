@@ -194,7 +194,14 @@ foreach ($mvcModuleMap as $prefix => $module) {
         // without the `users` module permission can't reach their workers.
         $bypass = $isCompanyScopedUser && $routePolicyMap->isCompanyScopedPermissionBypassRoute($uri);
 
-        if (!$bypass && !$authorization->canAccessModule($user, $module)) {
+        // Un operaio non ha nessun modulo e non deve averne: le poche rotte
+        // che sono sue — i suoi cantieri, la Zone di quelli — passano dalla
+        // lista bianca degli operai, che e' il controllo vero e sta poche
+        // righe piu' sotto. Senza questo, "I miei cantieri" chiederebbe il
+        // modulo `worksites` e li rimanderebbe tutti alla dashboard.
+        $bypassOperaio = $user->type === 'worker' && $routePolicyMap->isWorkerRouteAllowed($uri);
+
+        if (!$bypass && !$bypassOperaio && !$authorization->canAccessModule($user, $module)) {
             header('Location: /dashboard?no_permission=1');
             exit;
         }
@@ -247,7 +254,18 @@ $requestedWorksiteId =
     ?? $_POST['cantiere_id']
     ?? null;
 
-if ($requestedWorksiteId !== null) {
+// Le pagine dell'operaio restano fuori: quando dichiara una giornata il
+// cantiere lo sceglie da un elenco di cantieri aperti, e non e' detto che
+// sia uno di quelli che gli sono stati assegnati — lo mandano dove serve, e
+// la mattina dopo e' da un'altra parte. Il controllo che conta lo fa il
+// controller: il cantiere dev'essere aperto, e quello che nasce e' una
+// dichiarazione che l'ufficio guarda, non una presenza.
+//
+// Senza questa eccezione un operaio poteva dichiarare solo i cantieri a cui
+// era assegnato in BOB Zone, che e' un'altra cosa e quasi sempre vuota.
+$scontoOperaio = $user->type === 'worker' && str_starts_with($uri, '/io/');
+
+if ($requestedWorksiteId !== null && !$scontoOperaio) {
     $requestedWorksiteId = (int) $requestedWorksiteId;
     if (!$scopeService->canAccessWorksite($allowedWorksites, $requestedWorksiteId)) {
         if ($isCompanyScopedUser) {
