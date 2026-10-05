@@ -1806,11 +1806,41 @@ final class FieldwireController
             $st->execute([':w' => $w]);
             $tutte = $st->fetchAll(\PDO::FETCH_ASSOC);
 
-            if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
-                return $tutte;
+            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
+                $capo   = $ruolo === \App\Service\Zone\Accesso::CAPO;
+                $operai = [];
+                if ($capo) {
+                    $q = $this->conn->prepare("SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w AND ruolo = 'operaio'");
+                    $q->execute([':w' => $w]);
+                    $operai = array_fill_keys(array_map('intval', $q->fetchAll(\PDO::FETCH_COLUMN)), true);
+                }
+                $fuori = [];
+                foreach ($tutte as $a) {
+                    $mio = (int)($a['a_user_id'] ?? 0) === $io || ($a['a_ruolo'] ?? null) === $ruolo;
+                    // il capo segue anche quelli della squadra, senza compilarli
+                    // lui: vede chi l'ha fatto e chi no
+                    $squadra = $capo && !$mio && (
+                        ($a['a_ruolo'] ?? null) === \App\Service\Zone\Accesso::OPERAIO
+                        || isset($operai[(int)($a['a_user_id'] ?? 0)])
+                    );
+                    if ($mio || $squadra) {
+                        $a['solo_stato'] = !$mio;
+                        $fuori[] = $a;
+                    }
+                }
+                $tutte = $fuori;
             }
-            return array_values(array_filter($tutte, fn(array $a) =>
-                (int)($a['a_user_id'] ?? 0) === $io || ($a['a_ruolo'] ?? null) === $ruolo));
+
+            // chi l'ha fatto e chi manca in questo periodo: l'ufficio e il
+            // capo, che deve stare dietro alla sua squadra
+            if (in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CAPO], true)) {
+                $stato = (new \App\Service\Zone\ScadenzeModuli($this->conn))->stato($w);
+                foreach ($tutte as &$a) {
+                    $a['stato'] = $stato[(int)$a['id']] ?? null;
+                }
+                unset($a);
+            }
+            return $tutte;
         });
     }
 

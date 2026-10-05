@@ -203,6 +203,9 @@ final class Lingua
             'zona_modulo'          => '{cantiere}: {modulo}',
             'zona_accesso_t'       => 'Nuovo cantiere',
             'zona_accesso'         => 'Ora vedi {cantiere} nella Zone di BOB.',
+            'zona_promemoria_t'    => 'Moduli da compilare',
+            'zona_promemoria_uno'  => 'Ti manca ancora {elenco}.',
+            'zona_promemoria_piu'  => 'Ti mancano ancora: {elenco}.',
         ],
         'en' => [
             'giorni_settimana'     => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
@@ -369,6 +372,9 @@ final class Lingua
             'zona_modulo'          => '{cantiere}: {modulo}',
             'zona_accesso_t'       => 'New site',
             'zona_accesso'         => 'You can now see {cantiere} in BOB Zone.',
+            'zona_promemoria_t'    => 'Forms to fill in',
+            'zona_promemoria_uno'  => 'You still have to fill in {elenco}.',
+            'zona_promemoria_piu'  => 'You still have to fill in: {elenco}.',
         ],
         'sq' => [
             'giorni_settimana'     => ['e hene', 'e marte', 'e merkure', 'e enjte', 'e premte', 'e shtune', 'e diel'],
@@ -535,6 +541,9 @@ final class Lingua
             'zona_modulo'          => '{cantiere}: {modulo}',
             'zona_accesso_t'       => 'Kantier i ri',
             'zona_accesso'         => 'Tani e sheh {cantiere} ne BOB Zone.',
+            'zona_promemoria_t'    => 'Formulare per te plotesuar',
+            'zona_promemoria_uno'  => 'Te mungon ende {elenco}.',
+            'zona_promemoria_piu'  => 'Te mungojne ende: {elenco}.',
         ],
         'ro' => [
             'giorni_settimana'     => ['luni', 'marti', 'miercuri', 'joi', 'vineri', 'sambata', 'duminica'],
@@ -701,6 +710,9 @@ final class Lingua
             'zona_modulo'          => '{cantiere}: {modulo}',
             'zona_accesso_t'       => 'Santier nou',
             'zona_accesso'         => 'Acum vezi {cantiere} in BOB Zone.',
+            'zona_promemoria_t'    => 'Formulare de completat',
+            'zona_promemoria_uno'  => 'Mai ai de completat {elenco}.',
+            'zona_promemoria_piu'  => 'Mai ai de completat: {elenco}.',
         ],
     ];
 

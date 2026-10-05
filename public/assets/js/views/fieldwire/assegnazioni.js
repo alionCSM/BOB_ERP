@@ -47,6 +47,31 @@
         return isNaN(d) ? s : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
 
+    const PERIODO = { giornaliera: 'Oggi', settimanale: 'Questa settimana', una_volta: '' };
+
+    /**
+     * Chi l'ha fatto e chi manca nel periodo (oggi, questa settimana, o da
+     * sempre). Arriva solo all'ufficio e ai capi.
+     */
+    function statoRiga(a) {
+        const st = a.stato;
+        if (!st) return '';
+        const quando = PERIODO[a.frequenza] ? PERIODO[a.frequenza] + ': ' : '';
+        const fatti = st.fatti.length
+            ? `<span style="color:#22c55e"><i class="fas fa-check"></i> ${st.fatti.map(f => esc(f.nome)).join(', ')}</span>`
+            : '';
+        const mancano = st.mancano.length
+            ? `<span style="color:#f87171"><i class="fas fa-hourglass-half"></i> mancano ${st.mancano.map(esc).join(', ')}</span>`
+            : '';
+        if (!fatti && !mancano) {
+            return `<div class="sub">${esc(quando)}nessuno l'ha ancora compilato</div>`;
+        }
+        if (!mancano && a.a_ruolo !== 'ufficio') {
+            return `<div class="sub">${esc(quando)}${fatti} · tutti fatto</div>`;
+        }
+        return `<div class="sub">${esc(quando)}${[fatti, mancano].filter(Boolean).join(' · ')}</div>`;
+    }
+
     function riga(a) {
         const chi = a.a_user_id ? (a.persona || 'una persona') : (A_CHI[a.a_ruolo] || a.a_ruolo);
         const sub = [
@@ -63,10 +88,11 @@
                 <div style="flex:1;min-width:0;">
                     <div><b>${esc(a.modulo)}</b> → ${esc(chi)}</div>
                     <div class="sub">${esc(sub)} ${vis}</div>
+                    ${statoRiga(a)}
                 </div>
                 ${DA_UFFICIO
                     ? `<button data-togli-assegnazione="${a.id}">Togli</button>`
-                    : `<button data-compila="${a.template_id}" data-assegnazione="${a.id}" style="background:#2563eb;color:#fff;border:0;">Compila</button>`}
+                    : a.solo_stato ? '<span class="sub">squadra</span>' : `<button data-compila="${a.template_id}" data-assegnazione="${a.id}" style="background:#2563eb;color:#fff;border:0;">Compila</button>`}
             </div>`;
     }
 

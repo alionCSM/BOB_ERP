@@ -361,6 +361,8 @@ Esempi presenti in `includes/cron/` e `includes/services/`:
 0    7 * * *  www-data  php /var/www/bob.csmontaggi.it/includes/cron/lifting_calendar_check.php
 # Sync flag "emessa" fatture da Yard (tiene aggiornati BOB AI e dashboard)
 30   5 * * *  www-data  php /var/www/bob.csmontaggi.it/includes/cron/sync_emessa_yard.php
+# BOB Zone: promemoria dei moduli da compilare (solo a chi oggi e' in quel cantiere)
+0    16 * * *  www-data  php /var/www/bob.csmontaggi.it/includes/cron/zone_promemoria_moduli.php
 ```
 
 ---
