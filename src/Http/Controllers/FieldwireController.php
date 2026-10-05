@@ -123,6 +123,12 @@ final class FieldwireController
         // squadra che puo' assegnare se stesso non e' un permesso, e'
         // una formalita'.
         'accessi'               => 'ufficio',
+        // chi vede cosa e chi compila cosa lo decide l'ufficio
+        'condividiCliente'      => 'ufficio',
+        'cambiaVisibilita'      => 'ufficio',
+        'assegnazioniModuli'    => ['moduli', 1],
+        'salvaAssegnazione'     => 'ufficio',
+        'disattivaAssegnazione' => 'ufficio',
         'salvaAccesso'          => 'ufficio',
         'eliminaAccesso'        => 'ufficio',
     ];
@@ -793,6 +799,8 @@ final class FieldwireController
                 $submitterName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? '');
             }
 
+            $assegnazione = $this->assegnazioneDi($worksiteId, (int)($body['assegnazione_id'] ?? 0));
+
             $id = $this->formRepo->createSubmission([
                 'template_id'    => $tplId,
                 'worksite_id'    => $worksiteId,
@@ -802,6 +810,13 @@ final class FieldwireController
                 'submitted_by'   => (int)($user?->id ?? 0) ?: null,
                 'source'         => 'internal',
             ]);
+            // chi la legge: quello deciso nell'assegnazione; senza, l'ufficio
+            $this->conn->prepare('UPDATE bb_zone_form_submissions SET visibilita = :v, assegnazione_id = :a WHERE id = :id')
+                ->execute([
+                    ':v'  => $assegnazione['visibilita'] ?? 'ufficio',
+                    ':a'  => $assegnazione ? (int)$assegnazione['id'] : null,
+                    ':id' => $id,
+                ]);
             return ['id' => $id];
         });
     }
@@ -926,7 +941,10 @@ final class FieldwireController
             $name = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome cartella obbligatorio');
             $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0));
-            return ['id' => $id, 'name' => $name];
+            $vis = \App\Service\Zone\Accesso::visibilitaPer($this->ruoloQui($request), $body['visibilita'] ?? null);
+            $this->conn->prepare('UPDATE bb_zone_folders SET visibilita = :v WHERE id = :id')
+                ->execute([':v' => $vis, ':id' => $id]);
+            return ['id' => $id, 'name' => $name, 'visibilita' => $vis];
         });
     }
 
@@ -1129,10 +1147,13 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $w = (int)$request->param('id');
+            $st = $this->conn->prepare('SELECT zone_cliente FROM bb_worksites WHERE id = :w');
+            $st->execute([':w' => $w]);
             return [
-                'famiglie' => \App\Service\Zone\Accesso::FAMIGLIE,
-                'persone'  => (new \App\Repository\Zone\AccessoRepository($this->conn))
-                                  ->perCantiere($w),
+                'famiglie'     => \App\Service\Zone\Accesso::FAMIGLIE,
+                'persone'      => (new \App\Repository\Zone\AccessoRepository($this->conn))
+                                      ->perCantiere($w),
+                'zone_cliente' => (bool)$st->fetchColumn(),
             ];
         });
     }
@@ -1234,6 +1255,7 @@ final class FieldwireController
                     'file_name'    => $r['file_name'],
                     'file_type'    => $r['file_type'],
                     'note'         => $r['note'],
+                    'zone_visibilita' => $r['zone_visibilita'] ?? 'squadra',
                     'folder'       => $r['subcategory'] ?: 'altri',
                     'uploader'     => trim($r['uploader']) ?: '—',
                     'created_at'   => $r['created_at'],
@@ -1681,6 +1703,174 @@ final class FieldwireController
             'error' => 'Non hai accesso a questa parte del cantiere',
         ], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    // ─── Ufficio: condivisione, visibilita', moduli da compilare ──────────────
+
+    /** "Condividi col cliente": senza, un account cliente non vede niente. */
+    public function condividiCliente(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $attivo = !empty($this->jsonBody()['attivo']);
+            $this->conn->prepare('UPDATE bb_worksites SET zone_cliente = :a WHERE id = :w')
+                ->execute([':a' => $attivo ? 1 : 0, ':w' => (int)$request->param('id')]);
+            return ['zone_cliente' => $attivo];
+        });
+    }
+
+    /**
+     * Cambia chi vede una cosa: cartella, file, disegno, attivita', o un
+     * messaggio (nota interna / per il cliente). Un punto solo, perche' e'
+     * la stessa decisione su oggetti diversi, e sempre dell'ufficio.
+     */
+    public function cambiaVisibilita(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $body = $this->jsonBody();
+            $tipo = (string)($body['tipo'] ?? '');
+            $id   = (int)($body['id'] ?? 0);
+            $vis  = $body['visibilita'] ?? null;
+
+            // file: null vuol dire "come la cartella"
+            $ammessa = in_array($vis, \App\Service\Zone\Accesso::VISIBILITA, true)
+                || ($tipo === 'file' && $vis === null);
+
+            [$tabella, $colonna, $cantiere] = match ($tipo) {
+                'cartella' => ['bb_zone_folders', 'visibilita', 'worksite_id'],
+                'file'     => ['bb_zone_files', 'visibilita', 'worksite_id'],
+                'disegno'  => ['bb_worksite_documents', 'zone_visibilita', 'worksite_id'],
+                'attivita' => ['bb_zone_tasks', 'visibilita', 'worksite_id'],
+                'interna', 'per_cliente' => ['bb_zone_task_comments', $tipo, null],
+                default    => throw new \RuntimeException('Tipo non valido'),
+            };
+
+            if ($cantiere === null) {
+                // un messaggio: si controlla che sia di un'attivita' di qui
+                $st = $this->conn->prepare("
+                    SELECT c.id FROM bb_zone_task_comments c
+                    JOIN bb_zone_tasks t ON t.id = c.task_id
+                    WHERE c.id = :id AND t.worksite_id = :w
+                ");
+                $st->execute([':id' => $id, ':w' => $w]);
+                if (!$st->fetchColumn()) throw new \RuntimeException('Messaggio non trovato');
+                $this->conn->prepare("UPDATE bb_zone_task_comments SET `$colonna` = :v WHERE id = :id")
+                    ->execute([':v' => !empty($body['valore']) ? 1 : 0, ':id' => $id]);
+                return ['ok' => true];
+            }
+
+            if (!$ammessa) throw new \RuntimeException('Visibilita non valida');
+            $st = $this->conn->prepare("UPDATE `$tabella` SET `$colonna` = :v WHERE id = :id AND `$cantiere` = :w");
+            $st->execute([':v' => $vis, ':id' => $id, ':w' => $w]);
+            if ($st->rowCount() === 0) {
+                // nessuna riga: o non e' di questo cantiere, o era gia' cosi'
+                $c = $this->conn->prepare("SELECT 1 FROM `$tabella` WHERE id = :id AND `$cantiere` = :w");
+                $c->execute([':id' => $id, ':w' => $w]);
+                if (!$c->fetchColumn()) throw new \RuntimeException('Non trovato in questo cantiere');
+            }
+            return ['visibilita' => $vis];
+        });
+    }
+
+    /**
+     * I moduli da compilare del cantiere. L'ufficio li vede tutti; gli altri
+     * solo quelli che toccano a loro (per nome o per ruolo).
+     */
+    public function assegnazioniModuli(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w     = (int)$request->param('id');
+            $ruolo = $this->ruoloQui($request);
+            $io    = (int)($request->user()->id ?? 0);
+
+            $st = $this->conn->prepare("
+                SELECT a.*, t.name AS modulo,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS persona,
+                       (SELECT MAX(s.created_at) FROM bb_zone_form_submissions s
+                         WHERE s.assegnazione_id = a.id) AS ultima_compilazione
+                FROM   bb_zone_form_assegnazioni a
+                JOIN   bb_zone_form_templates t ON t.id = a.template_id
+                LEFT JOIN bb_users u ON u.id = a.a_user_id
+                WHERE  a.worksite_id = :w AND a.attiva = 1
+                ORDER BY t.name
+            ");
+            $st->execute([':w' => $w]);
+            $tutte = $st->fetchAll(\PDO::FETCH_ASSOC);
+
+            if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
+                return $tutte;
+            }
+            return array_values(array_filter($tutte, fn(array $a) =>
+                (int)($a['a_user_id'] ?? 0) === $io || ($a['a_ruolo'] ?? null) === $ruolo));
+        });
+    }
+
+    /** Assegna un modulo: a una persona o a un ruolo, una volta o a cadenza. */
+    public function salvaAssegnazione(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $body = $this->jsonBody();
+
+            $tpl = $this->formRepo->find((int)($body['template_id'] ?? 0));
+            if (!$tpl || ($tpl['worksite_id'] !== null && (int)$tpl['worksite_id'] !== $w)) {
+                throw new \RuntimeException('Modulo non trovato');
+            }
+
+            $aUser  = (int)($body['a_user_id'] ?? 0) ?: null;
+            $aRuolo = in_array($body['a_ruolo'] ?? null, ['capo', 'operaio', 'cliente', 'ufficio'], true)
+                ? $body['a_ruolo'] : null;
+            if (!$aUser && !$aRuolo) throw new \RuntimeException('Scegli a chi tocca compilarlo');
+
+            $frequenza = in_array($body['frequenza'] ?? '', ['una_volta', 'giornaliera', 'settimanale'], true)
+                ? $body['frequenza'] : 'una_volta';
+            $scadenza = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($body['scadenza'] ?? ''))
+                ? $body['scadenza'] : null;
+            $vis = in_array($body['visibilita'] ?? '', \App\Service\Zone\Accesso::VISIBILITA, true)
+                ? $body['visibilita'] : 'ufficio';
+
+            $this->conn->prepare("
+                INSERT INTO bb_zone_form_assegnazioni
+                    (worksite_id, template_id, a_ruolo, a_user_id, frequenza, scadenza, visibilita, created_by)
+                VALUES (:w, :t, :r, :u, :f, :s, :v, :by)
+            ")->execute([
+                ':w' => $w, ':t' => (int)$tpl['id'], ':r' => $aUser ? null : $aRuolo, ':u' => $aUser,
+                ':f' => $frequenza, ':s' => $scadenza, ':v' => $vis,
+                ':by' => (int)($request->user()->id ?? 0) ?: null,
+            ]);
+            return ['id' => (int)$this->conn->lastInsertId()];
+        });
+    }
+
+    /** Toglie un "da compilare". Le compilazioni gia' fatte restano. */
+    public function disattivaAssegnazione(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $this->conn->prepare('UPDATE bb_zone_form_assegnazioni SET attiva = 0 WHERE id = :a AND worksite_id = :w')
+                ->execute([':a' => (int)$request->param('aId'), ':w' => (int)$request->param('id')]);
+            return ['ok' => true];
+        });
+    }
+
+    /** L'assegnazione, se e' di questo cantiere e tocca a chi chiede. */
+    private function assegnazioneDi(int $worksiteId, int $assegnazioneId): ?array
+    {
+        if ($assegnazioneId <= 0) {
+            return null;
+        }
+        $st = $this->conn->prepare('SELECT * FROM bb_zone_form_assegnazioni WHERE id = :a AND worksite_id = :w AND attiva = 1');
+        $st->execute([':a' => $assegnazioneId, ':w' => $worksiteId]);
+        return $st->fetch(\PDO::FETCH_ASSOC) ?: null;
     }
 
     // ─── Chi vede cosa ────────────────────────────────────────────────────────

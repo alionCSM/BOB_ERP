@@ -585,7 +585,19 @@ final class WorksitesController
         }
 
         // Access check for workers/clients
-        if (in_array($user->type, ['worker', 'client'], true)) {
+        // Nella Zone il disegno lo vede chi la sua visibilita' fa entrare:
+        // se e' cosi', si apre senza bisogno della vecchia condivisione uno
+        // per uno. Le condivisioni fatte prima continuano a valere.
+        $daZone = false;
+        if (in_array($user->type, ['worker', 'client'], true) && $versionId <= 0) {
+            $acc   = new \App\Service\Zone\Accesso($this->conn);
+            $daZone = \App\Service\Zone\Accesso::vedeVisibilita(
+                $acc->ruolo($user, $worksiteId),
+                $disegno['zone_visibilita'] ?? null
+            );
+        }
+
+        if (!$daZone && in_array($user->type, ['worker', 'client'], true)) {
             $accessStmt = $this->conn->prepare("
                 SELECT 1 FROM bb_worksite_users
                 WHERE worksite_id = :wid AND user_id = :uid LIMIT 1

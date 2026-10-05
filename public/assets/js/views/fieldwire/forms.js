@@ -293,7 +293,12 @@
     }
 
     // ── FILLER ──────────────────────────────────────────────────────────────
-    async function openFill(tplId) {
+    // il "da compilare" da cui si e' partiti: la compilazione ne prende chi
+    // la puo' leggere (es. il DPI solo l'ufficio, il verbale anche il cliente)
+    let fillAssegnazione = null;
+
+    async function openFill(tplId, assegnazioneId) {
+        fillAssegnazione = assegnazioneId || null;
         const res = await api(`${base()}/${tplId}`);
         if (!res.ok) { alert('Errore'); return; }
         const tpl = res.data;
@@ -395,7 +400,7 @@
         const btn = root.querySelector('#bzf-submit'); btn.disabled = true; btn.textContent = 'Invio...';
         const res = await api(`${base()}/${tpl.id}/submit`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ values, submitter_name: submitter }),
+            body: JSON.stringify({ values, submitter_name: submitter, assegnazione_id: fillAssegnazione }),
         });
         if (res.ok) { alert('Modulo inviato!'); loadTemplates(); }
         else { alert('Errore: ' + (res.error || 'invio')); btn.disabled = false; btn.textContent = 'Invia'; }
@@ -441,5 +446,5 @@
         return isNaN(d) ? s : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    window.BZForms = { init, show, loadTemplates };
+    window.BZForms = { init, show, loadTemplates, openFill };
 })();
