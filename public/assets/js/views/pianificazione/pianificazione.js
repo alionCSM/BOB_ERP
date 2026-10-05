@@ -86,6 +86,14 @@ function updateRowTags(id) {
         if (i < 3) html += '<span class="pn-tag pn-tag-blue">' + esc(w.dataset.workerName) + '</span>';
     });
     if (workers.length > 3) html += '<span class="pn-tag pn-tag-blue">+' + (workers.length - 3) + '</span>';
+
+    // il campo del rientro compare solo con qualcuno in trasferta
+    const inTrasferta = [...workers].some(w => w.dataset.trasferta === '1');
+    row.classList.toggle('ha-trasferta', inTrasferta);
+    const rientro = row.querySelector('.pn-rientro-data')?.value;
+    if (inTrasferta && rientro) {
+        html += '<span class="pn-tag pn-tag-violet">rientro ' + esc(rientro.split('-').reverse().slice(0, 2).join('/')) + '</span>';
+    }
     if (cons > 0)            html += '<span class="pn-tag pn-tag-yellow">' + cons + ' cons.</span>';
     html += '<span class="pn-tag-count">' + (workers.length + cons) + '</span>';
     tagsEl.innerHTML = html;
@@ -128,6 +136,11 @@ function addRow(data) {
                         'trasferta a tutti' +
                     '</button>' +
                 '</div>' +
+                // la fine della trasferta: una data per cantiere, per tutta
+                // la squadra che dorme fuori
+                '<label class="pn-rientro">Rientro previsto ' +
+                    '<input type="date" class="pn-rientro-data" value="' + esc(data?.rientro_previsto || '') + '">' +
+                '</label>' +
                 '<div class="pn-workers" id="workers-' + id + '"></div>' +
                 '<div class="pn-select-wrap"><select id="ws-' + id + '" multiple placeholder="Cerca operaio..."></select></div>' +
             '</div>' +
@@ -633,6 +646,7 @@ function collectData() {
             db_id: row.dataset.dbId || '',
             cantiere,
             worksite_id: worksiteId,
+            rientro_previsto: row.querySelector('.pn-rientro-data')?.value || '',
             nostri,
             consorziate,
         });
@@ -650,9 +664,15 @@ async function savePiano() {
             body:    JSON.stringify(data),
         });
         const res = await r.json();
-        if (res.ok) { showToast('Piano salvato!'); loadPiano(); }
-        else alert(res.error || 'Errore');
+        if (res.ok) {
+            modificheNonSalvate = false;
+            showToast('Piano salvato!');
+            await loadPiano();
+            return true;
+        }
+        alert(res.error || 'Errore');
     } catch (e) { alert('Errore di rete'); }
+    return false;
 }
 
 async function loadPiano() {
@@ -669,8 +689,55 @@ async function loadPiano() {
         const r    = await fetch('/pianificazione/get?data=' + date);
         const data = await r.json();
         if (data.ok && data.cantieri?.length) data.cantieri.forEach(c => addRow(c));
+        mostraInvio(data.invio);
     } catch (e) { console.error(e); }
     updateStats();
+    // appena caricato, lo schermo e il database dicono la stessa cosa
+    modificheNonSalvate = false;
+}
+
+// ── Invio alle squadre ──────────────────────────────────────────────────────
+
+let modificheNonSalvate = false;
+
+function mostraInvio(invio) {
+    const btn   = document.getElementById('pn-invia-btn');
+    const label = document.getElementById('pn-invia-label');
+    const stato = document.getElementById('pn-invio-stato');
+    const n     = invio?.da_avvisare || 0;
+
+    btn.disabled = n === 0;
+    label.textContent = n === 0
+        ? 'Squadre avvisate'
+        : 'Invia alle squadre (' + n + ')';
+    stato.textContent = invio?.ultimo_invio
+        ? 'ultimo invio ' + invio.ultimo_invio.slice(11, 16)
+        : '';
+}
+
+async function inviaSquadre() {
+    // si manda quello che e' salvato: con modifiche a meta' sullo schermo
+    // gli operai riceverebbero il piano vecchio
+    if (modificheNonSalvate && !confirm('Ci sono modifiche non salvate: verranno salvate prima di inviare. Continuare?')) return;
+    if (modificheNonSalvate) {
+        const ok = await savePiano();
+        if (!ok) return;
+    }
+    const btn = document.getElementById('pn-invia-btn');
+    btn.disabled = true;
+    try {
+        const r   = await fetch('/pianificazione/invia', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ data: getDate() }),
+        });
+        const res = await r.json();
+        if (!res.ok) { alert(res.error || 'Errore'); btn.disabled = false; return; }
+        let msg = res.avvisati === 1 ? '1 operaio avvisato' : res.avvisati + ' operai avvisati';
+        if (res.senza_account > 0) msg += ' — ' + res.senza_account + ' senza app';
+        showToast(msg);
+        mostraInvio(res.invio);
+    } catch (e) { alert('Errore di rete'); btn.disabled = false; }
 }
 
 async function copyFromPrevious() {
@@ -727,6 +794,17 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('pn-copy-btn').addEventListener('click', copyFromPrevious);
     document.getElementById('pn-save-btn').addEventListener('click', savePiano);
     document.getElementById('pn-print-btn').addEventListener('click', printPiano);
+    document.getElementById('pn-invia-btn').addEventListener('click', inviaSquadre);
+
+    // qualsiasi tocco al piano lo rende "da salvare" prima dell'invio
+    document.getElementById('pianoList').addEventListener('input', function (e) {
+        modificheNonSalvate = true;
+        if (e.target.classList.contains('pn-rientro-data')) {
+            const row = e.target.closest('.pn-row');
+            if (row) updateRowTags(row.id.replace('row-', ''));
+        }
+    });
+    document.getElementById('pianoList').addEventListener('click', function () { modificheNonSalvate = true; });
     document.getElementById('pn-add-row-btn').addEventListener('click', function () { addRow(); });
     document.getElementById('sbSearch').addEventListener('input', updateSidebar);
 

@@ -33,6 +33,7 @@ final class Dati
     {
         $stmt = $this->conn->prepare("
             SELECT p.id, p.data, p.cantiere, p.worksite_id,
+                   p.rientro_previsto,
                    pn.capo_squadra AS sei_capo,
                    pn.trasferta,
                    pn.auto_targa,
@@ -56,6 +57,9 @@ final class Dati
             // l'app la usa per sapere se proporre cena e albergo; l'ufficio
             // la usa in approvazione per accorgersi di chi li dichiara senza
             $g['trasferta'] = (bool)$g['trasferta'];
+            // il rientro riguarda solo chi dorme fuori: a chi torna a casa la
+            // sera non serve, e vederlo lo confonderebbe
+            $g['rientro_previsto'] = $g['trasferta'] ? ($g['rientro_previsto'] ?: null) : null;
 
             $pid = (int)$g['id'];
             $squadre[$pid] ??= $this->squadra($pid, $workerId);

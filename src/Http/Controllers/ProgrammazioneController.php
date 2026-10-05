@@ -493,14 +493,20 @@ final class ProgrammazioneController
                 // programmare finche' l'ufficio non ha aperto la commessa.
                 if ($cantiere === '' && !$worksiteId) continue;
 
+                // il rientro vale solo con una data vera: un campo lasciato
+                // a meta' dal browser non deve diventare 0000-00-00
+                $rientro = trim((string)($c['rientro_previsto'] ?? ''));
+                $rientro = preg_match('/^\d{4}-\d{2}-\d{2}$/', $rientro) ? $rientro : null;
+
                 $stmt = $this->conn->prepare("
-                    INSERT INTO bb_pianificazione (data, cantiere, worksite_id, sort_order, created_by)
-                    VALUES (:data, :cantiere, :ws, :sort, :uid)
+                    INSERT INTO bb_pianificazione (data, cantiere, worksite_id, rientro_previsto, sort_order, created_by)
+                    VALUES (:data, :cantiere, :ws, :rientro, :sort, :uid)
                 ");
                 $stmt->execute([
                     ':data'     => $date,
                     ':cantiere' => $cantiere,
                     ':ws'       => $worksiteId,
+                    ':rientro'  => $rientro,
                     ':sort'     => $sortOrder++,
                     ':uid'      => $userId,
                 ]);
@@ -566,7 +572,7 @@ final class ProgrammazioneController
             Response::json(['ok' => false, 'error' => 'Nessun piano trovato per ' . $fromDate]);
         }
 
-        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
+        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, rientro_previsto, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
         $stmt->execute([':data' => $fromDate]);
         $sourceCantieri = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -577,8 +583,10 @@ final class ProgrammazioneController
             $stmt->execute([':data' => $toDate]);
 
             foreach ($sourceCantieri as $sc) {
-                $stmt = $this->conn->prepare("INSERT INTO bb_pianificazione (data, cantiere, worksite_id, sort_order, created_by) VALUES (:data, :cantiere, :ws, :sort, :uid)");
-                $stmt->execute([':data' => $toDate, ':cantiere' => $sc['cantiere'], ':ws' => $sc['worksite_id'] ?? null, ':sort' => $sc['sort_order'], ':uid' => $userId]);
+                // il rientro si copia: una trasferta dura piu' giorni, e
+                // copiare il piano di ieri e' proprio il caso in cui vale ancora
+                $stmt = $this->conn->prepare("INSERT INTO bb_pianificazione (data, cantiere, worksite_id, rientro_previsto, sort_order, created_by) VALUES (:data, :cantiere, :ws, :rientro, :sort, :uid)");
+                $stmt->execute([':data' => $toDate, ':cantiere' => $sc['cantiere'], ':ws' => $sc['worksite_id'] ?? null, ':rientro' => $sc['rientro_previsto'] ?? null, ':sort' => $sc['sort_order'], ':uid' => $userId]);
                 $newPid = (int)$this->conn->lastInsertId();
 
                 $stmt2 = $this->conn->prepare("SELECT worker_id, worker_name, auto_targa, note, capo_squadra, trasferta FROM bb_pianificazione_nostri WHERE pianificazione_id = :pid");
@@ -613,7 +621,7 @@ final class ProgrammazioneController
             Response::json(['ok' => false, 'error' => 'Data mancante']);
         }
 
-        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
+        $stmt = $this->conn->prepare("SELECT id, cantiere, worksite_id, rientro_previsto, sort_order FROM bb_pianificazione WHERE data = :data ORDER BY sort_order, id");
         $stmt->execute([':data' => $date]);
         $cantieri = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -641,12 +649,56 @@ final class ProgrammazioneController
                 'id'          => $pid,
                 'cantiere'    => $c['cantiere'],
                 'worksite_id' => $c['worksite_id'] !== null ? (int)$c['worksite_id'] : null,
+                'rientro_previsto' => $c['rientro_previsto'] ?: null,
                 'nostri'      => $stmt2->fetchAll(\PDO::FETCH_ASSOC),
                 'consorziate' => $stmt3->fetchAll(\PDO::FETCH_ASSOC),
             ];
         }
 
-        Response::json(['ok' => true, 'cantieri' => $result]);
+        Response::json([
+            'ok'       => true,
+            'cantieri' => $result,
+            // per il pulsante "Invia alle squadre": quanti aspettano ancora
+            'invio'    => $this->avvisi()->statoInvio($date),
+        ]);
+    }
+
+    // ── POST /pianificazione/invia ────────────────────────────────────────────
+
+    /**
+     * Manda il programma alle squadre, quando l'ufficio dice che e' pronto.
+     *
+     * Non parte da solo al salvataggio: il piano si costruisce un pezzo per
+     * volta, e un avviso a ogni salvataggio manderebbe agli operai un
+     * programma ancora a meta'. Va salvato prima: si manda quello che c'e'
+     * sul database, non quello che c'e' sullo schermo.
+     */
+    public function invia(Request $request): never
+    {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $date  = (string)($input['data'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            Response::json(['ok' => false, 'error' => 'Data mancante'], 400);
+        }
+
+        $userId = (int)($GLOBALS['authenticated_user']['user_id'] ?? 0);
+
+        try {
+            $esito = $this->avvisi()->pianificazione($date, $userId);
+        } catch (\Throwable $e) {
+            error_log('invio pianificazione: ' . $e->getMessage());
+            Response::json(['ok' => false, 'error' => 'Invio non riuscito: ' . $e->getMessage()], 500);
+        }
+
+        Response::json(['ok' => true] + $esito + ['invio' => $this->avvisi()->statoInvio($date)]);
+    }
+
+    private function avvisi(): \App\Service\Operaio\AvvisiOperaio
+    {
+        return new \App\Service\Operaio\AvvisiOperaio(
+            $this->conn,
+            new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+        );
     }
 
     // ── GET /pianificazione/print ─────────────────────────────────────────────

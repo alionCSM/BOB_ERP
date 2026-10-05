@@ -135,6 +135,11 @@ funzione, o su un lavoro programmato prima che la commessa fosse aperta: in
 quel caso vale solo `cantiere`, il testo. Senza `worksite_id` l'app non puo'
 precompilare la dichiarazione di presenza — mostra il nome e lascia scegliere.
 
+`rientro_previsto` (aaaa-mm-gg o `null`) e' la fine prevista della
+trasferta su quel cantiere. Arriva **solo a chi e' in trasferta**: chi la
+sera torna a casa non dorme fuori e il rientro non lo riguarda. In
+`/me/home` lo stesso dato e' `prossimo.rientro`.
+
 `squadra` arriva **a tutti**, non solo al capo. Non sono centoquaranta
 persone: sono i tre o quattro con cui uno sale in macchina domattina, e che
 vedra' comunque fra sei ore. Sapere la sera con chi si va, e chi comanda, e'
@@ -444,6 +449,29 @@ fallisce la decisione resta valida e l'ufficio non se ne accorge: e' finita
 nel log, e l'operaio lo scopre riaprendo l'app, che e' dove eravamo prima.
 
 Chi non ha un telefono registrato riceve comunque la riga dentro BOB.
+
+### Programma del giorno e documenti
+
+| Quando | Titolo | Categoria | Priorita' |
+|---|---|---|---|
+| l'ufficio preme **Invia alle squadre** | Programma del {data} | `pianificazione` | normal |
+| non e' piu' in squadra dopo un invio | Cambio di programma | `pianificazione` | high |
+| documento nuovo | Nuovo documento | `documenti` | normal |
+| documento sostituito o corretto | Documento aggiornato | `documenti` | normal |
+
+Il programma **non parte al salvataggio**: l'ufficio lo costruisce un pezzo
+per volta e lo manda quando e' definitivo. Se dopo l'invio cambia qualcosa
+e lo rimanda, l'avviso arriva solo a chi ha la giornata cambiata — cantiere,
+squadra, capo, auto, trasferta, rientro. Cosa e' gia' stato mandato sta in
+`bb_pianificazione_invii`.
+
+Il testo dice dove, con chi comanda e, se c'e', la trasferta col rientro:
+"MADE ITALIA SPA, Moncalieri. Capo squadra: Alliu Igli. Trasferta, rientro
+previsto il 17/10/2026."
+
+L'app usa la `category` per aprire la pagina giusta quando si tocca la
+notifica: `attendance` → presenze o assenze, `pianificazione` → oggi e
+domani, `documenti` → documenti.
 
 ## Cosa manca ancora
 
