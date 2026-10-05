@@ -687,7 +687,15 @@ final class FieldwireController
         if (!$worksite) { http_response_code(404); exit('Cantiere non trovato'); }
 
         try {
-            $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate($worksiteId, $worksite);
+            // le stesse regole della Zone: solo quello che chi scarica vede
+            $ruolo = $this->ruoloQui($request);
+            $io    = (int)($request->user()->id ?? 0);
+            $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate(
+                $worksiteId,
+                $worksite,
+                fn(array $t) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $t['visibilita'] ?? null),
+                fn(array $foto) => $this->filtraCommenti($foto, $ruolo, $io),
+            );
         } catch (\Throwable $e) {
             error_log('[FW report] ' . $e->getMessage());
             http_response_code(500);

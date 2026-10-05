@@ -27,9 +27,26 @@ final class ZoneReportService
 
     public function __construct(private PDO $conn) {}
 
-    public function generate(int $worksiteId, array $worksite): string
+    /**
+     * @param callable(array): bool|null           $vedeTask  quali attivita' entrano
+     * @param callable(array): array|null          $filtraFoto quali foto di un'attivita' entrano
+     *
+     * Il report lo scaricano anche capi e clienti: senza filtri ci finirebbero
+     * le attivita' "solo ufficio" e le note interne. Chi chiama passa le
+     * stesse regole della Zone; senza, e' il report dell'ufficio.
+     */
+    public function generate(int $worksiteId, array $worksite, ?callable $vedeTask = null, ?callable $filtraFoto = null): string
     {
         $tasks = $this->loadTasks($worksiteId);
+        if ($vedeTask) {
+            $tasks = array_values(array_filter($tasks, $vedeTask));
+        }
+        if ($filtraFoto) {
+            foreach ($tasks as &$t) {
+                $t['photos'] = $filtraFoto($t['photos']);
+            }
+            unset($t);
+        }
         $html  = $this->buildHtml($worksite, $tasks);
 
         $options = new Options();
@@ -53,7 +70,8 @@ final class ZoneReportService
 
         // foto per task (commenti con file_url)
         $cstmt = $this->conn->prepare("
-            SELECT task_id, text, file_url, author_name, created_at
+            SELECT task_id, text, file_url, author_name, created_at,
+                   interna, per_cliente, author_user_id
             FROM bb_zone_task_comments
             WHERE task_id = :t AND file_url IS NOT NULL AND file_url <> ''
             ORDER BY created_at ASC
