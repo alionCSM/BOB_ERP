@@ -585,6 +585,26 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/disegni/{docId}/dwg/convert',                             [FieldwireController::class, 'dwgConvert'])
            ->get( '/worksites/{id}/zone/disegni/{docId}/dwg-svg',                                  [FieldwireController::class, 'dwgSvg']);
 
+    // chat del cantiere e segnalazioni: stessi metodi per il sito e per l'app
+    require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
+    $router
+        ->get ('/worksites/{id}/zone/chat',                                 [ZoneDialogoController::class, 'chat'])
+        ->get ('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'canale'])
+        ->post('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'scriviCanale'])
+        ->post('/worksites/{id}/zone/chat/{canale}/foto',                   [ZoneDialogoController::class, 'fotoCanale'])
+        ->post('/worksites/{id}/zone/messaggi/{mid}/fissa',                 [ZoneDialogoController::class, 'fissa'])
+        ->post('/worksites/{id}/zone/messaggi/{mid}/elimina',               [ZoneDialogoController::class, 'eliminaMessaggio'])
+        ->get ('/worksites/{id}/zone/messaggi/{mid}/letto',                 [ZoneDialogoController::class, 'lettoDa'])
+        ->get ('/worksites/{id}/zone/messaggi/{mid}/foto',                  [ZoneDialogoController::class, 'fotoMessaggio'])
+        ->get ('/worksites/{id}/zone/segnalazioni',                         [ZoneDialogoController::class, 'segnalazioni'])
+        ->post('/worksites/{id}/zone/segnalazioni',                         [ZoneDialogoController::class, 'creaSegnalazione'])
+        ->get ('/worksites/{id}/zone/segnalazioni/{sid}',                   [ZoneDialogoController::class, 'segnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/messaggi',          [ZoneDialogoController::class, 'scriviSegnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/foto',              [ZoneDialogoController::class, 'fotoSegnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/stato',             [ZoneDialogoController::class, 'statoSegnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/visibilita',        [ZoneDialogoController::class, 'visibilitaSegnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/attivita',          [ZoneDialogoController::class, 'attivitaDaSegnalazione']);
+
     $router->dispatch($request, $container);
 }
 
@@ -846,6 +866,26 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/disegni/{docId}/annotations',      [FieldwireController::class, 'annotations'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg',              [FieldwireController::class, 'dwgMeta'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg-svg',          [FieldwireController::class, 'dwgSvg']);
+
+    // chat del cantiere e segnalazioni, gli stessi del sito
+    require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
+    $router
+        ->get ('/api/v1/zone/{id}/chat',                                    [ZoneDialogoController::class, 'chat'])
+        ->get ('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'canale'])
+        ->post('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'scriviCanale'])
+        ->post('/api/v1/zone/{id}/chat/{canale}/foto',                      [ZoneDialogoController::class, 'fotoCanale'])
+        ->post('/api/v1/zone/{id}/messaggi/{mid}/fissa',                    [ZoneDialogoController::class, 'fissa'])
+        ->post('/api/v1/zone/{id}/messaggi/{mid}/elimina',                  [ZoneDialogoController::class, 'eliminaMessaggio'])
+        ->get ('/api/v1/zone/{id}/messaggi/{mid}/letto',                    [ZoneDialogoController::class, 'lettoDa'])
+        ->get ('/api/v1/zone/{id}/messaggi/{mid}/foto',                     [ZoneDialogoController::class, 'fotoMessaggio'])
+        ->get ('/api/v1/zone/{id}/segnalazioni',                            [ZoneDialogoController::class, 'segnalazioni'])
+        ->post('/api/v1/zone/{id}/segnalazioni',                            [ZoneDialogoController::class, 'creaSegnalazione'])
+        ->get ('/api/v1/zone/{id}/segnalazioni/{sid}',                      [ZoneDialogoController::class, 'segnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/messaggi',             [ZoneDialogoController::class, 'scriviSegnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/foto',                 [ZoneDialogoController::class, 'fotoSegnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/stato',                [ZoneDialogoController::class, 'statoSegnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/visibilita',           [ZoneDialogoController::class, 'visibilitaSegnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/attivita',             [ZoneDialogoController::class, 'attivitaDaSegnalazione']);
 
     $router->dispatch($request, $container);
 }

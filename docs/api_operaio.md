@@ -594,3 +594,60 @@ Il rifiuto vuole un motivo, bloccato lato pagina. Finisce nell'app, ed e' la
 differenza fra "no" e "no, in quella settimana siamo in tre a Lecco": col
 secondo uno ripropone altre date invece di venire in ufficio a chiedere
 perche'.
+
+
+## Chat del cantiere e segnalazioni (BOB Zone)
+
+Stessi metodi per il sito (`/worksites/{id}/zone/...`) e per l'app
+(`/api/v1/zone/{id}/...`). Risposte `{ok, data}` come il resto della Zone.
+Serve un ruolo sul cantiere (ufficio, capo, operaio, cliente), se no 403.
+
+### Chat
+
+| | |
+|---|---|
+| `GET chat` | canali che posso aprire: `{canali:[{canale, non_letti, ultimo, fissati}], puo_fissare, rapidi}` |
+| `GET chat/{canale}?dopo=N` | messaggi (gli ultimi 80, o solo quelli dopo N) e `fissati`; aprire = letto |
+| `POST chat/{canale}` | `{testo}` oppure `{rapido}`; `fissa: true` (capo/ufficio) lo fissa e avvisa tutti |
+| `POST chat/{canale}/foto` | multipart `photo`, `testo` facoltativo |
+| `POST messaggi/{mid}/fissa` | `{si}` capo e ufficio |
+| `POST messaggi/{mid}/elimina` | i propri; l'ufficio tutti |
+| `GET messaggi/{mid}/letto` | `{letto:[nomi], non_letto:[nomi]}` |
+| `GET messaggi/{mid}/foto` | l'immagine, a chi puo' leggere il messaggio |
+
+Canali: `squadra` (ufficio, capi, operai), `capi` (ufficio, capi), `cliente`
+(ufficio, capi, cliente — solo con "Condividi col cliente" acceso).
+
+Messaggi rapidi: si manda la chiave, ognuno la legge nella sua lingua:
+`materiale_arrivato, serve_materiale, finito_oggi, arrivati, ritardo,
+pausa_meteo, serve_aiuto, ok`. Le righe di BOB nel filo di una segnalazione
+hanno `sistema: true` e `rapido` = `sys_presa | sys_risolta | sys_aperta`
+(con `autore` = chi l'ha fatto, `testo` = l'esito).
+
+Ogni messaggio: `id, user_id, autore, autore_tipo, testo, rapido, ha_foto,
+sistema, fissato, eliminato, mio, created_at`.
+
+Push: uno per canale finche' uno non lo apre (non uno per messaggio); gli
+avvisi fissati sempre. Link `/worksites/{id}/zone#chat-{canale}`.
+
+### Segnalazioni
+
+| | |
+|---|---|
+| `GET segnalazioni` | `{segnalazioni:[...], puo_gestire, tipi}` — prima le aperte, le piu' gravi in cima |
+| `POST segnalazioni` | `{tipo, gravita, testo}`; le foto dopo, una per volta |
+| `GET segnalazioni/{sid}?dopo=N` | `{segnalazione, messaggi, puo_gestire, da_ufficio}`; aprire = letto |
+| `POST segnalazioni/{sid}/messaggi` | `{testo}` |
+| `POST segnalazioni/{sid}/foto` | multipart `photo` |
+| `POST segnalazioni/{sid}/stato` | `{stato: presa|risolta|aperta, esito}` capo e ufficio |
+| `POST segnalazioni/{sid}/visibilita` | `{visibilita}` solo ufficio |
+| `POST segnalazioni/{sid}/attivita` | `{name}` ne fa un'attivita' per la squadra (capo e ufficio) |
+
+`tipo`: sicurezza, materiale, danno, ritardo, qualita, altro.
+`gravita`: bassa, alta, blocca. `stato`: aperta, presa, risolta.
+
+Chi la vede: l'ufficio, chi l'ha fatta, e per visibilita' (da capo o
+operaio nasce `capi`, dal cliente `cliente`). Avvisi: nuova → ufficio del
+cantiere e capi (urgente se `blocca` o `sicurezza`); cambio di stato → chi
+l'ha fatta; risposte → chi l'ha fatta e chi la gestisce, una per volta
+finche' non la apre. Link `/worksites/{id}/zone#segnalazione-{sid}`.
