@@ -245,6 +245,8 @@ final class AttendanceController
         try {
             if ($azione === 'approva') {
                 $repo->approva($id, [
+                    // il cantiere scelto dall'ufficio: scritto a mano o sbagliato
+                    'worksite_id'   => (int)($_POST['worksite_id'] ?? 0),
                     'turno'         => (string)($_POST['turno'] ?? ''),
                     'pranzo'        => (string)($_POST['pranzo'] ?? '-'),
                     'cena'          => (string)($_POST['cena'] ?? '-'),

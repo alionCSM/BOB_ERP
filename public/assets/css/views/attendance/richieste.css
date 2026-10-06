@@ -214,3 +214,45 @@
     color: #94a3b8;
     font-size: 14px;
 }
+
+/* ── Cantiere: si cambia prima di approvare ──────────────────────────────── */
+.ri-cantiere-scelta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+.ri-cantiere-scelta.da-scegliere { border-color: #f59e0b; background: #fffbeb; }
+.ri-cs-etichetta { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748b; }
+.ri-cs-nome { flex: 1; min-width: 160px; font-size: 13px; font-weight: 600; color: #0f172a; }
+.ri-cs-cerca { flex-basis: 100%; }
+.ri-cs-cerca[hidden] { display: none; }
+.ri-cs-cerca input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    font-size: 13px;
+}
+.ri-cs-risultati { margin-top: 6px; max-height: 220px; overflow-y: auto; }
+.ri-cs-risultato {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.ri-cs-risultato:hover { background: #e0f2fe; }
+.ri-cs-risultato small { color: #64748b; }
+.ri-cs-vuoto { font-size: 12px; color: #64748b; padding: 6px 10px; }

@@ -651,3 +651,18 @@ operaio nasce `capi`, dal cliente `cliente`). Avvisi: nuova → ufficio del
 cantiere e capi (urgente se `blocca` o `sicurezza`); cambio di stato → chi
 l'ha fatta; risposte → chi l'ha fatta e chi la gestisce, una per volta
 finche' non la apre. Link `/worksites/{id}/zone#segnalazione-{sid}`.
+
+
+## Mezze giornate e cantiere scritto a mano (`POST /me/presenze`)
+
+- `worksite_id` puo' mancare se c'e' `cantiere_testo`: l'operaio non cerca fra
+  i cantieri, scrive dov'era quando quello della pianificazione non e' giusto.
+  L'ufficio sceglie il cantiere vero su `/attendance/richieste` prima di
+  approvare (senza, l'approvazione non passa).
+- Una giornata non supera 1: `Intero` vale 1, `Mezzo` 0.5, contando quelle in
+  attesa e le presenze gia' registrate. Due mezze su due cantieri si';
+  oltre, **422** con il motivo (non 409: il 409 resta "c'era gia'", che
+  l'app toglie dalla coda in silenzio).
+- Nella lista dell'operaio, finche' l'ufficio non sceglie, `cantiere_nome` e'
+  il testo scritto a mano. Dopo l'approvazione la dichiarazione prende il
+  cantiere dove e' stata registrata; `cantiere_testo` resta.
