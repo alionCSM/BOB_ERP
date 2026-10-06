@@ -412,6 +412,9 @@ final class ApiV1OperaioController
 
         foreach ($cantieri as &$c) {
             $c['id']      = (int)$c['id'];
+            // il ruolo decide cosa l'app mostra; `accessi` resta per le
+            // versioni dell'app che conoscono solo i livelli
+            $c['ruolo']   = $accesso->ruolo($utente, $c['id']);
             $c['accessi'] = $accesso->tutti($utente, $c['id']);
         }
         unset($c);
@@ -447,6 +450,12 @@ final class ApiV1OperaioController
         $utente  = $request->user();
         $operaio = (int)($utente->worker_id ?? 0);
         $lingua  = \App\Service\Lingua::normalizza($utente->lingua ?? null);
+
+        // Un cliente usa la stessa app: niente presenze ne' ferie, solo i
+        // cantieri che l'ufficio condivide con lui.
+        if (($utente->type ?? '') === 'client') {
+            $this->homeCliente($utente, $lingua);
+        }
 
         if (!$operaio) {
             Response::json([
@@ -516,7 +525,65 @@ final class ApiV1OperaioController
                 'assenze'  => (int)$attesaAssenze->fetchColumn(),
             ],
             'cantieri' => count($cantieriZone),
+            // quello che tocca a lui nella Zone: attivita' e moduli da fare
+            'zona'     => $cantieriZone
+                ? (new \App\Service\Zone\LeMie($this->conn))->conti((int)$utente->id)
+                : ['attivita' => 0, 'da_compilare' => 0],
             'menu'     => $menu,
+        ]);
+    }
+
+    /** La home di un cliente: chi e', i suoi cantieri, cosa gli tocca. */
+    private function homeCliente(object $utente, string $lingua): never
+    {
+        $cantieri = (new \App\Repository\Zone\AccessoRepository($this->conn))
+            ->cantieriDi((int)$utente->id);
+
+        $menu = [];
+        if ($cantieri) {
+            $menu[] = ['chiave' => 'cantieri', 'titolo' => \App\Service\Lingua::testo('menu_cantieri', $lingua)];
+        }
+
+        Response::json([
+            'success'   => true,
+            'tipo'      => 'cliente',
+            'utente'    => [
+                'nome'     => trim((string)($utente->first_name ?? '')),
+                'lingua'   => $lingua,
+                'sei_capo' => false,
+            ],
+            'prossimo'  => null,
+            'da_segnare'=> 0,
+            'in_attesa' => ['presenze' => 0, 'assenze' => 0],
+            'cantieri'  => count($cantieri),
+            'zona'      => (new \App\Service\Zone\LeMie($this->conn))->conti((int)$utente->id),
+            'menu'      => $menu,
+        ]);
+    }
+
+    // ── GET /api/v1/me/attivita ──────────────────────────────────────────────
+
+    /**
+     * Le attivita' che toccano a me, in tutti i miei cantieri.
+     * Con `?pronte=1` anche quelle completate e non ancora verificate.
+     */
+    public function mieAttivita(Request $request): never
+    {
+        Response::json([
+            'success'  => true,
+            'attivita' => (new \App\Service\Zone\LeMie($this->conn))
+                ->attivita((int)$request->user()->id, !empty($_GET['pronte'])),
+        ]);
+    }
+
+    // ── GET /api/v1/me/da-compilare ──────────────────────────────────────────
+
+    /** I moduli che devo compilare, e se per questo periodo li ho gia' fatti. */
+    public function daCompilare(Request $request): never
+    {
+        Response::json([
+            'success' => true,
+            'moduli'  => (new \App\Service\Zone\LeMie($this->conn))->daCompilare((int)$request->user()->id),
         ]);
     }
 

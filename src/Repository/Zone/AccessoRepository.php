@@ -51,6 +51,9 @@ final class AccessoRepository
                    u.username,
                    TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS nome,
                    u.type, u.company,
+                   -- chi era assegnato da prima ha il ruolo che gli darebbe
+                   -- l'assegnazione di oggi: cliente se e' un cliente
+                   COALESCE(a.ruolo, IF(u.type = 'client', 'cliente', 'operaio')) AS ruolo,
                    a.id IS NOT NULL AS ha_livelli
             FROM   bb_worksite_users wu
             JOIN   bb_users u ON u.id = wu.user_id
@@ -84,13 +87,15 @@ final class AccessoRepository
      */
     public function cantieriDi(int $userId): array
     {
-        $somma = implode('` + a.`', array_keys(Accesso::FAMIGLIE));
+        // Il ruolo decide, non piu' i sei livelli. Un cliente compare solo
+        // dove l'ufficio ha acceso "Condividi col cliente": un cantiere in
+        // elenco che poi non apre niente fa pensare a un guasto.
         $stmt  = $this->conn->prepare("
-            SELECT w.id, w.worksite_code, w.name, w.location, w.status
+            SELECT w.id, w.worksite_code, w.name, w.location, w.status, a.ruolo
             FROM   bb_zone_accessi a
             JOIN   bb_worksites w ON w.id = a.worksite_id
             WHERE  a.user_id = :u
-              AND  (a.`$somma`) > 0
+              AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
             ORDER BY w.worksite_code DESC
         ");
         $stmt->execute([':u' => $userId]);
@@ -105,22 +110,26 @@ final class AccessoRepository
      * riga sola, e l'unico su (cantiere, utente) lo garantisce qui invece
      * che sperando nei tempi.
      *
-     * @param array<string, int> $livelli
+     * @param array<string, int> $livelli  i vecchi livelli: si scrivono ancora,
+     *                                       finche' le pagine nuove non sono in uso
+     * @param string|null $ruolo capo, operaio, cliente; null = dal tipo di account
      */
-    public function salva(int $worksiteId, int $userId, array $livelli, int $daChi): void
+    public function salva(int $worksiteId, int $userId, array $livelli, int $daChi, ?string $ruolo = null): void
     {
+        $ruolo = $this->ruoloValido($ruolo, $userId, $worksiteId);
+
         $famiglie = array_keys(Accesso::FAMIGLIE);
         $colonne  = '`' . implode('`, `', $famiglie) . '`';
         $segnali  = implode(', ', array_map(static fn($f) => ':' . $f, $famiglie));
         $aggiorna = implode(', ', array_map(static fn($f) => "`$f` = VALUES(`$f`)", $famiglie));
 
         $stmt = $this->conn->prepare("
-            INSERT INTO bb_zone_accessi (worksite_id, user_id, $colonne, created_by)
-            VALUES (:w, :u, $segnali, :da)
-            ON DUPLICATE KEY UPDATE $aggiorna
+            INSERT INTO bb_zone_accessi (worksite_id, user_id, ruolo, $colonne, created_by)
+            VALUES (:w, :u, :ruolo, $segnali, :da)
+            ON DUPLICATE KEY UPDATE ruolo = VALUES(ruolo), $aggiorna
         ");
 
-        $parametri = [':w' => $worksiteId, ':u' => $userId, ':da' => $daChi ?: null];
+        $parametri = [':w' => $worksiteId, ':u' => $userId, ':ruolo' => $ruolo, ':da' => $daChi ?: null];
         foreach ($famiglie as $f) {
             $parametri[':' . $f] = $this->livelloValido($livelli[$f] ?? Accesso::VEDE);
         }
@@ -153,6 +162,30 @@ final class AccessoRepository
         // basta che sia sparito da una delle due: le righe vecchie di
         // bb_worksite_users non hanno un accesso Zone da togliere
         return $tolto || $altro->rowCount() > 0;
+    }
+
+    /**
+     * Il ruolo, controllato. Un account cliente e' cliente e basta: nessun
+     * form, nemmeno scritto a mano, lo fa diventare capo di una squadra. Un
+     * account interno non diventa cliente.
+     */
+    private function ruoloValido(?string $ruolo, int $userId, int $worksiteId): string
+    {
+        $stmt = $this->conn->prepare('SELECT type FROM bb_users WHERE id = :u');
+        $stmt->execute([':u' => $userId]);
+        if ((string)$stmt->fetchColumn() === 'client') {
+            return Accesso::CLIENTE;
+        }
+        if (in_array($ruolo, [Accesso::CAPO, Accesso::OPERAIO], true)) {
+            return $ruolo;
+        }
+        // Nessun ruolo chiesto (la pagina vecchia manda solo i livelli): si
+        // tiene quello che c'era. Se no, cambiare un livello a un capo lo
+        // farebbe tornare operaio senza che nessuno l'abbia deciso.
+        $c = $this->conn->prepare('SELECT ruolo FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
+        $c->execute([':w' => $worksiteId, ':u' => $userId]);
+        $attuale = (string)$c->fetchColumn();
+        return in_array($attuale, [Accesso::CAPO, Accesso::OPERAIO], true) ? $attuale : Accesso::OPERAIO;
     }
 
     /**

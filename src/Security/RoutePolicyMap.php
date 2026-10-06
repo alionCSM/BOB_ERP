@@ -131,6 +131,9 @@ class RoutePolicyMap
         // cantiere — preventivi, fatture, ordini — resta dell'ufficio.
         '#^/worksites/my(/|$)#',
         '#^/worksites/\d+/zone(/|$)#',
+        // il file di un disegno della Zone: chi lo apre lo decide il
+        // controller, con la visibilita' del disegno (o la condivisione)
+        '#^/worksites/\d+/disegni/\d+/view$#',
         // c'era /my_worksites, che non e' mai esistito come rotta: il menu
         // ha sempre puntato a /worksites/my, quindi "I miei cantieri" dava
         // "Access denied" da sempre. Nessuno se n'era accorto perche'

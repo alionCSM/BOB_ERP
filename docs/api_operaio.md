@@ -397,6 +397,74 @@ suo mestiere.
 **Gli endpoint della Zone restano quelli di sempre** (`/api/v1/zone/{id}/...`):
 non cambia niente nelle chiamate, cambia solo chi riceve 403.
 
+### Ruoli e chi vede cosa
+
+Ogni persona assegnata ha un **ruolo**: `capo`, `operaio`, `cliente`
+(l'ufficio e' chi ha il modulo `zone`). In `/me/zone` ogni cantiere ha
+`ruolo`; `accessi` resta per le versioni vecchie dell'app.
+
+Ogni cosa della Zone ha una **visibilita'**: `ufficio`, `squadra` (capi e
+operai), `capi`, `cliente` (ufficio e cliente), `tutti`. Il filtro e' sul
+server: una cosa che uno non vede non arriva nella risposta. Il cliente vede
+qualcosa solo dove l'ufficio ha acceso "Condividi col cliente".
+
+| | capo | operaio | cliente |
+|---|---|---|---|
+| crea attivita', voci di checklist | si' | no | no |
+| sposta / spunta | si' | solo le sue o della squadra | no |
+| "Verificato" | no (solo ufficio) | no | no |
+| scrive messaggi e foto | si' | si' | si' (li legge solo l'ufficio) |
+| carica file | si' | no | no |
+
+## GET /api/v1/me/attivita
+
+Le attivita' che toccano a me in tutti i miei cantieri: assegnate a me per
+nome, alla squadra (se ci sono), ai capi (se sono capo), al cliente (se sono
+il cliente). Solo aperte e in corso; con `?pronte=1` anche le completate non
+ancora verificate. Prima le urgenti, poi chi scade prima.
+
+```json
+{ "success": true,
+  "attivita": [
+    { "id": 5, "worksite_id": 2, "cantiere_nome": "MADE ITALIA SPA", "worksite_code": "C26-867",
+      "name": "Montare scaffale A", "status": "open", "priority": 2,
+      "assegnata_a": "persona", "due_date": "2026-10-08", "in_ritardo": false,
+      "ruolo": "capo" } ] }
+```
+
+## GET /api/v1/me/da-compilare
+
+I moduli assegnati a me, con lo stato del periodo: `giornaliera` e' fatto se
+l'ho compilato oggi, `settimanale` da lunedi', `una_volta` se l'ho fatto. Ognuno
+compila il suo. Prima quelli da fare (in ritardo in cima).
+
+```json
+{ "success": true,
+  "moduli": [
+    { "id": 3, "worksite_id": 2, "template_id": 7, "modulo": "Verbale giornaliero",
+      "cantiere_nome": "MADE ITALIA SPA", "frequenza": "giornaliera",
+      "scadenza": null, "fatto": false, "in_ritardo": false } ] }
+```
+
+Si compila con `POST /api/v1/zone/{worksite_id}/forms/{template_id}/submit`
+passando `assegnazione_id`: la compilazione prende la visibilita' decisa
+dall'ufficio per quel modulo.
+
+In `/me/home`, `zona` ha i due numeri: `{ "attivita": 3, "da_compilare": 1 }`.
+
+## Il cliente nell'app
+
+Stessa app, stesso login. Per un account cliente `/me/home` risponde con
+`"tipo": "cliente"`, niente presenze ne' ferie, e nel menu solo `cantieri`
+(se ne ha). Le rotte `/me/presenze`, `/me/ferie`, `/me/documenti` gli
+rispondono 403: sono dell'operaio.
+
+### Avvisi della Zone
+
+Categoria `zone`, nella lingua di ciascuno: attivita' nuova o riassegnata (a
+chi tocca, se la vede), modulo da compilare, cantiere nuovo (al cliente solo
+quando l'ufficio accende la condivisione).
+
 ### Come si assegna
 
 Dalla scheda del cantiere, **Assegna utente**. Assegnare il cantiere e dare

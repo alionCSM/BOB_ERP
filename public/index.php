@@ -551,6 +551,11 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get( '/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'accessi'])
            ->post('/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'salvaAccesso'])
            ->post('/worksites/{id}/zone/accessi/elimina',                                         [FieldwireController::class, 'eliminaAccesso'])
+           ->post('/worksites/{id}/zone/condividi-cliente',                                       [FieldwireController::class, 'condividiCliente'])
+           ->post('/worksites/{id}/zone/visibilita',                                              [FieldwireController::class, 'cambiaVisibilita'])
+           ->get( '/worksites/{id}/zone/forms/assegnazioni',                                      [FieldwireController::class, 'assegnazioniModuli'])
+           ->post('/worksites/{id}/zone/forms/assegnazioni',                                      [FieldwireController::class, 'salvaAssegnazione'])
+           ->post('/worksites/{id}/zone/forms/assegnazioni/{aId}/disattiva',                      [FieldwireController::class, 'disattivaAssegnazione'])
            ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
            ->get( '/worksites/{id}/zone/media',                                                   [FieldwireController::class, 'media'])
            ->get( '/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'formTemplates'])
@@ -779,6 +784,8 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/me/ferie',                 [ApiV1OperaioController::class, 'creaFerie'])
             ->post('/api/v1/me/lingua',                [ApiV1OperaioController::class, 'cambiaLingua'])
             ->get('/api/v1/me/zone',                   [ApiV1OperaioController::class, 'zone'])
+            ->get('/api/v1/me/attivita',               [ApiV1OperaioController::class, 'mieAttivita'])
+            ->get('/api/v1/me/da-compilare',           [ApiV1OperaioController::class, 'daCompilare'])
             ->get('/api/v1/me/home',                   [ApiV1OperaioController::class, 'home'])
             ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
             ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
@@ -813,6 +820,8 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->post('/api/v1/zone/{id}/tasks/{taskId}/comments/{commentId}/delete',
                                                                      [FieldwireController::class, 'deleteComment'])
         ->get( '/api/v1/zone/{id}/photo',                            [FieldwireController::class, 'zonePhoto'])
+        ->get( '/api/v1/zone/{id}/media',                            [FieldwireController::class, 'media'])
+        ->get( '/api/v1/zone/{id}/report',                           [FieldwireController::class, 'report'])
         ->get( '/api/v1/zone/{id}/users',                            [FieldwireController::class, 'bobUsers'])
         // file: si consultano e si scaricano, non si riordinano
         ->get( '/api/v1/zone/{id}/files',                            [FieldwireController::class, 'files'])
@@ -824,6 +833,7 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->post('/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'postFileComment'])
         // moduli: si compilano in cantiere, i template si fanno da ufficio
         ->get( '/api/v1/zone/{id}/forms',                            [FieldwireController::class, 'formTemplates'])
+        ->get( '/api/v1/zone/{id}/forms/assegnazioni',               [FieldwireController::class, 'assegnazioniModuli'])
         ->get( '/api/v1/zone/{id}/forms/submissions',                [FieldwireController::class, 'formSubmissions'])
         ->get( '/api/v1/zone/{id}/forms/submission/{subId}',         [FieldwireController::class, 'formSubmission'])
         ->get( '/api/v1/zone/{id}/forms/{tplId}',                    [FieldwireController::class, 'formTemplate'])
@@ -831,6 +841,7 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/form-file',                        [FieldwireController::class, 'formFile'])
         // disegni: solo da guardare, con i pin dei task sopra
         ->get( '/api/v1/zone/{id}/disegni',                          [FieldwireController::class, 'disegni'])
+        ->get( '/api/v1/zone/{id}/disegni/{docId}/file',             [FieldwireController::class, 'fileDisegno'])
         ->get( '/api/v1/zone/{id}/floorplans',                       [FieldwireController::class, 'floorplans'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/annotations',      [FieldwireController::class, 'annotations'])
         ->get( '/api/v1/zone/{id}/disegni/{docId}/dwg',              [FieldwireController::class, 'dwgMeta'])

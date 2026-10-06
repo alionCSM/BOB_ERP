@@ -447,6 +447,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
         {# Moduli #}
         <div class="bz-view" id="view-forms">
+            <div id="bz-assegnazioni-root"></div>
             <div id="bz-forms-root"></div>
         </div>
 
@@ -467,6 +468,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-files-main">
                     <div class="bz-files-bar">
                         <div class="bz-files-title" id="bz-files-title">Tutti i file</div>
+                        <div class="bz-folder-vis" id="bz-folder-vis"></div>
                         <div style="display:flex;gap:8px;">
                             {% if accessi.file > 1 %}
                             <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica file
@@ -531,6 +533,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"></textarea>
                 <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
+            {% if daUfficio %}
+            {# Solo l'ufficio sceglie: una nota interna la leggono solo loro,
+               un messaggio "per il cliente" lo vede anche il cliente. #}
+            <div class="bz-comment-flags">
+                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna</label>
+                <label><input type="checkbox" id="bz-flag-cliente"> <i class="fas fa-handshake"></i> Per il cliente</label>
+            </div>
+            {% endif %}
         </div>
 
     </div>{# /bz-body #}
@@ -579,6 +589,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <div class="bz-modal-field">
                 <label>Data inizio</label>
                 <input type="date" id="task-start">
+            </div>
+            <div class="bz-modal-field">
+                <label>Chi la vede</label>
+                <select id="task-vis" class="bz-vis-select"></select>
             </div>
         </div>
         <div class="bz-modal-actions">
@@ -642,6 +656,12 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 </select>
             </div>
         </div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>Chi la vede</label>
+                <select id="edit-task-vis" class="bz-vis-select"></select>
+            </div>
+        </div>
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="btn-edit-cancel">Annulla</button>
             <button class="bz-modal-submit" id="btn-edit-submit">Salva modifiche</button>
@@ -660,9 +680,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
         <p style="font-size:12px; color:#64748b; margin:-12px 0 18px;">
             Chi ha il modulo Zone in BOB vede tutto comunque. Qui si danno i
-            cantieri a chi quel modulo non ce l'ha — capi squadra, operai.
-            Non c'entra con la pianificazione: li' si decide chi lavora dove,
-            qui chi legge cosa.
+            cantieri a chi quel modulo non ce l'ha — capi squadra, operai,
+            clienti — con un ruolo. Cosa vede ognuno si decide su ogni cosa,
+            con "Chi la vede".
         </p>
 
         <div class="bz-modal-field">
@@ -691,6 +711,41 @@ const ACC = {{ accessi|json_encode|raw }};
 const DA_UFFICIO = {{ daUfficio ? 'true' : 'false' }};
 const puoScrivere = (sezione) => (ACC[sezione] || 0) > 1;
 const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
+
+/* ── Chi vede cosa ──
+   Le stesse cinque scelte ovunque. Le regole le applica il server: qui si
+   mostra e si sceglie. Il capo puo' dare solo "squadra" e "capi". */
+const VIS = {
+    ufficio: { icon: 'fa-lock',        label: 'Solo ufficio',      color: '#f87171' },
+    squadra: { icon: 'fa-hard-hat',    label: 'Ufficio e squadra', color: '#94a3b8' },
+    capi:    { icon: 'fa-user-shield', label: 'Ufficio e capi',    color: '#fbbf24' },
+    cliente: { icon: 'fa-handshake',   label: 'Ufficio e cliente', color: '#a78bfa' },
+    tutti:   { icon: 'fa-globe',       label: 'Tutti',             color: '#4ade80' },
+};
+const VIS_CONCESSE = DA_UFFICIO ? Object.keys(VIS) : ['squadra', 'capi'];
+function visBadge(v, sempre = false) {
+    const x = VIS[v || 'squadra'];
+    if (!x || (!sempre && (v || 'squadra') === 'squadra')) return '';
+    return `<span class="bz-vis-badge" style="color:${x.color}" title="${x.label}"><i class="fas ${x.icon}"></i> ${x.label}</span>`;
+}
+function visOptions(cur) {
+    return VIS_CONCESSE.map(k => `<option value="${k}" ${k === (cur || 'squadra') ? 'selected' : ''}>${VIS[k].label}</option>`).join('');
+}
+async function cambiaVisibilita(tipo, id, visibilita, valore) {
+    const res = await api(`/worksites/${WID}/zone/visibilita`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, id, visibilita, valore }),
+    });
+    if (!res.ok) alert(res.error || res.message || 'Non salvato');
+    return res.ok;
+}
+/* "Assegnato a": una persona, o un gruppo. Nel select i gruppi hanno @. */
+function assegnazioneDaSelect(sel) {
+    const v = sel.value || '';
+    if (v.startsWith('@')) return { assegnata_a: v.slice(1), assignee_user_id: null, assignee_name: sel.options[sel.selectedIndex]?.text || null };
+    if (v) return { assegnata_a: 'persona', assignee_user_id: v, assignee_name: sel.options[sel.selectedIndex]?.text || null };
+    return { assegnata_a: 'squadra', assignee_user_id: null, assignee_name: null };
+}
 const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
 
 let allTasks = [];
@@ -845,6 +900,7 @@ function cardHtml(t) {
     return `
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
             <div class="bz-card-name">${escHtml(t.name)}</div>
+            ${visBadge(t.visibilita)}
             <div class="bz-card-foot">
                 ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
@@ -1136,11 +1192,12 @@ function openEditModal(taskId) {
     const sel = document.getElementById('edit-task-assignee');
     if (t.assignee_user_id) {
         sel.value = String(t.assignee_user_id);
-    } else if (t.assignee_name) {
-        sel.value = '';
+    } else if (t.assegnata_a && t.assegnata_a !== 'persona' && t.assegnata_a !== 'squadra') {
+        sel.value = '@' + t.assegnata_a;
     } else {
         sel.value = '';
     }
+    document.getElementById('edit-task-vis').innerHTML = visOptions(t.visibilita);
     document.getElementById('task-edit-modal').classList.remove('hidden');
     document.getElementById('edit-task-name').focus();
 }
@@ -1156,8 +1213,8 @@ async function submitEdit() {
         description:     document.getElementById('edit-task-desc').value,
         status:          document.getElementById('edit-task-status').value,
         category:        document.getElementById('edit-task-cat').value || null,
-        assignee_user_id: eSel.value || null,
-        assignee_name:   eSel.value ? (eSel.options[eSel.selectedIndex]?.text || null) : null,
+        ...assegnazioneDaSelect(eSel),
+        visibilita:      document.getElementById('edit-task-vis').value,
         due_date:        document.getElementById('edit-task-due').value   || null,
         start_date:      document.getElementById('edit-task-start').value || null,
         priority:        parseInt(document.getElementById('edit-task-priority').value || '0'),
@@ -1203,7 +1260,12 @@ async function loadBobUsers() {
     const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label)}</option>`).join('');
     document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
         // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
-        sel.innerHTML = '<option value="">— nessuno —</option>' + html;
+        // prima i gruppi: un'attivita' di tutta la squadra non e' di nessuno
+        // in particolare. Ufficio e cliente li assegna solo l'ufficio.
+        const gruppi = '<option value="">— tutta la squadra —</option>' +
+            '<option value="@capi">— i capi squadra —</option>' +
+            (DA_UFFICIO ? '<option value="@ufficio">— l\'ufficio —</option><option value="@cliente">— il cliente —</option>' : '');
+        sel.innerHTML = gruppi + '<optgroup label="Una persona">' + html + '</optgroup>';
     });
 }
 
@@ -1221,6 +1283,9 @@ async function loadComments(taskId) {
                 <div class="bz-comment-meta">
                     <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
+                    ${c.interna == 1 ? '<span class="bz-vis-badge" style="color:#f87171"><i class="fas fa-lock"></i> interna</span>' : ''}
+                    ${c.per_cliente == 1 ? '<span class="bz-vis-badge" style="color:#a78bfa"><i class="fas fa-handshake"></i> cliente</span>' : ''}
+                    ${DA_UFFICIO ? `<button class="bz-x-btn" data-flag-cliente="${c.id}" data-val="${c.per_cliente == 1 ? 0 : 1}" title="${c.per_cliente == 1 ? 'Non mostrare al cliente' : 'Mostra al cliente'}" style="background:transparent;border:0;cursor:pointer;color:${c.per_cliente == 1 ? '#a78bfa' : '#475569'};"><i class="fas fa-handshake"></i></button>` : ''}
                     <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
                             title="Elimina commento"
                             style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
@@ -1232,6 +1297,16 @@ async function loadComments(taskId) {
     el.scrollTop = el.scrollHeight;
 }
 
+function flagMessaggio() {
+    return {
+        interna:     document.getElementById('bz-flag-interna')?.checked ? 1 : 0,
+        per_cliente: document.getElementById('bz-flag-cliente')?.checked ? 1 : 0,
+    };
+}
+function azzeraFlag() {
+    ['bz-flag-interna', 'bz-flag-cliente'].forEach(id => { const x = document.getElementById(id); if (x) x.checked = false; });
+}
+
 async function sendComment() {
     const inp  = document.getElementById('bz-comment-input');
     const text = inp?.value?.trim();
@@ -1239,9 +1314,9 @@ async function sendComment() {
     inp.disabled = true;
     const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/comments`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...flagMessaggio() }),
     });
-    if (res.ok) { inp.value = ''; loadComments(activeTaskId); }
+    if (res.ok) { inp.value = ''; azzeraFlag(); loadComments(activeTaskId); }
     inp.disabled = false;
     inp.focus();
 }
@@ -1291,6 +1366,9 @@ function renderDisegni(items, fwReady) {
             </div>
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
+            ${DA_UFFICIO
+                ? `<div class="bz-dz-meta"><i class="fas fa-eye"></i> <select data-vis-disegno="${d.id}" class="bz-vis-select">${visOptions(d.zone_visibilita)}</select></div>`
+                : visBadge(d.zone_visibilita)}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
@@ -1453,6 +1531,14 @@ async function loadFiles() {
     if (!res.ok) { list.innerHTML = '<div class="bz-dz-empty">Errore caricamento file.</div>'; return; }
     renderFolders(res.data.folders || []);
     renderFiles(res.data.files || []);
+    // dentro una cartella, l'ufficio decide chi la vede: vale per tutti i file
+    const cart = (res.data.folders || []).find(f => f.id == curFolder);
+    const box  = document.getElementById('bz-folder-vis');
+    if (box) {
+        box.innerHTML = DA_UFFICIO && cart
+            ? `<i class="fas fa-eye"></i> <select data-vis-cartella="${cart.id}" class="bz-vis-select">${visOptions(cart.visibilita)}</select>`
+            : (cart ? visBadge(cart.visibilita, true) : '');
+    }
 }
 
 function renderFolders(folders) {
@@ -1461,7 +1547,7 @@ function renderFolders(folders) {
         <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
         ${folders.map(f => `
             <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
-                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>
+                <i class="fas ${(f.visibilita || 'squadra') === 'squadra' ? 'fa-folder' : VIS[f.visibilita].icon}" style="${(f.visibilita || 'squadra') === 'squadra' ? '' : 'color:' + VIS[f.visibilita].color}" title="${VIS[f.visibilita || 'squadra'].label}"></i> <span>${escHtml(f.name)}</span>
                 <em>${f.file_count}</em>
                 <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
             </button>`).join('')}
@@ -1605,6 +1691,7 @@ function quickAdd(status) {
 }
 
 function openModal() {
+    document.getElementById('task-vis').innerHTML = visOptions('squadra');
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
@@ -1628,8 +1715,8 @@ async function submitTask() {
         description:      document.getElementById('task-desc').value,
         status:          document.getElementById('task-status').value,
         category:        document.getElementById('task-cat').value,
-        assignee_user_id: aSel.value || null,
-        assignee_name:   aSel.value ? (aSel.options[aSel.selectedIndex]?.text || null) : null,
+        ...assegnazioneDaSelect(aSel),
+        visibilita:      document.getElementById('task-vis').value,
         due_date:        document.getElementById('task-due').value || null,
         start_date:      document.getElementById('task-start').value || null,
     };
@@ -1727,6 +1814,9 @@ document.getElementById('bz-photo-input')?.addEventListener('change', async e =>
     const fd = new FormData();
     fd.append('photo', file);
     fd.append('text', document.getElementById('bz-comment-input')?.value?.trim() || '');
+    const f = flagMessaggio();
+    fd.append('interna', f.interna);
+    fd.append('per_cliente', f.per_cliente);
     const lbl = document.querySelector('.bz-comment-photo');
     if (lbl) lbl.classList.add('uploading');
     const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/photo`, { method: 'POST', body: fd });
@@ -1928,6 +2018,27 @@ function fmtDate(str) {
     return new Date(str + 'T00:00:00').toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
 }
 
+/* ══════════ CHI VEDE COSA: i comandi ══════════ */
+// Delegati sul documento: cartelle, disegni e messaggi si ridisegnano a ogni
+// caricamento, e un ascoltatore attaccato all'elemento sparirebbe con lui.
+document.addEventListener('change', async e => {
+    const c = e.target.closest('[data-vis-cartella]');
+    if (c) {
+        if (await cambiaVisibilita('cartella', parseInt(c.dataset.visCartella), c.value)) loadFiles();
+        return;
+    }
+    const d = e.target.closest('[data-vis-disegno]');
+    if (d) { await cambiaVisibilita('disegno', parseInt(d.dataset.visDisegno), d.value); }
+});
+document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-flag-cliente]');
+    if (!b) return;
+    e.stopPropagation();
+    if (await cambiaVisibilita('per_cliente', parseInt(b.dataset.flagCliente), null, parseInt(b.dataset.val))) {
+        loadComments(activeTaskId);
+    }
+});
+
 /* ══════════ INIT ══════════ */
 loadTasks();
 renderCalendar();
@@ -1937,6 +2048,21 @@ loadBobUsers();
 </script>
 
 <style>
+/* Chi vede cosa */
+.bz-vis-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; margin-top:4px; }
+.bz-vis-select { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:3px 6px; font-size:11.5px; }
+.bz-comment-flags { display:flex; gap:14px; padding:6px 14px 10px; font-size:11.5px; color:#94a3b8; }
+.bz-comment-flags label { display:flex; align-items:center; gap:5px; cursor:pointer; }
+.bz-folder-vis { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#94a3b8; margin-left:12px; }
+.bz-assegna { border:1px solid #1e293b; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+.bz-assegna h4 { margin:0 0 10px; font-size:13px; color:#e2e8f0; }
+.bz-assegna-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid #1e293b; font-size:12.5px; color:#cbd5e1; }
+.bz-assegna-row:first-of-type { border-top:0; }
+.bz-assegna-row .sub { color:#64748b; font-size:11.5px; }
+.bz-assegna-form { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.bz-assegna-form select, .bz-assegna-form input { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:7px; padding:6px 8px; font-size:12px; }
+.bz-assegna-form button, .bz-assegna-row button { background:#2563eb; color:#fff; border:0; border-radius:7px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.bz-assegna-row button { background:none; color:#f87171; border:1px solid #7f1d1d; padding:3px 9px; margin-left:auto; }
 /* Drag & drop highlight per le colonne Kanban (style inline per non dover
    toccare il CSS principale; safe perche' usato solo in BOB Zone). */
 .bz-cards.dnd-over { background: rgba(96, 165, 250, 0.10); outline: 2px dashed rgba(96, 165, 250, 0.45); outline-offset: -4px; border-radius: 8px; }
@@ -2085,7 +2211,7 @@ loadBobUsers();
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js?v=2"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -2095,6 +2221,7 @@ loadBobUsers();
   }
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
-{% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=1"></script>{% endif %}
+{% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=2"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=1"></script>
 </body>
 </html>
