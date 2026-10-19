@@ -198,18 +198,37 @@ final class DocumentsController
             $dove[] = 'w.company IN (' . implode(', ', $segna) . ')';
         }
 
+        // `scadenza` e `data_emissione` NON sono colonne data: sono testo, e
+        // dentro convivono tre formati — 2026-03-10, 10/03/2026, 10-03-2026.
+        // Trattarle come date fa due danni insieme: le righe scritte
+        // all'italiana danno NULL e diventano "Non scade", e la data esce
+        // vuota. E' la stessa normalizzazione che usa AnomalyCheckerService.
+        //
+        // I documenti nascosti restano fuori, come nel resto di BOB. Il
+        // filtro sta DENTRO la sottoquery: messo nel WHERE, il LEFT JOIN
+        // diventerebbe un join normale e sparirebbero proprio gli operai
+        // senza documenti, che sono quelli che interessano di piu'.
         $sql = "
             SELECT w.last_name, w.first_name, w.company,
-                   d.tipo_documento, d.data_emissione, d.scadenza,
-                   CASE WHEN d.scadenza IS NULL OR d.scadenza = '0000-00-00'
-                        THEN NULL
-                        ELSE DATEDIFF(d.scadenza, CURDATE())
-                   END AS giorni
+                   d.tipo_documento,
+                   DATE_FORMAT(d.emesso, '%d/%m/%Y') AS emesso,
+                   DATE_FORMAT(d.scade,  '%d/%m/%Y') AS scade,
+                   DATEDIFF(d.scade, CURDATE())      AS giorni
             FROM   bb_workers w
-            LEFT JOIN bb_worker_documents d ON d.worker_id = w.id
+            LEFT JOIN (
+                SELECT worker_id, tipo_documento,
+                       COALESCE(STR_TO_DATE(data_emissione, '%Y-%m-%d'),
+                                STR_TO_DATE(data_emissione, '%d/%m/%Y'),
+                                STR_TO_DATE(data_emissione, '%d-%m-%Y')) AS emesso,
+                       COALESCE(STR_TO_DATE(scadenza,       '%Y-%m-%d'),
+                                STR_TO_DATE(scadenza,       '%d/%m/%Y'),
+                                STR_TO_DATE(scadenza,       '%d-%m-%Y')) AS scade
+                FROM   bb_worker_documents
+                WHERE  COALESCE(nascondere, 'N') <> 'Y'
+            ) d ON d.worker_id = w.id
             WHERE  " . implode(' AND ', $dove) . "
             ORDER BY w.company ASC, w.last_name ASC, w.first_name ASC,
-                     d.scadenza IS NULL, d.scadenza ASC
+                     d.scade IS NULL, d.scade ASC
         ";
 
         $stmt = $this->conn->prepare($sql);
@@ -263,8 +282,10 @@ final class DocumentsController
                 $r['first_name'],
                 $r['company'],
                 $r['tipo_documento'] ?? '',
-                $this->giornoItaliano($r['data_emissione'] ?? null),
-                $this->giornoItaliano($r['scadenza'] ?? null),
+                // gia' in gg/mm/aaaa: le formatta la query, che e' l'unico
+                // posto che sa quali formati puo' trovarsi davanti
+                $r['emesso'] ?? '',
+                $r['scade'] ?? '',
                 $stato,
                 $gio === null ? '' : $gio,
             ], ';');
@@ -274,15 +295,6 @@ final class DocumentsController
         exit;
     }
 
-    /** aaaa-mm-gg come lo legge una persona, vuoto se non c'e'. */
-    private function giornoItaliano(?string $data): string
-    {
-        if (!$data || $data === '0000-00-00') {
-            return '';
-        }
-        $t = strtotime($data);
-        return $t ? date('d/m/Y', $t) : '';
-    }
 
     public function expiring(Request $request): void
     {
