@@ -96,7 +96,12 @@ final class ZoneSegnalazioniChat extends AbstractMigration
                 ->addColumn('user_id', 'integer', ['null' => false, 'signed' => false])
                 ->addColumn('worksite_id', 'integer', ['null' => false, 'signed' => false])
                 // 'squadra', 'capi', 'cliente' o 's<id>' per una segnalazione
-                ->addColumn('chiave', 'string', ['limit' => 20])
+                //
+                // null => false non e' una formalita': questa colonna sta
+                // nella chiave primaria, e MySQL rifiuta la tabella intera
+                // se una parte della chiave puo' essere vuota. Phinx le
+                // stringhe le fa annullabili se non glielo si dice.
+                ->addColumn('chiave', 'string', ['limit' => 20, 'null' => false])
                 ->addColumn('ultimo_id', 'integer', ['default' => 0, 'signed' => false])
                 ->addColumn('letto_at', 'datetime', ['null' => true])
                 // l'ultimo push mandato: fino a che non legge, non se ne mandano altri
