@@ -178,8 +178,12 @@ final class ApiV1OperaioController
         $worksiteId = (int)($body['worksite_id'] ?? 0);
         $data       = $this->data($body['data'] ?? '', '');
         $turno      = (string)($body['turno'] ?? 'Intero');
+        // Il cantiere scritto a mano, quando quello della pianificazione non
+        // e' giusto (o non c'e'): lo sceglie l'ufficio prima di approvare.
+        // L'operaio non cerca fra i cantieri.
+        $aMano      = trim((string)($body['cantiere_testo'] ?? ''));
 
-        if (!$worksiteId || $data === '') {
+        if ((!$worksiteId && $aMano === '') || $data === '') {
             Response::json([
                 'success' => false,
                 'message' => 'Servono il cantiere e il giorno',
@@ -203,7 +207,7 @@ final class ApiV1OperaioController
         // sembrava piu' sicuro, ma quell'assegnazione in BOB non la scrive
         // nessuno — avrebbe rifiutato tutto — e comunque un operaio mandato
         // per un giorno da un'altra parte deve poterlo dichiarare.
-        if (!$this->dati()->cantiereAperto($worksiteId)) {
+        if ($worksiteId && !$this->dati()->cantiereAperto($worksiteId)) {
             Response::json([
                 'success' => false,
                 'message' => 'Cantiere non trovato o non aperto',
@@ -212,11 +216,24 @@ final class ApiV1OperaioController
 
         $repo = new RichiestaPresenzaRepository($this->conn);
 
-        if ($repo->giaInAttesa($operaio, $data, $worksiteId)) {
+        if ($worksiteId && $repo->giaInAttesa($operaio, $data, $worksiteId)) {
             Response::json([
                 'success' => false,
                 'message' => 'Hai gia\' dichiarato questo giorno su questo cantiere',
             ], 409);
+        }
+
+        // Una giornata e' una: due mezze su due cantieri si', di piu' no.
+        // 422 e non 409: il 409 l'app lo prende per "c'era gia'" e la toglie
+        // dalla coda in silenzio; questa invece deve restare, col motivo.
+        $gia = $repo->giornataSegnata($operaio, $data);
+        if ($gia + ($turno === 'Mezzo' ? 0.5 : 1.0) > 1.0) {
+            Response::json([
+                'success' => false,
+                'message' => $gia >= 1.0
+                    ? 'Questa giornata e\' gia\' segnata tutta'
+                    : 'Hai gia\' segnato mezza giornata: puoi aggiungere solo l\'altra mezza',
+            ], 422);
         }
 
         // L'app manda le parole dell'operaio, il database tiene quelle
@@ -233,7 +250,8 @@ final class ApiV1OperaioController
         // L'importo non si chiede: lui sa di aver mangiato, non quanto e'
         // costato. Lo mette l'ufficio, dove ci sono le fatture.
         $id = $repo->crea($operaio, [
-            'worksite_id' => $worksiteId,
+            'worksite_id'    => $worksiteId ?: null,
+            'cantiere_testo' => $aMano,
             'data'        => $data,
             'turno'       => $turno,
             'pranzo'      => $this->dati()->chiHaPagato($body['pranzo'] ?? ''),

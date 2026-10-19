@@ -327,6 +327,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
                 {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
                 {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
+                {# chat e segnalazioni: chiunque entri nel cantiere; cosa legge lo decide il server #}
+                <button class="bz-nav-item" data-view="segnalazioni"><i class="fas fa-triangle-exclamation"></i><span>Segnalazioni</span><span class="bzd-badge" id="bzd-badge-segn" hidden></span></button>
+                <button class="bz-nav-item" data-view="chat"><i class="fas fa-comments"></i><span>Chat</span><span class="bzd-badge" id="bzd-badge-chat" hidden></span></button>
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
@@ -510,6 +513,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 </div>
             </div>
         </div>
+
+        {# Segnalazioni e chat del cantiere: le disegna dialogo.js #}
+        <div class="bz-view" id="view-segnalazioni"><div class="bzd" id="bzd-segn-root"></div></div>
+        <div class="bz-view" id="view-chat"><div class="bzd" id="bzd-chat-root"></div></div>
 
         {# Lightbox #}
         <div class="bz-lightbox" id="bz-lightbox">
@@ -797,6 +804,7 @@ function switchTop(v) {
     else if (v === 'media')    loadMedia();
     else if (v === 'files')    loadFiles();
     else if (v === 'forms')    openForms();
+    window.BZDialogo?.vista(v);
 }
 
 function switchSub(s) {
@@ -2222,6 +2230,8 @@ loadBobUsers();
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
 {% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=2"></script>{% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=1"></script>
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=2"></script>
+<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
+<script src="/assets/js/views/fieldwire/dialogo.js?v=1"></script>
 </body>
 </html>

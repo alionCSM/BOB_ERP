@@ -116,7 +116,7 @@ final class RichiestaPresenzaRepository
                 'targa_auto'      => $r['targa_auto'],
                 'trasferta'       => (int)$r['trasferta'],
                 'worksite_id'     => $r['worksite_id'] !== null ? (int)$r['worksite_id'] : null,
-                'cantiere_nome'   => $r['cantiere_nome'],
+                'cantiere_nome'   => $r['cantiere_nome'] ?? $r['cantiere_testo'] ?? null,
                 'cantiere_codice' => $r['cantiere_codice'],
             ];
         }
@@ -243,19 +243,46 @@ final class RichiestaPresenzaRepository
         return (int)$stmt->fetchColumn() > 0;
     }
 
+    /**
+     * Quanto e' gia' segnato quel giorno: 1 la giornata intera, 0.5 la mezza.
+     *
+     * Conta quello che aspetta l'ufficio e quello che e' gia' in presenze
+     * (approvato, o messo dall'ufficio a mano). Le rifiutate no.
+     * Una giornata piu' piena di 1 non esiste: due mezze su due cantieri si',
+     * una intera e una mezza no.
+     */
+    public function giornataSegnata(int $workerId, string $data): float
+    {
+        $stmt = $this->conn->prepare("
+            SELECT turno FROM bb_presenze_richieste
+            WHERE  worker_id = :wid AND data = :data AND stato = 'in_attesa'
+            UNION ALL
+            SELECT turno FROM bb_presenze
+            WHERE  worker_id = :wid2 AND data = :data2
+        ");
+        $stmt->execute([':wid' => $workerId, ':data' => $data, ':wid2' => $workerId, ':data2' => $data]);
+        $tot = 0.0;
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $turno) {
+            $tot += $turno === 'Mezzo' ? 0.5 : 1.0;
+        }
+        return $tot;
+    }
+
     /** @param array<string, mixed> $d */
     public function crea(int $workerId, array $d): int
     {
         $stmt = $this->conn->prepare("
             INSERT INTO bb_presenze_richieste
-                (worker_id, worksite_id, data, turno,
+                (worker_id, worksite_id, cantiere_testo, data, turno,
                  pranzo, cena, hotel, targa_auto, trasferta, note)
-            VALUES (:wid, :ws, :data, :turno,
+            VALUES (:wid, :ws, :testo, :data, :turno,
                     :pranzo, :cena, :hotel, :targa, :tras, :note)
         ");
         $stmt->execute([
             ':wid'    => $workerId,
-            ':ws'     => (int)$d['worksite_id'],
+            // senza cantiere: l'ha scritto a mano, lo sceglie l'ufficio
+            ':ws'     => !empty($d['worksite_id']) ? (int)$d['worksite_id'] : null,
+            ':testo'  => ($d['cantiere_testo'] ?? '') !== '' ? mb_substr((string)$d['cantiere_testo'], 0, 150) : null,
             ':data'   => (string)$d['data'],
             ':turno'  => in_array($d['turno'] ?? '', self::TURNI, true) ? $d['turno'] : 'Intero',
             ':pranzo' => in_array($d['pranzo'] ?? '', self::PASTI, true) ? $d['pranzo'] : '-',
@@ -426,9 +453,17 @@ final class RichiestaPresenzaRepository
             $out[] = 'Ha dichiarato ' . $cosa . ' ma non era in trasferta';
         }
 
+        // Scritto a mano: l'ufficio sceglie il cantiere prima di approvare.
+        if (empty($r['worksite_id'])) {
+            $out[] = 'Cantiere scritto a mano: "' . trim((string)($r['cantiere_testo'] ?? '')) . '" — sceglilo qui sotto';
+        } elseif (preg_match('/Cantiere giusto:\s*(.+)/u', (string)($r['note'] ?? ''), $m)) {
+            // le app di prima scrivevano il cantiere giusto nelle note
+            $out[] = 'L\'operaio dice che il cantiere giusto e\' "' . trim($m[1]) . '"';
+        }
+
         // Cantiere diverso da quello pianificato: puo' essere giusto — capita
         // di spostare qualcuno all'ultimo — ma va guardato.
-        if ($pian && !empty($pian['worksite_id'])
+        if ($pian && !empty($pian['worksite_id']) && !empty($r['worksite_id'])
             && (int)$pian['worksite_id'] !== (int)$r['worksite_id']) {
             $out[] = 'Era pianificato su ' . trim(
                 ($pian['worksite_code'] ?? '') . ' ' . ($pian['cantiere_nome'] ?? '')
@@ -488,9 +523,16 @@ final class RichiestaPresenzaRepository
                         :pranzo, :pprezzo, :cena, :cprezzo,
                         :hotel, :targa, :tras, :note, :uid)
             ");
+            // Il cantiere: quello scelto dall'ufficio, se l'ha cambiato (o se
+            // l'operaio l'aveva scritto a mano), se no quello dichiarato.
+            $worksiteId = (int)($correzioni['worksite_id'] ?? 0) ?: (int)($r['worksite_id'] ?? 0);
+            if ($worksiteId <= 0) {
+                throw new RuntimeException('Scegli il cantiere prima di approvare');
+            }
+
             $ins->execute([
                 ':wid'     => (int)$r['worker_id'],
-                ':ws'      => (int)$r['worksite_id'],
+                ':ws'      => $worksiteId,
                 ':azienda' => (string)($correzioni['azienda'] ?? ''),
                 ':data'    => (string)$r['data'],
                 ':turno'   => in_array($correzioni['turno'] ?? '', self::TURNI, true)
@@ -511,13 +553,16 @@ final class RichiestaPresenzaRepository
             ]);
             $presenzaId = (int)$this->conn->lastInsertId();
 
+            // La dichiarazione prende il cantiere dove e' stata registrata:
+            // l'operaio la ritrova li'. Le sue parole restano in
+            // cantiere_testo e nelle note.
             $upd = $this->conn->prepare("
                 UPDATE bb_presenze_richieste
-                SET stato = 'approvata', presenza_id = :pid,
+                SET stato = 'approvata', presenza_id = :pid, worksite_id = :ws,
                     decisa_at = NOW(), decisa_da = :uid
                 WHERE id = :id
             ");
-            $upd->execute([':pid' => $presenzaId, ':uid' => $userId, ':id' => $id]);
+            $upd->execute([':pid' => $presenzaId, ':ws' => $worksiteId, ':uid' => $userId, ':id' => $id]);
 
             $this->conn->commit();
             return $presenzaId;

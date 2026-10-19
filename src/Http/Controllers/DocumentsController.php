@@ -157,6 +157,133 @@ final class DocumentsController
      * Documenti in scadenza nei prossimi 30 giorni (non ancora scaduti).
      * Stessa struttura di /documents/expired, con giorni rimanenti.
      */
+    // ── GET /documents/attestati ─────────────────────────────────────────────
+
+    /**
+     * L'elenco di tutti gli operai attivi e dei loro documenti, da aprire
+     * in Excel.
+     *
+     * Lo chiedono da fuori — committenti, enti, chi fa una verifica — e
+     * finora si rifaceva a mano ogni volta guardando scheda per scheda.
+     *
+     * **Anche gli operai che non hanno nessun documento.** Sono quelli che
+     * interessano di piu' a chi guarda: un elenco che li salta mostra solo
+     * chi e' in regola e nasconde il problema. Escono con le colonne del
+     * documento vuote e la riga che dice "nessun documento".
+     *
+     * CSV e non xlsx: in questo progetto non c'e' una libreria per scrivere
+     * xlsx, e tirarne dentro una per un elenco di righe non vale il peso.
+     * Excel lo apre lo stesso — purche' si rispettino le due cose che lo
+     * fanno sbagliare, vedi sotto.
+     */
+    public function attestati(Request $request): never
+    {
+        $user = $request->user();
+
+        // Chi vede solo la propria azienda esporta solo i propri: altrimenti
+        // basterebbe l'indirizzo per portarsi via l'anagrafica di tutti.
+        $dove   = ["w.active = 'Y'", "w.removed = 'N'"];
+        $args   = [];
+
+        if (isCompanyScopedUserByContext($this->conn, $user)) {
+            $consentite = getCompanyScopeAllowedNames($this->conn, $user);
+            if (empty($consentite)) {
+                Response::error('Nessuna azienda associata al tuo utente.', 403);
+            }
+            $segna = [];
+            foreach (array_values($consentite) as $i => $nome) {
+                $segna[] = ':az' . $i;
+                $args[':az' . $i] = $nome;
+            }
+            $dove[] = 'w.company IN (' . implode(', ', $segna) . ')';
+        }
+
+        $sql = "
+            SELECT w.last_name, w.first_name, w.company,
+                   d.tipo_documento, d.data_emissione, d.scadenza,
+                   CASE WHEN d.scadenza IS NULL OR d.scadenza = '0000-00-00'
+                        THEN NULL
+                        ELSE DATEDIFF(d.scadenza, CURDATE())
+                   END AS giorni
+            FROM   bb_workers w
+            LEFT JOIN bb_worker_documents d ON d.worker_id = w.id
+            WHERE  " . implode(' AND ', $dove) . "
+            ORDER BY w.company ASC, w.last_name ASC, w.first_name ASC,
+                     d.scadenza IS NULL, d.scadenza ASC
+        ";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($args);
+        $righe = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        AuditLogger::log($this->conn, $user, 'documents_export', 'document', 0,
+                         'Attestati operai (' . count($righe) . ' righe)');
+
+        $nome = 'attestati-operai-' . date('Y-m-d') . '.csv';
+
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $nome . '"');
+        header('Cache-Control: private, no-store');
+
+        $out = fopen('php://output', 'w');
+
+        // Le due cose che fanno sbagliare Excel, e che senza si scoprono
+        // solo quando il file e' gia' in mano a qualcun altro:
+        //
+        // 1. il BOM, se no le lettere accentate escono storte;
+        // 2. "sep=;", che dice a Excel qual e' il separatore. Con la virgola
+        //    un Excel italiano apre tutto dentro una colonna sola.
+        fwrite($out, "\xEF\xBB\xBF");
+        fwrite($out, "sep=;\n");
+
+        fputcsv($out, [
+            'Cognome', 'Nome', 'Azienda', 'Documento',
+            'Rilasciato il', 'Scade il', 'Stato', 'Giorni alla scadenza',
+        ], ';');
+
+        foreach ($righe as $r) {
+            $haDoc = !empty($r['tipo_documento']);
+            $gio   = $r['giorni'] !== null ? (int)$r['giorni'] : null;
+
+            if (!$haDoc) {
+                $stato = 'NESSUN DOCUMENTO';
+            } elseif ($gio === null) {
+                $stato = 'Non scade';
+            } elseif ($gio < 0) {
+                $stato = 'SCADUTO';
+            } elseif ($gio <= 30) {
+                $stato = 'In scadenza';
+            } else {
+                $stato = 'Valido';
+            }
+
+            fputcsv($out, [
+                $r['last_name'],
+                $r['first_name'],
+                $r['company'],
+                $r['tipo_documento'] ?? '',
+                $this->giornoItaliano($r['data_emissione'] ?? null),
+                $this->giornoItaliano($r['scadenza'] ?? null),
+                $stato,
+                $gio === null ? '' : $gio,
+            ], ';');
+        }
+
+        fclose($out);
+        exit;
+    }
+
+    /** aaaa-mm-gg come lo legge una persona, vuoto se non c'e'. */
+    private function giornoItaliano(?string $data): string
+    {
+        if (!$data || $data === '0000-00-00') {
+            return '';
+        }
+        $t = strtotime($data);
+        return $t ? date('d/m/Y', $t) : '';
+    }
+
     public function expiring(Request $request): void
     {
         $days = 30;
