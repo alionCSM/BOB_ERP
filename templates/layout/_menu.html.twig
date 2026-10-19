@@ -392,6 +392,9 @@
                     <li><a href="/users" class="side-menu {{ (usersActive and currentPath != '/users/create') ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="users"></i></div><div class="side-menu__title">Operai</div></a></li>
                     <li><a href="/companies" class="side-menu {{ (companiesActive and currentPath != '/companies/my') ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="file-text"></i></div><div class="side-menu__title">Aziende</div></a></li>
                     <li><a href="/documents/expired" class="side-menu {{ currentPath == '/documents/expired' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="alert-triangle"></i></div><div class="side-menu__title">Documenti Scaduti</div></a></li>
+                    {# Scarica e basta: non apre una pagina, parte il file.
+                       Lo chiedono da fuori e prima si rifaceva a mano. #}
+                    <li><a href="/documents/attestati" class="side-menu"><div class="side-menu__icon"><i data-lucide="download"></i></div><div class="side-menu__title">Elenco attestati</div></a></li>
                 </ul>
             </li>
             <li class="side-nav__devider my-6"></li>

@@ -432,6 +432,7 @@ if ($uri === '/documents' || str_starts_with($uri, '/documents/')) {
            ->post('/documents/ai-suggest',   [DocumentsController::class, 'aiSuggest'])
            ->get('/documents/check-mandatory', [DocumentsController::class, 'checkMandatory'])
            ->get('/documents/check-mandatory-company', [DocumentsController::class, 'checkMandatoryCompany'])
+           ->get('/documents/attestati',    [DocumentsController::class, 'attestati'])
            ->get('/documents/expired',       [DocumentsController::class, 'expired'])
            ->get('/documents/expiring',      [DocumentsController::class, 'expiring'])
            ->get('/documents/expired-cv',    [DocumentsController::class, 'expiredCv'])
