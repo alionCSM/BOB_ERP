@@ -420,3 +420,25 @@ dal menu basta non dare il permesso `report_business`.
 
 Le due cose sono indipendenti: si puo' avere uno dei due, tutti e due o
 nessuno.
+
+## Installazione per un'azienda sola (senza consorziate)
+
+BOB e' nato in un consorzio, e due cose lo danno per scontato. Nessuna
+delle due va tolta dal codice: vanno solo sapute quando si installa.
+
+**L'azienda di casa e' la riga 1 di `bb_companies`.** In ventinove punti
+`company_id = 1` vuol dire "noi": chi e' 1 vede tutti i cantieri e legge
+il valore del contratto da `total_offer`, gli altri vedono solo i propri
+e leggono `ext_total_offer` (quanto la capogruppo riconosce a loro). Se
+l'azienda che installa non e' la riga 1, i cantieri risultano filtrati e
+gli importi vengono da una colonna che nessuno compila: non e' un errore
+che salta all'occhio, sono solo numeri sbagliati. **La prima riga di
+`bb_companies` dev'essere l'azienda stessa**, cosa che capita da sola se
+e' la prima che si inserisce.
+
+**Le consorziate si spengono da sole.** La pagina
+`/fatturazione/consorziate` elenca le aziende con `consorziata = 1`:
+senza nessuna, la pagina e' vuota e non rompe niente. Per toglierla
+anche dal menu basta non dare il permesso del modulo. La fatturazione
+clienti somma le presenze delle consorziate con una UNION: senza righe
+somma zero, e i conti sono quelli delle presenze proprie.
