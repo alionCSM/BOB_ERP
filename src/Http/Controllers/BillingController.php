@@ -34,9 +34,14 @@ final class BillingController
         $year  = (int)($request->get('year',  date('Y')));
         $month = (int)($request->get('month', date('n')));
 
-        $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        // Senza Yard non c'e' niente da allineare: si legge la copia che c'e'
+        // in bb_billing, che su un'installazione senza Yard e' l'unica verita'
+        // e la scrive l'ufficio a mano.
+        if ((new Config())->yardConfigured()) {
+            $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+            $this->billingRepo->syncEmessaFromYardForMovedWorksites($companyId, $year, $month, $yardBilling);
+        }
 
-        $this->billingRepo->syncEmessaFromYardForMovedWorksites($companyId, $year, $month, $yardBilling);
         $rows = $this->billingRepo->getMovedWorksitesWithBilling($companyId, $year, $month);
 
         Response::json($rows);
@@ -77,16 +82,23 @@ final class BillingController
         // vecchi, cosi' nessuno ci fa affidamento senza saperlo.
         $currentYear = (int)date('Y');
 
+        // Dove Yard non c'e' non si prova nemmeno: provarci ogni volta
+        // significherebbe un'attesa e una riga di log a ogni apertura della
+        // pagina, per un server che non esiste.
+        $yardC = $yardAttivo = (new \App\Infrastructure\Config())->yardConfigured();
         $syncFallita = null;
-        try {
-            $this->billingRepo->syncEmessaAll(
-                new \App\Domain\YardWorksiteBilling(
-                    new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config())
-                )
-            );
-        } catch (\Throwable $e) {
-            $syncFallita = $e->getMessage();
-            error_log('[BillingController] sync emessa da Yard non riuscita: ' . $e->getMessage());
+
+        if ($yardC) {
+            try {
+                $this->billingRepo->syncEmessaAll(
+                    new \App\Domain\YardWorksiteBilling(
+                        new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config())
+                    )
+                );
+            } catch (\Throwable $e) {
+                $syncFallita = $e->getMessage();
+                error_log('[BillingController] sync emessa da Yard non riuscita: ' . $e->getMessage());
+            }
         }
 
         $clients = $this->billingRepo->getClientsWithBillingSummary($currentYear);
@@ -148,14 +160,16 @@ final class BillingController
         $emessRealPrev    = ['count' => 0, 'imponibile' => 0.0];
         $emessRealCurRows  = [];
         $emessRealPrevRows = [];
-        try {
-            $yardBilling       = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
-            $emessRealCur      = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
-            $emessRealPrev     = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
-            $emessRealCurRows  = $yardBilling->getEmesseRowsForMonth($thisYear, $thisMonth);
-            $emessRealPrevRows = $yardBilling->getEmesseRowsForMonth($prevYear, $prevMonth);
-        } catch (\Throwable $e) {
-            error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
+        if ($yardC) {
+            try {
+                $yardBilling       = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+                $emessRealCur      = $yardBilling->getEmesseTotalsForMonth($thisYear, $thisMonth);
+                $emessRealPrev     = $yardBilling->getEmesseTotalsForMonth($prevYear, $prevMonth);
+                $emessRealCurRows  = $yardBilling->getEmesseRowsForMonth($thisYear, $thisMonth);
+                $emessRealPrevRows = $yardBilling->getEmesseRowsForMonth($prevYear, $prevMonth);
+            } catch (\Throwable $e) {
+                error_log('[BillingController::clientList] Yard unreachable: ' . $e->getMessage());
+            }
         }
 
         // Raggruppa le righe di brogliaccio in fatture — logica condivisa con
@@ -185,6 +199,7 @@ final class BillingController
             'emessRealCur', 'emessRealPrev', 'emessRealCurLabel', 'emessRealPrevLabel',
             'emessRealCurRows', 'emessRealPrevRows',
             'emessRealCurRowsTotal', 'emessRealPrevRowsTotal',
+            'yardAttivo',
             'emessRealCurFatture', 'emessRealPrevFatture',
             'defaultPickerValue',
             // Prospetto-fatto feature
@@ -258,12 +273,18 @@ final class BillingController
         $year  = (int)$m[1];
         $month = (int)$m[2];
 
+        // Senza Yard questo riquadro non lo apre nessuno — la scheda che lo
+        // chiama non c'e' — ma l'indirizzo si puo' scrivere a mano, e
+        // rispondere vuoto e' meglio che tentare una connessione che non
+        // esiste.
         $rows = [];
-        try {
-            $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
-            $rows = $yardBilling->getEmesseRowsForMonth($year, $month);
-        } catch (\Throwable $e) {
-            error_log('[BillingController::emesseMonthFragment] Yard unreachable: ' . $e->getMessage());
+        if ((new \App\Infrastructure\Config())->yardConfigured()) {
+            try {
+                $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+                $rows = $yardBilling->getEmesseRowsForMonth($year, $month);
+            } catch (\Throwable $e) {
+                error_log('[BillingController::emesseMonthFragment] Yard unreachable: ' . $e->getMessage());
+            }
         }
 
         $groups = self::groupEmesseRows($rows);
@@ -348,6 +369,10 @@ final class BillingController
         $year  = (int)$m[1];
         $month = (int)$m[2];
 
+        if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+            Response::error("Questo export legge le fatture dal gestionale, che su questa installazione non e' collegato.", 404);
+        }
+
         try {
             $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
             $rows = $yardBilling->getEmesseRowsForMonth($year, $month);
@@ -382,10 +407,14 @@ final class BillingController
             Response::redirect('/billing/clients');
         }
 
-        $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+        // Dove Yard non c'e', bb_billing.emessa e' l'unica verita' e la
+        // scrive l'ufficio a mano: non c'e' niente da allineare.
+        $yardAttivo = (new \App\Infrastructure\Config())->yardConfigured();
 
-        // Sync emessa from Yard for this client's rows that have yard_id
-        $this->billingRepo->syncEmessaForClient($clientId, $yardBilling);
+        if ($yardAttivo) {
+            $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+            $this->billingRepo->syncEmessaForClient($clientId, $yardBilling);
+        }
 
         $currentYear     = (int)date('Y');
 
@@ -409,6 +438,7 @@ final class BillingController
         $activeDraft = $this->draftService()->getActiveDraft($clientId);
 
         Response::view('billing/client_detail.html.twig', $request, compact(
+            'yardAttivo',
             'client', 'daEmettere', 'totalDaEmettere',
             'emesse', 'totalEmesse', 'totalEmesseEuro', 'perPage',
             'currentYear', 'daEmettereCountYr', 'daEmettereEuroYr', 'emesseCountYr', 'emesseEuroYr',

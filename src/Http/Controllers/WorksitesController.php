@@ -338,16 +338,25 @@ final class WorksitesController
         $clientNameStmt->execute([$client_id]);
         $clientName = $clientNameStmt->fetchColumn();
 
-        $sqlSrv     = new SQLServer(new Config());
-        $sqlSrvConn = $sqlSrv->connect();
-        $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
-        $yardQuery->execute([$clientName]);
+        // La bozza esiste per un motivo solo: il cliente non si trova su
+        // Yard, quindi il cantiere non si puo' ancora creare la' e resta
+        // in attesa qui. Dove Yard non c'e' quel motivo non esiste, e
+        // lasciare la regola com'era farebbe nascere OGNI cantiere come
+        // bozza, per sempre, senza nessun modo di attivarlo.
+        $yardAttivo = (new Config())->yardConfigured();
 
-        if ($row = $yardQuery->fetch(\PDO::FETCH_ASSOC)) {
-            $yardId = $row['id'];
+        if ($yardAttivo) {
+            $sqlSrv     = new SQLServer(new Config());
+            $sqlSrvConn = $sqlSrv->connect();
+            $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
+            $yardQuery->execute([$clientName]);
+
+            if ($row = $yardQuery->fetch(\PDO::FETCH_ASSOC)) {
+                $yardId = $row['id'];
+            }
         }
 
-        $isDraft     = ($yardId === null);
+        $isDraft     = $yardAttivo && ($yardId === null);
         $clientData  = null;
 
         if ($isDraft && $client_id) {
@@ -360,7 +369,11 @@ final class WorksitesController
         $yard_worksite_id = null;
 
         // Create on YARD (only if not draft)
-        if (!$isDraft) {
+        //
+        // Dove Yard non c'e', il cantiere nasce e basta: resta senza
+        // yard_worksite_id, che e' esattamente quello che succede gia' alle
+        // bozze. Tutto il resto di BOB regge quel campo vuoto.
+        if (!$isDraft && $yardAttivo) {
             $yardWorksiteData = [
                 'name'                  => $name,
                 'client_id'             => $client_id,
@@ -761,7 +774,10 @@ final class WorksitesController
         $vatCodes = $this->billingRepo->getVatCodes();
         $fatture  = $this->billingRepo->getByWorksiteId($worksite_id);
 
-        $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        $yardAttivo  = (new Config())->yardConfigured();
+        $yardBilling = $yardAttivo
+            ? new YardWorksiteBilling(new SqlServerConnection(new Config()))
+            : null;
         $totalEmesseReale     = 0.0;
         $totalFatture         = 0.0;
         $totalExtraFatturato  = 0.0; // sum of righe linked to extras AND emessa on Yard
@@ -772,9 +788,9 @@ final class WorksitesController
         // la scheda resta consultabile, semplicemente senza i dati fattura.
         $yardDocInfo = [];
         try {
-            $yardDocInfo = $yardBilling->getDocumentInfoMap(
+            $yardDocInfo = $yardBilling?->getDocumentInfoMap(
                 array_column(array_filter($fatture, fn($f) => !empty($f['yard_id'])), 'yard_id')
-            );
+            ) ?? [];
         } catch (\Throwable $e) {
             error_log('[WorksitesController::show] Yard non raggiungibile: ' . $e->getMessage());
         }
@@ -1088,7 +1104,7 @@ final class WorksitesController
                 $clientNameStmt = $this->conn->prepare("SELECT name FROM bb_clients WHERE id = ?");
                 $clientNameStmt->execute([$data['client_id']]);
                 $clientName = $clientNameStmt->fetchColumn();
-                if ($clientName) {
+                if ($clientName && (new Config())->yardConfigured()) {
                     $sqlSrv     = new SQLServer(new Config());
                     $sqlSrvConn = $sqlSrv->connect();
                     $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
@@ -1113,6 +1129,15 @@ final class WorksitesController
                 'yard_client_id' => $yardClientId,
                 'location'       => $data['location'],
             ];
+
+            // Senza Yard non c'e' niente da aggiornare la' fuori: si tira
+            // dritto come se l'aggiornamento fosse andato bene, perche' il
+            // cantiere qui dentro e' gia' stato salvato.
+            if (!(new Config())->yardConfigured()) {
+                $returnTo = $_POST['return_to'] ?? '/worksites';
+                $_SESSION['success'] = 'Cantiere modificato con successo!';
+                Response::redirect($returnTo);
+            }
 
             $sqlSrv      = new SQLServer(new Config());
             $sqlSrvConn  = $sqlSrv->connect();
@@ -1457,7 +1482,13 @@ final class WorksitesController
     public function saveBilling(Request $request): never
     {
         $worksite_id = $request->intParam('id');
-        $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+
+        // Dove Yard non c'e', le righe di fatturazione vivono solo in
+        // bb_billing: si salvano qui e basta, senza il brogliaccio la' fuori.
+        $yardAttivo  = (new Config())->yardConfigured();
+        $yardBilling = $yardAttivo
+            ? new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()))
+            : null;
 
         $id          = $_POST['id']           ?? '';
         $data        = $_POST['data']         ?? '';
@@ -1539,7 +1570,7 @@ final class WorksitesController
                         'iva_id'            => $iva_id,
                         'attivita_id'       => null,
                     ];
-                    $yardBilling->updateBrogliaccio($yard_id, $dataY);
+                    $yardBilling?->updateBrogliaccio($yard_id, $dataY);
                 }
 
                 $_SESSION['success'] = 'Fatturazione aggiornata.';
@@ -1559,7 +1590,7 @@ final class WorksitesController
                     'iva_id'            => $iva_id,
                     'attivita_id'       => null,
                 ];
-                $yardId = $yardBilling->insertToBrogliaccio($dataY);
+                $yardId = $yardBilling?->insertToBrogliaccio($dataY);
 
                 $this->billingRepo->setYardId($newId, (int)$yardId);
 
@@ -1600,7 +1631,7 @@ final class WorksitesController
 
             if (!empty($yard_id)) {
                 $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
-                $yardBilling->softDeleteBrogliaccio((int)$yard_id);
+                $yardBilling?->softDeleteBrogliaccio((int)$yard_id);
             }
 
             $this->billingRepo->delete((int)$id);
@@ -2339,6 +2370,14 @@ final class WorksitesController
             Response::error('Cantiere non trovato o già attivato', 404);
         }
 
+        // Senza Yard le bozze non nascono (vedi store), quindi qui non ci
+        // si arriva. Se ci si arriva lo stesso — una bozza vecchia, un
+        // database portato da un'altra installazione — meglio dirlo che
+        // tentare una connessione che non c'e'.
+        if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+            Response::error('Le bozze si attivano solo con il gestionale collegato.', 409);
+        }
+
         $sqlSrvConn = (new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()))->connect();
 
         $clientNameStmt = $conn->prepare("
@@ -2467,7 +2506,7 @@ final class WorksitesController
         }
 
         $jobs = [];
-        foreach (\App\Service\CronRun::JOBS as $key => $meta) {
+        foreach (\App\Service\CronRun::attivi() as $key => $meta) {
             $r    = $runs[$key] ?? null;
             $prev = $lastEver[$key] ?? null;
 
@@ -2597,6 +2636,12 @@ final class WorksitesController
 
     public function updateYardStatus(Request $request): never
     {
+        // Il confronto degli stati esiste solo se c'e' qualcosa con cui
+        // confrontarsi.
+        if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+            Response::json(['success' => false, 'message' => "Il gestionale non e' collegato su questa installazione."], 404);
+        }
+
         try {
             $service = new \YardWorksiteStatusService(
                 $this->conn,

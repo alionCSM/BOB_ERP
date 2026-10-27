@@ -105,6 +105,28 @@ final class CronRun
     }
 
     /** Apre una riga in stato "running". */
+    /**
+     * I lavori che su questa installazione hanno senso.
+     *
+     * Quelli di Yard spariscono dove Yard non e' collegato: un pannello che
+     * elenca due lavori che non possono riuscire e' un pannello che insegna
+     * a ignorare i puntini rossi.
+     *
+     * @return array<string, array<string, string>>
+     */
+    public static function attivi(): array
+    {
+        if ((new \App\Infrastructure\Config())->yardConfigured()) {
+            return self::JOBS;
+        }
+
+        return array_filter(
+            self::JOBS,
+            static fn(string $k): bool => !str_contains($k, 'yard'),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
     public static function start(?PDO $conn, string $job): self
     {
         $run = new self($conn, $job);

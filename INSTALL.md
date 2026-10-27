@@ -394,3 +394,29 @@ esegui anche §4 (ezdxf + LibreDWG) e verifica che `CLOUD_ROOT` (NFS) sia montat
 - [ ] (se DWG) `python3 scripts/dwg/dwg_to_svg.py <file.dwg> /tmp/out` → `{"ok":true,...}`
 - [ ] Versione mostrata in app = ultimo tag git
 ```
+
+---
+
+## Installazione senza il gestionale (Yard / Business)
+
+BOB gira anche senza i due gestionali SQL Server. Non serve un ramo
+diverso ne' una copia del codice: le pagine che li leggono guardano il
+`.env` e si spengono da sole, come fa gia' Fieldwire.
+
+**Yard** — basta non mettere `SQLSRV_DB` nel `.env`. Allora:
+
+- la fatturazione clienti funziona su `bb_billing` e basta, che su
+  quell'installazione e' l'unica verita' e la scrive l'ufficio a mano;
+- spariscono le due schede "Emesse reale" e la colonna "Yard ID";
+- i cantieri nascono senza `yard_worksite_id` e **non nascono piu' come
+  bozze**: la bozza esiste solo per dire "il cliente non e' ancora su
+  Yard", e dove Yard non c'e' quel motivo non esiste;
+- i due lavori notturni di Yard spariscono dal pannello, e lanciati a
+  mano escono subito dicendo perche'.
+
+**Business (TeamSystem)** — basta non mettere `BUSINESS_DB`. La pagina
+Andamento Fatturato lo controlla gia' per conto suo; per toglierla anche
+dal menu basta non dare il permesso `report_business`.
+
+Le due cose sono indipendenti: si puo' avere uno dei due, tutti e due o
+nessuno.

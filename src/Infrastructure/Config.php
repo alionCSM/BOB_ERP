@@ -97,6 +97,19 @@ final class Config
     // ── SQL Server ────────────────────────────────────────────────────────────
 
     public function sqlSrvHost(): string    { return $this->require('SQLSRV_HOST'); }
+    /**
+     * Yard c'e'?
+     *
+     * BOB gira anche senza. Yard e' il gestionale di chi l'ha fatto, non una
+     * parte di BOB: un'altra azienda che lo installa non ce l'ha, e le poche
+     * pagine che lo leggono devono sapersi spegnere invece di provare a
+     * connettersi a un server che non esiste.
+     *
+     * Stesso criterio di businessConfigured(): se manca il nome del
+     * database, non c'e'.
+     */
+    public function yardConfigured(): bool  { return $this->get('SQLSRV_DB', '') !== ''; }
+
     public function sqlSrvPort(): int       { return (int) $this->get('SQLSRV_PORT', '1433'); }
     public function sqlSrvDb(): string      { return $this->require('SQLSRV_DB'); }
     public function sqlSrvUser(): string    { return $this->require('SQLSRV_USER'); }

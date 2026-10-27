@@ -8,6 +8,14 @@ if (php_sapi_name() !== 'cli') {
 define('APP_ROOT', dirname(__DIR__, 2));
 require_once APP_ROOT . '/includes/bootstrap.php';
 
+// Dove Yard non c'e' questo lavoro non ha senso: si esce prima di provare
+// una connessione a un server che non esiste, invece di riempire il log di
+// errori ogni notte.
+if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+    echo "Yard non e' collegato su questa installazione: niente da fare" . PHP_EOL;
+    exit(0);
+}
+
 $logger = \App\Infrastructure\LoggerFactory::app();
 
 $run = null;
