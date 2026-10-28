@@ -599,7 +599,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
             <div class="bz-modal-field">
                 <label>Chi la vede</label>
-                <select id="task-vis" class="bz-vis-select"></select>
+                <button type="button" class="bz-chi-btn" id="task-chi" data-persone="">
+                    <i class="fas fa-eye"></i> La squadra
+                </button>
             </div>
         </div>
         <div class="bz-modal-actions">
@@ -666,7 +668,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-modal-row">
             <div class="bz-modal-field">
                 <label>Chi la vede</label>
-                <select id="edit-task-vis" class="bz-vis-select"></select>
+                <button type="button" class="bz-chi-btn" id="edit-task-chi">
+                    <i class="fas fa-eye"></i> Chi la vede
+                </button>
             </div>
         </div>
         <div class="bz-modal-actions">
@@ -706,6 +710,18 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 </div>
 {% endif %}
 
+<div id="bz-chi-modal" class="bz-overlay hidden">
+    <div class="bz-modal">
+        <h3>Chi la vede</h3>
+        <p class="bz-chi-nota">L'ufficio vede tutto. Qui si spunta chi altro la vede.</p>
+        <div id="bz-chi-corpo"></div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="bz-chi-annulla">Annulla</button>
+            <button class="bz-modal-submit" id="bz-chi-salva">Salva</button>
+        </div>
+    </div>
+</div>
+
 <script nonce="{{ cspNonce }}">
 const WID = {{ worksite_id }};
 const CSRF = '{{ csrfToken }}';
@@ -722,26 +738,126 @@ const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completat
 /* ── Chi vede cosa ──
    Le stesse cinque scelte ovunque. Le regole le applica il server: qui si
    mostra e si sceglie. Il capo puo' dare solo "squadra" e "capi". */
-const VIS = {
-    ufficio: { icon: 'fa-lock',        label: 'Solo ufficio',      color: '#f87171' },
-    squadra: { icon: 'fa-hard-hat',    label: 'Ufficio e squadra', color: '#94a3b8' },
-    capi:    { icon: 'fa-user-shield', label: 'Ufficio e capi',    color: '#fbbf24' },
-    cliente: { icon: 'fa-handshake',   label: 'Ufficio e cliente', color: '#a78bfa' },
-    tutti:   { icon: 'fa-globe',       label: 'Tutti',             color: '#4ade80' },
-};
-const VIS_CONCESSE = DA_UFFICIO ? Object.keys(VIS) : ['squadra', 'capi'];
-function visBadge(v, sempre = false) {
-    const x = VIS[v || 'squadra'];
-    if (!x || (!sempre && (v || 'squadra') === 'squadra')) return '';
-    return `<span class="bz-vis-badge" style="color:${x.color}" title="${x.label}"><i class="fas ${x.icon}"></i> ${x.label}</span>`;
+/* ── Chi la vede ───────────────────────────────────────────────────────────
+   Si spuntano le persone del cantiere, raggruppate per ruolo.
+
+   Prima erano cinque etichette — solo ufficio, ufficio e squadra, ufficio e
+   capi, ufficio e cliente, tutti. Dicevano una categoria, e la categoria
+   comprendeva sempre qualcuno in piu' di quanto si voleva: "ufficio e
+   squadra" su una lettera al committente la faceva leggere a quindici
+   persone per darla a una.
+
+   L'elenco dei nomi arriva dal server insieme a chi e' gia' dentro: non si
+   tiene in pagina, perche' fra l'apertura della Zone e il momento in cui si
+   decide qualcuno puo' essere stato aggiunto al cantiere.                 */
+let chiAperto = null;   // { tipo, oggetto, onSalva }
+
+function chiBadge(con) {
+    if (!DA_UFFICIO) return '';
+    const n = (con || []).length;
+    if (!n) {
+        return `<span class="bz-vis-badge" style="color:#f87171" title="Nessuno fuori dall'ufficio la vede"><i class="fas fa-lock"></i> solo ufficio</span>`;
+    }
+    return `<span class="bz-vis-badge" style="color:#94a3b8" title="Persone che la vedono, oltre all'ufficio"><i class="fas fa-user-check"></i> ${n}</span>`;
 }
-function visOptions(cur) {
-    return VIS_CONCESSE.map(k => `<option value="${k}" ${k === (cur || 'squadra') ? 'selected' : ''}>${VIS[k].label}</option>`).join('');
+
+function chiBottone(tipo, oggetto, con) {
+    if (!DA_UFFICIO) return '';
+    const n = (con || []).length;
+    return `<button type="button" class="bz-chi-btn" data-chi-tipo="${tipo}" data-chi-oggetto="${oggetto}">`
+         + `<i class="fas fa-eye"></i> ${n ? n + (n === 1 ? ' persona' : ' persone') : 'Chi la vede'}</button>`;
 }
-async function cambiaVisibilita(tipo, id, visibilita, valore) {
-    const res = await api(`/worksites/${WID}/zone/visibilita`, {
+
+/* Il pannello. onSalva riceve l'elenco scelto; se non c'e', si salva da
+   se' sul server — e' il caso delle cartelle e dei disegni, che esistono
+   gia'. Nei moduli di creazione l'oggetto non esiste ancora, quindi la
+   scelta resta in pagina e parte con il resto del modulo. */
+async function apriChi(tipo, oggetto, scelte, onSalva) {
+    const pan = document.getElementById('bz-chi-modal');
+    const box = document.getElementById('bz-chi-corpo');
+    chiAperto = { tipo, oggetto, onSalva };
+    box.innerHTML = '<p class="bz-chi-vuoto">Carico…</p>';
+    pan.classList.remove('hidden');
+
+    let gruppi = [];
+    let con = scelte || [];
+    if (oggetto) {
+        const r = await api(`/worksites/${WID}/zone/condivisione?tipo=${tipo}&oggetto=${oggetto}`);
+        if (!r.ok) { box.innerHTML = `<p class="bz-chi-vuoto">${escHtml(r.error || 'Non riesco a leggere')}</p>`; return; }
+        gruppi = (r.data || r).gruppi || [];
+        if (!scelte) con = (r.data || r).con || [];
+    } else {
+        const r = await api(`/worksites/${WID}/zone/accessi`);
+        const persone = ((r.data || r).persone) || [];
+        const titoli = { capo: 'Capi squadra', operaio: 'Operai', cliente: 'Cliente' };
+        gruppi = Object.keys(titoli)
+            .map(ruolo => ({
+                ruolo,
+                titolo: titoli[ruolo],
+                persone: persone.filter(x => x.ruolo === ruolo)
+                                .map(x => ({ id: x.user_id, nome: x.nome, azienda: x.company || '' })),
+            }))
+            .filter(g => g.persone.length);
+    }
+
+    if (!gruppi.length) {
+        box.innerHTML = '<p class="bz-chi-vuoto">In questo cantiere non c\'e\' ancora nessuno. '
+                      + 'Si aggiungono da "Chi accede".</p>';
+        return;
+    }
+
+    const dentro = new Set(con.map(Number));
+    box.innerHTML = gruppi.map(g => `
+        <div class="bz-chi-gruppo">
+            <div class="bz-chi-titolo">
+                <span>${escHtml(g.titolo)}</span>
+                <button type="button" class="bz-chi-tutti" data-gruppo="${g.ruolo}">tutti</button>
+            </div>
+            ${g.persone.map(pr => `
+                <label class="bz-chi-riga">
+                    <input type="checkbox" value="${pr.id}" data-gruppo="${g.ruolo}" ${dentro.has(pr.id) ? 'checked' : ''}>
+                    <span>${escHtml(pr.nome)}</span>
+                    ${pr.azienda ? `<em>${escHtml(pr.azienda)}</em>` : ''}
+                </label>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+function chiudiChi() {
+    document.getElementById('bz-chi-modal').classList.add('hidden');
+    chiAperto = null;
+}
+
+function chiScelte() {
+    return [...document.querySelectorAll('#bz-chi-corpo input[type=checkbox]:checked')]
+        .map(c => parseInt(c.value));
+}
+
+async function salvaChi() {
+    if (!chiAperto) return;
+    const persone = chiScelte();
+    const { tipo, oggetto, onSalva } = chiAperto;
+
+    if (onSalva) { onSalva(persone); chiudiChi(); return; }
+
+    const res = await api(`/worksites/${WID}/zone/condivisione`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, id, visibilita, valore }),
+        body: JSON.stringify({ tipo, oggetto, persone }),
+    });
+    if (!res.ok) { alert(res.error || res.message || 'Non salvato'); return; }
+    chiudiChi();
+    if (tipo === 'cartella' || tipo === 'file') loadFiles();
+    else if (tipo === 'disegno') loadDisegni();
+    else loadTasks();
+}
+
+/* "Nota interna" e "per il cliente" su un messaggio: due interruttori, non
+   un elenco di nomi. */
+async function flagMessaggio(quale, id, valore) {
+    const res = await api(`/worksites/${WID}/zone/messaggio-flag`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quale, id, valore }),
     });
     if (!res.ok) alert(res.error || res.message || 'Non salvato');
     return res.ok;
@@ -908,7 +1024,7 @@ function cardHtml(t) {
     return `
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
             <div class="bz-card-name">${escHtml(t.name)}</div>
-            ${visBadge(t.visibilita)}
+            ${chiBadge(t.condivisa_con)}
             <div class="bz-card-foot">
                 ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
@@ -1205,7 +1321,11 @@ function openEditModal(taskId) {
     } else {
         sel.value = '';
     }
-    document.getElementById('edit-task-vis').innerHTML = visOptions(t.visibilita);
+    const chiEdit = document.getElementById('edit-task-chi');
+    chiEdit.dataset.chiTipo    = 'attivita';
+    chiEdit.dataset.chiOggetto = t.id;
+    chiEdit.innerHTML = '<i class="fas fa-eye"></i> '
+        + ((t.condivisa_con || []).length ? (t.condivisa_con.length + ' persone') : 'Chi la vede');
     document.getElementById('task-edit-modal').classList.remove('hidden');
     document.getElementById('edit-task-name').focus();
 }
@@ -1222,7 +1342,6 @@ async function submitEdit() {
         status:          document.getElementById('edit-task-status').value,
         category:        document.getElementById('edit-task-cat').value || null,
         ...assegnazioneDaSelect(eSel),
-        visibilita:      document.getElementById('edit-task-vis').value,
         due_date:        document.getElementById('edit-task-due').value   || null,
         start_date:      document.getElementById('edit-task-start').value || null,
         priority:        parseInt(document.getElementById('edit-task-priority').value || '0'),
@@ -1375,8 +1494,8 @@ function renderDisegni(items, fwReady) {
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${DA_UFFICIO
-                ? `<div class="bz-dz-meta"><i class="fas fa-eye"></i> <select data-vis-disegno="${d.id}" class="bz-vis-select">${visOptions(d.zone_visibilita)}</select></div>`
-                : visBadge(d.zone_visibilita)}
+                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d.condivisa_con)}</div>`
+                : ''}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
@@ -1544,8 +1663,8 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) {
         box.innerHTML = DA_UFFICIO && cart
-            ? `<i class="fas fa-eye"></i> <select data-vis-cartella="${cart.id}" class="bz-vis-select">${visOptions(cart.visibilita)}</select>`
-            : (cart ? visBadge(cart.visibilita, true) : '');
+            ? chiBottone('cartella', cart.id, cart.condivisa_con)
+            : '';
     }
 }
 
@@ -1555,7 +1674,7 @@ function renderFolders(folders) {
         <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
         ${folders.map(f => `
             <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
-                <i class="fas ${(f.visibilita || 'squadra') === 'squadra' ? 'fa-folder' : VIS[f.visibilita].icon}" style="${(f.visibilita || 'squadra') === 'squadra' ? '' : 'color:' + VIS[f.visibilita].color}" title="${VIS[f.visibilita || 'squadra'].label}"></i> <span>${escHtml(f.name)}</span>
+                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f.condivisa_con)}
                 <em>${f.file_count}</em>
                 <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
             </button>`).join('')}
@@ -1699,7 +1818,10 @@ function quickAdd(status) {
 }
 
 function openModal() {
-    document.getElementById('task-vis').innerHTML = visOptions('squadra');
+    // vuoto = come prima: la squadra. Si tocca solo per stringere.
+    const chiNuovo = document.getElementById('task-chi');
+    chiNuovo.dataset.persone = '';
+    chiNuovo.innerHTML = '<i class="fas fa-eye"></i> La squadra';
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
@@ -1724,7 +1846,7 @@ async function submitTask() {
         status:          document.getElementById('task-status').value,
         category:        document.getElementById('task-cat').value,
         ...assegnazioneDaSelect(aSel),
-        visibilita:      document.getElementById('task-vis').value,
+        ...personeDalBottone('task-chi'),
         due_date:        document.getElementById('task-due').value || null,
         start_date:      document.getElementById('task-start').value || null,
     };
@@ -2029,22 +2151,65 @@ function fmtDate(str) {
 /* ══════════ CHI VEDE COSA: i comandi ══════════ */
 // Delegati sul documento: cartelle, disegni e messaggi si ridisegnano a ogni
 // caricamento, e un ascoltatore attaccato all'elemento sparirebbe con lui.
-document.addEventListener('change', async e => {
-    const c = e.target.closest('[data-vis-cartella]');
-    if (c) {
-        if (await cambiaVisibilita('cartella', parseInt(c.dataset.visCartella), c.value)) loadFiles();
+
+/* I nomi scelti in un modulo di creazione: stanno sul bottone finche' non
+   si salva, perche' l'oggetto non esiste ancora e non c'e' niente da
+   condividere. Vuoto = come prima, la squadra: chi carica una foto non
+   deve fermarsi a spuntare nomi. */
+function personeDalBottone(idBottone) {
+    const b = document.getElementById(idBottone);
+    const v = (b?.dataset.persone || '').trim();
+    return v === '' ? {} : { persone: JSON.parse(v) };
+}
+
+document.addEventListener('click', async e => {
+    // il bottone "Chi la vede" di una cosa che esiste gia': si salva da se'
+    const chi = e.target.closest('[data-chi-tipo]');
+    if (chi) {
+        e.stopPropagation();
+        apriChi(chi.dataset.chiTipo, parseInt(chi.dataset.chiOggetto), null, null);
         return;
     }
-    const d = e.target.closest('[data-vis-disegno]');
-    if (d) { await cambiaVisibilita('disegno', parseInt(d.dataset.visDisegno), d.value); }
-});
-document.addEventListener('click', async e => {
+
+    // lo stesso bottone dentro un modulo di creazione: la scelta resta qui
+    const nuovo = e.target.closest('#task-chi');
+    if (nuovo) {
+        e.stopPropagation();
+        const gia = (nuovo.dataset.persone || '').trim();
+        apriChi('attivita', 0, gia === '' ? [] : JSON.parse(gia), persone => {
+            nuovo.dataset.persone = JSON.stringify(persone);
+            nuovo.innerHTML = '<i class="fas fa-eye"></i> '
+                + (persone.length ? persone.length + (persone.length === 1 ? ' persona' : ' persone')
+                                  : 'Nessuno fuori dall\'ufficio');
+        });
+        return;
+    }
+
+    if (e.target.closest('#bz-chi-salva'))   { await salvaChi(); return; }
+    if (e.target.closest('#bz-chi-annulla')) { chiudiChi();      return; }
+
+    // "tutti" su un gruppo: spunta i nomi di quel gruppo, non salva un
+    // ruolo. Se domani entra qualcuno nel cantiere, non eredita niente.
+    const tutti = e.target.closest('.bz-chi-tutti');
+    if (tutti) {
+        const caselle = [...document.querySelectorAll(
+            `#bz-chi-corpo input[data-gruppo="${tutti.dataset.gruppo}"]`)];
+        const accendi = caselle.some(c => !c.checked);
+        caselle.forEach(c => { c.checked = accendi; });
+        return;
+    }
+
     const b = e.target.closest('[data-flag-cliente]');
     if (!b) return;
     e.stopPropagation();
-    if (await cambiaVisibilita('per_cliente', parseInt(b.dataset.flagCliente), null, parseInt(b.dataset.val))) {
+    if (await flagMessaggio('per_cliente', parseInt(b.dataset.flagCliente), parseInt(b.dataset.val))) {
         loadComments(activeTaskId);
     }
+});
+
+// fuori dal pannello si chiude, come gli altri
+document.getElementById('bz-chi-modal').addEventListener('click', e => {
+    if (e.target.id === 'bz-chi-modal') chiudiChi();
 });
 
 /* ══════════ INIT ══════════ */
@@ -2058,7 +2223,34 @@ loadBobUsers();
 <style>
 /* Chi vede cosa */
 .bz-vis-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; margin-top:4px; }
-.bz-vis-select { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:3px 6px; font-size:11.5px; }
+/* Il bottone "Chi la vede" sta in due posti con due fondi: negli elenchi
+   della pagina, che sono scuri, e dentro i moduli, che sono bianchi. Si
+   parte dallo scuro e dentro .bz-modal si schiarisce — se no nel modulo
+   bianco veniva un rettangolo nero. */
+.bz-chi-btn { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:7px;
+              padding:4px 9px; font-size:11.5px; font-family:inherit; cursor:pointer;
+              display:inline-flex; align-items:center; gap:5px; }
+.bz-chi-btn:hover { border-color:#2563eb; color:#e2e8f0; }
+[data-theme="light"] .bz-chi-btn { background:#f8fafc; color:#1e293b; border-color:#e2e8f0; }
+.bz-modal .bz-chi-btn { background:#f8fafc; color:#1e293b; border-color:#e2e8f0; padding:8px 12px; font-size:13px; }
+.bz-modal .bz-chi-btn:hover { border-color:#94a3b8; background:#fff; }
+
+/* Il pannello e' un .bz-modal, quindi bianco come gli altri. */
+.bz-chi-nota { margin:-12px 0 16px; font-size:11.5px; color:#64748b; }
+.bz-chi-vuoto { font-size:12.5px; color:#64748b; padding:16px 0; }
+#bz-chi-corpo { max-height:46vh; overflow-y:auto; margin-bottom:20px; }
+.bz-chi-gruppo + .bz-chi-gruppo { margin-top:16px; }
+.bz-chi-titolo { display:flex; align-items:center; justify-content:space-between;
+                 font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+                 color:#94a3b8; padding-bottom:6px; border-bottom:1px solid #e2e8f0; margin-bottom:4px; }
+.bz-chi-tutti { background:none; border:0; color:#2563eb; font-size:11px; font-weight:700;
+                font-family:inherit; cursor:pointer; text-transform:none; letter-spacing:0; padding:2px 4px; }
+.bz-chi-tutti:hover { text-decoration:underline; }
+.bz-chi-riga { display:flex; align-items:center; gap:10px; padding:7px 6px; font-size:13px;
+               color:#1e293b; cursor:pointer; border-radius:7px; }
+.bz-chi-riga:hover { background:#f8fafc; }
+.bz-chi-riga input { width:16px; height:16px; flex:0 0 auto; accent-color:#2563eb; margin:0; }
+.bz-chi-riga em { margin-left:auto; font-style:normal; font-size:11.5px; color:#94a3b8; }
 .bz-comment-flags { display:flex; gap:14px; padding:6px 14px 10px; font-size:11.5px; color:#94a3b8; }
 .bz-comment-flags label { display:flex; align-items:center; gap:5px; cursor:pointer; }
 .bz-folder-vis { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#94a3b8; margin-left:12px; }

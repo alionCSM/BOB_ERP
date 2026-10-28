@@ -79,8 +79,11 @@
             a.scadenza ? 'entro il ' + data(a.scadenza) : '',
             a.ultima_compilazione ? 'ultima: ' + data(a.ultima_compilazione) : 'mai compilato',
         ].filter(Boolean).join(' · ');
-        const vis = (typeof VIS !== 'undefined' && VIS[a.visibilita])
-            ? `<span class="bz-vis-badge" style="color:${VIS[a.visibilita].color}" title="Chi legge le risposte"><i class="fas ${VIS[a.visibilita].icon}"></i> ${VIS[a.visibilita].label}</span>`
+        // chi legge le risposte: un numero, e il pannello per cambiarlo.
+        // L'ufficio le legge sempre e non si conta.
+        const quanti = (a.condivisa_con || []).length;
+        const vis = DA_UFFICIO
+            ? `<button type="button" class="bz-chi-btn" data-chi-tipo="modulo" data-chi-oggetto="${a.id}" title="Chi legge le risposte"><i class="fas fa-eye"></i> ${quanti ? quanti : 'solo ufficio'}</button>`
             : '';
         return `
             <div class="bz-assegna-row">
@@ -113,9 +116,7 @@
             ]);
             const tpls    = (modelli.ok && Array.isArray(modelli.data)) ? modelli.data : [];
             const persone = ((acc.data || {}).persone) || [];
-            const visOpz  = (typeof VIS !== 'undefined')
-                ? Object.keys(VIS).map(k => `<option value="${k}" ${k === 'ufficio' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')
-                : '<option value="ufficio">Solo ufficio</option>';
+
 
             form = tpls.length ? `
                 <div class="bz-assegna-form">
@@ -128,7 +129,7 @@
                     </select>
                     <select id="bza-freq">${Object.keys(FREQ).map(k => `<option value="${k}">${FREQ[k]}</option>`).join('')}</select>
                     <input type="date" id="bza-scad" title="Scadenza (facoltativa)">
-                    <select id="bza-vis" title="Chi legge le risposte">${visOpz}</select>
+                    <button type="button" class="bz-chi-btn" id="bza-vis" data-persone="" title="Chi legge le risposte"><i class="fas fa-eye"></i> Solo ufficio</button>
                     <button id="bza-assegna">Assegna</button>
                 </div>` : '<div class="sub" style="font-size:12px;color:#64748b;">Crea prima un modello qui sotto, poi assegnalo.</div>';
         }
@@ -155,15 +156,32 @@
             document.getElementById('bz-forms-root')?.scrollIntoView({ behavior: 'smooth' });
             return;
         }
+        // Chi legge le risposte, prima che il modulo esista: la scelta
+        // resta sul bottone e parte col resto. Il pannello e' quello della
+        // pagina (apriChi), cosi' i nomi si spuntano allo stesso modo
+        // ovunque.
+        const sceltaVis = e.target.closest('#bza-vis');
+        if (sceltaVis && typeof window.apriChi === 'function') {
+            const gia = (sceltaVis.dataset.persone || '').trim();
+            window.apriChi('modulo', 0, gia === '' ? [] : JSON.parse(gia), function (persone) {
+                sceltaVis.dataset.persone = JSON.stringify(persone);
+                sceltaVis.innerHTML = '<i class="fas fa-eye"></i> '
+                    + (persone.length ? persone.length + (persone.length === 1 ? ' persona' : ' persone')
+                                      : 'Solo ufficio');
+            });
+            return;
+        }
+
         if (e.target.closest('#bza-assegna')) {
             const chi = document.getElementById('bza-chi').value;
+            const scelte = (document.getElementById('bza-vis')?.dataset.persone || '').trim();
             const r = await post(base(), {
                 template_id: parseInt(document.getElementById('bza-modello').value),
                 a_ruolo:     chi.startsWith('r:') ? chi.slice(2) : null,
                 a_user_id:   chi.startsWith('u:') ? parseInt(chi.slice(2)) : null,
                 frequenza:   document.getElementById('bza-freq').value,
                 scadenza:    document.getElementById('bza-scad').value || null,
-                visibilita:  document.getElementById('bza-vis').value,
+                persone:     scelte === '' ? [] : JSON.parse(scelte),
             });
             if (!r.ok) { alert(r.error || 'Non salvato'); return; }
             carica();

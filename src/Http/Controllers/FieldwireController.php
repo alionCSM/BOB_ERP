@@ -41,6 +41,7 @@ final class FieldwireController
     private ZoneFileRepository       $fileRepo;
     private ZoneFormRepository       $formRepo;
     private \App\Service\Zone\Accesso $accesso;
+    private \App\Service\Zone\Condivisione $condivisione;
 
     /** La guardia e' passata per questa richiesta? La controlla assertZone. */
     private bool $guardiaPassata = false;
@@ -126,7 +127,9 @@ final class FieldwireController
         'accessi'               => 'ufficio',
         // chi vede cosa e chi compila cosa lo decide l'ufficio
         'condividiCliente'      => 'ufficio',
-        'cambiaVisibilita'      => 'ufficio',
+        'condivisione'          => 'ufficio',
+        'flagMessaggio'         => 'ufficio',
+        'salvaCondivisione'     => 'ufficio',
         'assegnazioniModuli'    => ['moduli', 1],
         'salvaAssegnazione'     => 'ufficio',
         'disattivaAssegnazione' => 'ufficio',
@@ -145,6 +148,7 @@ final class FieldwireController
         $this->fileRepo        = new ZoneFileRepository($conn);
         $this->formRepo        = new ZoneFormRepository($conn);
         $this->accesso         = new \App\Service\Zone\Accesso($conn);
+        $this->condivisione    = new \App\Service\Zone\Condivisione($conn, $this->accesso);
     }
 
     /**
@@ -192,6 +196,79 @@ final class FieldwireController
         $this->accesso->pretende($utente, (int)($request->param('id') ?? 0), $famiglia, $minimo);
 
         $this->guardiaPassata = true;
+    }
+
+    // ─── Chi vede cosa ────────────────────────────────────────────────────────
+
+    /**
+     * Un filtro da dare a array_filter: tiene le righe che chi chiede vede.
+     *
+     * Una volta sola per elenco, non una query per riga: le condivisioni di
+     * questa persona si leggono tutte insieme e il confronto si fa in
+     * memoria. Su una Zone con duecento file la differenza e' fra una
+     * interrogazione e duecento.
+     *
+     * @param string $campoId      la colonna con l'id dell'oggetto condiviso
+     *                             (per le foto e' task_id: una foto segue
+     *                             l'attivita' dov'e' appesa)
+     * @param string $campoCreatore chi l'ha caricata: la vede sempre
+     */
+    private function filtro(
+        Request $request,
+        string $tipo,
+        string $campoId = 'id',
+        string $campoCreatore = 'created_by'
+    ): callable {
+        $utente  = $request->user();
+        $ufficio = $this->accesso->daUfficio($utente);
+        $io      = (int)($utente->id ?? 0);
+        $visti   = $io > 0 ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
+
+        return static function (array $r) use ($ufficio, $io, $visti, $campoId, $campoCreatore): bool {
+            if ($ufficio) {
+                return true;
+            }
+            if ($io > 0 && (int)($r[$campoCreatore] ?? 0) === $io) {
+                return true;
+            }
+            return isset($visti[(int)($r[$campoId] ?? 0)]);
+        };
+    }
+
+    /**
+     * Attacca a ogni riga con chi e' condivisa, per l'ufficio.
+     *
+     * Una query per l'intero elenco, non una per riga. Agli altri non
+     * arriva: chi altro vede un documento non e' affare di chi lo apre, e
+     * un elenco di nomi che parte verso un telefono e' un elenco di nomi
+     * uscito di casa.
+     *
+     * @param  array<int, array<string, mixed>> $righe
+     * @return array<int, array<string, mixed>>
+     */
+    private function conChiSuRighe(Request $request, string $tipo, array $righe, string $campoId = 'id'): array
+    {
+        if (!$righe || !$this->accesso->daUfficio($request->user())) {
+            return $righe;
+        }
+
+        $persone = $this->condivisione->conChi($tipo, array_column($righe, $campoId));
+        foreach ($righe as &$r) {
+            $r['condivisa_con'] = $persone[(int)($r[$campoId] ?? 0)] ?? [];
+        }
+        return $righe;
+    }
+
+    /** Lo stesso, per un oggetto solo. */
+    private function condiviso(Request $request, string $tipo, int $oggettoId, int $creatoDa = 0): bool
+    {
+        return $this->condivisione->vede(
+            $request->user(),
+            (int)($request->param('id') ?? 0),
+            $tipo,
+            $oggettoId,
+            $creatoDa
+        );
     }
 
     // ─── Pagina BOB Zone ──────────────────────────────────────────────────────
@@ -245,11 +322,10 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
-            $ruolo = $this->ruoloQui($request);
-            return array_values(array_filter(
+            return $this->conChiSuRighe($request, 'attivita', array_values(array_filter(
                 $this->zoneRepo->allForWorksite($worksiteId),
-                fn(array $t) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $t['visibilita'] ?? null)
-            ));
+                $this->filtro($request, 'attivita')
+            )));
         });
     }
 
@@ -269,7 +345,7 @@ final class FieldwireController
             $ruolo = $this->accesso->pretendeRuolo($user, $worksiteId, [\App\Service\Zone\Accesso::CAPO]);
 
             $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user?->id ?? 0));
-            $this->scriviVisibilitaTask($taskId, $ruolo, $body, true);
+            $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, true, $request);
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
             // avvisa a chi tocca: la persona, la squadra, i capi, il cliente
@@ -293,7 +369,7 @@ final class FieldwireController
 
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
-            $this->scriviVisibilitaTask($taskId, $ruolo, $body, false);
+            $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, false, $request);
 
             // avvisa se e' cambiato a chi tocca
             $dopo = $this->zoneRepo->find($taskId) ?? [];
@@ -693,7 +769,7 @@ final class FieldwireController
             $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate(
                 $worksiteId,
                 $worksite,
-                fn(array $t) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $t['visibilita'] ?? null),
+                $this->filtro($request, 'attivita'),
                 fn(array $foto) => $this->filtraCommenti($foto, $ruolo, $io),
             );
         } catch (\Throwable $e) {
@@ -815,13 +891,26 @@ final class FieldwireController
                 'submitted_by'   => (int)($user?->id ?? 0) ?: null,
                 'source'         => 'internal',
             ]);
-            // chi la legge: quello deciso nell'assegnazione; senza, l'ufficio
-            $this->conn->prepare('UPDATE bb_zone_form_submissions SET visibilita = :v, assegnazione_id = :a WHERE id = :id')
+            $this->conn->prepare('UPDATE bb_zone_form_submissions SET assegnazione_id = :a WHERE id = :id')
                 ->execute([
-                    ':v'  => $assegnazione['visibilita'] ?? 'ufficio',
                     ':a'  => $assegnazione ? (int)$assegnazione['id'] : null,
                     ':id' => $id,
                 ]);
+
+            // Chi legge la risposta: le stesse persone del "da compilare".
+            // Senza assegnazione resta all'ufficio, che e' giusto: una
+            // risposta a un modulo DPI non la deve leggere la squadra
+            // perche' qualcuno ha dimenticato di dire a chi va.
+            if ($assegnazione) {
+                $persone = $this->condivisione->conChi('modulo', [(int)$assegnazione['id']]);
+                $this->condivisione->salva(
+                    $worksiteId,
+                    'risposta',
+                    $id,
+                    $persone[(int)$assegnazione['id']] ?? [],
+                    (int)($user?->id ?? 0)
+                );
+            }
             return ['id' => $id];
         });
     }
@@ -833,13 +922,11 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $tplId = isset($_GET['template']) && $_GET['template'] !== '' ? (int)$_GET['template'] : null;
-            $ruolo = $this->ruoloQui($request);
-            $io    = (int)($request->user()->id ?? 0);
-            // le proprie si vedono sempre; le altre secondo la visibilita'
+            // le proprie si vedono sempre: chi l'ha compilato deve poter
+            // rileggere cosa ha scritto
             return array_values(array_filter(
                 $this->formRepo->submissions($worksiteId, $tplId),
-                fn(array $c) => (int)($c['submitted_by'] ?? 0) === $io
-                    || \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $c['visibilita'] ?? 'ufficio')
+                $this->filtro($request, 'risposta', 'id', 'submitted_by')
             ));
         });
     }
@@ -853,8 +940,7 @@ final class FieldwireController
             if (!$sub || (int)$sub['worksite_id'] !== (int)$request->param('id')) {
                 throw new \RuntimeException('Compilazione non trovata');
             }
-            if ((int)($sub['submitted_by'] ?? 0) !== (int)($request->user()->id ?? 0)
-                && !\App\Service\Zone\Accesso::vedeVisibilita($this->ruoloQui($request), $sub['visibilita'] ?? 'ufficio')) {
+            if (!$this->condiviso($request, 'risposta', (int)$sub['id'], (int)($sub['submitted_by'] ?? 0))) {
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa compilazione');
             }
             $tpl = $this->formRepo->find((int)$sub['template_id']);
@@ -914,14 +1000,13 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = isset($_GET['folder']) && $_GET['folder'] !== '' ? (int)$_GET['folder'] : null;
-            $ruolo   = $this->ruoloQui($request);
-            $cartelle = $this->cartelleVisibili($worksiteId, $ruolo);
+            $cartelle = $this->cartelleVisibili($request, $worksiteId);
             if ($folderId !== null && !isset($cartelle[$folderId])) {
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
             }
             $files = array_values(array_filter(
                 $this->fileRepo->files($worksiteId, $folderId),
-                fn(array $f) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $this->visibilitaFile($f, $cartelle))
+                fn(array $f) => $this->vedeFile($request, $f, $cartelle)
             ));
             // arricchisci con url download/preview
             foreach ($files as &$f) {
@@ -929,8 +1014,8 @@ final class FieldwireController
                 $f['is_image'] = in_array(strtolower($f['file_type'] ?? ''), ['jpg','jpeg','png','webp','gif'], true);
             }
             return [
-                'folders'        => array_values($cartelle),
-                'files'          => $files,
+                'folders'        => $this->conChiSuRighe($request, 'cartella', array_values($cartelle)),
+                'files'          => $this->conChiSuRighe($request, 'file', $files),
                 'current_folder' => $folderId,
             ];
         });
@@ -946,10 +1031,8 @@ final class FieldwireController
             $name = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome cartella obbligatorio');
             $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0));
-            $vis = \App\Service\Zone\Accesso::visibilitaPer($this->ruoloQui($request), $body['visibilita'] ?? null);
-            $this->conn->prepare('UPDATE bb_zone_folders SET visibilita = :v WHERE id = :id')
-                ->execute([':v' => $vis, ':id' => $id]);
-            return ['id' => $id, 'name' => $name, 'visibilita' => $vis];
+            $con = $this->condivisioneNuova($request, $worksiteId, 'cartella', $id, $body);
+            return ['id' => $id, 'name' => $name, 'condivisa_con' => $con];
         });
     }
 
@@ -977,7 +1060,7 @@ final class FieldwireController
             $user       = $request->user();
             $folderId   = !empty($_POST['folder_id']) ? (int)$_POST['folder_id'] : null;
             // si carica solo dove si vede
-            if ($folderId !== null && !isset($this->cartelleVisibili($worksiteId, $this->ruoloQui($request))[$folderId])) {
+            if ($folderId !== null && !isset($this->cartelleVisibili($request, $worksiteId)[$folderId])) {
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
             }
 
@@ -1009,6 +1092,17 @@ final class FieldwireController
                 'size_bytes'  => (int)($f['size'] ?? 0),
                 'uploaded_by' => (int)($user?->id ?? 0),
             ]);
+
+            // Nella radice non c'e' una cartella da cui ereditare: un file
+            // caricato li' nasce condiviso come prima faceva l'etichetta —
+            // con la squadra se lo carica un capo o un operaio, con nessuno
+            // se lo carica l'ufficio, che poi decide. Dentro una cartella
+            // non si scrive niente: eredita, e l'ufficio decide una volta
+            // sola per tutta la cartella.
+            if ($folderId === null) {
+                $this->condivisioneNuova($request, $worksiteId, 'file', $id, []);
+            }
+
             echo json_encode(['ok' => true, 'data' => ['id' => $id]]);
         } catch (\Throwable $e) {
             http_response_code(500);
@@ -1113,9 +1207,11 @@ final class FieldwireController
             ");
             $stmt->execute([':w' => $worksiteId]);
             $ruolo = $this->ruoloQui($request);
+            // una foto segue l'attivita' a cui e' appesa: per questo si
+            // filtra su task_id, non sull'id della foto
             $foto  = array_filter(
                 $stmt->fetchAll(\PDO::FETCH_ASSOC),
-                fn(array $f) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $f['visibilita'] ?? null)
+                $this->filtro($request, 'attivita', 'task_id', 'author_user_id')
             );
             return $this->filtraCommenti(array_values($foto), $ruolo, (int)($request->user()->id ?? 0));
         });
@@ -1241,7 +1337,7 @@ final class FieldwireController
             // disegni BOB (sorgente di verita') + stato sync
             $stmt = $this->conn->prepare("
                 SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
-                       d.created_at, d.zone_visibilita,
+                       d.created_at, d.created_by,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
                        r.status AS dwg_status
@@ -1254,10 +1350,9 @@ final class FieldwireController
                 ORDER BY d.created_at DESC
             ");
             $stmt->execute([':wid' => $worksiteId]);
-            $ruolo = $this->ruoloQui($request);
             $righe = array_filter(
                 $stmt->fetchAll(\PDO::FETCH_ASSOC),
-                fn(array $d) => \App\Service\Zone\Accesso::vedeVisibilita($ruolo, $d['zone_visibilita'] ?? null)
+                $this->filtro($request, 'disegno')
             );
             $bob = array_map(function ($r) use ($worksiteId) {
                 $type = strtolower($r['file_type'] ?? '');
@@ -1267,7 +1362,6 @@ final class FieldwireController
                     'file_name'    => $r['file_name'],
                     'file_type'    => $r['file_type'],
                     'note'         => $r['note'],
-                    'zone_visibilita' => $r['zone_visibilita'] ?? 'squadra',
                     'folder'       => $r['subcategory'] ?: 'altri',
                     'uploader'     => trim($r['uploader']) ?: '—',
                     'created_at'   => $r['created_at'],
@@ -1282,6 +1376,7 @@ final class FieldwireController
                                       || ($isDwg && ($r['dwg_status'] ?? '') === 'ok'),
                 ];
             }, array_values($righe));
+            $bob = $this->conChiSuRighe($request, 'disegno', $bob);
 
             // floorplan Fieldwire (sola lettura, con deep link)
             $fw = [];
@@ -1724,11 +1819,79 @@ final class FieldwireController
     }
 
     /**
-     * Cambia chi vede una cosa: cartella, file, disegno, attivita', o un
-     * messaggio (nota interna / per il cliente). Un punto solo, perche' e'
-     * la stessa decisione su oggetti diversi, e sempre dell'ufficio.
+     * Chi vede una cosa, e fra chi si puo' scegliere.
+     *
+     * Un punto solo per cartelle, file, disegni, attivita' e moduli: e' la
+     * stessa decisione su oggetti diversi, e sempre dell'ufficio.
+     *
+     * I messaggi di un'attivita' restano fuori: hanno i loro due
+     * interruttori ("nota interna", "per il cliente") che si decidono
+     * mentre si scrive. Fermarsi a spuntare nomi per rispondere a una
+     * domanda non lo farebbe nessuno.
      */
-    public function cambiaVisibilita(Request $request): void
+    public function condivisione(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $tipo = (string)($_GET['tipo'] ?? '');
+            $id   = (int)($_GET['oggetto'] ?? 0);
+
+            if (!in_array($tipo, \App\Service\Zone\Condivisione::TIPI, true)) {
+                throw new \RuntimeException('Tipo non valido');
+            }
+            $this->oggettoDelCantiere($tipo, $id, $w);
+
+            return [
+                'gruppi' => $this->condivisione->persone($w),
+                'con'    => $this->condivisione->conChi($tipo, [$id])[$id] ?? [],
+            ];
+        });
+    }
+
+    /**
+     * "Nota interna" e "per il cliente" su un messaggio di un'attivita'.
+     *
+     * Stavano nello stesso endpoint di chi-vede-cosa, e li' non tornavano
+     * piu': un messaggio non ha un elenco di nomi, ha due interruttori che
+     * si decidono mentre si scrive.
+     */
+    public function flagMessaggio(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $body = $this->jsonBody();
+            $quale = (string)($body['quale'] ?? '');
+            $id    = (int)($body['id'] ?? 0);
+
+            if (!in_array($quale, ['interna', 'per_cliente'], true)) {
+                throw new \RuntimeException('Tipo non valido');
+            }
+
+            // il messaggio deve essere di un'attivita' di questo cantiere
+            $st = $this->conn->prepare("
+                SELECT c.id FROM bb_zone_task_comments c
+                JOIN bb_zone_tasks t ON t.id = c.task_id
+                WHERE c.id = :id AND t.worksite_id = :w
+            ");
+            $st->execute([':id' => $id, ':w' => $w]);
+            if (!$st->fetchColumn()) {
+                throw new \RuntimeException('Messaggio non trovato');
+            }
+
+            // il nome della colonna viene dal controllo qui sopra, non dalla
+            // richiesta
+            $this->conn->prepare("UPDATE bb_zone_task_comments SET `$quale` = :v WHERE id = :id")
+                ->execute([':v' => !empty($body['valore']) ? 1 : 0, ':id' => $id]);
+            return ['ok' => true];
+        });
+    }
+
+    /** Scrive chi vede una cosa: esattamente queste persone, non altre. */
+    public function salvaCondivisione(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
 
@@ -1736,47 +1899,95 @@ final class FieldwireController
             $w    = (int)$request->param('id');
             $body = $this->jsonBody();
             $tipo = (string)($body['tipo'] ?? '');
-            $id   = (int)($body['id'] ?? 0);
-            $vis  = $body['visibilita'] ?? null;
+            $id   = (int)($body['oggetto'] ?? 0);
 
-            // file: null vuol dire "come la cartella"
-            $ammessa = in_array($vis, \App\Service\Zone\Accesso::VISIBILITA, true)
-                || ($tipo === 'file' && $vis === null);
-
-            [$tabella, $colonna, $cantiere] = match ($tipo) {
-                'cartella' => ['bb_zone_folders', 'visibilita', 'worksite_id'],
-                'file'     => ['bb_zone_files', 'visibilita', 'worksite_id'],
-                'disegno'  => ['bb_worksite_documents', 'zone_visibilita', 'worksite_id'],
-                'attivita' => ['bb_zone_tasks', 'visibilita', 'worksite_id'],
-                'interna', 'per_cliente' => ['bb_zone_task_comments', $tipo, null],
-                default    => throw new \RuntimeException('Tipo non valido'),
-            };
-
-            if ($cantiere === null) {
-                // un messaggio: si controlla che sia di un'attivita' di qui
-                $st = $this->conn->prepare("
-                    SELECT c.id FROM bb_zone_task_comments c
-                    JOIN bb_zone_tasks t ON t.id = c.task_id
-                    WHERE c.id = :id AND t.worksite_id = :w
-                ");
-                $st->execute([':id' => $id, ':w' => $w]);
-                if (!$st->fetchColumn()) throw new \RuntimeException('Messaggio non trovato');
-                $this->conn->prepare("UPDATE bb_zone_task_comments SET `$colonna` = :v WHERE id = :id")
-                    ->execute([':v' => !empty($body['valore']) ? 1 : 0, ':id' => $id]);
-                return ['ok' => true];
+            if (!in_array($tipo, \App\Service\Zone\Condivisione::TIPI, true)) {
+                throw new \RuntimeException('Tipo non valido');
             }
+            $this->oggettoDelCantiere($tipo, $id, $w);
 
-            if (!$ammessa) throw new \RuntimeException('Visibilita non valida');
-            $st = $this->conn->prepare("UPDATE `$tabella` SET `$colonna` = :v WHERE id = :id AND `$cantiere` = :w");
-            $st->execute([':v' => $vis, ':id' => $id, ':w' => $w]);
-            if ($st->rowCount() === 0) {
-                // nessuna riga: o non e' di questo cantiere, o era gia' cosi'
-                $c = $this->conn->prepare("SELECT 1 FROM `$tabella` WHERE id = :id AND `$cantiere` = :w");
-                $c->execute([':id' => $id, ':w' => $w]);
-                if (!$c->fetchColumn()) throw new \RuntimeException('Non trovato in questo cantiere');
-            }
-            return ['visibilita' => $vis];
+            $con = $this->condivisione->salva(
+                $w,
+                $tipo,
+                $id,
+                is_array($body['persone'] ?? null) ? $body['persone'] : [],
+                (int)($request->user()->id ?? 0)
+            );
+            return ['con' => $con];
         });
+    }
+
+    /**
+     * L'oggetto e' di questo cantiere? Se no si ferma qui.
+     *
+     * Senza questo controllo l'indirizzo del cantiere A servirebbe a
+     * cambiare chi vede un documento del cantiere B: la guardia guarda che
+     * chi chiede sia dell'ufficio, non che l'oggetto sia di qui.
+     */
+    private function oggettoDelCantiere(string $tipo, int $oggettoId, int $worksiteId): void
+    {
+        $tabella = match ($tipo) {
+            'attivita' => 'bb_zone_tasks',
+            'cartella' => 'bb_zone_folders',
+            'file'     => 'bb_zone_files',
+            'disegno'  => 'bb_worksite_documents',
+            'modulo'   => 'bb_zone_form_assegnazioni',
+            'risposta' => 'bb_zone_form_submissions',
+            default    => throw new \RuntimeException('Tipo non valido'),
+        };
+
+        // il nome della tabella viene dal match qui sopra, non dalla
+        // richiesta: niente che arrivi da fuori finisce nella query
+        $st = $this->conn->prepare("SELECT 1 FROM `$tabella` WHERE id = :id AND worksite_id = :w");
+        $st->execute([':id' => $oggettoId, ':w' => $worksiteId]);
+        if (!$st->fetchColumn()) {
+            throw new \RuntimeException('Non trovato in questo cantiere');
+        }
+    }
+
+    /**
+     * Con chi nasce condivisa una cosa appena creata.
+     *
+     * Se chi la crea ha mandato i nomi, quelli. Se no, e solo quando la
+     * cosa e' nuova, il comportamento di prima: un capo o un operaio
+     * creano per la squadra, il cliente per i clienti, l'ufficio per
+     * l'ufficio. Chi carica una foto non deve fermarsi a spuntare nomi.
+     *
+     * Un non-ufficio non puo' mandarla al cliente nemmeno scrivendo gli id
+     * a mano: cosa arriva al committente lo decide l'ufficio.
+     *
+     * @param  array<string, mixed> $body
+     * @return int[] le persone che ci sono finite
+     */
+    private function condivisioneNuova(
+        Request $request,
+        int $worksiteId,
+        string $tipo,
+        int $oggettoId,
+        array $body,
+        bool $nuova = true
+    ): array {
+        $ruolo = $this->ruoloQui($request);
+
+        if (is_array($body['persone'] ?? null)) {
+            $persone = array_map('intval', $body['persone']);
+            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
+                $suoi    = $this->condivisione->predefinite($worksiteId, $ruolo);
+                $persone = array_values(array_intersect($persone, $suoi));
+            }
+        } elseif ($nuova) {
+            $persone = $this->condivisione->predefinite($worksiteId, $ruolo);
+        } else {
+            return [];
+        }
+
+        // chi la crea la vede sempre, anche se non si e' messo nell'elenco
+        $io = (int)($request->user()->id ?? 0);
+        if ($io > 0 && $ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
+            $persone[] = $io;
+        }
+
+        return $this->condivisione->salva($worksiteId, $tipo, $oggettoId, $persone, $io);
     }
 
     /**
@@ -1840,6 +2051,8 @@ final class FieldwireController
                 }
                 unset($a);
             }
+
+            $tutte = $this->conChiSuRighe($request, 'modulo', $tutte);
             return $tutte;
         });
     }
@@ -1867,19 +2080,25 @@ final class FieldwireController
                 ? $body['frequenza'] : 'una_volta';
             $scadenza = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($body['scadenza'] ?? ''))
                 ? $body['scadenza'] : null;
-            $vis = in_array($body['visibilita'] ?? '', \App\Service\Zone\Accesso::VISIBILITA, true)
-                ? $body['visibilita'] : 'ufficio';
-
             $this->conn->prepare("
                 INSERT INTO bb_zone_form_assegnazioni
-                    (worksite_id, template_id, a_ruolo, a_user_id, frequenza, scadenza, visibilita, created_by)
-                VALUES (:w, :t, :r, :u, :f, :s, :v, :by)
+                    (worksite_id, template_id, a_ruolo, a_user_id, frequenza, scadenza, created_by)
+                VALUES (:w, :t, :r, :u, :f, :s, :by)
             ")->execute([
                 ':w' => $w, ':t' => (int)$tpl['id'], ':r' => $aUser ? null : $aRuolo, ':u' => $aUser,
-                ':f' => $frequenza, ':s' => $scadenza, ':v' => $vis,
+                ':f' => $frequenza, ':s' => $scadenza,
                 ':by' => (int)($request->user()->id ?? 0) ?: null,
             ]);
             $id = (int)$this->conn->lastInsertId();
+            // chi legge le risposte: i nomi mandati, se no nessuno — un
+            // modulo DPI lo legge l'ufficio, e l'ufficio vede tutto
+            $this->condivisione->salva(
+                $w,
+                'modulo',
+                $id,
+                is_array($body['persone'] ?? null) ? $body['persone'] : [],
+                (int)($request->user()->id ?? 0)
+            );
             $this->avvisa(fn($a) => $a->modulo($id, (int)($request->user()->id ?? 0)));
             return ['id' => $id];
         });
@@ -1946,7 +2165,7 @@ final class FieldwireController
     {
         $task = $this->zoneRepo->find($taskId);
         if (!$task || (int)$task['worksite_id'] !== (int)$request->param('id')
-            || !\App\Service\Zone\Accesso::vedeVisibilita($this->ruoloQui($request), $task['visibilita'] ?? null)) {
+            || !$this->condiviso($request, 'attivita', $taskId, (int)($task['created_by'] ?? 0))) {
             Response::json(['ok' => false, 'error' => 'Attivita non trovata'], 404);
         }
         return $task;
@@ -1990,15 +2209,25 @@ final class FieldwireController
     }
 
     /**
-     * Visibilita' e assegnazione di un'attivita', nei limiti del ruolo: il
-     * capo non mette una cosa "solo ufficio" ne' la mostra al cliente.
+     * Chi vede un'attivita', e a chi tocca.
+     *
+     * Chi la vede sono nomi, e chi non e' dell'ufficio non puo' darla al
+     * cliente: cosa arriva al committente lo decide l'ufficio, come prima
+     * faceva il limite sulle etichette.
      */
-    private function scriviVisibilitaTask(int $taskId, string $ruolo, array $body, bool $nuova): void
-    {
-        $campi = [];
-        if ($nuova || array_key_exists('visibilita', $body)) {
-            $campi['visibilita'] = \App\Service\Zone\Accesso::visibilitaPer($ruolo, $body['visibilita'] ?? null);
+    private function scriviVisibilitaTask(
+        int $worksiteId,
+        int $taskId,
+        string $ruolo,
+        array $body,
+        bool $nuova,
+        Request $request
+    ): void {
+        if ($nuova || array_key_exists('persone', $body)) {
+            $this->condivisioneNuova($request, $worksiteId, 'attivita', $taskId, $body, $nuova);
         }
+
+        $campi = [];
         if ($nuova || array_key_exists('assegnata_a', $body)) {
             $a = (string)($body['assegnata_a'] ?? '');
             if (!in_array($a, ['persona', 'squadra', 'capi', 'ufficio', 'cliente'], true)) {
@@ -2087,11 +2316,12 @@ final class FieldwireController
      *
      * @return array<int, array<string, mixed>>
      */
-    private function cartelleVisibili(int $worksiteId, string $ruolo): array
+    private function cartelleVisibili(Request $request, int $worksiteId): array
     {
+        $vede  = $this->filtro($request, 'cartella');
         $fuori = [];
         foreach ($this->fileRepo->folders($worksiteId) as $c) {
-            if (\App\Service\Zone\Accesso::vedeVisibilita($ruolo, $c['visibilita'] ?? null)) {
+            if ($vede($c)) {
                 $fuori[(int)$c['id']] = $c;
             }
         }
@@ -2099,29 +2329,39 @@ final class FieldwireController
     }
 
     /**
-     * La visibilita' vera di un file: la sua, se l'ha; se no quella della
-     * cartella; nella radice "squadra". Una cartella che chi chiede non vede
-     * nasconde anche i suoi file: per questo $cartelle sono quelle VISIBILI,
-     * e un file in una cartella che non c'e' li' resta all'ufficio.
+     * Chi vede un file.
+     *
+     * Un file condiviso con qualcuno vale per se'. Un file senza
+     * condivisioni segue la cartella — l'ufficio decide una volta per
+     * "Contratti" e non file per file — e una cartella che chi chiede non
+     * vede nasconde anche quello che c'e' dentro: per questo $cartelle sono
+     * quelle VISIBILI, e un file in una cartella che li' non c'e' resta
+     * all'ufficio.
+     *
+     * Nella radice, senza cartella, un file senza condivisioni non lo vede
+     * nessuno fuori dall'ufficio. Prima valeva "squadra", cioe' lo vedevano
+     * tutti: con i nomi, una cosa che nessuno ha condiviso non e'
+     * condivisa.
+     *
+     * @param array<int, array<string, mixed>> $cartelleVisibili
      */
-    private function visibilitaFile(array $file, array $cartelleVisibili): string
+    private function vedeFile(Request $request, array $file, array $cartelleVisibili): bool
     {
-        if (!empty($file['visibilita'])) {
-            return (string)$file['visibilita'];
+        if ($this->condiviso($request, 'file', (int)$file['id'], (int)($file['uploaded_by'] ?? 0))) {
+            return true;
         }
         $cartella = $file['folder_id'] ?? null;
         if ($cartella === null || $cartella === '') {
-            return 'squadra';
+            return false;
         }
-        return (string)($cartelleVisibili[(int)$cartella]['visibilita'] ?? 'ufficio');
+        return isset($cartelleVisibili[(int)$cartella]);
     }
 
     private function fileVisibile(Request $request, ?array $file): void
     {
         $w = (int)$request->param('id');
-        $ruolo = $this->ruoloQui($request);
         if (!$file || (int)$file['worksite_id'] !== $w
-            || !\App\Service\Zone\Accesso::vedeVisibilita($ruolo, $this->visibilitaFile($file, $this->cartelleVisibili($w, $ruolo)))) {
+            || !$this->vedeFile($request, $file, $this->cartelleVisibili($request, $w))) {
             Response::json(['ok' => false, 'error' => 'File non trovato'], 404);
         }
     }
@@ -2163,11 +2403,11 @@ final class FieldwireController
     /** Un disegno: di questo cantiere, e visibile a chi chiede. */
     private function documentoVisibile(Request $request, int $docId): void
     {
-        $st = $this->conn->prepare('SELECT worksite_id, zone_visibilita FROM bb_worksite_documents WHERE id = :id');
+        $st = $this->conn->prepare('SELECT worksite_id, created_by FROM bb_worksite_documents WHERE id = :id');
         $st->execute([':id' => $docId]);
         $d = $st->fetch(\PDO::FETCH_ASSOC);
         if (!$d || (int)$d['worksite_id'] !== (int)$request->param('id')
-            || !\App\Service\Zone\Accesso::vedeVisibilita($this->ruoloQui($request), $d['zone_visibilita'] ?? null)) {
+            || !$this->condiviso($request, 'disegno', $docId, (int)($d['created_by'] ?? 0))) {
             Response::json(['ok' => false, 'error' => 'Disegno non trovato'], 404);
         }
     }

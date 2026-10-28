@@ -610,15 +610,18 @@ final class WorksitesController
         }
 
         // Access check for workers/clients
-        // Nella Zone il disegno lo vede chi la sua visibilita' fa entrare:
-        // se e' cosi', si apre senza bisogno della vecchia condivisione uno
-        // per uno. Le condivisioni fatte prima continuano a valere.
+        // Nella Zone il disegno lo apre chi gli e' stato condiviso. Le
+        // condivisioni fatte prima con la vecchia tabella continuano a
+        // valere: si guardano subito dopo, e basta una delle due.
         $daZone = false;
         if (in_array($user->type, ['worker', 'client'], true) && $versionId <= 0) {
-            $acc   = new \App\Service\Zone\Accesso($this->conn);
-            $daZone = \App\Service\Zone\Accesso::vedeVisibilita(
-                $acc->ruolo($user, $worksiteId),
-                $disegno['zone_visibilita'] ?? null
+            $acc    = new \App\Service\Zone\Accesso($this->conn);
+            $daZone = (new \App\Service\Zone\Condivisione($this->conn, $acc))->vede(
+                $user,
+                $worksiteId,
+                'disegno',
+                (int)$disegno['id'],
+                (int)($disegno['created_by'] ?? 0)
             );
         }
 
@@ -1267,6 +1270,28 @@ final class WorksitesController
                 'note'        => $note !== '' ? $note : null,
                 'subcategory' => $category,
             ]);
+
+            // Un disegno nuovo nasce condiviso con la squadra — capi e
+            // operai — e non col cliente. E' quello che faceva prima
+            // l'etichetta predefinita, e i disegni sono la cosa per cui in
+            // cantiere si apre BOB: se nascessero visibili a nessuno,
+            // caricarne uno e non dirlo a nessuno sarebbe la stessa cosa.
+            // Cosa va al committente lo decide l'ufficio, uno per uno.
+            try {
+                $acc  = new \App\Service\Zone\Accesso($this->conn);
+                $cond = new \App\Service\Zone\Condivisione($this->conn, $acc);
+                $cond->salva(
+                    $worksiteId,
+                    'disegno',
+                    (int)$savedDocId,
+                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CAPO),
+                    (int)$auth['user_id']
+                );
+            } catch (\Throwable $e) {
+                // il disegno e' gia' caricato: se la condivisione non va,
+                // resta all'ufficio e si sistema dal pannello
+                error_log('[uploadDisegno] condivisione: ' . $e->getMessage());
+            }
         }
 
         // DWG/DXF → conversione in SVG vettoriale per il viewer BOB Zone.

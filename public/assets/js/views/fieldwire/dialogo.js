@@ -15,6 +15,26 @@
 (function () {
     'use strict';
 
+    /* Le segnalazioni restano a etichette, e la mappa e' loro.
+       Altrove in BOB Zone chi vede una cosa si scrive coi nomi; qui no: una
+       segnalazione e' un messaggio, si scrive di corsa dal telefono, e
+       fermarsi a spuntare quindici nomi per dire che manca un tirante
+       vorrebbe dire non scriverla. Prima questa mappa arrivava dalla
+       pagina, che adesso non ce l'ha piu'. */
+    const VIS = {
+        ufficio: { icon: 'fa-lock',        label: 'Solo ufficio',      color: '#f87171' },
+        squadra: { icon: 'fa-hard-hat',    label: 'Ufficio e squadra', color: '#94a3b8' },
+        capi:    { icon: 'fa-user-shield', label: 'Ufficio e capi',    color: '#fbbf24' },
+        cliente: { icon: 'fa-handshake',   label: 'Ufficio e cliente', color: '#a78bfa' },
+        tutti:   { icon: 'fa-globe',       label: 'Tutti',             color: '#4ade80' },
+    };
+    function visBadge(v, sempre = false) {
+        const x = VIS[v || 'capi'];
+        if (!x || (!sempre && (v || 'capi') === 'capi')) return '';
+        return '<span class="bz-vis-badge" style="color:' + x.color + '" title="' + x.label + '">'
+             + '<i class="fas ' + x.icon + '"></i> ' + x.label + '</span>';
+    }
+
     if (typeof WID === 'undefined') return;
 
     const BASE = '/worksites/' + WID + '/zone';
@@ -248,7 +268,7 @@
                     <span class="bzd-pill ${s.stato}">${STATI[s.stato]}</span>
                     ${s.gravita !== 'bassa' ? `<span class="bzd-pill ${s.gravita}">${GRAVITA[s.gravita].label}</span>` : ''}
                     <span class="bzd-pill tipo"><i class="fas ${t.icon}"></i> ${t.label}</span>
-                    ${typeof visBadge === 'function' ? visBadge(s.visibilita, true) : ''}
+                    ${visBadge(s.visibilita, true)}
                 </div>
                 <h3>${esc(s.testo)}</h3>
                 <div class="sub">

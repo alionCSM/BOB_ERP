@@ -23,9 +23,12 @@ use PDO;
  *    cliente": senza, anche assegnato non vede niente.
  *
  * 2. **Questo contenuto, chi lo vede?**
- *    Ogni attivita', cartella, disegno, modulo ha una visibilita':
- *    ufficio, squadra, capi, cliente, tutti. Il filtro si fa qui sul
- *    server: quello che uno non deve vedere non arriva nemmeno al telefono.
+ *    Non piu' qui: le attivita', le cartelle, i file, i disegni e i moduli
+ *    si condividono coi nomi delle persone, e quello sta in
+ *    {@see Condivisione}. Le etichette (ufficio, squadra, capi, cliente,
+ *    tutti) sono rimaste alle sole **segnalazioni**: sono messaggi scritti
+ *    di corsa dal telefono, e fermarsi a spuntare quindici nomi per dire
+ *    che manca un tirante vorrebbe dire non scriverla.
  *
  * Una volta c'erano sei livelli per persona (per sezione); dicevano quali
  * sezioni uno apriva, non quali cose vedeva. Restano nel database finche'
@@ -136,7 +139,12 @@ final class Accesso
 
     // ── Chi vede cosa ───────────────────────────────────────────────────────
 
-    /** Con questo ruolo si vede un contenuto con questa visibilita'? */
+    /**
+     * Con questo ruolo si vede un contenuto con questa visibilita'?
+     *
+     * Serve solo alle segnalazioni, le uniche che hanno ancora
+     * un'etichetta. Tutto il resto passa da {@see Condivisione}.
+     */
     public static function vedeVisibilita(?string $ruolo, ?string $visibilita): bool
     {
         if ($ruolo === null) {
@@ -148,33 +156,11 @@ final class Accesso
         return in_array($visibilita ?? 'squadra', self::CHI_VEDE[$ruolo] ?? [], true);
     }
 
-    /**
-     * Le visibilita' che un ruolo puo' dare a una cosa che crea. Il capo non
-     * puo' mettere una cosa "solo ufficio" (non la vedrebbe piu' lui) ne'
-     * mostrarla al cliente: quello lo decide l'ufficio.
-     *
-     * @return string[]
-     */
-    public static function visibilitaConcesse(string $ruolo): array
-    {
-        return match ($ruolo) {
-            self::UFFICIO => self::VISIBILITA,
-            self::CAPO    => ['squadra', 'capi'],
-            self::OPERAIO => ['squadra'],
-            self::CLIENTE => ['cliente'],
-            default       => [],
-        };
-    }
-
-    /** La visibilita' chiesta, se il ruolo puo' darla; se no quella di base. */
-    public static function visibilitaPer(string $ruolo, ?string $chiesta): string
-    {
-        $concesse = self::visibilitaConcesse($ruolo);
-        if ($chiesta !== null && in_array($chiesta, $concesse, true)) {
-            return $chiesta;
-        }
-        return $concesse[0] ?? 'ufficio';
-    }
+    // Qui stavano visibilitaConcesse() e visibilitaPer(), che dicevano quali
+    // etichette un ruolo poteva mettere su una cosa che creava. Non le
+    // chiama piu' nessuno: il limite ("un capo non la manda al cliente") lo
+    // tiene Condivisione::predefinite() con i nomi, e le segnalazioni le
+    // etichette le scelgono per conto loro.
 
     // ── Sezioni (come prima, ma dal ruolo) ──────────────────────────────────
 

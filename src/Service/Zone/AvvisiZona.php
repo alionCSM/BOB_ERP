@@ -49,11 +49,15 @@ final class AvvisiZona
             default   => [],
         };
         $persone = $this->persone((int)$t['worksite_id'], $ruoli, (int)($t['assignee_user_id'] ?? 0) ?: null);
+        // Avvisare qualcuno di una cosa che poi non riesce ad aprire e' il
+        // modo piu' sicuro di fargli pensare che BOB sia rotto: la notifica
+        // va solo a chi l'attivita' e' stata condivisa.
+        $condivisa = $this->condivisaCon('attivita', $taskId);
 
         foreach ($persone as $p) {
             if ((int)$p['user_id'] === $daChi) continue;
             if ($p['ruolo'] === Accesso::CLIENTE && empty($t['zone_cliente'])) continue;
-            if (!Accesso::vedeVisibilita($p['ruolo'], $t['visibilita'] ?? null)) continue;
+            if (!isset($condivisa[(int)$p['user_id']])) continue;
             $this->manda($p, 'zona_attivita_t', 'zona_attivita', [
                 'cantiere' => $t['cantiere'],
                 'nome'     => mb_substr((string)$t['name'], 0, 120),
@@ -117,6 +121,20 @@ final class AvvisiZona
      * @param string[] $ruoli
      * @return array<int, array{user_id:int, lingua:?string, ruolo:string}>
      */
+    /**
+     * Con chi e' condivisa una cosa, per id, da cercare con isset().
+     *
+     * @return array<int, true>
+     */
+    private function condivisaCon(string $tipo, int $oggettoId): array
+    {
+        $st = $this->conn->prepare(
+            'SELECT user_id FROM bb_zone_condivisioni WHERE tipo = :t AND oggetto_id = :o'
+        );
+        $st->execute([':t' => $tipo, ':o' => $oggettoId]);
+        return array_fill_keys(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)), true);
+    }
+
     private function persone(int $worksiteId, array $ruoli, ?int $persona): array
     {
         $cond = [];
