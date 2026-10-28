@@ -877,7 +877,7 @@ final class ApiV1Controller
         }
 
         $jobs = [];
-        foreach (\App\Service\CronRun::JOBS as $key => $meta) {
+        foreach (\App\Service\CronRun::attivi() as $key => $meta) {
             $r    = $runs[$key] ?? null;
             $prev = $lastEver[$key] ?? null;
 

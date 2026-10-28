@@ -33,7 +33,7 @@ final class LeMie
         $stati = $anchePronte ? "'open','in_progress','complete'" : "'open','in_progress'";
         $stmt = $this->conn->prepare("
             SELECT t.id, t.worksite_id, t.name, t.description, t.status, t.category,
-                   t.assignee_name, t.assignee_user_id, t.assegnata_a, t.visibilita,
+                   t.assignee_name, t.assignee_user_id, t.assegnata_a,
                    t.start_date, t.due_date, t.priority, t.updated_at,
                    w.name AS cantiere_nome, w.worksite_code, a.ruolo
             FROM   bb_zone_tasks t
@@ -41,14 +41,23 @@ final class LeMie
             JOIN   bb_worksites w   ON w.id = t.worksite_id
             WHERE  t.status IN ($stati)
               AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
+              -- condivisa con me, o l'ho creata io: un'attivita' che
+              -- nessuno mi ha condiviso non e' mia, nemmeno se tocca al
+              -- mio ruolo
+              AND  (EXISTS (
+                        SELECT 1 FROM bb_zone_condivisioni c
+                        WHERE c.tipo = 'attivita' AND c.oggetto_id = t.id
+                          AND c.user_id = :u2
+                   ) OR t.created_by = :u3)
         ");
-        $stmt->execute([':u' => $userId]);
+        // tre segnaposto per lo stesso valore: le prepared statement non
+        // sono emulate, e un nome ripetuto fa fallire la query
+        $stmt->execute([':u' => $userId, ':u2' => $userId, ':u3' => $userId]);
 
         $mie = array_values(array_filter($stmt->fetchAll(PDO::FETCH_ASSOC), function (array $t) use ($userId) {
             $ruolo = (string)$t['ruolo'];
-            if (!Accesso::vedeVisibilita($ruolo, $t['visibilita'] ?? null)) {
-                return false;
-            }
+            // chi la vede l'ha deciso la query, con le condivisioni: qui
+            // resta solo a chi tocca
             return match ((string)($t['assegnata_a'] ?? 'squadra')) {
                 'persona' => (int)$t['assignee_user_id'] === $userId,
                 'squadra' => in_array($ruolo, [Accesso::CAPO, Accesso::OPERAIO], true),

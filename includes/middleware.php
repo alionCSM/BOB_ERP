@@ -201,7 +201,14 @@ foreach ($mvcModuleMap as $prefix => $module) {
         // modulo `worksites` e li rimanderebbe tutti alla dashboard.
         $bypassOperaio = $user->type === 'worker' && $routePolicyMap->isWorkerRouteAllowed($uri);
 
-        if (!$bypass && !$bypassOperaio && !$authorization->canAccessModule($user, $module)) {
+        // Idem per un cliente: i suoi indirizzi sono /worksites/my e la Zone
+        // dei cantieri condivisi con lui. Senza questo, per farlo entrare
+        // nella Zone gli si doveva dare il modulo `worksites` — e con quello
+        // si apriva l'elenco di TUTTI i cantieri, di tutti i committenti. O
+        // non entrava, o vedeva troppo.
+        $bypassCliente = $user->type === 'client' && $routePolicyMap->isClientRouteAllowed($uri);
+
+        if (!$bypass && !$bypassOperaio && !$bypassCliente && !$authorization->canAccessModule($user, $module)) {
             header('Location: /dashboard?no_permission=1');
             exit;
         }
@@ -241,6 +248,28 @@ $allowedWorksites = $scopeService->resolveAllowedWorksites($connection, $user);
 if ($user->type === 'worker' && !$routePolicyMap->isWorkerRouteAllowed($uri)) {
     http_response_code(403);
     exit('Access denied');
+}
+
+if ($user->type === 'client' && !$routePolicyMap->isClientRouteAllowed($uri)) {
+    http_response_code(403);
+    exit('Access denied');
+}
+
+// ── Il cantiere scritto nell'indirizzo ────────────────────────────────────────
+//
+// Il controllo qui sotto guarda `worksite_id` nei parametri. Ma
+// /worksites/5/zone non ha parametri: il numero sta nel percorso, e quello
+// nessuno lo confrontava con i cantieri della persona. Un operaio o un
+// cliente cambiava 5 in 6 e si apriva la Zone di un cantiere che non era suo.
+//
+// Vale per operai e clienti, che hanno una lista bianca e sanno di avere un
+// elenco di cantieri. Non per l'ufficio: li' il confine e' la societa'
+// attiva, e lo tiene CompanyModuleGuard.
+if (in_array($user->type, ['worker', 'client'], true)
+    && preg_match('#^/worksites/(\d+)(/|$)#', $uri, $pezzi)
+    && !$scopeService->canAccessWorksite($allowedWorksites, (int)$pezzi[1])) {
+    http_response_code(403);
+    exit('Access denied to this worksite');
 }
 
 $GLOBALS['allowedWorksites'] = $allowedWorksites;

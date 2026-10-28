@@ -140,6 +140,36 @@ class RoutePolicyMap
         // nessun operaio era mai entrato in BOB.
     ];
 
+    /**
+     * Dove puo' andare un cliente.
+     *
+     * Come per gli operai: lista bianca, tutto il resto e' 403. Un cliente
+     * entra nella Zone dei cantieri che gli sono stati condivisi, e in
+     * nient'altro — la scheda cantiere dell'ufficio (preventivi, fatture,
+     * ordini, margini) non e' qui dentro, e non ci deve essere.
+     *
+     * Attenzione a /worksites/\d+/zone: la lista bianca dice soltanto che
+     * l'indirizzo e' suo da aprire, non che quel cantiere sia suo. Quale
+     * cantiere puo' aprire lo decide il controllo sul numero
+     * nell'indirizzo, nel middleware, con i cantieri che gli sono stati
+     * condivisi. Senza quello, un cliente cambiava il numero a mano ed
+     * entrava nella Zone di chiunque.
+     */
+    private array $clientAllowedPatterns = [
+        '#^/$#',
+        '#^/dashboard#',
+        '#^/change-password$#',
+        '#^/profile#',
+        '#^/logout#',
+        '#^/notifications#',
+        // i cantieri condivisi con lui, e la Zone di quelli
+        '#^/worksites/my(/|$)#',
+        '#^/worksites/\d+/zone(/|$)#',
+        // il file di un disegno: chi lo apre lo decide il controller, con
+        // la condivisione del disegno
+        '#^/worksites/\d+/disegni/\d+/view$#',
+    ];
+
     public function isCompanyScopedRouteAllowed(string $uri): bool
     {
         return $this->matchesAny($uri, $this->companyScopedAllowedPatterns);
@@ -153,6 +183,11 @@ class RoutePolicyMap
     public function isWorkerRouteAllowed(string $uri): bool
     {
         return $this->matchesAny($uri, $this->workerAllowedPatterns);
+    }
+
+    public function isClientRouteAllowed(string $uri): bool
+    {
+        return $this->matchesAny($uri, $this->clientAllowedPatterns);
     }
 
     /** @param string[] $patterns */

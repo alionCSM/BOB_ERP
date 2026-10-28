@@ -68,6 +68,11 @@
 
 {# ── Stats Row ── #}
 <div class="bc-stats">
+    {# Le due schede "Emesse reale" leggono il gestionale. Dove non e'
+       collegato non c'e' niente da mostrare, e due riquadri con zero
+       dentro fanno pensare a un guasto invece che a una funzione che su
+       questa installazione non esiste. #}
+    {% if yardAttivo %}
     {# Emesse reale — mese corrente (da YARD) — cliccabile, apre modale #}
     <div class="bc-stat bc-stat-clickable" data-er-period="cur" data-er-label="{{ emessRealCurLabel }}" style="cursor:pointer;">
         <div class="bc-stat-dot" style="background:#0ea5e9;box-shadow:0 0 6px rgba(14,165,233,.4);"></div>
@@ -88,6 +93,7 @@
             <div class="bc-stat-label">Emesse reale</div>
         </div>
     </div>
+    {% endif %}
     <div class="bc-stat">
         <div class="bc-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
         <div>

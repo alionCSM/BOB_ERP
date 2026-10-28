@@ -151,14 +151,26 @@ final class WorksitesController
 
         $auth = $GLOBALS['authenticated_user'] ?? [];
 
+        // Per un cliente non basta l'assegnazione: ci vogliono le stesse tre
+        // condizioni con cui il middleware decide dove puo' entrare (vedi
+        // ScopeService). Se qui l'elenco fosse piu' largo, i cantieri in
+        // piu' si vedrebbero scritti e poi darebbero 403 appena cliccati —
+        // che e' il modo peggiore di dire "non e' tuo".
+        $soloCondivisi = $user->type === 'client';
+
         $stmt = $this->conn->prepare("
             SELECT w.id, w.name, w.worksite_code, w.location
             FROM bb_worksites w
             INNER JOIN bb_worksite_users wu ON wu.worksite_id = w.id
             WHERE wu.user_id = :uid
+            " . ($soloCondivisi ? "AND w.client_id = :cid AND w.zone_cliente = 1" : "") . "
             ORDER BY w.name
         ");
-        $stmt->execute([':uid' => $auth['user_id']]);
+        $parametri = [':uid' => $auth['user_id']];
+        if ($soloCondivisi) {
+            $parametri[':cid'] = $user->client_id;
+        }
+        $stmt->execute($parametri);
         $worksites = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         Response::view('worksites/my.html.twig', $request, compact('worksites'));
@@ -338,16 +350,25 @@ final class WorksitesController
         $clientNameStmt->execute([$client_id]);
         $clientName = $clientNameStmt->fetchColumn();
 
-        $sqlSrv     = new SQLServer(new Config());
-        $sqlSrvConn = $sqlSrv->connect();
-        $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
-        $yardQuery->execute([$clientName]);
+        // La bozza esiste per un motivo solo: il cliente non si trova su
+        // Yard, quindi il cantiere non si puo' ancora creare la' e resta
+        // in attesa qui. Dove Yard non c'e' quel motivo non esiste, e
+        // lasciare la regola com'era farebbe nascere OGNI cantiere come
+        // bozza, per sempre, senza nessun modo di attivarlo.
+        $yardAttivo = (new Config())->yardConfigured();
 
-        if ($row = $yardQuery->fetch(\PDO::FETCH_ASSOC)) {
-            $yardId = $row['id'];
+        if ($yardAttivo) {
+            $sqlSrv     = new SQLServer(new Config());
+            $sqlSrvConn = $sqlSrv->connect();
+            $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
+            $yardQuery->execute([$clientName]);
+
+            if ($row = $yardQuery->fetch(\PDO::FETCH_ASSOC)) {
+                $yardId = $row['id'];
+            }
         }
 
-        $isDraft     = ($yardId === null);
+        $isDraft     = $yardAttivo && ($yardId === null);
         $clientData  = null;
 
         if ($isDraft && $client_id) {
@@ -360,7 +381,11 @@ final class WorksitesController
         $yard_worksite_id = null;
 
         // Create on YARD (only if not draft)
-        if (!$isDraft) {
+        //
+        // Dove Yard non c'e', il cantiere nasce e basta: resta senza
+        // yard_worksite_id, che e' esattamente quello che succede gia' alle
+        // bozze. Tutto il resto di BOB regge quel campo vuoto.
+        if (!$isDraft && $yardAttivo) {
             $yardWorksiteData = [
                 'name'                  => $name,
                 'client_id'             => $client_id,
@@ -585,15 +610,18 @@ final class WorksitesController
         }
 
         // Access check for workers/clients
-        // Nella Zone il disegno lo vede chi la sua visibilita' fa entrare:
-        // se e' cosi', si apre senza bisogno della vecchia condivisione uno
-        // per uno. Le condivisioni fatte prima continuano a valere.
+        // Nella Zone il disegno lo apre chi gli e' stato condiviso. Le
+        // condivisioni fatte prima con la vecchia tabella continuano a
+        // valere: si guardano subito dopo, e basta una delle due.
         $daZone = false;
         if (in_array($user->type, ['worker', 'client'], true) && $versionId <= 0) {
-            $acc   = new \App\Service\Zone\Accesso($this->conn);
-            $daZone = \App\Service\Zone\Accesso::vedeVisibilita(
-                $acc->ruolo($user, $worksiteId),
-                $disegno['zone_visibilita'] ?? null
+            $acc    = new \App\Service\Zone\Accesso($this->conn);
+            $daZone = (new \App\Service\Zone\Condivisione($this->conn, $acc))->vede(
+                $user,
+                $worksiteId,
+                'disegno',
+                (int)$disegno['id'],
+                (int)($disegno['created_by'] ?? 0)
             );
         }
 
@@ -761,7 +789,10 @@ final class WorksitesController
         $vatCodes = $this->billingRepo->getVatCodes();
         $fatture  = $this->billingRepo->getByWorksiteId($worksite_id);
 
-        $yardBilling = new YardWorksiteBilling(new SqlServerConnection(new Config()));
+        $yardAttivo  = (new Config())->yardConfigured();
+        $yardBilling = $yardAttivo
+            ? new YardWorksiteBilling(new SqlServerConnection(new Config()))
+            : null;
         $totalEmesseReale     = 0.0;
         $totalFatture         = 0.0;
         $totalExtraFatturato  = 0.0; // sum of righe linked to extras AND emessa on Yard
@@ -772,9 +803,9 @@ final class WorksitesController
         // la scheda resta consultabile, semplicemente senza i dati fattura.
         $yardDocInfo = [];
         try {
-            $yardDocInfo = $yardBilling->getDocumentInfoMap(
+            $yardDocInfo = $yardBilling?->getDocumentInfoMap(
                 array_column(array_filter($fatture, fn($f) => !empty($f['yard_id'])), 'yard_id')
-            );
+            ) ?? [];
         } catch (\Throwable $e) {
             error_log('[WorksitesController::show] Yard non raggiungibile: ' . $e->getMessage());
         }
@@ -1088,7 +1119,7 @@ final class WorksitesController
                 $clientNameStmt = $this->conn->prepare("SELECT name FROM bb_clients WHERE id = ?");
                 $clientNameStmt->execute([$data['client_id']]);
                 $clientName = $clientNameStmt->fetchColumn();
-                if ($clientName) {
+                if ($clientName && (new Config())->yardConfigured()) {
                     $sqlSrv     = new SQLServer(new Config());
                     $sqlSrvConn = $sqlSrv->connect();
                     $yardQuery  = $sqlSrvConn->prepare("SELECT id FROM ANA_anagrafiche WHERE ragione_sociale = ?");
@@ -1113,6 +1144,15 @@ final class WorksitesController
                 'yard_client_id' => $yardClientId,
                 'location'       => $data['location'],
             ];
+
+            // Senza Yard non c'e' niente da aggiornare la' fuori: si tira
+            // dritto come se l'aggiornamento fosse andato bene, perche' il
+            // cantiere qui dentro e' gia' stato salvato.
+            if (!(new Config())->yardConfigured()) {
+                $returnTo = $_POST['return_to'] ?? '/worksites';
+                $_SESSION['success'] = 'Cantiere modificato con successo!';
+                Response::redirect($returnTo);
+            }
 
             $sqlSrv      = new SQLServer(new Config());
             $sqlSrvConn  = $sqlSrv->connect();
@@ -1230,6 +1270,28 @@ final class WorksitesController
                 'note'        => $note !== '' ? $note : null,
                 'subcategory' => $category,
             ]);
+
+            // Un disegno nuovo nasce condiviso con la squadra — capi e
+            // operai — e non col cliente. E' quello che faceva prima
+            // l'etichetta predefinita, e i disegni sono la cosa per cui in
+            // cantiere si apre BOB: se nascessero visibili a nessuno,
+            // caricarne uno e non dirlo a nessuno sarebbe la stessa cosa.
+            // Cosa va al committente lo decide l'ufficio, uno per uno.
+            try {
+                $acc  = new \App\Service\Zone\Accesso($this->conn);
+                $cond = new \App\Service\Zone\Condivisione($this->conn, $acc);
+                $cond->salva(
+                    $worksiteId,
+                    'disegno',
+                    (int)$savedDocId,
+                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CAPO),
+                    (int)$auth['user_id']
+                );
+            } catch (\Throwable $e) {
+                // il disegno e' gia' caricato: se la condivisione non va,
+                // resta all'ufficio e si sistema dal pannello
+                error_log('[uploadDisegno] condivisione: ' . $e->getMessage());
+            }
         }
 
         // DWG/DXF → conversione in SVG vettoriale per il viewer BOB Zone.
@@ -1457,7 +1519,13 @@ final class WorksitesController
     public function saveBilling(Request $request): never
     {
         $worksite_id = $request->intParam('id');
-        $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
+
+        // Dove Yard non c'e', le righe di fatturazione vivono solo in
+        // bb_billing: si salvano qui e basta, senza il brogliaccio la' fuori.
+        $yardAttivo  = (new Config())->yardConfigured();
+        $yardBilling = $yardAttivo
+            ? new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()))
+            : null;
 
         $id          = $_POST['id']           ?? '';
         $data        = $_POST['data']         ?? '';
@@ -1539,7 +1607,7 @@ final class WorksitesController
                         'iva_id'            => $iva_id,
                         'attivita_id'       => null,
                     ];
-                    $yardBilling->updateBrogliaccio($yard_id, $dataY);
+                    $yardBilling?->updateBrogliaccio($yard_id, $dataY);
                 }
 
                 $_SESSION['success'] = 'Fatturazione aggiornata.';
@@ -1559,7 +1627,7 @@ final class WorksitesController
                     'iva_id'            => $iva_id,
                     'attivita_id'       => null,
                 ];
-                $yardId = $yardBilling->insertToBrogliaccio($dataY);
+                $yardId = $yardBilling?->insertToBrogliaccio($dataY);
 
                 $this->billingRepo->setYardId($newId, (int)$yardId);
 
@@ -1600,7 +1668,7 @@ final class WorksitesController
 
             if (!empty($yard_id)) {
                 $yardBilling = new \App\Domain\YardWorksiteBilling(new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()));
-                $yardBilling->softDeleteBrogliaccio((int)$yard_id);
+                $yardBilling?->softDeleteBrogliaccio((int)$yard_id);
             }
 
             $this->billingRepo->delete((int)$id);
@@ -2339,6 +2407,14 @@ final class WorksitesController
             Response::error('Cantiere non trovato o già attivato', 404);
         }
 
+        // Senza Yard le bozze non nascono (vedi store), quindi qui non ci
+        // si arriva. Se ci si arriva lo stesso — una bozza vecchia, un
+        // database portato da un'altra installazione — meglio dirlo che
+        // tentare una connessione che non c'e'.
+        if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+            Response::error('Le bozze si attivano solo con il gestionale collegato.', 409);
+        }
+
         $sqlSrvConn = (new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config()))->connect();
 
         $clientNameStmt = $conn->prepare("
@@ -2467,7 +2543,7 @@ final class WorksitesController
         }
 
         $jobs = [];
-        foreach (\App\Service\CronRun::JOBS as $key => $meta) {
+        foreach (\App\Service\CronRun::attivi() as $key => $meta) {
             $r    = $runs[$key] ?? null;
             $prev = $lastEver[$key] ?? null;
 
@@ -2597,6 +2673,12 @@ final class WorksitesController
 
     public function updateYardStatus(Request $request): never
     {
+        // Il confronto degli stati esiste solo se c'e' qualcosa con cui
+        // confrontarsi.
+        if (!(new \App\Infrastructure\Config())->yardConfigured()) {
+            Response::json(['success' => false, 'message' => "Il gestionale non e' collegato su questa installazione."], 404);
+        }
+
         try {
             $service = new \YardWorksiteStatusService(
                 $this->conn,
