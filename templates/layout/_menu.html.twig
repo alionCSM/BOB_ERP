@@ -222,6 +222,17 @@
                 </a>
             </li>
             <li class="side-nav__devider my-6"></li>
+        {% elseif user.type == 'client' %}
+            {# Per un cliente il menu e' una voce sola: i cantieri che gli
+               sono stati condivisi. Da li' si apre la Zone, che e' tutto
+               quello che ha in BOB. #}
+            <li>
+                <a href="/worksites/my" class="side-menu {{ worksitesActive ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="hard-hat"></i></div>
+                    <div class="side-menu__title">{{ t('menu_cantieri') }}</div>
+                </a>
+            </li>
+            <li class="side-nav__devider my-6"></li>
         {% elseif user.canAccess('worksites') %}
             <li>
                 <a href="javascript:;" class="side-menu {{ worksitesActive ? 'side-menu--active' : '' }}">

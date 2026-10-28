@@ -151,14 +151,26 @@ final class WorksitesController
 
         $auth = $GLOBALS['authenticated_user'] ?? [];
 
+        // Per un cliente non basta l'assegnazione: ci vogliono le stesse tre
+        // condizioni con cui il middleware decide dove puo' entrare (vedi
+        // ScopeService). Se qui l'elenco fosse piu' largo, i cantieri in
+        // piu' si vedrebbero scritti e poi darebbero 403 appena cliccati —
+        // che e' il modo peggiore di dire "non e' tuo".
+        $soloCondivisi = $user->type === 'client';
+
         $stmt = $this->conn->prepare("
             SELECT w.id, w.name, w.worksite_code, w.location
             FROM bb_worksites w
             INNER JOIN bb_worksite_users wu ON wu.worksite_id = w.id
             WHERE wu.user_id = :uid
+            " . ($soloCondivisi ? "AND w.client_id = :cid AND w.zone_cliente = 1" : "") . "
             ORDER BY w.name
         ");
-        $stmt->execute([':uid' => $auth['user_id']]);
+        $parametri = [':uid' => $auth['user_id']];
+        if ($soloCondivisi) {
+            $parametri[':cid'] = $user->client_id;
+        }
+        $stmt->execute($parametri);
         $worksites = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         Response::view('worksites/my.html.twig', $request, compact('worksites'));

@@ -40,8 +40,30 @@ class ScopeService
         }
 
         if ($user->type === 'client') {
-            $stmt = $connection->prepare('SELECT id FROM bb_worksites WHERE client_id = :cid');
-            $stmt->execute([':cid' => $user->client_id]);
+            // Non tutti i cantieri del committente: solo quelli che
+            // l'ufficio gli ha condiviso, uno per uno.
+            //
+            // Prima era "SELECT id FROM bb_worksites WHERE client_id = :cid":
+            // bastava essere l'account di quel committente per avere in mano
+            // tutti i suoi cantieri, compresi quelli che in ufficio nessuno
+            // aveva deciso di mostrargli. Un cantiere si condivide, non si
+            // eredita.
+            //
+            // Tre condizioni, e servono tutte e tre:
+            //   - assegnato a lui dalla scheda del cantiere;
+            //   - il cantiere e' del suo committente (un'assegnazione
+            //     sbagliata non apre i lavori di un altro cliente);
+            //   - sul cantiere e' acceso "Condividi col cliente", che e'
+            //     l'interruttore con cui l'ufficio decide quando e' pronto.
+            $stmt = $connection->prepare('
+                SELECT wu.worksite_id
+                FROM   bb_worksite_users wu
+                JOIN   bb_worksites w ON w.id = wu.worksite_id
+                WHERE  wu.user_id     = :uid
+                  AND  w.client_id    = :cid
+                  AND  w.zone_cliente = 1
+            ');
+            $stmt->execute([':uid' => $user->id, ':cid' => $user->client_id]);
             return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
         }
 
