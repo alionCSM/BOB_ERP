@@ -32,7 +32,29 @@
 
     function csrf() {
         var meta = document.querySelector('meta[name="csrf-token"]');
-        return meta ? meta.content : '';
+        return (meta && meta.content) ? meta.content : '';
+    }
+
+    /**
+     * Gli header di una POST.
+     *
+     * Il token va nel corpo (campo `_csrf`), come fa il resto di BOB, e
+     * l'header si manda solo se c'e' davvero qualcosa: un header vuoto e'
+     * peggio di nessun header, perche' il verificatore lo prenderebbe come
+     * la fonte da controllare.
+     */
+    function intestazioni() {
+        var h = { 'Content-Type': 'application/x-www-form-urlencoded' };
+        var t = csrf();
+        if (t) {
+            h['X-CSRF-Token'] = t;
+        }
+        return h;
+    }
+
+    /** Il campo _csrf da aggiungere al corpo di ogni POST. */
+    function campoCsrf() {
+        return '_csrf=' + encodeURIComponent(csrf());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -226,21 +248,26 @@
 
         annullatore = new AbortController();
 
-        var corpo = 'domanda=' + encodeURIComponent(q) +
+        var corpo = campoCsrf() +
+                    '&domanda=' + encodeURIComponent(q) +
                     '&conversazione=' + encodeURIComponent(conversazione);
 
         fetch('/ai/chat', {
             method:  'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-TOKEN': csrf()
-            },
+            headers: intestazioni(),
             body:   corpo,
             signal: annullatore.signal
         })
         .then(function (r) {
             if (!r.ok && r.status !== 200) {
-                throw new Error('Il server ha risposto ' + r.status);
+                // Il corpo della risposta dice *quale* errore e': un 403 di
+                // CSRF e un 403 di permessi si leggono uguali guardando solo
+                // il numero, e si finisce a indovinare.
+                return r.text().then(function (corpo) {
+                    var dettaglio = (corpo || '').replace(/<[^>]*>/g, '').trim().slice(0, 200);
+                    throw new Error('Il server ha risposto ' + r.status +
+                                    (dettaglio ? ' — ' + dettaglio : ''));
+                });
             }
             if (!r.body || !r.body.getReader) {
                 // Browser senza streaming: si rilegge tutto alla fine. Non e'
@@ -362,7 +389,8 @@
     function aggiornaElenco() {
         if (!listaEl) return;
 
-        fetch('/ai/conversazioni', { headers: { 'X-CSRF-TOKEN': csrf() } })
+        // GET: niente token, il CSRF si controlla solo sulle POST
+        fetch('/ai/conversazioni')
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) return;
@@ -465,11 +493,8 @@
     function azione(url, corpo, poi) {
         fetch(url, {
             method:  'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-TOKEN': csrf()
-            },
-            body: corpo
+            headers: intestazioni(),
+            body: campoCsrf() + (corpo ? '&' + corpo : '')
         })
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -553,11 +578,9 @@
 
         fetch('/ai/export-table', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-TOKEN': csrf()
-            },
-            body: 'headers=' + encodeURIComponent(JSON.stringify(headers)) +
+            headers: intestazioni(),
+            body: campoCsrf() +
+                  '&headers=' + encodeURIComponent(JSON.stringify(headers)) +
                   '&rows='    + encodeURIComponent(JSON.stringify(rows)) +
                   '&filename='+ encodeURIComponent(xlsxFilename)
         })

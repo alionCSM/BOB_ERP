@@ -25,14 +25,28 @@ function csrf_token(): string
 
 /**
  * Verify CSRF token from POST body (_csrf) or X-CSRF-Token header.
+ *
+ * Si prende la prima fonte che porta qualcosa, non la prima che esiste.
+ *
+ * Prima era `$_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_POST['_csrf'] ?? ''`, e `??`
+ * cade solo su null: un header X-CSRF-Token presente ma **vuoto** vinceva, e
+ * il token nel corpo non veniva nemmeno guardato. Basta un pezzo di JS che
+ * scriva l'header con il valore di un meta tag che non c'e' per far fallire
+ * il controllo con il token buono nel corpo della richiesta — un 403 che non
+ * si spiega guardando il form.
  */
 function csrf_verify(): bool
 {
-    $submitted = $_SERVER['HTTP_X_CSRF_TOKEN']
-        ?? $_POST['_csrf']
-        ?? '';
+    $submitted = '';
 
-    return !empty($submitted)
+    foreach ([$_SERVER['HTTP_X_CSRF_TOKEN'] ?? null, $_POST['_csrf'] ?? null] as $fonte) {
+        if (is_string($fonte) && $fonte !== '') {
+            $submitted = $fonte;
+            break;
+        }
+    }
+
+    return $submitted !== ''
         && !empty($_SESSION['csrf_token'])
         && hash_equals($_SESSION['csrf_token'], $submitted);
 }
