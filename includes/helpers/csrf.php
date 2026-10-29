@@ -46,6 +46,21 @@ function csrf_verify(): bool
         }
     }
 
+    // Un header mandato due volte arriva a PHP come un unico valore con i
+    // pezzi separati da virgola ("abc, abc"), e hash_equals lo boccia.
+    //
+    // Succede piu' facilmente di quanto sembri: footer.js aggiunge
+    // 'X-CSRF-Token' a ogni fetch POST con Object.assign, e un pezzo di JS
+    // che scriva lo stesso header con un'altra grafia ('X-CSRF-TOKEN')
+    // produce DUE chiavi distinte nell'oggetto JavaScript — le chiavi sono
+    // sensibili alle maiuscole, gli header HTTP no — che il browser unisce
+    // in un header ripetuto. Il token era giusto due volte, e il controllo
+    // falliva. Qui si prende il primo valore, che e' la lettura corretta di
+    // un header ripetuto.
+    if (str_contains($submitted, ',')) {
+        $submitted = trim(explode(',', $submitted)[0]);
+    }
+
     return $submitted !== ''
         && !empty($_SESSION['csrf_token'])
         && hash_equals($_SESSION['csrf_token'], $submitted);
