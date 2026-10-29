@@ -3,7 +3,7 @@
 {% set pageTitle = 'BOB AI' %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ asset('/assets/css/views/ai/chat.css') }}">
+<link rel="stylesheet" href="{{ asset('/assets/css/views/ai/chat.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -48,49 +48,103 @@
         </div>
     </div>
 
-    <!-- Chat Area -->
-    <div class="ai-chat-wrap">
-        <div class="ai-chat-messages" id="chat-messages">
-            <div class="ai-msg ai-msg-ai">
-                <div class="ai-msg-avatar">BOB</div>
-                <div class="ai-msg-bubble">
-                    <p>Ciao! Sono <strong>BOB AI</strong>. Chiedimi informazioni sui tuoi cantieri, operai, fatture, presenze o pagamenti — in italiano o in inglese.</p>
+    <div class="ai-layout">
+
+        <!-- Le chat salvate -->
+        <aside class="ai-side" id="ai-side">
+            <div class="ai-side-head">
+                <span class="ai-side-titolo">Le tue chat</span>
+                <a href="/ai/chat" class="ai-side-nuova" title="Nuova chat">+ Nuova</a>
+            </div>
+
+            <ul class="ai-side-lista" id="ai-side-lista">
+                {% for c in conversazioni %}
+                    <li class="ai-side-item{{ c.id == apertaId ? ' attiva' : '' }}" data-id="{{ c.id }}">
+                        <a href="/ai/chat?c={{ c.id }}" class="ai-side-link">
+                            <span class="ai-side-nome">{{ c.titolo }}</span>
+                            <span class="ai-side-data">{{ c.updated_at|date('d/m/Y H:i') }}</span>
+                        </a>
+                        <span class="ai-side-azioni">
+                            <button type="button" class="ai-side-azione" data-azione="rinomina"
+                                    data-id="{{ c.id }}" data-titolo="{{ c.titolo }}"
+                                    title="Rinomina" aria-label="Rinomina la chat {{ c.titolo }}">✎</button>
+                            <button type="button" class="ai-side-azione" data-azione="elimina"
+                                    data-id="{{ c.id }}" data-titolo="{{ c.titolo }}"
+                                    title="Elimina" aria-label="Elimina la chat {{ c.titolo }}">🗑</button>
+                        </span>
+                    </li>
+                {% else %}
+                    <li class="ai-side-vuoto">Nessuna chat salvata. Fai la tua prima domanda.</li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <!-- Chat Area -->
+        <div class="ai-chat-wrap">
+            <div class="ai-chat-messages" id="chat-messages">
+                {% if apertaId == 0 %}
+                <div class="ai-msg ai-msg-ai">
+                    <div class="ai-msg-avatar">BOB</div>
+                    <div class="ai-msg-bubble">
+                        <p>Ciao! Sono <strong>BOB AI</strong>. Chiedimi informazioni sui tuoi cantieri, operai, fatture, presenze o pagamenti.</p>
+                        <p class="ai-esempi-t">Per esempio:</p>
+                        <div class="ai-esempi">
+                            <button type="button" class="ai-esempio">Quanti cantieri aperti abbiamo?</button>
+                            <button type="button" class="ai-esempio">Giornate fatte dai nostri questo mese</button>
+                            <button type="button" class="ai-esempio">Attestati scaduti degli operai</button>
+                        </div>
+                    </div>
                 </div>
+                {% endif %}
+            </div>
+
+            <!-- Loading -->
+            <div id="chat-loading" class="ai-chat-loading hidden">
+                <div class="ai-msg ai-msg-ai">
+                    <div class="ai-msg-avatar">BOB</div>
+                    <div class="ai-msg-bubble ai-msg-bubble-loading">
+                        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                        <span class="ai-stato" id="ai-stato"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="ai-chat-input-area">
+                <div class="ai-chat-input-wrap">
+                    <textarea
+                        id="chat-input"
+                        placeholder="Chiedi qualcosa sui dati…"
+                        rows="1"
+                        aria-label="La tua domanda"
+                    ></textarea>
+                    <button type="button" id="chat-stop" class="ai-chat-clear hidden" title="Ferma">
+                        <span aria-hidden="true">■</span>
+                        <span class="sr-only">Ferma la risposta</span>
+                    </button>
+                    <button type="button" id="chat-clear" class="ai-chat-clear" title="Nuova chat" aria-label="Nuova chat">
+                        <i data-lucide="rotate-cw" class="ai-chat-clear-icon"></i>
+                    </button>
+                    <button type="button" id="chat-send" class="ai-chat-send" title="Invia" aria-label="Invia la domanda">
+                        <i data-lucide="send" class="ai-chat-send-icon"></i>
+                    </button>
+                </div>
+                <div class="ai-chat-hint">Invio per inviare &nbsp;·&nbsp; Shift+Invio per nuova riga</div>
             </div>
         </div>
 
-        <!-- Loading -->
-        <div id="chat-loading" class="ai-chat-loading hidden">
-            <div class="ai-msg ai-msg-ai">
-                <div class="ai-msg-avatar">BOB</div>
-                <div class="ai-msg-bubble ai-msg-bubble-loading">
-                    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Input -->
-        <div class="ai-chat-input-area">
-            <div class="ai-chat-input-wrap">
-                <textarea
-                    id="chat-input"
-                    placeholder="Chiedi qualcosa sui dati…"
-                    rows="1"
-                ></textarea>
-                <button type="button" id="chat-clear" class="ai-chat-clear" title="Nuova conversazione">
-                    <i data-lucide="rotate-cw" class="ai-chat-clear-icon"></i>
-                </button>
-                <button type="button" id="chat-send" class="ai-chat-send">
-                    <i data-lucide="send" class="ai-chat-send-icon"></i>
-                </button>
-            </div>
-            <div class="ai-chat-hint">Invio per inviare &nbsp;·&nbsp; Shift+Invio per nuova riga</div>
-        </div>
     </div>
-
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ asset('/assets/js/views/ai/chat.js') }}"></script>
+{# I messaggi della chat riaperta: il testo e' markdown, lo disegna chat.js
+   con lo stesso renderer dei messaggi nuovi. #}
+<script nonce="{{ cspNonce }}">
+window.BOB_AI = {
+    conversazione: {{ apertaId }},
+    messaggi: {{ messaggi|json_encode(constant('JSON_UNESCAPED_UNICODE') b-or constant('JSON_HEX_TAG'))|raw }}
+};
+</script>
+<script src="{{ asset('/assets/js/views/ai/chat.js') }}?v=2"></script>
 {% endblock %}

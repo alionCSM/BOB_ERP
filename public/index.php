@@ -717,18 +717,31 @@ if ($uri === '/ai' || str_starts_with($uri, '/ai/')) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);
 
+    // Timeout generosi ma espliciti: il tempo per *collegarsi* al server del
+    // modello e quello per *farsi rispondere* sono due cose diverse. Se e'
+    // spento lo si scopre in pochi secondi; se e' lento gli si da' il tempo
+    // che serve, perche' la risposta arriva in streaming e la connessione col
+    // browser resta viva da sola.
     $ollamaClient = new \App\Service\OllamaClient(
-        $_ENV['OLLAMA_URL'] ?? 'http://192.168.1.10:8000/v1/chat/completions',
-        $_ENV['MODEL'] ?? 'Qwen3-30B-A3B-Q4_K_M.gguf'
+        $_ENV['OLLAMA_URL']         ?? 'http://192.168.1.10:8000/v1/chat/completions',
+        $_ENV['MODEL']              ?? 'Qwen3-30B-A3B-Q4_K_M.gguf',
+        (int)($_ENV['AI_TIMEOUT']   ?? 180),
+        (int)($_ENV['AI_CONNESSIONE'] ?? 5),
+        ($_ENV['AI_SENZA_RAGIONAMENTO'] ?? '1') !== '0',
     );
     $controller = new \App\Http\Controllers\AiSqlController($connection, $ollamaClient);
     $container->set(\App\Http\Controllers\AiSqlController::class, fn() => $controller);
 
     $request = new \App\Http\Request();
     $router  = new \App\Http\Router();
-    $router->get('/ai/chat',         [\App\Http\Controllers\AiSqlController::class, 'chatPage'])
-           ->post('/ai/chat',        [\App\Http\Controllers\AiSqlController::class, 'chat'])
-           ->post('/ai/export-table',[\App\Http\Controllers\AiSqlController::class, 'exportTable']);
+    $router->get('/ai/chat',          [\App\Http\Controllers\AiSqlController::class, 'chatPage'])
+           ->post('/ai/chat',         [\App\Http\Controllers\AiSqlController::class, 'chat'])
+           ->post('/ai/export-table', [\App\Http\Controllers\AiSqlController::class, 'exportTable'])
+           // le chat salvate
+           ->get('/ai/conversazioni',                 [\App\Http\Controllers\AiSqlController::class, 'elencoConversazioni'])
+           ->get('/ai/conversazioni/{id}',            [\App\Http\Controllers\AiSqlController::class, 'apriConversazione'])
+           ->post('/ai/conversazioni/{id}/rinomina',  [\App\Http\Controllers\AiSqlController::class, 'rinominaConversazione'])
+           ->post('/ai/conversazioni/{id}/elimina',   [\App\Http\Controllers\AiSqlController::class, 'eliminaConversazione']);
     $router->dispatch($request, $container);
 }
 
