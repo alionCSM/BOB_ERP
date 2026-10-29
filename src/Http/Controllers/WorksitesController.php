@@ -964,6 +964,27 @@ final class WorksitesController
             $billingRemaining = max(0.0, $grossConsuntivo - $worksite->getTotalBilled());
         }
 
+        // ── Ancora da fatturare (tab Fatturazione) ───────────────────────────
+        // Contratto + extra, meno quello che e' gia' stato messo in
+        // fatturazione. E' il numero che prima bisognava fare a mente
+        // guardando tre card diverse.
+        //
+        // Non e' $billingRemaining, anche se parte dagli stessi addendi:
+        // quello serve a precompilare il modale, e per quello viene fermato a
+        // zero (un campo importo con un numero negativo dentro non ha senso).
+        // Qui il negativo e' invece l'informazione piu' utile della scheda,
+        // perche' vuol dire che abbiamo fatturato piu' di quanto il cantiere
+        // vale: va mostrato, non nascosto.
+        //
+        // Su un cantiere a consuntivo un contratto non c'e': la base e' il
+        // ricavo stimato dalle presenze, la stessa che usa il calcolo qui
+        // sopra.
+        $baseFatturabile = ($worksite->isConsuntivo() && !empty($ricavi['ricavo_stimato']))
+            ? (float)$ricavi['ricavo_stimato'] + (float)($ricavi['extra'] ?? 0)
+            : $worksite->getTotalOffer() + $totalExtra;
+
+        $ancoraDaFatturare = $baseFatturabile - $totalFatture;
+
         $userObj = $user; // alias expected by view.html.twig (userObj.type)
 
         // Finance notes — only loaded for users who can see prices.
@@ -1005,6 +1026,7 @@ final class WorksitesController
             'orderDateFormatted', 'clientName', 'clientId',
             'billingDefaultDescr', 'billingRemaining', 'totalEmesseReale',
             'extrasUnbilledCount',
+            'ancoraDaFatturare', 'baseFatturabile',
             'totalFatture', 'totalFattureDaEmettere',
             'totalExtra', 'totalExtraFatturato', 'totalExtraDaFatturare',
             'financeNotes', 'financeNotesBillingOpen',
@@ -1610,7 +1632,19 @@ final class WorksitesController
                     $yardBilling?->updateBrogliaccio($yard_id, $dataY);
                 }
 
-                $_SESSION['success'] = 'Fatturazione aggiornata.';
+                // L'extra collegato segue la riga, cosi' non va corretto due
+                // volte in due tab diverse.
+                $avvisoExtra = $this->allineaExtraDallaFattura($row ?? [], $data, $descrizione, $totale);
+
+                $_SESSION['success'] = 'Fatturazione aggiornata.'
+                    . (!empty($row['extra_id']) && $avvisoExtra === null
+                        ? ' Aggiornato anche l\'extra EX-' . (int)$row['extra_id'] . '.'
+                        : '');
+
+                if ($avvisoExtra !== null) {
+                    $_SESSION['info'] = $avvisoExtra;
+                }
+
                 Response::redirect("/worksites/{$worksite_id}#billing");
             } else {
                 $newId = $this->billingRepo->create($dataMy);
@@ -1685,6 +1719,120 @@ final class WorksitesController
 
     // ── Extra ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Scrive un extra: su bb_extra e, dove il cantiere e' agganciato al
+     * gestionale, anche sul brogliaccio Yard.
+     *
+     * Estratto da saveExtra() perche' adesso lo chiama anche la modifica
+     * fatta dalla tab Fatturazione. La spinta verso Yard deve essere la
+     * stessa nei due casi: altrimenti un extra corretto da una tab arriva su
+     * Yard e lo stesso extra corretto dall'altra no, e la differenza si
+     * scopre in contabilita'.
+     *
+     * @param array $extraRow la riga come e' adesso (serve yard_id)
+     * @param array $campi    data, ordine, descrizione, totale
+     */
+    private function aggiornaExtra(int $extraId, array $extraRow, array $campi): void
+    {
+        $yardId = $extraRow['yard_id'] ?? null;
+
+        if ($yardId !== null && $yardId !== '') {
+            $sqlServer = new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config());
+            $yardExtra = new \YardWorksiteExtra($sqlServer);
+            $yardExtra->updateInYard((string)$yardId, [
+                'descrizione' => $campi['descrizione'],
+                'totale'      => $campi['totale'],
+                'data'        => $campi['data'],
+                'ordine'      => $campi['ordine'],
+            ]);
+        }
+
+        $this->extraRepo->update($extraId, $campi);
+    }
+
+    /**
+     * Allinea l'extra alla riga di fatturazione che lo fattura.
+     *
+     * Prima un extra rivisto col cliente andava corretto due volte, nella tab
+     * Extra e nella tab Fatturazione. Chi si fermava a una lasciava il
+     * cantiere con due numeri diversi per la stessa cosa — l'extra a 5.000 e
+     * la fattura a 5.500 — e la riga si marcava da sola "fatturato in
+     * eccesso" senza che nessuno avesse sbagliato niente.
+     *
+     * Vale in un senso solo, da Fatturazione verso Extra: modificando l'extra
+     * nella sua tab, la riga di fatturazione resta come e'.
+     *
+     * Non si tocca niente quando l'extra e' coperto da PIU' righe (il bottone
+     * "Saldo" ne crea una seconda per la differenza non ancora fatturata): in
+     * quel caso l'importo dell'extra e' la somma delle righe, non l'importo
+     * di quella che si sta modificando, e scriverci 5.500 al posto di 10.000
+     * vorrebbe dire rompere il conteggio della copertura. Si avvisa e si
+     * lascia stare.
+     *
+     * @return string|null un avviso da mostrare all'utente, o null se e' andato tutto liscio
+     */
+    private function allineaExtraDallaFattura(
+        array $billingRow,
+        string $data,
+        string $descrizione,
+        float $totale,
+    ): ?string {
+        $extraId = (int)($billingRow['extra_id'] ?? 0);
+        if ($extraId <= 0) {
+            return null; // riga scritta a mano, non c'e' niente da allineare
+        }
+
+        $extraRow = $this->extraRepo->getById($extraId);
+        if (!$extraRow) {
+            return null; // extra cancellato: la riga resta, orfana
+        }
+
+        if ($this->billingRepo->countByExtraId($extraId) > 1) {
+            return "L'extra EX-{$extraId} e' fatturato su piu' righe, quindi l'ho lasciato "
+                 . "come era: il suo importo e' la somma delle righe, non quello di una sola. "
+                 . "Se l'importo concordato col cliente e' cambiato, correggilo nella tab Extra.";
+        }
+
+        $this->aggiornaExtra($extraId, $extraRow, [
+            'data'        => $data,
+            // L'ordine non esiste in fatturazione: si tiene quello dell'extra.
+            'ordine'      => $extraRow['ordine'] ?? null,
+            'descrizione' => $this->descrizioneExtraDa($descrizione),
+            'totale'      => $totale,
+        ]);
+
+        return null;
+    }
+
+    /**
+     * La descrizione da scrivere nell'extra, partendo da quella della riga di
+     * fatturazione.
+     *
+     * Quando la riga nasce dal bottone "Fattura", la sua descrizione e' un
+     * composto costruito dal browser:
+     *
+     *   ORDINE <n> del <data> - CANTIERE <nome> - EXTRA <ordine> - <descrizione>
+     *
+     * Ricopiarla dentro l'extra cosi' com'e' vorrebbe dire mettere nella
+     * descrizione dell'extra il riferimento all'extra stesso, e quel testo va
+     * anche su Yard. Si tiene quindi solo il pezzo dopo "- EXTRA <...> - ",
+     * che e' la descrizione vera.
+     *
+     * Se la riga e' stata scritta a mano e non ha quella forma si prende
+     * tutta, perche' e' quello che l'utente ha scritto.
+     */
+    private function descrizioneExtraDa(string $descrizioneFattura): string
+    {
+        if (preg_match('/-\s*EXTRA\s.*?\s-\s(.+)$/is', $descrizioneFattura, $m)) {
+            $pezzo = trim($m[1]);
+            if ($pezzo !== '') {
+                return $pezzo;
+            }
+        }
+
+        return $descrizioneFattura;
+    }
+
     public function saveExtra(Request $request): never
     {
         $worksite_id = $request->intParam('id');
@@ -1719,19 +1867,7 @@ final class WorksitesController
                     throw new \Exception("Record non trovato in bb_extra.");
                 }
 
-                $yard_id = $extraRow['yard_id'] ?? null;
-                if ($yard_id !== null && $yard_id !== '') {
-                    $sqlServer = new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config());
-                    $yardExtra = new \YardWorksiteExtra($sqlServer);
-                    $yardExtra->updateInYard((string)$yard_id, [
-                        'descrizione' => $descrizione,
-                        'totale'      => $totale,
-                        'data'        => $data,
-                        'ordine'      => $ordine,
-                    ]);
-                }
-
-                $this->extraRepo->update((int)$id, $dataArr);
+                $this->aggiornaExtra((int)$id, $extraRow, $dataArr);
 
                 $_SESSION['success'] = 'Extra aggiornato.';
                 Response::redirect("/worksites/{$worksite_id}#extra");
