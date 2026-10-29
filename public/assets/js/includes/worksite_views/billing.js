@@ -8,12 +8,31 @@
                 create:false
             });
 
+            // L'avviso "questa riga fattura l'extra EX-n": compare solo quando
+            // il legame c'e' davvero, perche' solo in quel caso salvando si
+            // modifica anche qualcosa in un'altra tab.
+            function mostraLegameExtra(extraId) {
+                const nota = document.getElementById('billing-extra-nota');
+                const rif  = document.getElementById('billing-extra-nota-rif');
+                if (!nota) return;
+
+                const n = parseInt(extraId, 10);
+                if (!n) {
+                    nota.classList.add('hidden');
+                    return;
+                }
+
+                if (rif) rif.textContent = 'EX-' + n;
+                nota.classList.remove('hidden');
+            }
+
             // --- Handle “Aggiungi Fattura” ---
             document.querySelector('[data-tw-target="#billing-modal"]').addEventListener('click', function(){
                 // reset modal for new entry
                 document.getElementById('billing-id').value = '';
                 document.getElementById('billing-extra-id').value = '';
                 document.getElementById('billing-modal-title').textContent = 'Aggiungi Fattura';
+                mostraLegameExtra(0);
                 // keep default totale from PHP
             });
 
@@ -38,6 +57,13 @@
                         isNaN(n) ? '' : n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
 
                     ivaSelect.setValue(iva);
+
+                    // Il legame con l'extra si porta dietro dalla riga: senza
+                    // questo il campo nascosto restava quello dell'ultima
+                    // apertura del modal.
+                    const extraId = this.dataset.extraId || '';
+                    document.getElementById('billing-extra-id').value = extraId;
+                    mostraLegameExtra(extraId);
 
                     document.getElementById('billing-modal-title').textContent = 'Modifica Fattura';
                 });

@@ -1433,15 +1433,37 @@
             </div>
 
             <div class="grid grid-cols-12 gap-3 mb-3">
-                <div class="col-span-12 sm:col-span-4 box p-3" style="border-left:4px solid #3b82f6;">
+                {# Ancora da fatturare: contratto + extra - totale fatture.
+                   Sta prima di Totale Fatture perche' e' la domanda da cui si
+                   parte ("quanto resta?"), non una conseguenza da ricavare
+                   leggendo le altre tre card. Se e' negativo si e' fatturato
+                   piu' del valore del cantiere, e lo si deve vedere subito. #}
+                {% set adf = ancoraDaFatturare ?? 0 %}
+                <div class="col-span-12 sm:col-span-6 lg:col-span-3 box p-3"
+                     style="border-left:4px solid {{ adf < 0 ? '#dc2626' : '#8b5cf6' }};"
+                     title="{{ statsSummary.is_consuntivo
+                                ? 'Ricavo stimato + extra meno le righe di fatturazione'
+                                : 'Contratto + extra meno le righe di fatturazione' }}">
+                    <div class="text-slate-500 text-xs uppercase">
+                        {{ adf < 0 ? 'Fatturato in eccesso' : 'Ancora da Fatturare' }}
+                    </div>
+                    <div class="text-xl font-semibold" style="color:{{ adf < 0 ? '#b91c1c' : '#6d28d9' }};">
+                        € {{ adf|abs|number_format(2, ',', '.') }}
+                    </div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px;white-space:nowrap;">
+                        su € {{ (baseFatturabile ?? 0)|number_format(2, ',', '.') }}
+                        {{ statsSummary.is_consuntivo ? 'stimati' : 'di contratto + extra' }}
+                    </div>
+                </div>
+                <div class="col-span-12 sm:col-span-6 lg:col-span-3 box p-3" style="border-left:4px solid #3b82f6;">
                     <div class="text-slate-500 text-xs uppercase">Totale Fatture</div>
                     <div class="text-xl font-semibold" style="color:#1e40af;">€ {{ totalFatture|number_format(2, ',', '.') }}</div>
                 </div>
-                <div class="col-span-12 sm:col-span-4 box p-3" style="border-left:4px solid #22c55e;">
+                <div class="col-span-12 sm:col-span-6 lg:col-span-3 box p-3" style="border-left:4px solid #22c55e;">
                     <div class="text-slate-500 text-xs uppercase">Emesso</div>
                     <div class="text-xl font-semibold" style="color:#15803d;">€ {{ totalEmesseReale|number_format(2, ',', '.') }}</div>
                 </div>
-                <div class="col-span-12 sm:col-span-4 box p-3" style="border-left:4px solid #f59e0b;">
+                <div class="col-span-12 sm:col-span-6 lg:col-span-3 box p-3" style="border-left:4px solid #f59e0b;">
                     <div class="text-slate-500 text-xs uppercase">Da Emettere</div>
                     <div class="text-xl font-semibold" style="color:#b45309;">€ {{ totalFattureDaEmettere|number_format(2, ',', '.') }}</div>
                 </div>
@@ -1510,6 +1532,7 @@
                                                 data-descrizione="{{ e.descrizione }}"
                                                 data-totale="{{ e.totale_imponibile }}"
                                                 data-iva="{{ e.iva_id }}"
+                                                data-extra-id="{{ e.extra_id }}"
                                                 data-tw-toggle="modal"
                                                 data-tw-target="#billing-modal">
                                             <i data-lucide="edit" class="w-4 h-4 mr-1"></i> Modifica
@@ -1543,6 +1566,21 @@
                             <input type="hidden" name="id" id="billing-id">
                             <input type="hidden" name="worksite_id" value="{{ worksite_id }}">
                             <input type="hidden" name="extra_id" id="billing-extra-id">
+
+                            {# Una modifica qui cambia anche l'extra, che sta
+                               in un'altra tab: va detto prima di salvare, non
+                               scoperto dopo. #}
+                            <div id="billing-extra-nota" class="hidden"
+                                 style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;font-size:12.5px;line-height:1.45;">
+                                <i data-lucide="link" class="w-4 h-4" style="flex-shrink:0;margin-top:1px;"></i>
+                                <span>
+                                    Questa riga fattura l'extra
+                                    <strong id="billing-extra-nota-rif">EX-</strong>.
+                                    Salvando, data, descrizione e importo dell'extra
+                                    vengono aggiornati con quelli che metti qui.
+                                </span>
+                            </div>
+
                             <div class="mb-3">
                                 <label>Data</label>
                                 <input type="date" name="data" id="billing-data" class="form-control" required>

@@ -118,7 +118,15 @@ final class BillingRepository
             ':data'              => $data['data'],
             ':descrizione'       => $data['descrizione'],
             ':totale_imponibile' => $data['totale_imponibile'],
-            ':totale'            => $data['totale'],
+            // Nessun chiamante passa 'totale': l'importo che conta e'
+            // totale_imponibile. Senza il ?? qui PHP 8 emette un warning
+            // "Undefined array key" a ogni modifica di una riga, e nel log
+            // ne compare uno per ogni salvataggio. Il valore scritto non
+            // cambia: era null prima ed e' null adesso. La colonna
+            // bb_billing.totale non viene letta da nessuna parte — se e'
+            // davvero morta va levata con una migration, ma non di nascosto
+            // dentro un'altra modifica.
+            ':totale'            => $data['totale'] ?? null,
             ':aliquota_iva'      => $data['aliquota_iva'],
             ':articolo_id'       => $data['articolo_id'],
             ':iva_id'            => $data['iva_id'],
@@ -131,6 +139,25 @@ final class BillingRepository
     {
         $stmt = $this->conn->prepare("DELETE FROM bb_billing WHERE id = :id");
         return $stmt->execute([':id' => $id]);
+    }
+
+    /**
+     * Quante righe di fatturazione sono collegate a un extra.
+     *
+     * Un extra puo' essere fatturato in piu' volte (il bottone "Saldo" crea
+     * la riga per la differenza), e in quel caso l'importo dell'extra non e'
+     * l'importo di nessuna singola riga: e' la somma. Serve a sapere quando
+     * allineare l'extra alla riga che si sta modificando ha un senso e
+     * quando no.
+     */
+    public function countByExtraId(int $extraId): int
+    {
+        $stmt = $this->conn->prepare(
+            'SELECT COUNT(*) FROM bb_billing WHERE extra_id = :eid'
+        );
+        $stmt->execute([':eid' => $extraId]);
+
+        return (int)$stmt->fetchColumn();
     }
 
     public function setYardId(int $billingId, int $yardId): bool
