@@ -33,7 +33,12 @@
                     document.querySelector('[data-tw-target="#billing-modal"]').click();
 
                     document.getElementById('billing-id').value = '';
-                    document.getElementById('billing-extra-id').value = this.dataset.extraId;
+                    // Il 'change' lo chiede billing.js per far comparire la
+                    // nota "questa riga fattura l'extra EX-n": assegnare
+                    // .value da codice non emette nessun evento.
+                    const campoExtra = document.getElementById('billing-extra-id');
+                    campoExtra.value = this.dataset.extraId;
+                    campoExtra.dispatchEvent(new Event('change'));
                     document.getElementById('billing-data').value = this.dataset.data;
 
                     // Description: extend the server-built billing prefix

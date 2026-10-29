@@ -1793,13 +1793,26 @@ final class WorksitesController
                  . "Se l'importo concordato col cliente e' cambiato, correggilo nella tab Extra.";
         }
 
-        $this->aggiornaExtra($extraId, $extraRow, [
-            'data'        => $data,
-            // L'ordine non esiste in fatturazione: si tiene quello dell'extra.
-            'ordine'      => $extraRow['ordine'] ?? null,
-            'descrizione' => $this->descrizioneExtraDa($descrizione),
-            'totale'      => $totale,
-        ]);
+        // Se l'allineamento non riesce — tipicamente SQL Server non
+        // raggiungibile — la riga di fatturazione e' gia' salvata, e qui
+        // sopra e' gia' partita anche sul brogliaccio. Lasciando volare
+        // l'eccezione, il catch di saveBilling trasformerebbe un salvataggio
+        // riuscito in una pagina di errore, e l'utente non saprebbe che la
+        // fattura c'e' e l'extra no. Si riporta il fatto e si va avanti.
+        try {
+            $this->aggiornaExtra($extraId, $extraRow, [
+                'data'        => $data,
+                // L'ordine non esiste in fatturazione: si tiene quello dell'extra.
+                'ordine'      => $extraRow['ordine'] ?? null,
+                'descrizione' => $this->descrizioneExtraDa($descrizione),
+                'totale'      => $totale,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[allineaExtraDallaFattura] extra ' . $extraId . ': ' . $e->getMessage());
+
+            return "La fattura e' salvata, ma l'extra EX-{$extraId} non si e' allineato "
+                 . '(il gestionale non risponde). Correggilo a mano nella tab Extra.';
+        }
 
         return null;
     }
