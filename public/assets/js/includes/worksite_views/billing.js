@@ -11,6 +11,12 @@
             // L'avviso "questa riga fattura l'extra EX-n": compare solo quando
             // il legame c'e' davvero, perche' solo in quel caso salvando si
             // modifica anche qualcosa in un'altra tab.
+            //
+            // Si nasconde con display inline e non con la classe "hidden":
+            // la nota ha un suo style="display:flex" addosso, e uno stile
+            // inline batte qualunque classe (che qui, poi, non e' nemmeno
+            // definita in nessun CSS). Risultato: la nota si vedeva sempre,
+            // anche sulle righe che non fatturano nessun extra.
             function mostraLegameExtra(extraId) {
                 const nota = document.getElementById('billing-extra-nota');
                 const rif  = document.getElementById('billing-extra-nota-rif');
@@ -18,12 +24,21 @@
 
                 const n = parseInt(extraId, 10);
                 if (!n) {
-                    nota.classList.add('hidden');
+                    nota.style.display = 'none';
                     return;
                 }
 
                 if (rif) rif.textContent = 'EX-' + n;
-                nota.classList.remove('hidden');
+                nota.style.display = 'flex';
+            }
+
+            // Il campo nascosto lo riempie anche extra.js (bottone "Fattura"
+            // su una riga extra): chi lo cambia emette 'change' e la nota si
+            // adegua, senza che i due file si conoscano.
+            const extraIdField = document.getElementById('billing-extra-id');
+            if (extraIdField) {
+                extraIdField.addEventListener('change',
+                    () => mostraLegameExtra(extraIdField.value));
             }
 
             // --- Handle “Aggiungi Fattura” ---
@@ -76,8 +91,34 @@
             const descrCount = document.getElementById('billing-descrizione-count');
             if (descrField && descrCount) {
                 const MAX_DESCR = parseInt(descrField.getAttribute('maxlength'), 10) || 255;
+
+                // Un textarea conta i ritorni a capo come un carattere (sia
+                // value.length sia maxlength), ma nel POST li manda come
+                // 
+, due caratteri: il server ne contava sempre qualcuno
+                // in piu'. Con tre righe scritte il contatore diceva 253/255
+                // e il salvataggio rispondeva "troppo lunga: 256". Qui si
+                // conta come conta il server.
+                const lunghezzaInviata = (v) => v.replace(/
+||
+/g, '
+').length;
+
+                // extra.js riempie la descrizione da codice (prefisso ordine +
+                // EXTRA + testo dell'extra) e il maxlength non vale per i
+                // valori assegnati da JS: senza questo taglio si arrivava al
+                // salvataggio oltre il limite.
+                const stringiAlLimite = () => {
+                    let v = descrField.value;
+                    while (v.length > 0 && lunghezzaInviata(v) > MAX_DESCR) {
+                        v = v.slice(0, -1);
+                    }
+                    if (v !== descrField.value) descrField.value = v;
+                };
+
                 const syncDescrCount = () => {
-                    const len = descrField.value.length;
+                    stringiAlLimite();
+                    const len = lunghezzaInviata(descrField.value);
                     descrCount.textContent = len + ' / ' + MAX_DESCR;
                     descrCount.style.color = len >= MAX_DESCR ? '#dc2626'
                                            : (len > MAX_DESCR * 0.9 ? '#d97706' : '#94a3b8');

@@ -1570,8 +1570,10 @@
                             {# Una modifica qui cambia anche l'extra, che sta
                                in un'altra tab: va detto prima di salvare, non
                                scoperto dopo. #}
-                            <div id="billing-extra-nota" class="hidden"
-                                 style="display:flex;align-items:flex-start;gap:8px;padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;font-size:12.5px;line-height:1.45;">
+                            {# display:none di partenza: la mostra billing.js
+                               solo se la riga fattura davvero un extra #}
+                            <div id="billing-extra-nota"
+                                 style="display:none;align-items:flex-start;gap:8px;padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;font-size:12.5px;line-height:1.45;">
                                 <i data-lucide="link" class="w-4 h-4" style="flex-shrink:0;margin-top:1px;"></i>
                                 <span>
                                     Questa riga fattura l'extra
