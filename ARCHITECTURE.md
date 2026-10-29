@@ -110,6 +110,8 @@ Environment variables: `SQLSRV_HOST`, `SQLSRV_PORT`, `SQLSRV_DB`, `SQLSRV_USER`,
 │   │   ├── Mailer.php
 │   │   ├── WorksiteAIService.php
 │   │   ├── WorksiteMarginService.php
+│   │   ├── Ai/             BOB AI: CatalogoDati, GuardiaSql,
+│   │   │   Risposta, Conversazioni
 │   │   ├── Bookings/, Clients/, Companies/, Documents/,
 │   │   │   Offers/, Ordini/, Share/, Tickets/, Workers/
 │   │   └── ...

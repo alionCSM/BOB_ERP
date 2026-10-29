@@ -165,6 +165,8 @@ Il database `bob_csm` ospita oltre 50 tabelle. Le principali sono:
 | `bb_login_attempts` / `bb_login_verifications` | Tentativi e verifica 2FA |
 | `bb_user_activity` / `bb_audit_log` | Tracciamento attività e audit |
 | `bb_ai_sql_logs` | Log delle interrogazioni BOB AI |
+| `bb_ai_conversazioni` | Chat di BOB AI (una riga per conversazione) |
+| `bb_ai_messaggi` | Messaggi delle chat di BOB AI |
 | `phinxlog` | Stato migrazioni applicate |
 
 ---
@@ -670,25 +672,45 @@ Sistema di condivisione documentale interna ed esterna. Permette di generare lin
 ### 5.18 BOB AI
 
 **Path:** `/ai/chat`
-**Accesso:** allowlist esplicita di utenti
+**Accesso:** permesso `ai_chat` in `bb_user_permissions` (Utenti → Permessi); Superadmin sempre.
 
-Modulo di interrogazione del database in linguaggio naturale, alimentato da un LLM locale (Ollama, modello Qwen3-30B). Il sistema converte la domanda dell'utente in una query SQL `SELECT`, la esegue, e restituisce il risultato in formato tabellare.
+Modulo di interrogazione del database in linguaggio naturale, alimentato da un LLM locale (endpoint OpenAI-compatibile, modello Qwen3-30B). La domanda dell'utente viene tradotta in una query `SELECT`, che viene validata, eseguita e formattata dal codice applicativo.
 
-**Funzionalità:**
-- Conversazione multi-turno.
-- Riconoscimento del contesto utente (ruolo, permessi, visibilità dati economici).
-- Esportazione del risultato in Excel formattato.
+**Come e' costruito:**
+- `App\Service\Ai\CatalogoDati` — catalogo delle tabelle interrogabili. Lista **positiva**: cio' che non e' in catalogo non e' interrogabile. I nomi e i tipi delle colonne (valori ENUM compresi) sono letti da `INFORMATION_SCHEMA` e tenuti in cache su file (`storage/cache/ai_catalogo.json`, TTL 1 ora); le note semantiche e le chiavi di join sono curate a mano. Per ogni domanda vengono inviate al modello solo le 4-6 tabelle pertinenti, scelte per parole chiave.
+- `App\Service\Ai\GuardiaSql` — validazione della query prima dell'esecuzione.
+- `App\Service\AiSqlService` — orchestrazione: una sola chiamata al modello, che restituisce un oggetto JSON con la query e un titolo. Un errore di MySQL o un rifiuto della guardia vengono rimandati al modello per **un** secondo tentativo.
+- `App\Service\Ai\Risposta` — formattazione del risultato (nessuna chiamata al modello).
+- `App\Service\Ai\Conversazioni` — memoria delle chat.
+
+**Prestazioni:**
+- Prompt ridotto dallo schema completo del database (oltre 100 tabelle, inviate a ogni domanda) alle sole tabelle pertinenti.
+- Generazione del ragionamento (`<think>` di Qwen3) disattivata via `chat_template_kwargs`, con pulizia difensiva lato PHP.
+- `temperature` 0 e `max_tokens` 700: la stessa domanda produce la stessa query.
+- Il contesto dei turni precedenti e' una riga di riassunto piu' la query usata, non la tabella dei risultati.
+- Parte stabile del prompt (regole ed esempi) in testa, per il riuso della cache di prefisso lato server del modello.
+- Timeout di connessione e di risposta distinti (`AI_CONNESSIONE`, `AI_TIMEOUT`).
+- `session_write_close()` prima della chiamata al modello: il lock di sessione non blocca le altre richieste dello stesso browser.
+
+**Risposta in streaming (SSE):**
+La risposta di `POST /ai/chat` e' un flusso `text/event-stream` (`X-Accel-Buffering: no`): eventi `inizio` / `stato` durante l'elaborazione, evento `fine` con il risultato. Finche' transitano byte la connessione non viene chiusa da proxy o browser — era la causa dei timeout su risposte lunghe. Con `stream=0` nel body si ottiene la vecchia risposta JSON unica.
 
 **Vincoli di sicurezza:**
-- Accesso ristretto a una whitelist di username (più Superadmin).
-- Tabelle critiche bloccate server-side: `bb_users`, `bb_user_permissions`, `bb_user_sessions`, `bb_login_*`, `bb_audit_log`, `bb_settings`, `bb_user_company_access`, schema interni MySQL.
-- Colonne credenziali bloccate (`password`, `token`, `remember_token`, `secret`, `api_key`) anche se rinominate via alias.
-- Solo statement `SELECT` ammessi.
-- Funzioni di esfiltrazione (`EXTRACTVALUE`, `UPDATEXML`, `BENCHMARK`, `SLEEP`, `OUTFILE`, `LOAD_FILE`) bloccate.
-- Messaggi di errore PDO mascherati al chiamante.
+- Solo `SELECT` / `WITH`. Nessun `;`, nessun commento SQL (`--`, `#`, `/*`).
+- `SELECT *` rifiutato: con l'asterisco i nomi delle colonne non compaiono nella query e il controllo sui dati economici non potrebbe vederle passare.
+- Tabelle: ammesse solo quelle del catalogo intersecate con i moduli dell'utente **nella societa' attiva**. Le tabelle definite da un `WITH` sono riconosciute come temporanee.
+- Colonne credenziali (`password`, `token`, `remember_token`, `secret`, `api_key`, ...) bloccate anche per il Superadmin, e anche se rinominate con un alias.
+- Colonne economiche bloccate per chi non ha `view_prices`.
+- Parole chiave di mutazione ed esfiltrazione (`OUTFILE`, `LOAD_FILE`, `BENCHMARK`, `SLEEP`, `EXTRACTVALUE`, ...) bloccate. Il controllo per parole viene eseguito sul **codice** della query, con le stringhe letterali sostituite da un segnaposto: un cantiere che si chiama "Deposito Secret" non fa piu' rifiutare la query.
+- `LIMIT` imposto d'ufficio (max 500 righe) e `max_execution_time` di sessione a 15 s: una query con un join sbagliato non puo' tenere occupato un thread MySQL.
+- Messaggi di errore PDO non mostrati all'utente (vanno al modello per il secondo tentativo e nel log).
 - Rate limiting (30 richieste / 5 minuti per utente).
+- CSRF verificato (`X-CSRF-TOKEN`); le vecchie esenzioni su `/ai/chat` e `/ai/export-table` sono state rimosse.
 
-Tutte le interazioni vengono registrate in `bb_ai_sql_logs` per finalità di audit.
+**Memoria delle conversazioni:**
+Le chat sono persistite in `bb_ai_conversazioni` e `bb_ai_messaggi` e si riaprono da `/ai/chat?c=<id>`. Il titolo e' derivato dalla prima domanda (nessuna chiamata al modello). Ogni lettura e' filtrata su `user_id`: non esiste condivisione fra utenti. Rotte: `GET /ai/conversazioni`, `GET /ai/conversazioni/{id}`, `POST /ai/conversazioni/{id}/rinomina`, `POST /ai/conversazioni/{id}/elimina` (cancellazione definitiva; `bb_ai_sql_logs` resta per l'audit).
+
+Tutte le interazioni vengono registrate in `bb_ai_sql_logs` per finalita' di audit.
 
 ---
 
@@ -757,6 +779,8 @@ L'applicativo emette un header CSP restrittivo:
 | `bb_login_attempts` | Tentativi falliti di login |
 | `bb_login_verifications` | Codici 2FA emessi |
 | `bb_ai_sql_logs` | Interrogazioni BOB AI (utente, domanda, query generata, righe restituite) |
+| `bb_ai_conversazioni` | Chat di BOB AI salvate, per utente e societa' |
+| `bb_ai_messaggi` | Domande e risposte delle chat, con query e riassunto per il contesto |
 | `bb_anomaly_email_log` | Email inviate dal sistema anomalie |
 
 I log sono interrogabili dalla pagina **Utenti → Audit Log** con filtri per data, utente e tipo azione.
@@ -807,9 +831,12 @@ Mittenti differenziati per tipologia di mail (`alerts`, `notifications`, `transa
 
 ### 7.3 Ollama (LLM locale)
 
-BOB AI utilizza un'istanza locale di Ollama, raggiungibile via API REST. Configurabile tramite variabili d'ambiente:
+BOB AI utilizza un'istanza locale raggiungibile via API REST compatibile OpenAI. Configurabile tramite variabili d'ambiente:
 - `OLLAMA_URL` — endpoint del servizio.
 - `MODEL` — nome del modello (default: Qwen3-30B-A3B-Q4_K_M).
+- `AI_TIMEOUT` — secondi concessi al modello per rispondere (default 180).
+- `AI_CONNESSIONE` — secondi per collegarsi al server (default 5): se e' spento lo si scopre subito invece di aspettare il timeout lungo.
+- `AI_SENZA_RAGIONAMENTO` — `1` (default) chiede al modello di non generare il blocco `<think>`; `0` lo lascia fare (utile solo per diagnosi).
 
 L'utilizzo di un LLM locale garantisce che **nessun dato aziendale lasci mai l'infrastruttura interna**.
 

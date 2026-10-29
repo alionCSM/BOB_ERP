@@ -241,6 +241,16 @@ OLLAMA_URL=http://192.168.1.10:8000/v1/chat/completions
 MODEL=
 DOC_CHECK_URL=
 DOC_CHECK_MODEL=
+# Secondi concessi al modello per rispondere. Alto senza paura: la risposta
+# arriva in streaming, quindi la connessione col browser resta viva da sola.
+AI_TIMEOUT=180
+# Secondi per *collegarsi*. Basso di proposito: se il server del modello e'
+# spento si deve scoprire in tre secondi, non in tre minuti.
+AI_CONNESSIONE=5
+# 1 = chiede al modello di non generare il blocco <think>. Con Qwen3 sono
+# migliaia di token di ragionamento buttati, e qui serve una riga di JSON.
+# Mettere 0 solo per capire cosa sta pensando quando sbaglia una query.
+AI_SENZA_RAGIONAMENTO=1
 
 # ── OnlyOffice (opzionale) ──────────────────────────────────────
 ONLYOFFICE_SERVER_URL=
@@ -310,6 +320,15 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+
+        # BOB AI risponde in streaming (text/event-stream) e manda gli
+        # avvisi di stato mentre il modello scrive. Non serve configurare
+        # niente: PHP manda l'header `X-Accel-Buffering: no` e nginx smette
+        # di accumulare da solo. Se invece si mette un *altro* proxy davanti
+        # (Cloudflare, un load balancer, un reverse proxy aziendale), va
+        # disattivato il buffering anche la', altrimenti consegna tutto alla
+        # fine e si torna ai timeout.
+        fastcgi_read_timeout 300s;   # >= AI_TIMEOUT
     }
 
     # ssl_certificate / ssl_certificate_key ...

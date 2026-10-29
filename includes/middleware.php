@@ -147,7 +147,10 @@ if ($isCompanyScopedUser) {
 
 // ── CSRF ─────────────────────────────────────────────────────────────────────
 csrf_token(); // ensure token exists in session for all authenticated requests
-(new CsrfMiddleware(['/api/analytics/heartbeat', '/ai/chat', '/ai/export-table']))->handle();
+// /ai/chat e /ai/export-table erano esentate perche' il vecchio frontend non
+// mandava il token. Lo manda, nell'header X-CSRF-TOKEN, e csrf_verify() lo
+// legge: l'esenzione era solo un buco rimasto aperto.
+(new CsrfMiddleware(['/api/analytics/heartbeat']))->handle();
 
 // ── Activity log ──────────────────────────────────────────────────────────────
 $activity = new UserActivity($connection);

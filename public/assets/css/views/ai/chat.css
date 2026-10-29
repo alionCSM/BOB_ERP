@@ -554,3 +554,219 @@
     .ai-hero-left { flex-direction: column; align-items: flex-start; }
     .ai-hero-title { font-size: 20px; }
 }
+
+/* ── Le chat salvate ──────────────────────────────────────────
+   La barra laterale sta a sinistra della chat sul desktop e in
+   cima sul telefono, dove diventa una striscia che scorre in
+   orizzontale: su uno schermo da telefono una colonna di titoli
+   si mangerebbe la chat. */
+.ai-layout {
+    display: grid;
+    grid-template-columns: 268px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+.ai-side {
+    background: #fff;
+    border: 1.5px solid #e8edf3;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.06);
+    height: calc(100vh - 22rem);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ai-side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.ai-side-titolo {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.ai-side-nuova {
+    font-size: 12px;
+    font-weight: 600;
+    color: #7c3aed;
+    background: rgba(124,58,237,.08);
+    border-radius: 8px;
+    padding: 4px 10px;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.ai-side-nuova:hover { background: rgba(124,58,237,.16); }
+
+.ai-side-lista {
+    list-style: none;
+    margin: 0;
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.ai-side-lista::-webkit-scrollbar { width: 5px; }
+.ai-side-lista::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+
+.ai-side-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 10px;
+    padding: 2px 4px 2px 0;
+}
+
+.ai-side-item:hover { background: #f7f8fc; }
+
+.ai-side-item.attiva {
+    background: rgba(124,58,237,.09);
+    box-shadow: inset 2px 0 0 #7c3aed;
+}
+
+.ai-side-link {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    padding: 9px 10px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.ai-side-nome {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    /* un titolo lungo si taglia su una riga: l'elenco deve restare
+       scorribile a occhio, non diventare un muro di testo */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-side-data {
+    display: block;
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 2px;
+}
+
+.ai-side-azioni {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+.ai-side-item:hover .ai-side-azioni,
+.ai-side-azione:focus-visible { opacity: 1; }
+
+.ai-side-azione {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 5px 4px;
+    border-radius: 6px;
+    color: #94a3b8;
+}
+
+.ai-side-azione:hover { background: #eef2f7; color: #475569; }
+
+.ai-side-vuoto {
+    font-size: 12.5px;
+    color: #94a3b8;
+    padding: 14px 12px;
+    line-height: 1.5;
+}
+
+/* ── Stato mentre si aspetta ──────────────────────────────────
+   Il testo sta accanto ai puntini: mezzo minuto di tre puntini
+   uguali non dice se sta lavorando o se si e' piantato. */
+.ai-stato {
+    font-size: 12.5px;
+    color: #64748b;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* ── Domande di esempio ───────────────────────────────────── */
+.ai-esempi-t {
+    font-size: 12.5px;
+    color: #64748b;
+    margin: 12px 0 6px;
+}
+
+.ai-esempi {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ai-esempio {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12.5px;
+    color: #334155;
+    cursor: pointer;
+}
+
+.ai-esempio:hover {
+    border-color: #c4b5fd;
+    background: rgba(124,58,237,.06);
+    color: #6d28d9;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 900px) {
+    .ai-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ai-side {
+        height: auto;
+        min-height: 0;
+    }
+
+    .ai-side-lista {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 8px;
+    }
+
+    .ai-side-item {
+        flex: 0 0 auto;
+        max-width: 190px;
+    }
+
+    .ai-side-azioni { opacity: 1; }
+
+    .ai-side-data { display: none; }
+}

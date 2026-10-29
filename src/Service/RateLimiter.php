@@ -52,7 +52,11 @@ class RateLimiter
             }
 
             return ['ok' => true];
-        } catch (Throwable $e) {
+        // \Throwable, non Throwable: senza la barra PHP cerca
+        // App\Service\Throwable, che non esiste, quindi questo catch non
+        // scattava mai e l'eccezione usciva dal rate limiter. Si vedeva come
+        // una pagina di errore al posto di un "riprova piu' tardi".
+        } catch (\Throwable $e) {
             $this->conn->rollBack();
             // In produzione: meglio permettere oppure bloccare? Io blocco per sicurezza.
             return ['ok' => false, 'reason' => 'rate_limit_error'];
