@@ -666,3 +666,53 @@ finche' non la apre. Link `/worksites/{id}/zone#segnalazione-{sid}`.
 - Nella lista dell'operaio, finche' l'ufficio non sceglie, `cantiere_nome` e'
   il testo scritto a mano. Dopo l'approvazione la dichiarazione prende il
   cantiere dove e' stata registrata; `cantiere_testo` resta.
+
+## Un'app per tutti: il profilo decide cosa si vede (`GET /me/home`)
+
+`/me/home` risponde a ogni utente, con `profilo` e `menu` (le chiavi che
+l'app disegna, gia' filtrate). Gli stessi profili del sito
+(`AccessProfileResolver`):
+
+| `profilo` | chi | `menu` possibile |
+|---|---|---|
+| `operaio` | type `worker` con operaio collegato | oggi, presenze, assenze, documenti, cantieri |
+| `ufficio` | tutti gli altri interni; il superadmin (id 1) sempre | home, (presenze, assenze, documenti se ha un operaio collegato), approvare (`attendance`), cantieri (Zone), ai (`ai_chat`) |
+| `cliente` | type `client` o legato a un cliente | cantieri |
+| `consorziata` | role `company_viewer` | nessuno: `messaggio` dice di usare il sito |
+
+**Societa'.** I permessi sono per societa'. Chi ne ha piu' d'una riceve
+**409 `needs_company_selection`** (con `companies`) su qualunque chiamata
+finche' non sceglie: `POST /switch-company {group_company_id}`. La scelta
+resta sul token. La home dell'ufficio riporta `societa: {attiva, elenco}` e
+`moduli` della societa' attiva; il menu si ricalcola quando si cambia.
+
+Campi in piu' per `ufficio`: `superadmin`, `utente.operaio`,
+`da_approvare: {presenze, assenze}` (solo con `attendance`).
+
+Il superadmin vede nella Zone i cantieri dove la Zone e' in uso (almeno un
+accesso dato); gli altri, quelli dove li abbiamo messi per nome.
+
+## Ufficio dall'app
+
+Stessi repository e stesse notifiche delle pagine web. Permesso
+`attendance` nella societa' attiva (il superadmin passa sempre).
+
+| | |
+|---|---|
+| `GET /ufficio/approvare` | `{presenze, assenze}` in attesa, con gli `avvisi` della pagina web |
+| `POST /ufficio/presenze/{id}/decidi` | `{azione: approva, correzioni: {worksite_id, turno, pranzo, cena, pranzo_prezzo, cena_prezzo, hotel, targa_auto, trasferta, azienda, note}}` oppure `{azione: rifiuta, motivo}` |
+| `POST /ufficio/assenze/{id}/decidi` | `{azione: approva|rifiuta, motivo}` (motivo obbligatorio per rifiutare) |
+| `GET /ufficio/cantieri?q=` | per scegliere il cantiere giusto prima di approvare |
+
+## BOB AI dall'app
+
+Lo stesso `AiSqlController` del sito (permesso `ai_chat`, chat salvate in
+comune col web), con Bearer:
+
+| | |
+|---|---|
+| `POST /ai/chat` | form `domanda`, `conversazione`, `stream=1`: risposta **SSE** — `inizio`, `stato {fase: penso/scrivo/riprovo/eseguo/pronto, righe}`, `fine {ok, answer (markdown), query, righe, conversazione, titolo}` oppure `fine {ok:false, error}` |
+| `GET /ai/conversazioni` | `{ok, conversazioni: [{id, titolo, updated_at, messaggi}]}` |
+| `GET /ai/conversazioni/{id}` | `{ok, messaggi: [{ruolo, testo, sql, righe, errore, created_at}]}` |
+| `POST /ai/conversazioni/{id}/rinomina` | form `titolo` |
+| `POST /ai/conversazioni/{id}/elimina` | |

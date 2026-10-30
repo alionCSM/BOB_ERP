@@ -425,8 +425,7 @@ final class ApiV1OperaioController
         $utente  = $request->user();
         $accesso = new \App\Service\Zone\Accesso($this->conn);
 
-        $cantieri = (new \App\Repository\Zone\AccessoRepository($this->conn))
-            ->cantieriDi((int)($utente->id ?? 0));
+        $cantieri = $this->cantieriZone($utente);
 
         foreach ($cantieri as &$c) {
             $c['id']      = (int)$c['id'];
@@ -469,10 +468,17 @@ final class ApiV1OperaioController
         $operaio = (int)($utente->worker_id ?? 0);
         $lingua  = \App\Service\Lingua::normalizza($utente->lingua ?? null);
 
-        // Un cliente usa la stessa app: niente presenze ne' ferie, solo i
-        // cantieri che l'ufficio condivide con lui.
-        if (($utente->type ?? '') === 'client') {
-            $this->homeCliente($utente, $lingua);
+        // Una sola app per tutti: cosa mostra lo decide chi sei. Lo stesso
+        // profilo che usa il web (AccessProfileResolver), cosi' un utente
+        // vede nell'app le stesse cose che vede sul sito.
+        switch ($this->profilo($utente)) {
+            case 'cliente':
+                // niente presenze ne' ferie, solo i cantieri condivisi
+                $this->homeCliente($utente, $lingua);
+            case 'consorziata':
+                $this->homeConsorziata($utente, $lingua);
+            case 'ufficio':
+                $this->homeUfficio($utente, $lingua);
         }
 
         if (!$operaio) {
@@ -503,8 +509,7 @@ final class ApiV1OperaioController
         );
         $attesaAssenze->execute([':w' => $operaio]);
 
-        $cantieriZone = (new \App\Repository\Zone\AccessoRepository($this->conn))
-            ->cantieriDi((int)$utente->id);
+        $cantieriZone = $this->cantieriZone($utente);
 
         $menu = [
             ['chiave' => 'oggi',      'titolo' => \App\Service\Lingua::testo('menu_oggi', $lingua)],
@@ -521,6 +526,7 @@ final class ApiV1OperaioController
 
         Response::json([
             'success' => true,
+            'profilo' => 'operaio',
             'utente'  => [
                 'nome'     => trim((string)($utente->first_name ?? '')),
                 'lingua'   => $lingua,
@@ -565,6 +571,7 @@ final class ApiV1OperaioController
         Response::json([
             'success'   => true,
             'tipo'      => 'cliente',
+            'profilo'   => 'cliente',
             'utente'    => [
                 'nome'     => trim((string)($utente->first_name ?? '')),
                 'lingua'   => $lingua,
@@ -702,6 +709,189 @@ final class ApiV1OperaioController
         header('Cache-Control: private, no-store');
         readfile($file);
         exit;
+    }
+
+    // ── Le home di chi non e' un operaio ────────────────────────────────────
+
+    /**
+     * Chi e' questo utente, per l'app: operaio, ufficio, cliente, consorziata.
+     *
+     * Gli stessi quattro profili del web (AccessProfileResolver), con un
+     * nome che l'app capisce. Il superadmin e' ufficio, sempre.
+     */
+    private function profilo(object $utente): string
+    {
+        if ((int)($utente->id ?? 0) === 1) {
+            return 'ufficio';
+        }
+        $p = $utente instanceof \App\Domain\User
+            ? (new \App\Security\AccessProfileResolver())->resolve($utente)
+            : (($utente->type ?? '') === 'client' ? 'CLIENT' : 'WORKER');
+        return match ($p) {
+            'CLIENT'  => 'cliente',
+            'COMPANY' => 'consorziata',
+            'INTERNAL'=> 'ufficio',
+            default   => 'operaio',
+        };
+    }
+
+    /**
+     * I cantieri di cui apre la Zone: quelli dove l'abbiamo messo, per nome.
+     *
+     * Il superadmin entra in tutti, ma "tutti i cantieri di BOB" sono
+     * migliaia: gli si mostrano quelli dove la Zone e' in uso, cioe' dove
+     * almeno una persona ha l'accesso.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function cantieriZone(object $utente): array
+    {
+        if ((int)($utente->id ?? 0) !== 1) {
+            return (new \App\Repository\Zone\AccessoRepository($this->conn))
+                ->cantieriDi((int)($utente->id ?? 0));
+        }
+        return $this->conn->query("
+            SELECT w.id, w.worksite_code, w.name, w.location, w.status, 'ufficio' AS ruolo
+            FROM   bb_worksites w
+            WHERE  w.id IN (SELECT DISTINCT worksite_id FROM bb_zone_accessi)
+            ORDER BY w.worksite_code DESC
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * La home dell'ufficio.
+     *
+     * I permessi sono per societa': il menu si fa coi moduli della societa'
+     * in cui sta lavorando (la sceglie l'app, /api/v1/switch-company), e
+     * cambia quando la cambia. Chi in ufficio e' anche un operaio (ha un
+     * operaio collegato) tiene le sue presenze e le sue ferie.
+     */
+    private function homeUfficio(object $utente, string $lingua): never
+    {
+        $L = fn(string $k) => \App\Service\Lingua::testo($k, $lingua);
+        $operaio = (int)($utente->worker_id ?? 0);
+        $oggi = date('Y-m-d');
+
+        $moduli = [];
+        if ($utente instanceof \App\Domain\User) {
+            foreach (array_keys(array_filter($utente->getPermissions())) as $m) {
+                if ($utente->canAccess($m)) {
+                    $moduli[] = $m;
+                }
+            }
+        }
+        $puo = fn(string $m) => (int)($utente->id ?? 0) === 1
+            || ($utente instanceof \App\Domain\User && $utente->canAccess($m));
+
+        // la sua giornata, se e' anche un operaio
+        $prossimo = null;
+        $daSegnare = 0;
+        $inAttesa = ['presenze' => 0, 'assenze' => 0];
+        if ($operaio) {
+            $giorni   = $this->dati()->pianificazione($operaio, $oggi, date('Y-m-d', strtotime('+1 day')));
+            $p        = $giorni[0] ?? null;
+            if ($p) {
+                $prossimo = [
+                    'data'      => $p['data'],
+                    'e_oggi'    => $p['data'] === $oggi,
+                    'cantiere'  => $p['cantiere_nome'] ?: $p['cantiere'],
+                    'codice'    => $p['worksite_code'],
+                    'luogo'     => $p['location'],
+                    'auto'      => $p['auto_targa'],
+                    'trasferta' => (bool)$p['trasferta'],
+                    'rientro'   => $p['rientro_previsto'] ?? null,
+                    'squadra'   => $p['squadra'],
+                ];
+            }
+            $daSegnare = count((new RichiestaPresenzaRepository($this->conn))
+                ->giorniSenzaNiente($operaio, date('Y-m-d', strtotime('-13 days')), $oggi));
+            foreach (['presenze' => 'bb_presenze_richieste', 'assenze' => 'bb_ferie_permessi'] as $k => $t) {
+                $st = $this->conn->prepare("SELECT COUNT(*) FROM $t WHERE worker_id = :w AND stato = 'in_attesa'");
+                $st->execute([':w' => $operaio]);
+                $inAttesa[$k] = (int)$st->fetchColumn();
+            }
+        }
+
+        // da approvare: chi ha il modulo presenze, come sul web
+        $daApprovare = null;
+        if ($puo('attendance')) {
+            $daApprovare = [
+                'presenze' => (new RichiestaPresenzaRepository($this->conn))->quanteInAttesa(),
+                'assenze'  => (int)$this->conn
+                    ->query("SELECT COUNT(*) FROM bb_ferie_permessi WHERE stato = 'in_attesa'")
+                    ->fetchColumn(),
+            ];
+        }
+
+        $cantieriZone = $this->cantieriZone($utente);
+
+        $menu = [['chiave' => 'home', 'titolo' => $L('menu_oggi')]];
+        if ($operaio) {
+            $menu[] = ['chiave' => 'presenze',  'titolo' => $L('menu_presenze')];
+            $menu[] = ['chiave' => 'assenze',   'titolo' => $L('menu_assenze')];
+            $menu[] = ['chiave' => 'documenti', 'titolo' => $L('documenti')];
+        }
+        if ($daApprovare !== null) {
+            $menu[] = ['chiave' => 'approvare', 'titolo' => $L('menu_approvare')];
+        }
+        if ($cantieriZone) {
+            $menu[] = ['chiave' => 'cantieri', 'titolo' => $L('menu_cantieri')];
+        }
+        if ($puo('ai_chat')) {
+            $menu[] = ['chiave' => 'ai', 'titolo' => 'BOB AI'];
+        }
+
+        $cc = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
+        $attiva = $cc->current();
+
+        Response::json([
+            'success'    => true,
+            'profilo'    => 'ufficio',
+            'superadmin' => (int)($utente->id ?? 0) === 1,
+            'utente'     => [
+                'nome'     => trim((string)($utente->first_name ?? '')),
+                'lingua'   => $lingua,
+                'sei_capo' => false,
+                'operaio'  => $operaio > 0,
+            ],
+            'societa'    => [
+                'attiva' => $attiva ? ['id' => (int)$attiva['id'], 'nome' => $attiva['nome'], 'colore' => $attiva['colore'] ?? null] : null,
+                'elenco' => $cc->availableFor((int)$utente->id),
+            ],
+            'moduli'       => $moduli,
+            'prossimo'     => $prossimo,
+            'da_segnare'   => $daSegnare,
+            'in_attesa'    => $inAttesa,
+            'da_approvare' => $daApprovare,
+            'cantieri'     => count($cantieriZone),
+            'zona'         => $cantieriZone
+                ? (new \App\Service\Zone\LeMie($this->conn))->conti((int)$utente->id)
+                : ['attivita' => 0, 'da_compilare' => 0],
+            'menu'         => $menu,
+        ]);
+    }
+
+    /**
+     * Le aziende consorziate: sul web gestiscono aziende, operai e
+     * documenti. Nell'app per ora niente: lo dice, invece di un errore.
+     */
+    private function homeConsorziata(object $utente, string $lingua): never
+    {
+        Response::json([
+            'success'  => true,
+            'profilo'  => 'consorziata',
+            'utente'   => [
+                'nome'     => trim((string)($utente->first_name ?? '')),
+                'lingua'   => $lingua,
+                'sei_capo' => false,
+            ],
+            'messaggio' => \App\Service\Lingua::testo('msg_consorziata_web', $lingua),
+            'prossimo'  => null,
+            'da_segnare'=> 0,
+            'in_attesa' => ['presenze' => 0, 'assenze' => 0],
+            'cantieri'  => 0,
+            'menu'      => [],
+        ]);
     }
 
     // ── Supporto ─────────────────────────────────────────────────────────────

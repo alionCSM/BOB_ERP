@@ -828,6 +828,37 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
             ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
 
+    // ── L'app per l'ufficio ───────────────────────────────────────────────
+    // Gli stessi repository e le stesse regole delle pagine web; i permessi
+    // sono quelli della societa' attiva, come sul sito.
+    require_once APP_ROOT . '/src/Http/Controllers/ApiV1UfficioController.php';
+    $router
+        ->get( '/api/v1/ufficio/approvare',             [ApiV1UfficioController::class, 'approvare'])
+        ->post('/api/v1/ufficio/presenze/{id}/decidi',  [ApiV1UfficioController::class, 'decidiPresenza'])
+        ->post('/api/v1/ufficio/assenze/{id}/decidi',   [ApiV1UfficioController::class, 'decidiAssenza'])
+        ->get( '/api/v1/ufficio/cantieri',              [ApiV1UfficioController::class, 'cercaCantieri']);
+
+    // BOB AI dall'app: lo stesso controller del sito (stessi permessi
+    // 'ai_chat', stessa memoria delle chat, stesso flusso SSE). Cambia
+    // solo come si entra: Bearer invece della sessione.
+    if (str_starts_with($uri, '/api/v1/ai/')) {
+        $aiClient = new \App\Service\OllamaClient(
+            $_ENV['OLLAMA_URL']           ?? 'http://192.168.1.10:8000/v1/chat/completions',
+            $_ENV['MODEL']                ?? 'Qwen3-30B-A3B-Q4_K_M.gguf',
+            (int)($_ENV['AI_TIMEOUT']     ?? 180),
+            (int)($_ENV['AI_CONNESSIONE'] ?? 5),
+            ($_ENV['AI_SENZA_RAGIONAMENTO'] ?? '1') !== '0',
+        );
+        $aiController = new \App\Http\Controllers\AiSqlController($connection, $aiClient);
+        $container->set(\App\Http\Controllers\AiSqlController::class, fn() => $aiController);
+        $router
+            ->post('/api/v1/ai/chat',                        [\App\Http\Controllers\AiSqlController::class, 'chat'])
+            ->get( '/api/v1/ai/conversazioni',               [\App\Http\Controllers\AiSqlController::class, 'elencoConversazioni'])
+            ->get( '/api/v1/ai/conversazioni/{id}',          [\App\Http\Controllers\AiSqlController::class, 'apriConversazione'])
+            ->post('/api/v1/ai/conversazioni/{id}/rinomina', [\App\Http\Controllers\AiSqlController::class, 'rinominaConversazione'])
+            ->post('/api/v1/ai/conversazioni/{id}/elimina',  [\App\Http\Controllers\AiSqlController::class, 'eliminaConversazione']);
+    }
+
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si
     // entra (Bearer invece del cookie di sessione). I metodi leggono i
