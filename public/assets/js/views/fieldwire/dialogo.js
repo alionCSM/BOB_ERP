@@ -54,9 +54,9 @@
     };
     const STATI = { aperta: 'Aperta', presa: 'Presa in carico', risolta: 'Risolta' };
     const CANALI = {
-        squadra: { label: 'Squadra', icon: 'fa-hard-hat',    desc: 'Ufficio, capi squadra e operai del cantiere.' },
-        capi:    { label: 'Capi',    icon: 'fa-user-shield', desc: 'Solo ufficio e capi squadra.' },
-        cliente: { label: 'Cliente', icon: 'fa-handshake',   desc: 'Ufficio, capi squadra e cliente. Gli operai non la vedono.' },
+        squadra: { label: 'Squadra', icon: 'fa-hard-hat',  desc: 'Noi e chi lavora in cantiere. Il cliente non la vede.' },
+        cliente: { label: 'Cliente', icon: 'fa-handshake', desc: 'Noi e il committente, nessun altro.' },
+        tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'Tutti quelli che entrano nel cantiere, committente compreso.' },
     };
     const RAPIDI = {
         materiale_arrivato: 'Materiale arrivato',

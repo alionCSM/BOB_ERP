@@ -83,13 +83,29 @@ $p->uguale('la chat squadra: ufficio del cantiere, capo e operaio', [ANNA, MARCO
 $p->check('Luca, che ha il modulo ma non e\' dentro, non c\'e\'', !in_array(LUCA, $ids, true));
 $p->check('e nemmeno l\'estraneo',                               !in_array(ESTRANEO, $ids, true));
 
-$capi = array_map(fn($x) => (int)$x['user_id'], $messaggi->personeCanale(CANTIERE, 'capi'));
-sort($capi);
-$p->uguale('la chat capi non arriva agli operai', [ANNA, MARCO], $capi);
-
+// Il canale "cliente" e' noi e il committente, nessun altro in mezzo:
+// prima c'erano anche i capi.
 $cli = array_map(fn($x) => (int)$x['user_id'], $messaggi->personeCanale(CANTIERE, 'cliente'));
 sort($cli);
-$p->uguale('la chat cliente: ufficio, capo e cliente', [ANNA, MARCO, NERI], $cli);
+$p->uguale('la chat cliente: solo ufficio e cliente', [ANNA, NERI], $cli);
+$p->check('il capo resta fuori dalla chat del cliente', !in_array(MARCO, $cli, true));
+
+// "tutti" e' il posto dove si parla insieme
+$tutti = array_map(fn($x) => (int)$x['user_id'], $messaggi->personeCanale(CANTIERE, 'tutti'));
+sort($tutti);
+$p->uguale('la chat tutti: ufficio, capo, operaio e cliente', [ANNA, MARCO, ILIR, NERI], $tutti);
+
+// il canale "capi" non esiste piu'
+$p->uguale('i canali sono tre', ['squadra', 'cliente', 'tutti'], Messaggi::CANALI);
+$p->uguale('chi chiede "capi" non trova nessuno', [], $messaggi->personeCanale(CANTIERE, 'capi'));
+
+// e ognuno apre i suoi
+$acc = new Accesso($pdo);
+$apre = fn($chi) => $messaggi->canali((string)$acc->ruolo($u[$chi], CANTIERE), CANTIERE);
+$p->uguale('ufficio: apre tutti e tre', ['squadra', 'cliente', 'tutti'], $apre('ufficio'));
+$p->uguale('il capo: squadra e tutti',     ['squadra', 'tutti'],            $apre('capo'));
+$p->uguale('operaio: squadra e tutti',    ['squadra', 'tutti'],            $apre('operaio'));
+$p->uguale('il cliente: cliente e tutti',  ['cliente', 'tutti'],            $apre('cliente'));
 
 // ── Il canale cliente sparisce se la condivisione e' spenta ───────────────
 $pdo->exec('UPDATE bb_worksites SET zone_cliente = 0 WHERE id = ' . CANTIERE);

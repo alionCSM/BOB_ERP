@@ -10,11 +10,16 @@ use PDO;
  * I messaggi della Zone: la chat del cantiere e il filo di ogni segnalazione.
  *
  * La chat ha tre canali, uno per chi legge:
- *   - squadra: ufficio, capi e operai — "domani si attacca alle sette"
- *   - capi:    ufficio e capi — le cose da coordinare
- *   - cliente: ufficio, capi e cliente — solo se l'ufficio ha acceso
- *              "Condividi col cliente" sul cantiere
- * Un operaio non vede il canale dei capi, il cliente vede solo il suo.
+ *   - squadra: noi e chi lavora in cantiere — "domani si attacca alle sette"
+ *   - cliente: noi e il committente, e nessun altro. Solo se l'ufficio ha
+ *              acceso "Condividi col cliente" sul cantiere
+ *   - tutti:   tutti quelli che entrano nel cantiere, committente compreso
+ *
+ * C'era anche un canale "capi", ed e' stato tolto: nella Zone non ci
+ * entrano tutti gli operai di un cantiere, ci entra chi gli diamo
+ * l'accesso — e quello, in pratica, e' il capo squadra. "Squadra" e "Capi"
+ * avevano dentro le stesse persone, e due chat con le stesse persone sono
+ * una chat sola in cui nessuno sa dove scrivere.
  *
  * Cose da cantiere che una chat qualsiasi non ha:
  *   - avvisi fissati in alto (capo e ufficio): "gru il 12 alle 7";
@@ -29,7 +34,7 @@ use PDO;
  */
 final class Messaggi
 {
-    public const CANALI = ['squadra', 'capi', 'cliente'];
+    public const CANALI = ['squadra', 'cliente', 'tutti'];
 
     /** Le chiavi dei messaggi rapidi: il testo lo mette chi legge. */
     public const RAPIDI = [
@@ -48,10 +53,12 @@ final class Messaggi
     {
         $conCliente = $this->clienteAcceso($worksiteId);
         $tutti = match ($ruolo) {
-            Accesso::UFFICIO, Accesso::CAPO => ['squadra', 'capi', 'cliente'],
-            Accesso::OPERAIO => ['squadra'],
-            Accesso::CLIENTE => ['cliente'],
-            default => [],
+            Accesso::UFFICIO                => ['squadra', 'cliente', 'tutti'],
+            Accesso::CAPO, Accesso::OPERAIO => ['squadra', 'tutti'],
+            // il committente non vede la chat della squadra: li' si parla
+            // di come si lavora, non di cosa si consegna
+            Accesso::CLIENTE                => ['cliente', 'tutti'],
+            default                         => [],
         };
         return array_values(array_filter($tutti, fn($c) => $c !== 'cliente' || $conCliente));
     }
@@ -275,10 +282,19 @@ final class Messaggi
      */
     public function personeCanale(int $worksiteId, string $canale): array
     {
+        // Un canale che non esiste non ha nessuno dentro. Senza questa
+        // riga i ruoli venivano vuoti ma l'ufficio si aggiungeva lo
+        // stesso in fondo: un nome di canale inventato — o uno vecchio
+        // rimasto in giro, come 'capi' — mandava il messaggio all'ufficio.
+        if (!in_array($canale, self::CANALI, true)) {
+            return [];
+        }
+
         $ruoli = match ($canale) {
             'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
-            'capi'    => [Accesso::CAPO],
-            'cliente' => [Accesso::CAPO, Accesso::CLIENTE],
+            // noi e il committente, nessun altro in mezzo
+            'cliente' => [Accesso::CLIENTE],
+            'tutti'   => [Accesso::CAPO, Accesso::OPERAIO, Accesso::CLIENTE],
             default   => [],
         };
         // Senza togliere i doppioni, chi e' dell'ufficio ed e' anche in
