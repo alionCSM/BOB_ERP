@@ -26,6 +26,20 @@ function db(): PDO
 
 function costruisciSchema(PDO $pdo): void
 {
+    // ── La sicura ───────────────────────────────────────────────────────────
+    // Qui sotto si fa DROP TABLE su tutto. Se qualcuno punta il DSN al
+    // database di lavoro — o lancia le prove sul server — questa riga e'
+    // l'unica cosa fra lui e un pomeriggio molto brutto. Il nome deve dire
+    // che e' un database di prova.
+    $nome = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+    if (!preg_match('/test/i', $nome)) {
+        throw new RuntimeException(
+            "Mi fermo: '$nome' non sembra un database di prova. "
+            . 'Queste prove cancellano tutte le tabelle del database a cui si collegano '
+            . '(vedi DSN in tests/zone/schema.php), e il nome deve contenere "test".'
+        );
+    }
+
     // ── Via tutto ───────────────────────────────────────────────────────────
     $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
     foreach ($pdo->query("SELECT table_name FROM information_schema.tables

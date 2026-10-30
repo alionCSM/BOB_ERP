@@ -19,7 +19,12 @@ mysql -h 127.0.0.1 -P 3307 -u root -e "CREATE DATABASE bob_test"
 ```
 
 La connessione sta in `schema.php` (`DSN`). Il database viene **svuotato e
-ricostruito a ogni prova**: non puntarlo mai su BOB vero.
+ricostruito a ogni prova**: non puntarlo mai su BOB vero. C'e' una sicura —
+il nome del database deve contenere `test`, se no le prove si rifiutano di
+partire — ma e' l'ultima difesa, non la prima.
+
+**Non si lanciano sul server di produzione.** Sono uno strumento da
+sviluppo: vogliono un MySQL da buttare, e sul server non c'e'.
 
 ## Com'e' fatto
 
