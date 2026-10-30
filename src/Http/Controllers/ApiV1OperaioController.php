@@ -850,7 +850,18 @@ final class ApiV1OperaioController
             'flotta'         => ['fleet_view', 'fleet_manage'],
             'autocarrate'    => ['pn_autocarrate', 'pn_autocarrate_giornata'],
             'noleggi'        => ['pn_noleggi', 'pn_noleggi_giornata'],
+            'offerte'        => ['offers'],
+            'clienti'        => ['clients'],
+            'aziende'        => ['companies'],
+            'prenotazioni'   => ['bookings'],
+            'ordini_aziende' => ['ordini_aziende'],
+            'fatturato'      => ['report_business'],
+            'rubrica'        => ['users'],
         ] as $chiave => $servono) {
+            // i clienti, come sul sito, solo a chi lavora nella societa' 1
+            if ($chiave === 'clienti' && (int)($utente->company_id ?? 0) !== 1) {
+                continue;
+            }
             foreach ($servono as $m) {
                 if ($puo($m)) {
                     $menu[] = ['chiave' => $chiave, 'titolo' => $chiave];

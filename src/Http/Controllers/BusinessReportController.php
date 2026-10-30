@@ -63,7 +63,7 @@ final class BusinessReportController
             }
         }
 
-        $dati = $this->buildSeries($rows, $daAnno, $aAnno);
+        $dati = self::buildSeries($rows, $daAnno, $aAnno);
 
         Response::view('report/fatturato.html.twig', $request, [
             'pageTitle'  => 'Andamento fatturato',
@@ -141,7 +141,7 @@ final class BusinessReportController
      * Le anagrafiche di tipo 'S' (altri soggetti) restano fuori da entrambi:
      * non sono ne' ricavi ne' costi di fornitura.
      */
-    private function buildSeries(array $rows, int $daAnno, int $aAnno): array
+    public static function buildSeries(array $rows, int $daAnno, int $aAnno): array
     {
         $serie = [];
         for ($y = $daAnno; $y <= $aAnno; $y++) {

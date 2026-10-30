@@ -843,6 +843,19 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/ufficio/documenti',             [ApiV1UfficioController::class, 'documenti'])
         ->get( '/api/v1/ufficio/flotta',                [ApiV1UfficioController::class, 'flotta']);
 
+    // La parte "da scrivania", in sola lettura: si guarda dal telefono, si
+    // modifica dal sito.
+    require_once APP_ROOT . '/src/Http/Controllers/ApiV1ScrivaniaController.php';
+    $router
+        ->get( '/api/v1/ufficio/offerte',         [ApiV1ScrivaniaController::class, 'offerte'])
+        ->get( '/api/v1/ufficio/clienti',         [ApiV1ScrivaniaController::class, 'clienti'])
+        ->get( '/api/v1/ufficio/clienti/{id}',    [ApiV1ScrivaniaController::class, 'cliente'])
+        ->get( '/api/v1/ufficio/aziende',         [ApiV1ScrivaniaController::class, 'aziende'])
+        ->get( '/api/v1/ufficio/prenotazioni',    [ApiV1ScrivaniaController::class, 'prenotazioni'])
+        ->get( '/api/v1/ufficio/ordini-aziende',  [ApiV1ScrivaniaController::class, 'ordiniAziende'])
+        ->get( '/api/v1/ufficio/fatturato',       [ApiV1ScrivaniaController::class, 'fatturato'])
+        ->get( '/api/v1/ufficio/rubrica',         [ApiV1ScrivaniaController::class, 'rubrica']);
+
     // Pianificazione e programmazione: i metodi del sito, non una copia. Il
     // controllo del modulo che sul sito fa il middleware (per indirizzo),
     // qui si fa prima di passare al metodo, con la societa' attiva.

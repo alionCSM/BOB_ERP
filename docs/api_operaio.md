@@ -735,3 +735,24 @@ scelta; le rotte hanno la stessa guardia.
 
 Autocarrate e noleggi del giorno usano le rotte gia' esistenti
 `/noleggi/giornata`, `/noleggi/giornata/segna`, `/noleggi/giornata/foto`.
+
+## Ufficio dall'app, terza parte: la scrivania (sola lettura)
+
+Si guarda dal telefono, si modifica dal sito. Stessi repository e stessi
+permessi della societa' attiva; nella home compaiono solo le voci che si
+possono aprire (`offerte`, `clienti`, `aziende`, `prenotazioni`,
+`ordini_aziende`, `fatturato`, `rubrica`).
+
+| Rotta | Modulo | Cosa torna |
+|---|---|---|
+| `GET /ufficio/offerte?stato=&q=` | `offers` | `{offerte: [{id, numero, oggetto, cliente, societa, stato, totale, creata, da}]}`, max 300; la societa' 1 le vede tutte, le altre solo le proprie |
+| `GET /ufficio/clienti` | `clients` (solo societa' 1, come sul sito) | `{clienti: [{id, nome, indirizzo, filiale, piva, email, offerte, cantieri}]}` |
+| `GET /ufficio/clienti/{id}` | `clients` | `{cliente, cantieri: [{id, codice, nome}], offerte}` |
+| `GET /ufficio/aziende` | `companies` | `{aziende: [{id, nome, codice, consorziata, attiva, operai}]}` |
+| `GET /ufficio/prenotazioni?tipo=hotel\|restaurant&attive=1&q=` | `bookings` | `{prenotazioni: [{struttura, citta, telefono, cantiere, capo, persone, dal, al, totale, attiva, pagata}]}` |
+| `GET /ufficio/ordini-aziende?anno=` | `ordini_aziende` | `{anno, ordini: [{azienda, mese, numero, data, totale, descrizione}]}` |
+| `GET /ufficio/fatturato?anno=` | `report_business` | `{anno, serie, totali}` per l'anno e quello prima, lo stesso calcolo di "Andamento fatturato"; 503 se Business non risponde |
+| `GET /ufficio/rubrica?q=` | `users` (non per chi vede solo alcune aziende) | `{persone: [{id, nome, azienda, telefono, email, attivo}]}`, da 2 lettere, max 50 |
+
+La fatturazione (`/billing`) resta sul sito: passa da Yard e serve lo
+schermo grande.
