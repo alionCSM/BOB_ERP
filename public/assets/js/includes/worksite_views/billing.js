@@ -93,16 +93,20 @@
                 const MAX_DESCR = parseInt(descrField.getAttribute('maxlength'), 10) || 255;
 
                 // Un textarea conta i ritorni a capo come un carattere (sia
-                // value.length sia maxlength), ma nel POST li manda come
-                // 
-, due caratteri: il server ne contava sempre qualcuno
-                // in piu'. Con tre righe scritte il contatore diceva 253/255
-                // e il salvataggio rispondeva "troppo lunga: 256". Qui si
+                // value.length sia maxlength), ma nel POST li manda come CR
+                // LF, due caratteri: il server ne contava sempre qualcuno in
+                // piu'. Con tre righe scritte il contatore diceva 253/255 e
+                // il salvataggio rispondeva "troppo lunga: 256". Qui si
                 // conta come conta il server.
-                const lunghezzaInviata = (v) => v.replace(/
-||
-/g, '
-').length;
+                //
+                // Attenzione a toccare questa riga: le sequenze di escape
+                // qui sotto una volta sono state sostituite dai caratteri
+                // veri (un a capo vero dentro la regex) e il file e'
+                // diventato un errore di sintassi. Quando billing.js non
+                // parte, il modale delle fatture non riempie piu' il campo
+                // nascosto con l'id, e ogni "Modifica" salva una fattura
+                // nuova invece di correggere quella aperta.
+                const lunghezzaInviata = (v) => v.replace(/\r\n|\r|\n/g, '\n').length;
 
                 // extra.js riempie la descrizione da codice (prefisso ordine +
                 // EXTRA + testo dell'extra) e il maxlength non vale per i

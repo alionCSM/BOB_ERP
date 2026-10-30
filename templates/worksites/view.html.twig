@@ -1589,7 +1589,8 @@
                             </div>
                             <div class="mb-3">
                                 <label>Articolo</label>
-                                <select name="articolo_id" id="billing-ordine" class="tomselect" required>
+                                <select name="articolo_id" id="billing-ordine" class="tomselect"
+                                        style="width:100%;max-width:100%;" required>
                                     {% for a in articles %}
                                         <option value="{{ a.id }}" {% if a.codice == 'MONT' %}selected{% endif %}>
                                             {{ a.codice }} - {{ a.descrizione }}
