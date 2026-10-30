@@ -1252,7 +1252,18 @@ final class FieldwireController
     {
         $this->guardia(__FUNCTION__, $request);
 
-        $this->jsonResponse(function () {
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)($request->param('id') ?? 0);
+
+            // Fuori dall'ufficio si vede solo chi sta in QUESTO cantiere.
+            // Prima l'elenco era tutti gli utenti attivi di BOB, e bastava
+            // essere un operaio — o un cliente — per farsi dare nomi e
+            // cognomi di tutta l'azienda. L'ufficio li vede tutti perche'
+            // assegna le attivita' e aggiunge la gente ai cantieri.
+            $soloQui = $this->accesso->daUfficio($request->user(), $w)
+                ? ''
+                : ' AND u.id IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = ' . $w . ')';
+
             $stmt = $this->conn->query("
                 SELECT u.id, u.username,
                        TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
@@ -1264,7 +1275,8 @@ final class FieldwireController
                            WHERE  pc.user_id = u.id AND pc.module = 'zone' AND pc.allowed = 1
                        ) AS ha_modulo_zone
                 FROM bb_users u
-                WHERE u.active = 'Y'
+                WHERE u.active = 'Y' AND u.removed = 'N'
+                      $soloQui
                 ORDER BY u.username ASC
             ");
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
