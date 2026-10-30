@@ -303,32 +303,61 @@ function costruisciSchema(PDO $pdo): void
     ");
 
     // ── Le tabelle della Zone: le migrazioni vere ──────────────────────────
-    $migrazioni = [];
-    foreach (glob(dirname(__DIR__, 1) . '/*') as $x) { /* niente */ }
+    //
+    // Si prova a far girare TUTTE le migrazioni, in ordine. Quelle che
+    // toccano tabelle vecchie che qui non esistono si fermano con "Base
+    // table or view not found", e quelle si saltano: a noi interessa la
+    // Zone, il resto del gestionale no.
+    //
+    // Prima il filtro era sul nome del file (doveva contenere "zone" o
+    // "fieldwire") ed era una trappola: una migrazione della Zone chiamata
+    // in un altro modo veniva saltata in silenzio, le prove giravano su uno
+    // schema senza la sua colonna, e sembrava rotto il codice.
     $dir = dirname(__DIR__, 2) . '/db/migrations';
+    $migrazioni = [];
     foreach (scandir($dir) as $f) {
         if (!preg_match('/^(\d+)_([a-z0-9_]+)\.php$/', $f, $m)) {
             continue;
         }
-        // solo quelle della Zone: le altre toccano tabelle che qui non ci sono
-        if (!preg_match('/zone|fieldwire/i', $f)) {
+        // Si scelgono per quello che TOCCANO, non per come si chiamano: una
+        // migrazione della Zone con un nome diverso veniva saltata in
+        // silenzio, le prove giravano senza la sua colonna, e sembrava
+        // rotto il codice. Il resto del gestionale qui non serve.
+        $sorgente = (string)file_get_contents($dir . '/' . $f);
+        if (!preg_match('/bb_zone_|bb_fw_|zone_cliente|zone_visibilita/', $sorgente)) {
             continue;
         }
         $migrazioni[$m[1]] = $dir . '/' . $f;
     }
     ksort($migrazioni);
 
+    $saltate = [];
     foreach ($migrazioni as $file) {
         $prima = get_declared_classes();
         require_once $file;
-        $nuove = array_diff(get_declared_classes(), $prima);
-        foreach ($nuove as $classe) {
+        foreach (array_diff(get_declared_classes(), $prima) as $classe) {
             if (!is_subclass_of($classe, \Phinx\Migration\AbstractMigration::class)) {
                 continue;
             }
             $m = new $classe();
             $m->pdo = $pdo;
-            $m->up();
+            try {
+                $m->up();
+            } catch (\PDOException $e) {
+                // 42S02 = tabella che non c'e'. Qualunque altro errore e'
+                // un problema vero e deve fermare tutto.
+                if (($e->getCode() ?? '') !== '42S02') {
+                    throw $e;
+                }
+                $saltate[] = basename($file);
+            }
         }
+    }
+
+    // Si stampano: una migrazione della Zone finita qui dentro vuol dire
+    // che manca una tabella vecchia da aggiungere qui sopra.
+    if ($saltate && getenv('ZONE_TEST_VERBOSE')) {
+        fwrite(STDERR, "Migrazioni saltate (tabelle fuori dalla Zone): "
+            . implode(', ', $saltate) . "\n");
     }
 }

@@ -65,7 +65,14 @@ final class Segnalazioni
                    TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))) AS presa_da_nome,
                    (SELECT COUNT(*) FROM bb_zone_messaggi m
                      WHERE m.segnalazione_id = s.id AND m.foto IS NOT NULL AND m.eliminato_at IS NULL) AS foto,
-                   (SELECT MAX(m.id) FROM bb_zone_messaggi m WHERE m.segnalazione_id = s.id) AS ultimo_msg
+                   (SELECT MAX(m.id) FROM bb_zone_messaggi m WHERE m.segnalazione_id = s.id) AS ultimo_msg,
+                   -- lo spillo sul disegno, se e' stata segnata li'. Una
+                   -- segnalazione con un posto si apre dal punto, e chi
+                   -- legge non deve indovinare in che campata siamo.
+                   (SELECT a.document_id FROM bb_zone_annotations a
+                     WHERE a.segnalazione_id = s.id ORDER BY a.id DESC LIMIT 1) AS disegno_id,
+                   (SELECT a.page FROM bb_zone_annotations a
+                     WHERE a.segnalazione_id = s.id ORDER BY a.id DESC LIMIT 1) AS disegno_pagina
             FROM   bb_zone_segnalazioni s
             JOIN   bb_users u ON u.id = s.created_by
             LEFT JOIN bb_users p ON p.id = s.presa_da
@@ -301,6 +308,10 @@ final class Segnalazioni
         $s['presa_da']  = $s['presa_da'] !== null ? (int)$s['presa_da'] : null;
         $s['task_id']   = $s['task_id'] !== null ? (int)$s['task_id'] : null;
         $s['presa_da_nome'] = trim((string)$s['presa_da_nome']) ?: null;
+        $s['disegno_id'] = isset($s['disegno_id']) && $s['disegno_id'] !== null
+            ? (int)$s['disegno_id'] : null;
+        $s['disegno_pagina'] = isset($s['disegno_pagina']) && $s['disegno_pagina'] !== null
+            ? (int)$s['disegno_pagina'] : null;
         unset($s['ultimo_msg']);
         return $s;
     }

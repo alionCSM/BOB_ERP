@@ -482,6 +482,7 @@
                 <label>Tipo</label>
                 <select data-el="pinmode">
                     <option value="new">Crea nuovo task qui</option>
+                    <option value="segn">Segnala un problema qui</option>
                     <option value="link">Collega task esistente</option>
                     <option value="note">Solo nota (no task)</option>
                 </select>
@@ -489,6 +490,28 @@
             <div data-el="pin-new">
                 <div class="bza-field"><label>Nome task</label><input data-el="pin-name" placeholder="Es. Montare staffa"></div>
                 <div class="bza-field"><label>Assegnato a (opzionale)</label><input data-el="pin-assignee" placeholder="Nome"></div>
+            </div>
+            <div data-el="pin-segn" style="display:none;">
+                <div class="bza-field"><label>Cosa non va</label>
+                    <textarea data-el="segn-testo" rows="3" placeholder="Es. qui manca un tirante"></textarea>
+                </div>
+                <div class="bza-field"><label>Tipo</label>
+                    <select data-el="segn-tipo">
+                        <option value="sicurezza">Sicurezza</option>
+                        <option value="materiale">Materiale</option>
+                        <option value="danno">Danno</option>
+                        <option value="ritardo">Ritardo</option>
+                        <option value="qualita">Qualit&agrave;</option>
+                        <option value="altro" selected>Altro</option>
+                    </select>
+                </div>
+                <div class="bza-field"><label>Gravità</label>
+                    <select data-el="segn-gravita">
+                        <option value="bassa">Bassa</option>
+                        <option value="alta">Alta</option>
+                        <option value="blocca">Blocca il lavoro</option>
+                    </select>
+                </div>
             </div>
             <div data-el="pin-link" style="display:none;">
                 <div class="bza-field"><label>Task esistente</label>
@@ -502,13 +525,13 @@
                 <button class="bza-btn bza-btn-primary" data-el="pin-save">Salva pin</button>
                 <button class="bza-btn bza-btn-ghost" data-el="pin-cancel">Annulla</button>
             </div>
-            <div class="bza-hint">Il pin verrà posizionato dove hai cliccato. I task creati appaiono nel Kanban.</div>
+            <div class="bza-hint">Il pin resta dove hai cliccato. I task finiscono nel Kanban, le segnalazioni nella loro lista — e da lì si torna qui.</div>
         `;
         const mode = dom.side.querySelector('[data-el="pinmode"]');
         const refresh = () => {
-            dom.side.querySelector('[data-el="pin-new"]').style.display  = mode.value === 'new'  ? 'block' : 'none';
-            dom.side.querySelector('[data-el="pin-link"]').style.display = mode.value === 'link' ? 'block' : 'none';
-            dom.side.querySelector('[data-el="pin-note"]').style.display = mode.value === 'note' ? 'block' : 'none';
+            ['new', 'segn', 'link', 'note'].forEach(v => {
+                dom.side.querySelector(`[data-el="pin-${v}"]`).style.display = mode.value === v ? 'block' : 'none';
+            });
         };
         mode.addEventListener('change', refresh); refresh();
         dom.side.querySelector('[data-el="pin-cancel"]').addEventListener('click', () => dom.side.classList.remove('open'));
@@ -519,6 +542,14 @@
                 payload.task_name = dom.side.querySelector('[data-el="pin-name"]').value.trim();
                 payload.assignee_name = dom.side.querySelector('[data-el="pin-assignee"]').value.trim() || null;
                 if (!payload.task_name) { alert('Inserisci il nome del task'); return; }
+            } else if (mode.value === 'segn') {
+                payload.create_segnalazione = true;
+                payload.segnalazione_testo   = dom.side.querySelector('[data-el="segn-testo"]').value.trim();
+                payload.segnalazione_tipo    = dom.side.querySelector('[data-el="segn-tipo"]').value;
+                payload.segnalazione_gravita = dom.side.querySelector('[data-el="segn-gravita"]').value;
+                if (!payload.segnalazione_testo) { alert('Scrivi qual è il problema'); return; }
+                // le segnalazioni che bloccano si vedono da lontano
+                payload.color = payload.segnalazione_gravita === 'blocca' ? '#ef4444' : '#f59e0b';
             } else if (mode.value === 'link') {
                 payload.task_id = parseInt(dom.side.querySelector('[data-el="pin-task"]').value);
             } else {
@@ -534,7 +565,19 @@
         if (!a) return;
         dom.side.classList.add('open');
         let info = '';
-        if (a.type === 'pin' && a.task_id) {
+        if (a.type === 'pin' && a.segnalazione_id) {
+            const grav = { bassa: 'Bassa', alta: 'Alta', blocca: 'Blocca il lavoro' };
+            const stat = { aperta: 'Aperta', presa: 'Presa in carico', risolta: 'Risolta' };
+            info = `<div class="bza-field"><label>Segnalazione</label>
+                <div style="color:#e2e8f0;font-size:13px;">${escapeHtml(a.segn_testo || '—')}</div>
+                <div style="color:#64748b;font-size:12px;">
+                    ${escapeHtml(stat[a.segn_stato] || a.segn_stato || '—')}
+                    · ${escapeHtml(grav[a.segn_gravita] || a.segn_gravita || '')}
+                </div>
+                <a href="#segnalazione-${a.segnalazione_id}" class="bza-btn bza-btn-ghost"
+                   style="margin-top:8px;display:inline-block;">Apri la segnalazione</a>
+            </div>`;
+        } else if (a.type === 'pin' && a.task_id) {
             info = `<div class="bza-field"><label>Task collegato</label>
                 <div style="color:#e2e8f0;font-size:13px;">${escapeHtml(a.task_name||'—')}</div>
                 <div style="color:#64748b;font-size:12px;">Stato: ${escapeHtml(a.task_status||'—')}${a.task_assignee?' · '+escapeHtml(a.task_assignee):''}</div></div>`;

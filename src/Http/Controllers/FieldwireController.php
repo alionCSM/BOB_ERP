@@ -1576,7 +1576,14 @@ final class FieldwireController
         });
     }
 
-    /** Crea o aggiorna un'annotazione. Se type=pin con create_task, crea anche il task. */
+    /**
+     * Crea o aggiorna un'annotazione.
+     *
+     * Un pin puo' portarsi dietro un'attivita' (`create_task`) o una
+     * segnalazione (`create_segnalazione`): "manca un tirante" non dice
+     * niente finche' non si sa dove, e il punto sul disegno lo si indica
+     * una volta invece di descriverlo in dieci messaggi.
+     */
     public function saveAnnotation(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
@@ -1592,6 +1599,30 @@ final class FieldwireController
             if (empty($body['geom'])) throw new \RuntimeException('Geometria mancante');
 
             $taskId = !empty($body['task_id']) ? (int)$body['task_id'] : null;
+            $segnId = !empty($body['segnalazione_id']) ? (int)$body['segnalazione_id'] : null;
+
+            // Una segnalazione aperta da qui: la scrive il servizio delle
+            // segnalazioni, non questo metodo. Li' dentro ci sono la
+            // visibilita' per ruolo e l'avviso a chi la deve prendere in
+            // mano, e riscriverli qui vorrebbe dire scordarsene uno.
+            if ($type === 'pin' && !empty($body['create_segnalazione']) && !$segnId) {
+                $segn = new \App\Service\Zone\Segnalazioni(
+                    $this->conn,
+                    new \App\Service\Zone\Messaggi($this->conn)
+                );
+                $segnId = $segn->crea(
+                    $worksiteId,
+                    (string)$this->ruoloQui($request),
+                    (int)($user?->id ?? 0),
+                    [
+                        'testo'      => (string)($body['segnalazione_testo'] ?? $body['text'] ?? ''),
+                        'tipo'       => $body['segnalazione_tipo'] ?? null,
+                        'gravita'    => $body['segnalazione_gravita'] ?? null,
+                        'visibilita' => $body['segnalazione_visibilita'] ?? null,
+                    ]
+                );
+                $this->avvisaSegnalazione($segnId);
+            }
 
             // pin che deve creare un task nuovo "qui"
             if ($type === 'pin' && !empty($body['create_task']) && !$taskId) {
@@ -1611,7 +1642,8 @@ final class FieldwireController
                 'page'        => (int)($body['page'] ?? 1),
                 'type'        => $type,
                 'geom'        => $body['geom'],
-                'task_id'     => $taskId,
+                'task_id'         => $taskId,
+                'segnalazione_id' => $segnId,
                 'text'        => $body['text'] ?? null,
                 'color'       => $body['color'] ?? '#ef4444',
                 'created_by'  => (int)($user?->id ?? 0),
@@ -2208,6 +2240,26 @@ final class FieldwireController
             $this->avvisa(fn($a) => $a->modulo($id, (int)($request->user()->id ?? 0)));
             return ['id' => $id];
         });
+    }
+
+    /**
+     * Avvisa di una segnalazione appena aperta.
+     *
+     * Passa dal servizio delle segnalazioni, che e' l'unico posto dove sta
+     * scritto chi la deve ricevere: ufficio e capi, e il ripiego quando a
+     * quel cantiere non e' attaccato nessuno dell'ufficio.
+     */
+    private function avvisaSegnalazione(int $segnalazioneId): void
+    {
+        try {
+            $notifiche = new \App\Service\Notifications\NotificationService($this->conn, $this->config);
+            (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
+                ->avvisaNuova($notifiche, $segnalazioneId);
+        } catch (\Throwable $e) {
+            // la segnalazione e' salvata: se l'avviso non parte non si
+            // perde, si vede aprendo il cantiere
+            error_log('[Zone avviso segnalazione] ' . $e->getMessage());
+        }
     }
 
     /** Toglie un "da compilare". Le compilazioni gia' fatte restano. */
