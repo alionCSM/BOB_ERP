@@ -41,14 +41,37 @@
                     () => mostraLegameExtra(extraIdField.value));
             }
 
+            // I valori con cui il modale nasce: li ha scritti il server
+            // (descrizione gia' composta, quanto resta da fatturare, MONT,
+            // IVA 22%). Si fotografano adesso, prima che qualcuno apra una
+            // riga in modifica e li sovrascriva.
+            const vuoto = {
+                data:        document.getElementById('billing-data').value,
+                articolo:    ordineSelect.getValue(),
+                descrizione: document.getElementById('billing-descrizione').value,
+                totale:      document.getElementById('billing-totale').value,
+                iva:         ivaSelect.getValue(),
+            };
+
             // --- Handle “Aggiungi Fattura” ---
             document.querySelector('[data-tw-target="#billing-modal"]').addEventListener('click', function(){
-                // reset modal for new entry
-                document.getElementById('billing-id').value = '';
-                document.getElementById('billing-extra-id').value = '';
+                // Si rimette tutto com'era all'apertura della pagina.
+                //
+                // Prima si azzerava solo l'id nascosto: aprire "Aggiungi"
+                // dopo aver modificato una riga lasciava dentro data,
+                // articolo, descrizione e importo di quella riga. L'id
+                // vuoto faceva il resto — nasceva una fattura nuova con i
+                // dati di un'altra, e sembrava giusta.
+                document.getElementById('billing-id').value          = '';
+                document.getElementById('billing-extra-id').value    = '';
+                document.getElementById('billing-data').value        = vuoto.data;
+                document.getElementById('billing-descrizione').value = vuoto.descrizione;
+                document.getElementById('billing-totale').value      = vuoto.totale;
+                ordineSelect.setValue(vuoto.articolo);
+                ivaSelect.setValue(vuoto.iva);
+
                 document.getElementById('billing-modal-title').textContent = 'Aggiungi Fattura';
                 mostraLegameExtra(0);
-                // keep default totale from PHP
             });
 
             // --- Handle “Modifica” buttons ---
