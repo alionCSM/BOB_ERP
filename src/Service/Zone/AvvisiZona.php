@@ -46,6 +46,11 @@ final class AvvisiZona
             'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
             'capi'    => [Accesso::CAPO],
             'cliente' => [Accesso::CLIENTE],
+            // "all'ufficio" prima non avvisava nessuno: l'ufficio non era un
+            // ruolo nell'elenco, era chiunque avesse il modulo, e non si
+            // sapeva a chi mandarla. Adesso sono le persone dell'ufficio
+            // messe su questo cantiere.
+            'ufficio' => [Accesso::UFFICIO],
             default   => [],
         };
         $persone = $this->persone((int)$t['worksite_id'], $ruoli, (int)($t['assignee_user_id'] ?? 0) ?: null);

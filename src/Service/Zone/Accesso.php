@@ -17,8 +17,15 @@ use PDO;
  * Due domande diverse:
  *
  * 1. **Che ruolo ha questa persona su questo cantiere?**
- *    ufficio (modulo `zone` in BOB: vede e fa tutto ovunque), capo,
- *    operaio, cliente. L'accesso lo da' l'ufficio, a mano, da "Chi accede".
+ *    ufficio, capo, operaio, cliente. L'accesso si da' a mano, da "Chi
+ *    accede", **a tutti e quattro**: anche chi sta in ufficio entra in un
+ *    cantiere solo se qualcuno ce lo mette.
+ *
+ *    Il modulo `zone` di BOB e' un'altra cosa: dice chi puo' DARE gli
+ *    accessi ({@see gestisce()}), non chi li ha. Prima faceva le due cose
+ *    insieme, e il risultato era che tutti quelli col modulo si
+ *    ritrovavano dentro ogni cantiere, con le notifiche di ogni cantiere.
+ *
  *    Il cliente conta solo se sul cantiere e' acceso "Condividi col
  *    cliente": senza, anche assegnato non vede niente.
  *
@@ -104,7 +111,9 @@ final class Accesso
         if (!$utente) {
             return null;
         }
-        if ($this->daUfficio($utente)) {
+        // Il superadmin resta dentro ovunque: e' l'unico modo di non
+        // chiudersi fuori da un cantiere in cui non c'e' rimasto nessuno.
+        if ((int)$utente->id === 1) {
             return self::UFFICIO;
         }
 
@@ -130,8 +139,30 @@ final class Accesso
         return $this->cache[$chiave] = $ruolo;
     }
 
-    /** Uno dell'ufficio, con il modulo Zone di BOB? */
-    public function daUfficio(?object $utente): bool
+    /**
+     * Dell'ufficio **su questo cantiere**.
+     *
+     * Prima bastava avere il modulo `zone` e valeva dappertutto. Adesso
+     * bisogna essere nell'elenco di quel cantiere col ruolo ufficio: in
+     * ufficio il modulo ce l'hanno in otto, ma non tutti e otto seguono
+     * tutti i cantieri, e soprattutto non tutti e otto vogliono le
+     * notifiche di tutti i cantieri.
+     */
+    public function daUfficio(?object $utente, int $worksiteId): bool
+    {
+        return $this->ruolo($utente, $worksiteId) === self::UFFICIO;
+    }
+
+    /**
+     * Chi puo' DARE gli accessi: il modulo `zone` di BOB.
+     *
+     * Non apre niente da solo. Chi ce l'ha e non e' nell'elenco di un
+     * cantiere, di quella Zone vede soltanto "Chi accede" — abbastanza per
+     * aggiungersi o aggiungere qualcuno, niente di piu'. Serve a non
+     * chiudere fuori nessuno: senza, un cantiere in cui per sbaglio non
+     * resta nessuno dell'ufficio non lo riaprirebbe piu' nessuno.
+     */
+    public function gestisce(?object $utente): bool
     {
         return $utente !== null
             && ((int)$utente->id === 1 || (bool)$utente->canAccess('zone'));
@@ -175,6 +206,7 @@ final class Accesso
         }
         return self::SEZIONI[$ruolo][$famiglia] ?? self::NIENTE;
     }
+
 
     public function vede(?object $utente, int $worksiteId, string $famiglia): bool
     {

@@ -194,7 +194,9 @@ final class ScadenzeModuli
     private function chiDeve(array $a): array
     {
         $ruolo = $a['a_ruolo'] ?? null;
-        if (empty($a['a_user_id']) && ($ruolo === null || $ruolo === 'ufficio')) {
+        // 'ufficio' non era un ruolo dell'elenco e non si sapeva a chi
+        // mandarlo: adesso sono le persone dell'ufficio di questo cantiere.
+        if (empty($a['a_user_id']) && $ruolo === null) {
             return [];
         }
         $st = $this->conn->prepare("

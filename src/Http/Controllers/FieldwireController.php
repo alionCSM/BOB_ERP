@@ -124,17 +124,17 @@ final class FieldwireController
         // Decidere chi entra e' dell'ufficio per definizione: un capo
         // squadra che puo' assegnare se stesso non e' un permesso, e'
         // una formalita'.
-        'accessi'               => 'ufficio',
+        'accessi'               => 'gestione',
         // chi vede cosa e chi compila cosa lo decide l'ufficio
-        'condividiCliente'      => 'ufficio',
+        'condividiCliente'      => 'gestione',
         'condivisione'          => 'ufficio',
         'flagMessaggio'         => 'ufficio',
         'salvaCondivisione'     => 'ufficio',
         'assegnazioniModuli'    => ['moduli', 1],
         'salvaAssegnazione'     => 'ufficio',
         'disattivaAssegnazione' => 'ufficio',
-        'salvaAccesso'          => 'ufficio',
-        'eliminaAccesso'        => 'ufficio',
+        'salvaAccesso'          => 'gestione',
+        'eliminaAccesso'        => 'gestione',
     ];
 
     public function __construct(
@@ -167,15 +167,39 @@ final class FieldwireController
 
         $utente = $request->user();
 
+        $w = (int)($request->param('id') ?? 0);
+
+        // Dare gli accessi: basta il modulo Zone di BOB, e vale su qualsiasi
+        // cantiere. E' la porta di servizio che impedisce di chiudersi
+        // fuori: un cantiere dove non e' rimasto dentro nessuno dell'ufficio
+        // si riapre da qui, aggiungendosi.
+        if ($regola === 'gestione') {
+            if (!$this->accesso->gestisce($utente)) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Serve il permesso Zone di BOB per decidere chi accede',
+                ], 403);
+            }
+            $this->guardiaPassata = true;
+            return;
+        }
+
         if ($regola === 'ufficio' || $regola === 'pagina') {
-            $daUfficio = $this->accesso->daUfficio($utente);
+            // "Dell'ufficio" adesso vuol dire su QUESTO cantiere: il modulo
+            // da solo non apre piu' niente.
+            $daUfficio = $this->accesso->daUfficio($utente, $w);
 
             if ($regola === 'pagina') {
                 // Chi arriva qui sta navigando col browser: senza accesso
                 // merita un rimando alla dashboard, non un blocco di JSON
                 // in faccia, che sembra un guasto.
-                $w = (int)($request->param('id') ?? 0);
-                if (!$daUfficio && !$this->accesso->qualcosa($utente, $w)) {
+                //
+                // Chi ha il modulo entra lo stesso, ma la pagina gli mostra
+                // solo "Chi accede" (vedi $soloAccessi): deve poter
+                // aggiungere qualcuno, non leggere il cantiere.
+                if (!$daUfficio
+                    && !$this->accesso->qualcosa($utente, $w)
+                    && !$this->accesso->gestisce($utente)) {
                     Response::redirect('/dashboard?no_permission=1');
                 }
                 $this->guardiaPassata = true;
@@ -185,7 +209,7 @@ final class FieldwireController
             if (!$daUfficio) {
                 Response::json([
                     'success' => false,
-                    'message' => 'Serve il permesso Zone di BOB per questa operazione',
+                    'message' => "Non sei fra chi accede a questo cantiere",
                 ], 403);
             }
             $this->guardiaPassata = true;
@@ -193,7 +217,7 @@ final class FieldwireController
         }
 
         [$famiglia, $minimo] = $regola;
-        $this->accesso->pretende($utente, (int)($request->param('id') ?? 0), $famiglia, $minimo);
+        $this->accesso->pretende($utente, $w, $famiglia, $minimo);
 
         $this->guardiaPassata = true;
     }
@@ -220,7 +244,7 @@ final class FieldwireController
         string $campoCreatore = 'created_by'
     ): callable {
         $utente  = $request->user();
-        $ufficio = $this->accesso->daUfficio($utente);
+        $ufficio = $this->accesso->daUfficio($utente, (int)($request->param('id') ?? 0));
         $io      = (int)($utente->id ?? 0);
         $visti   = $io > 0 ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
 
@@ -248,7 +272,7 @@ final class FieldwireController
      */
     private function conChiSuRighe(Request $request, string $tipo, array $righe, string $campoId = 'id'): array
     {
-        if (!$righe || !$this->accesso->daUfficio($request->user())) {
+        if (!$righe || !$this->accesso->daUfficio($request->user(), (int)($request->param('id') ?? 0))) {
             return $righe;
         }
 
@@ -310,7 +334,12 @@ final class FieldwireController
             // le sezioni che questa persona puo' vedere: nascondere una
             // scheda che risponderebbe 403 e' meglio che farcela sbattere
             'accessi'              => $this->accesso->tutti($request->user(), $worksiteId),
-            'daUfficio'            => $this->accesso->daUfficio($request->user()),
+            'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
+            // chi ha il modulo ma non e' dentro: della Zone vede solo
+            // "Chi accede", per aggiungersi o aggiungere qualcuno
+            'soloAccessi'          => !$this->accesso->qualcosa($request->user(), $worksiteId)
+                                      && $this->accesso->gestisce($request->user()),
+            'puoGestire'           => $this->accesso->gestisce($request->user()),
         ]);
     }
 
@@ -1225,16 +1254,26 @@ final class FieldwireController
 
         $this->jsonResponse(function () {
             $stmt = $this->conn->query("
-                SELECT id, username,
-                       TRIM(CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,''))) AS full_name
-                FROM bb_users
-                WHERE active = 'Y'
-                ORDER BY username ASC
+                SELECT u.id, u.username,
+                       TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
+                       EXISTS (
+                           SELECT 1 FROM bb_user_permissions p
+                           WHERE  p.user_id = u.id AND p.module = 'zone' AND p.allowed = 1
+                           UNION
+                           SELECT 1 FROM bb_user_company_permissions pc
+                           WHERE  pc.user_id = u.id AND pc.module = 'zone' AND pc.allowed = 1
+                       ) AS ha_modulo_zone
+                FROM bb_users u
+                WHERE u.active = 'Y'
+                ORDER BY u.username ASC
             ");
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            // ha_modulo_zone serve al pannello per aggiungerlo come ufficio
+            // invece che come operaio, e per proporgli quel ruolo
             return array_map(fn($r) => [
-                'id'    => (int)$r['id'],
-                'label' => $r['full_name'] !== '' ? $r['full_name'] : $r['username'],
+                'id'             => (int)$r['id'],
+                'label'          => $r['full_name'] !== '' ? $r['full_name'] : $r['username'],
+                'ha_modulo_zone' => (bool)$r['ha_modulo_zone'],
             ], $rows);
         });
     }

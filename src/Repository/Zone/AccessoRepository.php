@@ -54,6 +54,15 @@ final class AccessoRepository
                    -- chi era assegnato da prima ha il ruolo che gli darebbe
                    -- l'assegnazione di oggi: cliente se e' un cliente
                    COALESCE(a.ruolo, IF(u.type = 'client', 'cliente', 'operaio')) AS ruolo,
+                   -- il modulo Zone di BOB: serve a proporgli il ruolo
+                   -- Ufficio invece di farlo entrare come operaio
+                   EXISTS (
+                       SELECT 1 FROM bb_user_permissions p
+                       WHERE  p.user_id = u.id AND p.module = 'zone' AND p.allowed = 1
+                       UNION
+                       SELECT 1 FROM bb_user_company_permissions pc
+                       WHERE  pc.user_id = u.id AND pc.module = 'zone' AND pc.allowed = 1
+                   ) AS ha_modulo_zone,
                    a.id IS NOT NULL AS ha_livelli
             FROM   bb_worksite_users wu
             JOIN   bb_users u ON u.id = wu.user_id
@@ -70,8 +79,9 @@ final class AccessoRepository
             foreach (array_keys(Accesso::FAMIGLIE) as $f) {
                 $r[$f] = (int)($r[$f] ?? 0);
             }
-            $r['user_id']    = (int)$r['user_id'];
-            $r['ha_livelli'] = (bool)$r['ha_livelli'];
+            $r['user_id']        = (int)$r['user_id'];
+            $r['ha_livelli']     = (bool)$r['ha_livelli'];
+            $r['ha_modulo_zone'] = (bool)$r['ha_modulo_zone'];
             $r['nome']       = $r['nome'] !== '' ? $r['nome'] : $r['username'];
             return $r;
         }, $stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -176,7 +186,7 @@ final class AccessoRepository
         if ((string)$stmt->fetchColumn() === 'client') {
             return Accesso::CLIENTE;
         }
-        if (in_array($ruolo, [Accesso::CAPO, Accesso::OPERAIO], true)) {
+        if (in_array($ruolo, [Accesso::CAPO, Accesso::OPERAIO, Accesso::UFFICIO], true)) {
             return $ruolo;
         }
         // Nessun ruolo chiesto (la pagina vecchia manda solo i livelli): si
@@ -185,7 +195,9 @@ final class AccessoRepository
         $c = $this->conn->prepare('SELECT ruolo FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
         $c->execute([':w' => $worksiteId, ':u' => $userId]);
         $attuale = (string)$c->fetchColumn();
-        return in_array($attuale, [Accesso::CAPO, Accesso::OPERAIO], true) ? $attuale : Accesso::OPERAIO;
+        return in_array($attuale, [Accesso::CAPO, Accesso::OPERAIO, Accesso::UFFICIO], true)
+            ? $attuale
+            : Accesso::OPERAIO;
     }
 
     /**

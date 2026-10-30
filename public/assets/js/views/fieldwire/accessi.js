@@ -24,10 +24,12 @@
     const elenco  = document.getElementById('acc-elenco');
 
     const RUOLI = {
+        ufficio: 'Ufficio',
         capo:    'Capo squadra',
         operaio: 'Operaio',
     };
     const SPIEGA = {
+        ufficio: 'vede tutto il cantiere, decide chi vede cosa, riceve i suoi avvisi',
         capo:    'crea e assegna attivita\' alla squadra, carica file e foto, compila i moduli',
         operaio: 'vede le cose della squadra, lavora sulle sue attivita\', compila i suoi moduli',
         cliente: 'vede solo quello che l\'ufficio condivide col cliente',
@@ -97,7 +99,12 @@
         } else {
             const sel = document.createElement('select');
             sel.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:12px;color:#1e293b;';
-            Object.keys(RUOLI).forEach(function (r) {
+            // "Ufficio" si propone solo a chi ha il modulo Zone di BOB: a un
+            // operaio non si puo' dare, e vederlo in tendina fa solo pensare
+            // che si possa.
+            Object.keys(RUOLI).filter(function (r) {
+                return r !== 'ufficio' || p.ha_modulo_zone;
+            }).forEach(function (r) {
                 const o = document.createElement('option');
                 o.value = r;
                 o.textContent = RUOLI[r];
@@ -136,7 +143,7 @@
                 const persone = d.persone || [];
                 if (!persone.length) {
                     elenco.innerHTML = '<p style="font-size:12.5px;color:#94a3b8;padding:18px 0;text-align:center;">' +
-                        'Nessuno assegnato. Chi ha il modulo Zone in BOB entra lo stesso.</p>';
+                        'Nessuno accede a questo cantiere. Nemmeno l\'ufficio: va aggiunto anche lui.</p>';
                 } else {
                     persone.forEach(function (p) { elenco.appendChild(riga(p)); });
                 }
@@ -157,16 +164,23 @@
                     const o = document.createElement('option');
                     o.value = u.id;
                     o.textContent = u.label;
+                    if (u.ha_modulo_zone) o.dataset.zone = '1';
                     tendina.appendChild(o);
                 });
             });
     }
 
-    // Si entra come operaio; capo si sceglie. Un account cliente diventa
-    // cliente da solo, qualunque cosa si mandi.
+    // Si entra come operaio, o come ufficio se si ha il modulo Zone —
+    // chi ha quel modulo quasi sempre lo si aggiunge per quello, e
+    // correggerlo dopo e' un clic in piu' ogni volta. Capo si sceglie. Un
+    // account cliente diventa cliente da solo, qualunque cosa si mandi.
     tendina.addEventListener('change', function () {
         if (!tendina.value) return;
-        post(base(), { user_id: tendina.value, ruolo: 'operaio' }).then(carica);
+        const opz = tendina.options[tendina.selectedIndex];
+        post(base(), {
+            user_id: tendina.value,
+            ruolo:   opz && opz.dataset.zone === '1' ? 'ufficio' : 'operaio',
+        }).then(carica);
     });
 
     apri.addEventListener('click', function () {

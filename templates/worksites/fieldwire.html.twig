@@ -328,14 +328,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
                 {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
                 {# chat e segnalazioni: chiunque entri nel cantiere; cosa legge lo decide il server #}
+                {% if not soloAccessi %}
                 <button class="bz-nav-item" data-view="segnalazioni"><i class="fas fa-triangle-exclamation"></i><span>Segnalazioni</span><span class="bzd-badge" id="bzd-badge-segn" hidden></span></button>
                 <button class="bz-nav-item" data-view="chat"><i class="fas fa-comments"></i><span>Chat</span><span class="bzd-badge" id="bzd-badge-chat" hidden></span></button>
+                {% endif %}
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
                 {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>{% endif %}
                 {% if accessi.report   > 0 %}<a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>{% endif %}
-                {% if daUfficio %}<button class="bz-nav-item" id="btn-accessi"><i class="fas fa-user-shield"></i><span>Chi accede</span></button>{% endif %}
+                {% if puoGestire %}<button class="bz-nav-item" id="btn-accessi"><i class="fas fa-user-shield"></i><span>Chi accede</span></button>{% endif %}
             </div>
 
             {# ── Info cantiere ── #}
@@ -369,7 +371,25 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </aside>
 
     {# ── Body ── #}
-    <div class="bz-body">
+    <div class="bz-body{{ soloAccessi ? ' solo-accessi' : '' }}">
+
+        {# Chi ha il modulo Zone ma non e' nell'elenco di questo cantiere:
+           della Zone vede solo questo. Il modulo dice chi puo' DARE gli
+           accessi, non chi li ha — se no basta averlo per leggere i
+           cantieri di tutti e per ricevere gli avvisi di tutti. #}
+        {% if soloAccessi %}
+        <div class="bz-fuori">
+            <i class="fas fa-user-lock"></i>
+            <h2>Non sei fra chi accede a questo cantiere</h2>
+            <p>
+                Il permesso Zone ti lascia decidere <strong>chi accede</strong> a un
+                cantiere, qui come altrove. Per vedere attività, disegni, file e chat
+                di <strong>questo</strong> cantiere — e per riceverne gli avvisi —
+                devi essere nel suo elenco.
+            </p>
+            <p class="bz-fuori-come">Aggiungiti da “Chi accede”, qui a sinistra.</p>
+        </div>
+        {% endif %}
 
         {# ── Attività (Kanban / Gantt / Calendario) ── #}
         <div class="bz-view active" id="view-attivita">
@@ -684,7 +704,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
    Solo per l'ufficio. Chi lavora qui non deve poter cambiare i propri
    permessi: un capo squadra che si assegna da solo non e' un permesso,
    e' una formalita'. #}
-{% if daUfficio %}
+{% if puoGestire %}
 <div class="bz-overlay hidden" id="accessi-modal">
     <div class="bz-modal" style="width: 760px;">
         <h3>Chi accede a questo cantiere</h3>
@@ -732,6 +752,8 @@ const CSRF = '{{ csrfToken }}';
 // un guasto, e chi lo trova continua a premerlo.
 const ACC = {{ accessi|json_encode|raw }};
 const DA_UFFICIO = {{ daUfficio ? 'true' : 'false' }};
+// ha il modulo Zone ma non e' nell'elenco di questo cantiere
+const SOLO_ACCESSI = {{ soloAccessi ? 'true' : 'false' }};
 const puoScrivere = (sezione) => (ACC[sezione] || 0) > 1;
 const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completato', verified: 'Verificato' };
 
@@ -2213,14 +2235,29 @@ document.getElementById('bz-chi-modal').addEventListener('click', e => {
 });
 
 /* ══════════ INIT ══════════ */
-loadTasks();
-renderCalendar();
-loadBobUsers();
+// Da fuori dal cantiere non si carica niente: ogni chiamata risponderebbe
+// 403, e una pagina piena di errori sembra un guasto invece di un confine.
+if (!SOLO_ACCESSI) {
+    loadTasks();
+    renderCalendar();
+    loadBobUsers();
+}
 /* BZForms init avviene lazy alla prima apertura della vista Moduli
    (forms.js è incluso a fine pagina, dopo questo script). */
 </script>
 
 <style>
+/* Chi ha il modulo ma non e' dentro al cantiere */
+.bz-fuori { max-width:520px; margin:8vh auto 0; text-align:center; padding:0 24px; }
+.bz-fuori i { font-size:34px; color:#475569; margin-bottom:18px; display:block; }
+.bz-fuori h2 { font-size:17px; font-weight:700; color:#e2e8f0; margin:0 0 12px; }
+.bz-fuori p { font-size:13.5px; line-height:1.65; color:#94a3b8; margin:0 0 10px; }
+.bz-fuori strong { color:#cbd5e1; font-weight:600; }
+.bz-fuori-come { font-size:12.5px; color:#64748b; }
+.bz-body.solo-accessi .bz-view { display:none !important; }
+[data-theme="light"] .bz-fuori h2 { color:#1e293b; }
+[data-theme="light"] .bz-fuori strong { color:#334155; }
+
 /* Chi vede cosa */
 .bz-vis-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; margin-top:4px; }
 /* Il bottone "Chi la vede" sta in due posti con due fondi: negli elenchi
@@ -2421,9 +2458,9 @@ loadBobUsers();
   }
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
-{% if daUfficio %}<script src="/assets/js/views/fieldwire/accessi.js?v=2"></script>{% endif %}
+{% if puoGestire %}<script src="/assets/js/views/fieldwire/accessi.js?v=3"></script>{% endif %}
 <script src="/assets/js/views/fieldwire/assegnazioni.js?v=2"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
-<script src="/assets/js/views/fieldwire/dialogo.js?v=1"></script>
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=1"></script>{% endif %}
 </body>
 </html>

@@ -324,23 +324,19 @@ final class Messaggi
     }
 
     /**
-     * L'ufficio di un cantiere: chi ha il permesso Zone ed e' attaccato a
-     * quel cantiere.
+     * L'ufficio di un cantiere: chi e' nel suo elenco col ruolo ufficio.
+     *
+     * Non "chi ha il modulo Zone": quello dice chi puo' DARE gli accessi, e
+     * in ufficio ce l'hanno in otto. Entra in un cantiere solo chi ce lo
+     * mettiamo, anche se sta in ufficio.
      *
      * Qui c'era un errore che mandava un messaggio di cantiere a tutto
-     * l'ufficio. La condizione era "sta in bb_worksite_users E NON sta in
-     * bb_zone_accessi", ma le due tabelle le scrive sempre insieme lo
-     * stesso metodo (AccessoRepository::salva): chi viene aggiunto da "Chi
-     * accede" finisce in tutte e due, quindi quella condizione non lo
-     * prendeva mai. Restavano solo le assegnazioni vecchie, fatte prima che
-     * la tabella degli accessi esistesse — su un cantiere di oggi, nessuno.
-     * Trovato zero, partiva il ripiego "allora tutti quelli col permesso
-     * Zone", e un messaggio scritto in un cantiere suonava a tutto
-     * l'ufficio.
-     *
-     * Adesso: attaccato al cantiere vuol dire stare in una delle due
-     * tabelle. Il NOT IN serviva a non contare due volte chi e' anche in
-     * squadra; se ne occupa chi chiama, togliendo i doppioni per user_id.
+     * l'ufficio: la condizione cercava chi sta in bb_worksite_users e NON
+     * in bb_zone_accessi, ma le due tabelle le scrive sempre insieme lo
+     * stesso metodo, quindi non trovava mai nessuno e partiva il ripiego
+     * "allora tutti quelli col permesso Zone". Adesso non serve piu'
+     * cercare in due tabelle: l'ufficio di un cantiere e' una riga del suo
+     * elenco, come il capo e l'operaio.
      *
      * @param bool $ripiegoSuTutti se qui non c'e' nessuno dell'ufficio,
      *                             prende tutti quelli col permesso Zone.
@@ -353,33 +349,25 @@ final class Messaggi
      */
     public function ufficio(int $worksiteId, bool $ripiegoSuTutti = false): array
     {
-        $conZone = "
-            SELECT user_id FROM bb_user_company_permissions WHERE module = 'zone' AND allowed = 1
-            UNION
-            SELECT user_id FROM bb_user_permissions WHERE module = 'zone' AND allowed = 1
-        ";
-        $base = "
-            SELECT DISTINCT u.id AS user_id, u.lingua, 'ufficio' AS ruolo,
-                   TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
-            FROM   bb_users u
-            WHERE  u.active = 'Y' AND u.removed = 'N'
-              AND  u.id IN ($conZone)
-        ";
-        // due segnaposto per lo stesso cantiere: le prepared statement non
-        // sono emulate, e un nome ripetuto fa fallire la query
-        $st = $this->conn->prepare($base . "
-              AND u.id IN (
-                    SELECT user_id FROM bb_worksite_users WHERE worksite_id = :w1
-                    UNION
-                    SELECT user_id FROM bb_zone_accessi   WHERE worksite_id = :w2
-              )");
-        $st->execute([':w1' => $worksiteId, ':w2' => $worksiteId]);
-        $chi = $st->fetchAll(PDO::FETCH_ASSOC);
+        $chi = $this->personeRuoli($worksiteId, [Accesso::UFFICIO]);
 
         if (!$chi && $ripiegoSuTutti) {
-            $chi = $this->conn->query($base)->fetchAll(PDO::FETCH_ASSOC);
+            // Il permesso vive in due tabelle, per societa' e per utente:
+            // vanno guardate tutte e due.
+            $chi = $this->conn->query("
+                SELECT DISTINCT u.id AS user_id, u.lingua, 'ufficio' AS ruolo,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
+                FROM   bb_users u
+                WHERE  u.active = 'Y' AND u.removed = 'N'
+                  AND  u.id IN (
+                        SELECT user_id FROM bb_user_company_permissions WHERE module = 'zone' AND allowed = 1
+                        UNION
+                        SELECT user_id FROM bb_user_permissions         WHERE module = 'zone' AND allowed = 1
+                  )
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            $chi = array_map(fn($p) => ['user_id' => (int)$p['user_id']] + $p, $chi);
         }
-        return array_map(fn($p) => ['user_id' => (int)$p['user_id']] + $p, $chi);
+        return $chi;
     }
 
     // ── Interni ─────────────────────────────────────────────────────────────

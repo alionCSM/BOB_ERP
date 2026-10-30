@@ -85,7 +85,9 @@ final class Condivisione
         if (!$utente) {
             return false;
         }
-        if ($this->accesso->daUfficio($utente)) {
+        // L'ufficio di QUESTO cantiere, non chiunque abbia il modulo: il
+        // modulo dice chi puo' dare gli accessi, non chi li ha.
+        if ($this->accesso->daUfficio($utente, $worksiteId)) {
             return true;
         }
         $io = (int)$utente->id;
@@ -159,6 +161,9 @@ final class Condivisione
         ");
         $stmt->execute([':w' => $worksiteId]);
 
+        // Niente gruppo "Ufficio": chi e' nell'elenco come ufficio vede
+        // gia' tutto il cantiere, e spuntarlo non aggiungerebbe niente —
+        // darebbe solo l'impressione che togliendolo smetta di vedere.
         $titoli = [
             Accesso::CAPO    => 'Capi squadra',
             Accesso::OPERAIO => 'Operai',
@@ -272,7 +277,10 @@ final class Condivisione
      */
     private function idAmmessi(int $worksiteId, array $ruoli = []): array
     {
-        $sql = 'SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w';
+        // Fuori l'ufficio: vede tutto per conto suo, e una riga di
+        // condivisione in piu' falserebbe il conteggio che l'ufficio legge
+        // sul bottone ("3 persone" deve voler dire tre oltre a noi).
+        $sql = "SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w AND ruolo <> 'ufficio'";
         $parametri = [':w' => $worksiteId];
 
         if ($ruoli) {

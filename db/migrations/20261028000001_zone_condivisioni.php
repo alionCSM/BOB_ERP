@@ -89,7 +89,10 @@ final class ZoneCondivisioni extends AbstractMigration
                 SELECT '{$tipo}', o.id, a.user_id
                 FROM   {$tabella} o
                 JOIN   bb_zone_accessi a ON a.worksite_id = o.worksite_id
-                WHERE  o.`{$colonna}` IS NOT NULL
+                -- l'ufficio fuori: vede tutto per conto suo, e una riga qui
+                -- falserebbe il conteggio che l'ufficio legge sul bottone
+                WHERE  a.ruolo <> 'ufficio'
+                  AND  o.`{$colonna}` IS NOT NULL
                   AND (
                         o.`{$colonna}` = 'tutti'
                      OR (o.`{$colonna}` = 'squadra' AND a.ruolo IN ('capo', 'operaio'))
