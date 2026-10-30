@@ -60,8 +60,7 @@ final class LeMie
             // resta solo a chi tocca
             return match ((string)($t['assegnata_a'] ?? 'squadra')) {
                 'persona' => (int)$t['assignee_user_id'] === $userId,
-                'squadra' => in_array($ruolo, [Accesso::CAPO, Accesso::OPERAIO], true),
-                'capi'    => $ruolo === Accesso::CAPO,
+                'squadra', 'capi' => $ruolo === Accesso::CANTIERE,
                 'cliente' => $ruolo === Accesso::CLIENTE,
                 default   => false,
             };

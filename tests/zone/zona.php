@@ -131,11 +131,11 @@ function semina(PDO $pdo): void
 
     // Chi accede al cantiere, coi ruoli
     $repo = new \App\Repository\Zone\AccessoRepository($pdo);
-    $repo->salva(CANTIERE, ANNA,  [], SUPER, Accesso::UFFICIO);
-    $repo->salva(CANTIERE, MARCO, [], SUPER, Accesso::CAPO);
-    $repo->salva(CANTIERE, ILIR,  [], SUPER, Accesso::OPERAIO);
-    $repo->salva(CANTIERE, NERI,  [], SUPER, Accesso::CLIENTE);
-    $repo->salva(ALTRO,    ESTRANEO, [], SUPER, Accesso::OPERAIO);
+    $repo->salva(CANTIERE, ANNA,  SUPER, Accesso::UFFICIO);
+    $repo->salva(CANTIERE, MARCO, SUPER, Accesso::CANTIERE);
+    $repo->salva(CANTIERE, ILIR,  SUPER, Accesso::CANTIERE);
+    $repo->salva(CANTIERE, NERI,  SUPER, Accesso::CLIENTE);
+    $repo->salva(ALTRO,    ESTRANEO, SUPER, Accesso::CANTIERE);
 }
 
 /** Le sei persone, pronte da passare ai servizi. */

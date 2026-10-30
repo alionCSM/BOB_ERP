@@ -43,8 +43,7 @@ final class AvvisiZona
         }
 
         $ruoli = match ((string)$t['assegnata_a']) {
-            'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
-            'capi'    => [Accesso::CAPO],
+            'squadra', 'capi', 'cantiere' => [Accesso::CANTIERE],
             'cliente' => [Accesso::CLIENTE],
             // "all'ufficio" prima non avvisava nessuno: l'ufficio non era un
             // ruolo nell'elenco, era chiunque avesse il modulo, e non si

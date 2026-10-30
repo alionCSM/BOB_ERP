@@ -445,7 +445,7 @@ final class ZoneDialogoController
                 // nel filo scrivono chi l'ha fatta e chi la gestisce: gli
                 // altri la leggono, ma non suona a ogni risposta
                 if ($p['user_id'] !== (int)$s['created_by']
-                    && !in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CAPO], true)) continue;
+                    && !in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CANTIERE], true)) continue;
                 if (!$this->messaggi->prenotaAvviso($p['user_id'], $w, $chiave)) continue;
                 $n->create(
                     $p['user_id'],

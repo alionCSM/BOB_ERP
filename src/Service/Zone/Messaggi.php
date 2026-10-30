@@ -54,7 +54,7 @@ final class Messaggi
         $conCliente = $this->clienteAcceso($worksiteId);
         $tutti = match ($ruolo) {
             Accesso::UFFICIO                => ['squadra', 'cliente', 'tutti'],
-            Accesso::CAPO, Accesso::OPERAIO => ['squadra', 'tutti'],
+            Accesso::CANTIERE               => ['squadra', 'tutti'],
             // il committente non vede la chat della squadra: li' si parla
             // di come si lavora, non di cosa si consegna
             Accesso::CLIENTE                => ['cliente', 'tutti'],
@@ -65,7 +65,7 @@ final class Messaggi
 
     public static function puoFissare(string $ruolo): bool
     {
-        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CAPO], true);
+        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CANTIERE], true);
     }
 
     // ── Leggere ─────────────────────────────────────────────────────────────
@@ -291,10 +291,10 @@ final class Messaggi
         }
 
         $ruoli = match ($canale) {
-            'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
+            'squadra' => [Accesso::CANTIERE],
             // noi e il committente, nessun altro in mezzo
             'cliente' => [Accesso::CLIENTE],
-            'tutti'   => [Accesso::CAPO, Accesso::OPERAIO, Accesso::CLIENTE],
+            'tutti'   => [Accesso::CANTIERE, Accesso::CLIENTE],
             default   => [],
         };
         // Senza togliere i doppioni, chi e' dell'ufficio ed e' anche in

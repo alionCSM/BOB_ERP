@@ -21,6 +21,7 @@ use App\Repository\Fieldwire\ZoneFileRepository;
 use App\Repository\Fieldwire\ZoneFormRepository;
 use App\Repository\Fieldwire\ZoneTaskRepository;
 use App\Repository\Worksites\WorksiteRepository;
+use App\Service\Zone\Permessi as P;
 
 /**
  * BOB Zone + integrazione Fieldwire.
@@ -47,99 +48,101 @@ final class FieldwireController
     private bool $guardiaPassata = false;
 
     /**
-     * Chi puo' chiamare cosa.
+     * Cosa serve per ogni endpoint della Zone.
      *
-     * Una mappa sola invece del controllo ripetuto in quaranta metodi: web e
-     * app passano tutti di qui, e un controllo copiato quaranta volte e' un
-     * controllo che in un punto prima o poi manca.
+     * Una riga per endpoint, e a destra l'azione: chi la puo' fare lo dice
+     * {@see \App\Service\Zone\Permessi}, in una tabella sola. Prima qui
+     * c'erano "sezione + livello" (file 1, attivita 2...) e la tabella dei
+     * livelli stava altrove: per sapere se un operaio poteva chiudere
+     * un'attivita' bisognava leggere quattro file.
      *
-     * Quello che NON e' elencato viene rifiutato. Un metodo nuovo aggiunto
-     * senza pensare ai permessi nasce chiuso e se ne accorge subito chi lo
-     * scrive; nasce aperto e se ne accorge qualcuno fuori, piu' tardi.
-     *
-     * 'ufficio' vuol dire che l'assegnazione al cantiere non basta: accendere
-     * Zone o creare il modello di un modulo sono cose da chi ha il modulo in
-     * BOB, non da chi lavora li'.
-     *
-     * @var array<string, array{0:string,1:int}|string>
+     * Tre voci non sono azioni della tabella perche' non riguardano il
+     * cantiere:
+     *   - 'pagina'   la Zone aperta col browser: rimanda alla dashboard
+     *                invece di rispondere in JSON;
+     *   - 'gestione' chi puo' DARE gli accessi, cioe' il modulo `zone` di
+     *                BOB. Vale ovunque, anche su un cantiere in cui non si
+     *                e' dentro: e' la porta di servizio che impedisce di
+     *                chiudersi fuori.
      */
     private const ACCESSI = [
         'page'                  => 'pagina',
-        'tasks'                 => ['attivita', 1],
-        'createTask'            => ['attivita', 2],
-        'updateTask'            => ['attivita', 2],
-        'updateTaskStatus'      => ['attivita', 2],
-        // cancellare e' dell'ufficio: un'attivita' sparita non lascia traccia
-        'deleteTask'            => 'ufficio',
-        'comments'              => ['attivita', 1],
-        'postComment'           => ['attivita', 2],
-        'deleteComment'         => ['attivita', 2],
-        'postPhoto'             => ['attivita', 2],
-        'checklist'             => ['attivita', 1],
-        'addChecklistItem'      => ['attivita', 2],
-        'completeChecklistItem' => ['attivita', 2],
-        'deleteChecklistItem'   => ['attivita', 2],
-        'bobUsers'              => ['attivita', 1],
 
-        'files'                 => ['file', 1],
-        'downloadFile'          => ['file', 1],
-        'fileComments'          => ['file', 1],
-        'uploadFile'            => ['file', 2],
-        'createFolder'          => ['file', 2],
-        'deleteFolder'          => 'ufficio',
-        'deleteFile'            => 'ufficio',
-        'postFileComment'       => ['file', 2],
+        // ── Guardare ────────────────────────────────────────────────────
+        'tasks'                 => P::VEDERE,
+        'comments'              => P::VEDERE,
+        'checklist'             => P::VEDERE,
+        'bobUsers'              => P::VEDERE,
+        'files'                 => P::VEDERE,
+        'downloadFile'          => P::VEDERE,
+        'fileComments'          => P::VEDERE,
+        'disegni'               => P::VEDERE,
+        'fileDisegno'           => P::VEDERE,
+        'floorplans'            => P::VEDERE,
+        'annotations'           => P::VEDERE,
+        'dwgMeta'               => P::VEDERE,
+        'dwgSvg'                => P::VEDERE,
+        'media'                 => P::VEDERE,
+        'zonePhoto'             => P::VEDERE,
+        'formTemplates'         => P::VEDERE,
+        'formTemplate'          => P::VEDERE,
+        'formSubmissions'       => P::VEDERE,
+        'formSubmission'        => P::VEDERE,
+        'formFile'              => P::VEDERE,
+        'assegnazioniModuli'    => P::VEDERE,
+        'report'                => P::VEDERE,
+        'presenze'              => P::VEDERE,
+        'presenzeGiorni'        => P::VEDERE,
 
-        'formTemplates'         => ['moduli', 1],
-        'formTemplate'          => ['moduli', 1],
-        'formSubmissions'       => ['moduli', 1],
-        'formSubmission'        => ['moduli', 1],
-        'formFile'              => ['moduli', 1],
-        'submitForm'            => ['moduli', 2],
-        // il modello del modulo lo disegna l'ufficio: chi compila in
-        // cantiere riempie quello che trova, non se lo riscrive
-        'saveFormTemplate'      => 'ufficio',
-        'deleteFormTemplate'    => 'ufficio',
+        // ── Scrivere ────────────────────────────────────────────────────
+        // commenti, foto e voci di checklist: le mani di tutti i giorni
+        'postComment'           => P::SCRIVERE,
+        'postPhoto'             => P::SCRIVERE,
+        'postFileComment'       => P::SCRIVERE,
+        'addChecklistItem'      => P::SCRIVERE,
+        // un messaggio proprio si cancella sempre: il controllo che sia
+        // proprio lo fa il metodo
+        'deleteComment'         => P::SCRIVERE,
 
-        'disegni'               => ['disegni', 1],
-        'fileDisegno'           => ['disegni', 1],
-        'floorplans'            => ['disegni', 1],
-        'annotations'           => ['disegni', 1],
-        'dwgMeta'               => ['disegni', 1],
-        'dwgSvg'                => ['disegni', 1],
-        'saveAnnotation'        => ['disegni', 2],
-        'deleteAnnotation'      => ['disegni', 2],
-        'dwgConvert'            => ['disegni', 2],
-        'pushDisegno'           => 'ufficio',
-        'setCalibration'        => 'ufficio',
+        // ── Portare avanti il lavoro ────────────────────────────────────
+        'updateTaskStatus'      => P::COMPLETARE,
+        'completeChecklistItem' => P::COMPLETARE,
+        'submitForm'            => P::COMPILARE,
+        'uploadFile'            => P::CARICARE,
+        'createFolder'          => P::CARICARE,
 
-        'media'                 => ['foto', 1],
-        'zonePhoto'             => ['foto', 1],
+        // ── Spilli sui disegni ──────────────────────────────────────────
+        'saveAnnotation'        => P::ANNOTARE,
+        'deleteAnnotation'      => P::ANNOTARE,
 
-        'report'                => ['report', 1],
+        // ── Aprire lavoro nuovo ─────────────────────────────────────────
+        'createTask'            => P::ATTIVITA,
+        'updateTask'            => P::ATTIVITA,
+        'deleteChecklistItem'   => P::ATTIVITA,
+        'dwgConvert'            => P::DISEGNI,
+        'pushDisegno'           => P::DISEGNI,
+        'setCalibration'        => P::DISEGNI,
+        'salvaAssegnazione'     => P::MODULI,
+        'disattivaAssegnazione' => P::MODULI,
+        'saveFormTemplate'      => P::MODULI,
+        'deleteFormTemplate'    => P::MODULI,
 
-        // Il registro presenze lo legge chiunque entri nel cantiere, il
-        // committente compreso: e' quello che un registro di cantiere
-        // serve a fare. Non passa dalle sezioni perche' non e' roba della
-        // Zone: sono le presenze vere di BOB, lette e basta.
-        'presenze'              => 'dentro',
-        'presenzeGiorni'        => 'dentro',
+        // ── Cancellare roba di altri ────────────────────────────────────
+        'deleteTask'            => P::CANCELLARE,
+        'deleteFolder'          => P::CANCELLARE,
+        'deleteFile'            => P::CANCELLARE,
 
-        'enable'                => 'ufficio',
-        'disable'               => 'ufficio',
+        // ── Decidere ────────────────────────────────────────────────────
+        // chi vede cosa, e com'e' collegato il cantiere: roba nostra
+        'condivisione'          => P::GESTIRE,
+        'salvaCondivisione'     => P::GESTIRE,
+        'flagMessaggio'         => P::GESTIRE,
+        'enable'                => P::GESTIRE,
+        'disable'               => P::GESTIRE,
 
-        // Decidere chi entra e' dell'ufficio per definizione: un capo
-        // squadra che puo' assegnare se stesso non e' un permesso, e'
-        // una formalita'.
+        // ── Chi accede: basta il modulo Zone di BOB ─────────────────────
         'accessi'               => 'gestione',
-        // chi vede cosa e chi compila cosa lo decide l'ufficio
         'condividiCliente'      => 'gestione',
-        'condivisione'          => 'ufficio',
-        'flagMessaggio'         => 'ufficio',
-        'salvaCondivisione'     => 'ufficio',
-        'assegnazioniModuli'    => ['moduli', 1],
-        'salvaAssegnazione'     => 'ufficio',
-        'disattivaAssegnazione' => 'ufficio',
         'salvaAccesso'          => 'gestione',
         'eliminaAccesso'        => 'gestione',
     ];
@@ -191,49 +194,30 @@ final class FieldwireController
             return;
         }
 
-        // Dentro al cantiere, con qualunque ruolo.
-        if ($regola === 'dentro') {
-            if (!$this->accesso->qualcosa($utente, $w)) {
-                \App\Service\Zone\Accesso::nega('Non hai accesso a questo cantiere');
+        if ($regola === 'pagina') {
+            // Chi arriva qui sta navigando col browser: senza accesso
+            // merita un rimando alla dashboard, non un blocco di JSON in
+            // faccia, che sembra un guasto.
+            //
+            // Chi ha il modulo entra lo stesso, ma la pagina gli mostra solo
+            // "Chi accede" (vedi $soloAccessi): deve poter aggiungere
+            // qualcuno, non leggere il cantiere.
+            if (!$this->accesso->qualcosa($utente, $w) && !$this->accesso->gestisce($utente)) {
+                Response::redirect('/dashboard?no_permission=1');
             }
             $this->guardiaPassata = true;
             return;
         }
 
-        if ($regola === 'ufficio' || $regola === 'pagina') {
-            // "Dell'ufficio" adesso vuol dire su QUESTO cantiere: il modulo
-            // da solo non apre piu' niente.
-            $daUfficio = $this->accesso->daUfficio($utente, $w);
-
-            if ($regola === 'pagina') {
-                // Chi arriva qui sta navigando col browser: senza accesso
-                // merita un rimando alla dashboard, non un blocco di JSON
-                // in faccia, che sembra un guasto.
-                //
-                // Chi ha il modulo entra lo stesso, ma la pagina gli mostra
-                // solo "Chi accede" (vedi $soloAccessi): deve poter
-                // aggiungere qualcuno, non leggere il cantiere.
-                if (!$daUfficio
-                    && !$this->accesso->qualcosa($utente, $w)
-                    && !$this->accesso->gestisce($utente)) {
-                    Response::redirect('/dashboard?no_permission=1');
-                }
-                $this->guardiaPassata = true;
-                return;
-            }
-
-            if (!$daUfficio) {
-                Response::json([
-                    'success' => false,
-                    'message' => "Non sei fra chi accede a questo cantiere",
-                ], 403);
-            }
-            $this->guardiaPassata = true;
-            return;
+        // Tutto il resto e' un'azione della tabella: il ruolo su QUESTO
+        // cantiere, e quello che quel ruolo puo' fare.
+        $ruolo = $this->accesso->ruolo($utente, $w);
+        if ($ruolo === null) {
+            \App\Service\Zone\Accesso::nega('Non sei fra chi accede a questo cantiere');
         }
-
-        [$famiglia, $minimo] = $regola;
-        $this->accesso->pretende($utente, $w, $famiglia, $minimo);
+        if (!P::puo($ruolo, (string)$regola)) {
+            \App\Service\Zone\Accesso::nega('Il tuo ruolo in questo cantiere non lo prevede');
+        }
 
         $this->guardiaPassata = true;
     }
@@ -349,7 +333,8 @@ final class FieldwireController
             'fieldwire_enabled'    => $this->config->fieldwireEnabled(),
             // le sezioni che questa persona puo' vedere: nascondere una
             // scheda che risponderebbe 403 e' meglio che farcela sbattere
-            'accessi'              => $this->accesso->tutti($request->user(), $worksiteId),
+            'accessi'              => P::tutte($this->accesso->ruolo($request->user(), $worksiteId)),
+            'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
             // "Chi accede", per aggiungersi o aggiungere qualcuno
@@ -387,7 +372,7 @@ final class FieldwireController
                 throw new \RuntimeException('Il nome del task è obbligatorio');
             }
             // creare attivita' e' del capo e dell'ufficio
-            $ruolo = $this->accesso->pretendeRuolo($user, $worksiteId, [\App\Service\Zone\Accesso::CAPO]);
+            $ruolo = (string)$this->ruoloQui($request);
 
             $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user?->id ?? 0));
             $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, true, $request);
@@ -410,7 +395,7 @@ final class FieldwireController
             $body       = $this->jsonBody();
 
             $existing = $this->taskVisibile($request, $taskId);
-            $ruolo = $this->accesso->pretendeRuolo($request->user(), $worksiteId, [\App\Service\Zone\Accesso::CAPO]);
+            $ruolo = (string)$this->ruoloQui($request);
 
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
@@ -701,7 +686,6 @@ final class FieldwireController
             $name       = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome elemento obbligatorio');
             $this->taskVisibile($request, $taskId);
-            $this->accesso->pretendeRuolo($request->user(), $worksiteId, [\App\Service\Zone\Accesso::CAPO]);
 
             $id = $this->zoneRepo->addChecklistItem($taskId, $name);
 
@@ -734,8 +718,7 @@ final class FieldwireController
             $done       = (bool) ($body['completed'] ?? true);
             // spuntare e' di chi ci lavora: il cliente guarda
             $this->taskVisibile($request, $taskId);
-            $this->accesso->pretendeRuolo($request->user(), $worksiteId,
-                [\App\Service\Zone\Accesso::CAPO, \App\Service\Zone\Accesso::OPERAIO]);
+            $this->accesso->pretende($request->user(), $worksiteId, P::COMPLETARE);
             $this->voceDelTask($itemId, $taskId);
 
             $this->zoneRepo->completeChecklistItem($itemId, $done);
@@ -771,7 +754,6 @@ final class FieldwireController
             $itemId     = (int) $request->param('itemId');
 
             $this->taskVisibile($request, $taskId);
-            $this->accesso->pretendeRuolo($request->user(), $worksiteId, [\App\Service\Zone\Accesso::CAPO]);
             $this->voceDelTask($itemId, $taskId);
             $item = $this->zoneRepo->findChecklistItem($itemId);
             if (!$item) throw new \RuntimeException('Elemento checklist non trovato');
@@ -1357,7 +1339,6 @@ final class FieldwireController
             $st = $this->conn->prepare('SELECT zone_cliente FROM bb_worksites WHERE id = :w');
             $st->execute([':w' => $w]);
             return [
-                'famiglie'     => \App\Service\Zone\Accesso::FAMIGLIE,
                 'persone'      => (new \App\Repository\Zone\AccessoRepository($this->conn))
                                       ->perCantiere($w),
                 'zone_cliente' => (bool)$st->fetchColumn(),
@@ -1378,17 +1359,12 @@ final class FieldwireController
                 throw new \RuntimeException('Serve la persona da assegnare');
             }
 
-            $livelli = [];
-            foreach (array_keys(\App\Service\Zone\Accesso::FAMIGLIE) as $f) {
-                $livelli[$f] = (int)($_POST[$f] ?? \App\Service\Zone\Accesso::VEDE);
-            }
-
             $c = $this->conn->prepare('SELECT 1 FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
             $c->execute([':w' => $w, ':u' => $userId]);
             $nuovo = !$c->fetchColumn();
 
             (new \App\Repository\Zone\AccessoRepository($this->conn))->salva(
-                $w, $userId, $livelli, (int)($request->user()->id ?? 0),
+                $w, $userId, (int)($request->user()->id ?? 0),
                 isset($_POST['ruolo']) ? (string)$_POST['ruolo'] : null
             );
             if ($nuovo) {
@@ -2156,7 +2132,7 @@ final class FieldwireController
             $tutte = $st->fetchAll(\PDO::FETCH_ASSOC);
 
             if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
-                $capo   = $ruolo === \App\Service\Zone\Accesso::CAPO;
+                $capo   = $ruolo === \App\Service\Zone\Accesso::CANTIERE;
                 $operai = [];
                 if ($capo) {
                     $q = $this->conn->prepare("SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w AND ruolo = 'operaio'");
@@ -2169,7 +2145,7 @@ final class FieldwireController
                     // il capo segue anche quelli della squadra, senza compilarli
                     // lui: vede chi l'ha fatto e chi no
                     $squadra = $capo && !$mio && (
-                        ($a['a_ruolo'] ?? null) === \App\Service\Zone\Accesso::OPERAIO
+                        in_array($a['a_ruolo'] ?? null, ['operaio', 'capo', \App\Service\Zone\Accesso::CANTIERE], true)
                         || isset($operai[(int)($a['a_user_id'] ?? 0)])
                     );
                     if ($mio || $squadra) {
@@ -2182,7 +2158,7 @@ final class FieldwireController
 
             // chi l'ha fatto e chi manca in questo periodo: l'ufficio e il
             // capo, che deve stare dietro alla sua squadra
-            if (in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CAPO], true)) {
+            if (in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CANTIERE], true)) {
                 $stato = (new \App\Service\Zone\ScadenzeModuli($this->conn))->stato($w);
                 foreach ($tutte as &$a) {
                     $a['stato'] = $stato[(int)$a['id']] ?? null;
@@ -2357,7 +2333,7 @@ final class FieldwireController
         if ($ruolo === \App\Service\Zone\Accesso::CLIENTE) {
             \App\Service\Zone\Accesso::nega('Puoi guardare ma non modificare');
         }
-        if ($ruolo === \App\Service\Zone\Accesso::OPERAIO) {
+        if ($ruolo === \App\Service\Zone\Accesso::CANTIERE) {
             $mia = ($task['assegnata_a'] ?? 'squadra') === 'squadra'
                 || (int)($task['assignee_user_id'] ?? 0) === (int)($request->user()->id ?? -1);
             if (!$mia) {

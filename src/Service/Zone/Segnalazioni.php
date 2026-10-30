@@ -40,7 +40,7 @@ final class Segnalazioni
 
     public static function puoGestire(string $ruolo): bool
     {
-        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CAPO], true);
+        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE], true);
     }
 
     /** La vede? L'ufficio sempre, chi l'ha fatta sempre, gli altri per visibilita'. */
@@ -200,7 +200,7 @@ final class Segnalazioni
     {
         $w = (int)$s['worksite_id'];
         $ruoli = array_values(array_filter(
-            [Accesso::CAPO, Accesso::OPERAIO, Accesso::CLIENTE],
+            [Accesso::CANTIERE, Accesso::CLIENTE],
             fn($r) => Accesso::vedeVisibilita($r, $s['visibilita'])
         ));
         // L'ufficio per ultimo: chi ha il permesso Zone e' dell'ufficio
@@ -249,7 +249,7 @@ final class Segnalazioni
             if ($p['user_id'] === (int)$s['created_by']) continue;
             // una segnalazione da squadra la legge chi la gestisce, non tutti:
             // l'operaio la vedra' se l'ufficio la allarga, senza un push
-            if (!in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CAPO], true)) continue;
+            if (!in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CANTIERE], true)) continue;
             $n->create(
                 $p['user_id'],
                 Lingua::testo($urgente ? 'zona_segn_urgente_t' : 'zona_segn_t', $p['lingua']),

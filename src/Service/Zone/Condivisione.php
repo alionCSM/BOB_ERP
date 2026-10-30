@@ -165,8 +165,7 @@ final class Condivisione
         // gia' tutto il cantiere, e spuntarlo non aggiungerebbe niente —
         // darebbe solo l'impressione che togliendolo smetta di vedere.
         $titoli = [
-            Accesso::CAPO    => 'Capi squadra',
-            Accesso::OPERAIO => 'Operai',
+            Accesso::CANTIERE => 'In cantiere',
             Accesso::CLIENTE => 'Cliente',
         ];
         $gruppi = array_fill_keys(array_keys($titoli), []);
@@ -262,7 +261,7 @@ final class Condivisione
     public function predefinite(int $worksiteId, ?string $ruolo): array
     {
         return match ($ruolo) {
-            Accesso::CAPO, Accesso::OPERAIO => $this->idAmmessi($worksiteId, [Accesso::CAPO, Accesso::OPERAIO]),
+            Accesso::CANTIERE => $this->idAmmessi($worksiteId, [Accesso::CANTIERE]),
             Accesso::CLIENTE                => $this->idAmmessi($worksiteId, [Accesso::CLIENTE]),
             default                         => [],
         };
