@@ -10,7 +10,7 @@ declare(strict_types=1);
  * che fallisce non sporca le altre.
  */
 
-$prove = ['t1_accessi', 't2_contenuti', 't3_notifiche', 't4_cliente'];
+$prove = ['t1_accessi', 't2_contenuti', 't3_notifiche', 't4_cliente', 't5_presenze'];
 $php   = PHP_BINARY;
 $falliti = 0;
 

@@ -327,8 +327,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
                 {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
                 {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
-                {# chat e segnalazioni: chiunque entri nel cantiere; cosa legge lo decide il server #}
+                {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
+                   cosa legge lo decide il server #}
                 {% if not soloAccessi %}
+                <button class="bz-nav-item" data-view="presenze"><i class="fas fa-user-check"></i><span>Presenze</span></button>
                 <button class="bz-nav-item" data-view="segnalazioni"><i class="fas fa-triangle-exclamation"></i><span>Segnalazioni</span><span class="bzd-badge" id="bzd-badge-segn" hidden></span></button>
                 <button class="bz-nav-item" data-view="chat"><i class="fas fa-comments"></i><span>Chat</span><span class="bzd-badge" id="bzd-badge-chat" hidden></span></button>
                 {% endif %}
@@ -475,6 +477,17 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
 
         {# Galleria (foto dai task) #}
+        {# Registro presenze: le presenze VERE di BOB, in sola lettura.
+           Niente pasti, albergo, auto o costi — vedi App\Service\Zone\Presenze. #}
+        <div class="bz-view" id="view-presenze">
+            <div class="bz-pres">
+                <aside class="bz-pres-giorni" id="bz-pres-giorni"></aside>
+                <div class="bz-pres-corpo" id="bz-pres-corpo">
+                    <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
+                </div>
+            </div>
+        </div>
+
         <div class="bz-view" id="view-media">
             <div class="bz-media">
                 <div class="bz-disegni-title"><i class="fas fa-images"></i> Galleria foto del cantiere</div>
@@ -942,6 +955,7 @@ function switchTop(v) {
     else if (v === 'media')    loadMedia();
     else if (v === 'files')    loadFiles();
     else if (v === 'forms')    openForms();
+    else if (v === 'presenze') loadPresenze();
     window.BZDialogo?.vista(v);
 }
 
@@ -2170,6 +2184,96 @@ function fmtDate(str) {
     return new Date(str + 'T00:00:00').toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
 }
 
+/* ══════════ REGISTRO PRESENZE ══════════
+   Le presenze vere di BOB, in sola lettura. I giorni a sinistra, chi c'era
+   a destra. Il server manda solo nome, azienda e turno: pasti, albergo e
+   costi non escono dall'ufficio.                                          */
+let presGiorno = null;
+
+async function loadPresenze(data = null) {
+    const corpo = document.getElementById('bz-pres-corpo');
+    const colonna = document.getElementById('bz-pres-giorni');
+
+    if (!presGiorno) {
+        const g = await api(`/worksites/${WID}/zone/presenze/giorni`);
+        const giorni = (g.data || g || []);
+        if (!giorni.length) {
+            colonna.innerHTML = '';
+            corpo.innerHTML = '<div class="bz-empty">Su questo cantiere non c\'e\' ancora nessuna presenza registrata.</div>';
+            return;
+        }
+        colonna.innerHTML = giorni.map(x => `
+            <button class="bz-pres-g" data-pres-data="${x.data}">
+                <span class="d">${fmtDateLunga(x.data)}</span>
+                <span class="n">${x.persone}</span>
+            </button>
+        `).join('');
+        data = data || giorni[0].data;
+    }
+
+    presGiorno = data;
+    colonna.querySelectorAll('[data-pres-data]').forEach(b =>
+        b.classList.toggle('on', b.dataset.presData === presGiorno));
+
+    corpo.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
+    const r = await api(`/worksites/${WID}/zone/presenze?data=${encodeURIComponent(presGiorno)}`);
+    if (!r.ok) {
+        corpo.innerHTML = `<div class="bz-empty">${escHtml(r.error || 'Non riesco a leggere le presenze')}</div>`;
+        return;
+    }
+    const d = r.data || r;
+
+    const nostri = (d.nostri || []).map(x => `
+        <tr>
+            <td>${escHtml(x.nome)}</td>
+            <td class="az">${escHtml(x.azienda)}</td>
+            <td class="tu${x.mezza ? ' mezza' : ''}">${escHtml(x.turno)}</td>
+        </tr>
+    `).join('');
+
+    const cons = (d.consorziate || []).map(x => `
+        <tr>
+            <td>${escHtml(x.azienda)}</td>
+            <td class="tu">${x.persone} ${x.persone === 1 ? 'persona' : 'persone'}</td>
+        </tr>
+    `).join('');
+
+    corpo.innerHTML = `
+        <div class="bz-pres-testa">
+            <h3>${fmtDateLunga(d.data)}</h3>
+            <span>${d.persone} ${d.persone === 1 ? 'persona' : 'persone'} in cantiere</span>
+        </div>
+        ${nostri ? `
+            <div class="bz-pres-sez">
+                <h4>I nostri</h4>
+                <table class="bz-pres-tab">
+                    <thead><tr><th>Nome</th><th>Azienda</th><th>Turno</th></tr></thead>
+                    <tbody>${nostri}</tbody>
+                </table>
+            </div>` : ''}
+        ${cons ? `
+            <div class="bz-pres-sez">
+                <h4>Imprese</h4>
+                <table class="bz-pres-tab">
+                    <thead><tr><th>Azienda</th><th>Persone</th></tr></thead>
+                    <tbody>${cons}</tbody>
+                </table>
+            </div>` : ''}
+        ${!nostri && !cons ? '<div class="bz-empty">Nessuno in cantiere questo giorno.</div>' : ''}
+    `;
+}
+
+function fmtDateLunga(str) {
+    if (!str) return '';
+    return new Date(str + 'T00:00:00')
+        .toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+document.addEventListener('click', e => {
+    const g = e.target.closest('[data-pres-data]');
+    if (g) loadPresenze(g.dataset.presData);
+});
+
 /* ══════════ CHI VEDE COSA: i comandi ══════════ */
 // Delegati sul documento: cartelle, disegni e messaggi si ridisegnano a ogni
 // caricamento, e un ascoltatore attaccato all'elemento sparirebbe con lui.
@@ -2247,6 +2351,39 @@ if (!SOLO_ACCESSI) {
 </script>
 
 <style>
+/* Registro presenze */
+.bz-pres { display:flex; width:100%; overflow:hidden; }
+.bz-pres-giorni { width:210px; flex:0 0 210px; border-right:1px solid #1e293b;
+                  overflow-y:auto; padding:10px 8px; }
+.bz-pres-g { display:flex; align-items:center; justify-content:space-between; gap:8px;
+             width:100%; background:none; border:0; border-radius:8px; padding:8px 10px;
+             color:#94a3b8; font-size:12.5px; font-family:inherit; cursor:pointer; text-align:left; }
+.bz-pres-g:hover { background:#1e293b; color:#cbd5e1; }
+.bz-pres-g.on { background:#1e293b; color:#f1f5f9; font-weight:600; }
+.bz-pres-g .n { flex:0 0 auto; font-size:11px; color:#64748b; background:#0f172a;
+                border-radius:20px; padding:2px 8px; }
+.bz-pres-g.on .n { color:#cbd5e1; }
+.bz-pres-corpo { flex:1; overflow-y:auto; padding:22px 26px; }
+.bz-pres-testa { display:flex; align-items:baseline; gap:12px; margin-bottom:22px; }
+.bz-pres-testa h3 { margin:0; font-size:16px; font-weight:700; color:#e2e8f0; text-transform:capitalize; }
+.bz-pres-testa span { font-size:12.5px; color:#64748b; }
+.bz-pres-sez { margin-bottom:26px; }
+.bz-pres-sez h4 { margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase;
+                  letter-spacing:.06em; color:#64748b; }
+.bz-pres-tab { width:100%; border-collapse:collapse; font-size:13px; }
+.bz-pres-tab th { text-align:left; font-size:10.5px; font-weight:700; text-transform:uppercase;
+                  letter-spacing:.05em; color:#475569; padding:0 10px 6px 0;
+                  border-bottom:1px solid #1e293b; }
+.bz-pres-tab td { padding:8px 10px 8px 0; border-bottom:1px solid #16202f; color:#cbd5e1; }
+.bz-pres-tab .az { color:#94a3b8; }
+.bz-pres-tab .tu { color:#94a3b8; white-space:nowrap; }
+.bz-pres-tab .tu.mezza { color:#fbbf24; }
+[data-theme="light"] .bz-pres-giorni { border-right-color:#e2e8f0; }
+[data-theme="light"] .bz-pres-g:hover, [data-theme="light"] .bz-pres-g.on { background:#f1f5f9; color:#1e293b; }
+[data-theme="light"] .bz-pres-testa h3 { color:#1e293b; }
+[data-theme="light"] .bz-pres-tab td { color:#334155; border-bottom-color:#e2e8f0; }
+[data-theme="light"] .bz-pres-tab th { border-bottom-color:#e2e8f0; }
+
 /* Chi ha il modulo ma non e' dentro al cantiere */
 .bz-fuori { max-width:520px; margin:8vh auto 0; text-align:center; padding:0 24px; }
 .bz-fuori i { font-size:34px; color:#475569; margin-bottom:18px; display:block; }

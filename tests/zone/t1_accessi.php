@@ -47,6 +47,11 @@ $decide = function ($utente, int $w, $regola) use ($acc, &$regoleViste): bool {
     if ($regola === 'ufficio') {
         return $acc->daUfficio($utente, $w);
     }
+    // 'dentro': basta avere un ruolo sul cantiere, qualunque sia. Lo usa il
+    // registro presenze, che in cantiere lo legge chiunque ci lavori.
+    if ($regola === 'dentro') {
+        return $acc->qualcosa($utente, $w);
+    }
     [$famiglia, $minimo] = $regola;
     return $acc->livello($utente, $w, $famiglia) >= $minimo;
 };
@@ -61,7 +66,7 @@ foreach ($ACCESSI as $endpoint => $regola) {
 
 // se domani qualcuno inventa una regola nuova e non la gestisce, si vede
 $p->uguale('le regole sono quelle che il test sa controllare',
-           ['gestione', 'livello', 'pagina', 'ufficio'],
+           ['dentro', 'gestione', 'livello', 'pagina', 'ufficio'],
            (function () use ($regoleViste) { $k = array_keys($regoleViste); sort($k); return $k; })());
 
 // ── Quello che non deve succedere, mai ────────────────────────────────────
@@ -69,6 +74,17 @@ $apertiAEstraneo = array_keys(array_filter($esito, fn($r) => $r['estraneo']));
 $p->uguale('a un estraneo non si apre niente', [], $apertiAEstraneo);
 
 $ufficioOGestione = array_keys(array_filter($ACCESSI, fn($r) => $r === 'ufficio' || $r === 'gestione'));
+
+// Il registro presenze lo legge chiunque entri nel cantiere, committente
+// compreso: e' il motivo per cui esiste.
+foreach (['presenze', 'presenzeGiorni'] as $e) {
+    foreach (['ufficio', 'capo', 'operaio', 'cliente'] as $chi) {
+        $p->check("$chi legge $e", $esito[$e][$chi]);
+    }
+    foreach (['fuori', 'estraneo'] as $chi) {
+        $p->check("$chi NON legge $e", !$esito[$e][$chi]);
+    }
+}
 
 foreach (['cliente', 'operaio', 'capo'] as $chi) {
     $rotti = array_values(array_filter($ufficioOGestione, fn($e) => $esito[$e][$chi]));

@@ -118,6 +118,13 @@ final class FieldwireController
 
         'report'                => ['report', 1],
 
+        // Il registro presenze lo legge chiunque entri nel cantiere, il
+        // committente compreso: e' quello che un registro di cantiere
+        // serve a fare. Non passa dalle sezioni perche' non e' roba della
+        // Zone: sono le presenze vere di BOB, lette e basta.
+        'presenze'              => 'dentro',
+        'presenzeGiorni'        => 'dentro',
+
         'enable'                => 'ufficio',
         'disable'               => 'ufficio',
 
@@ -179,6 +186,15 @@ final class FieldwireController
                     'success' => false,
                     'message' => 'Serve il permesso Zone di BOB per decidere chi accede',
                 ], 403);
+            }
+            $this->guardiaPassata = true;
+            return;
+        }
+
+        // Dentro al cantiere, con qualunque ruolo.
+        if ($regola === 'dentro') {
+            if (!$this->accesso->qualcosa($utente, $w)) {
+                \App\Service\Zone\Accesso::nega('Non hai accesso a questo cantiere');
             }
             $this->guardiaPassata = true;
             return;
@@ -1243,6 +1259,44 @@ final class FieldwireController
                 $this->filtro($request, 'attivita', 'task_id', 'author_user_id')
             );
             return $this->filtraCommenti(array_values($foto), $ruolo, (int)($request->user()->id ?? 0));
+        });
+    }
+
+    // ─── Registro presenze ────────────────────────────────────────────────────
+
+    /**
+     * Chi c'era in cantiere, un giorno.
+     *
+     * Legge le presenze vere di BOB. Pasti, albergo, auto e costi restano
+     * fuori: vedi {@see \App\Service\Zone\Presenze}.
+     */
+    public function presenze(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+
+            $data = (string)($_GET['data'] ?? '');
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+                // senza data: l'ultimo giorno in cui c'e' stato qualcuno,
+                // che e' quello che si vuole guardare nove volte su dieci
+                $giorni = (new \App\Service\Zone\Presenze($this->conn))->giorni($w, 1);
+                $data   = $giorni[0]['data'] ?? date('Y-m-d');
+            }
+
+            return (new \App\Service\Zone\Presenze($this->conn))->giorno($w, $data);
+        });
+    }
+
+    /** I giorni in cui c'e' stato qualcuno, per il calendario del registro. */
+    public function presenzeGiorni(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            return (new \App\Service\Zone\Presenze($this->conn))
+                ->giorni((int)$request->param('id'), 60);
         });
     }
 
