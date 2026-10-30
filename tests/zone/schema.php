@@ -107,8 +107,17 @@ function db(): PDO
         throw new RuntimeException(
             "Non riesco a collegarmi a MySQL ({$c['dsn']}, utente {$c['utente']}): "
             . $e->getMessage() . "\n"
-            . "Le prove usano l'accesso del .env dell'installazione, su un database a parte "
-            . "({$c['nome']}), e lo creano da sole: serve che quell'utente possa CREATE DATABASE.",
+            . "Le prove usano l'accesso del .env, su un database a parte ({$c['nome']}), "
+            . "e provano a crearselo. Se quell'utente non puo' creare database, "
+            . "si fa una volta sola da un utente che puo':
+
+"
+            . "  CREATE DATABASE {$c['nome']} CHARACTER SET utf8mb4;
+"
+            . "  GRANT ALL ON {$c['nome']}.* TO '{$c['utente']}'@'%';
+"
+            . "  FLUSH PRIVILEGES;
+",
             0,
             $e
         );

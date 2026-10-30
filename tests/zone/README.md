@@ -31,8 +31,14 @@ volta sola:
 
 ```sql
 CREATE DATABASE bob_zone_test CHARACTER SET utf8mb4;
-GRANT ALL ON bob_zone_test.* TO 'utente_di_bob'@'localhost';
+GRANT ALL ON bob_zone_test.* TO 'utente_di_bob'@'%';
+FLUSH PRIVILEGES;
 ```
+
+L'utente e l'host li dice il messaggio d'errore, che stampa le righe gia'
+pronte. Attenzione all'host nella GRANT: se l'utente di BOB e'
+`...'@'%'`, la GRANT va data su `%`, non su `localhost` — sono due utenti
+diversi per MySQL.
 
 **Dove lanciarle.** Sul server di collaudo va bene: si fanno il database
 loro e non toccano `bob_collaudo`. In produzione no — non c'e' motivo di
