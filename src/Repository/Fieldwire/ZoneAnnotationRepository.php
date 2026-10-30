@@ -21,9 +21,15 @@ final class ZoneAnnotationRepository
             SELECT a.*,
                    t.name   AS task_name,
                    t.status AS task_status,
-                   t.assignee_name AS task_assignee
+                   t.assignee_name AS task_assignee,
+                   s.testo   AS segn_testo,
+                   s.tipo    AS segn_tipo,
+                   s.gravita AS segn_gravita,
+                   s.stato   AS segn_stato,
+                   s.visibilita AS segn_visibilita
             FROM bb_zone_annotations a
-            LEFT JOIN bb_zone_tasks t ON t.id = a.task_id
+            LEFT JOIN bb_zone_tasks t        ON t.id = a.task_id
+            LEFT JOIN bb_zone_segnalazioni s ON s.id = a.segnalazione_id
             WHERE a.document_id = :doc
         ";
         $params = [':doc' => $documentId];
@@ -49,11 +55,12 @@ final class ZoneAnnotationRepository
     {
         $stmt = $this->db->prepare("
             INSERT INTO bb_zone_annotations
-                (worksite_id, document_id, page, type, geom, task_id, text, color, created_by)
+                (worksite_id, document_id, page, type, geom, task_id, segnalazione_id, text, color, created_by)
             VALUES
-                (:wid, :doc, :page, :type, :geom, :task, :text, :color, :uid)
+                (:wid, :doc, :page, :type, :geom, :task, :segn, :text, :color, :uid)
         ");
         $stmt->execute([
+            ':segn'  => $d['segnalazione_id'] ?? null,
             ':wid'   => $d['worksite_id'],
             ':doc'   => $d['document_id'],
             ':page'  => $d['page'] ?? 1,
@@ -71,10 +78,12 @@ final class ZoneAnnotationRepository
     {
         $stmt = $this->db->prepare("
             UPDATE bb_zone_annotations
-               SET geom = :geom, text = :text, color = :color, task_id = :task
+               SET geom = :geom, text = :text, color = :color,
+                   task_id = :task, segnalazione_id = :segn
              WHERE id = :id
         ");
         $stmt->execute([
+            ':segn'  => $d['segnalazione_id'] ?? null,
             ':geom'  => is_string($d['geom']) ? $d['geom'] : json_encode($d['geom']),
             ':text'  => $d['text'] ?? null,
             ':color' => $d['color'] ?? '#ef4444',
@@ -86,6 +95,39 @@ final class ZoneAnnotationRepository
     public function delete(int $id): void
     {
         $this->db->prepare("DELETE FROM bb_zone_annotations WHERE id = :id")->execute([':id' => $id]);
+    }
+
+    /**
+     * Lo spillo di una segnalazione, se ce l'ha.
+     *
+     * Serve per il verso opposto: dalla segnalazione al punto sul disegno.
+     * Una sola, la piu' recente: se qualcuno la appunta due volte, vale
+     * l'ultimo posto in cui l'ha messa.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function perSegnalazione(int $segnalazioneId): ?array
+    {
+        $stmt = $this->db->prepare("
+            SELECT a.id, a.document_id, a.page, a.geom, d.file_name
+            FROM   bb_zone_annotations a
+            JOIN   bb_worksite_documents d ON d.id = a.document_id
+            WHERE  a.segnalazione_id = :s AND d.is_deleted = 0
+            ORDER BY a.id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([':s' => $segnalazioneId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return [
+            'annotazione' => (int)$row['id'],
+            'disegno'     => (int)$row['document_id'],
+            'pagina'      => (int)$row['page'],
+            'nome'        => (string)$row['file_name'],
+            'geom'        => json_decode($row['geom'] ?? '{}', true) ?: [],
+        ];
     }
 
     public function setTaskId(int $id, ?int $taskId): void
@@ -100,6 +142,9 @@ final class ZoneAnnotationRepository
         $row['id']         = (int)$row['id'];
         $row['page']       = (int)$row['page'];
         $row['task_id']    = $row['task_id'] !== null ? (int)$row['task_id'] : null;
+        $row['segnalazione_id'] = isset($row['segnalazione_id']) && $row['segnalazione_id'] !== null
+            ? (int)$row['segnalazione_id']
+            : null;
         return $row;
     }
 

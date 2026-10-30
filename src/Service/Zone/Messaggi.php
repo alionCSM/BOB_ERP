@@ -10,11 +10,16 @@ use PDO;
  * I messaggi della Zone: la chat del cantiere e il filo di ogni segnalazione.
  *
  * La chat ha tre canali, uno per chi legge:
- *   - squadra: ufficio, capi e operai — "domani si attacca alle sette"
- *   - capi:    ufficio e capi — le cose da coordinare
- *   - cliente: ufficio, capi e cliente — solo se l'ufficio ha acceso
- *              "Condividi col cliente" sul cantiere
- * Un operaio non vede il canale dei capi, il cliente vede solo il suo.
+ *   - squadra: noi e chi lavora in cantiere — "domani si attacca alle sette"
+ *   - cliente: noi e il committente, e nessun altro. Solo se l'ufficio ha
+ *              acceso "Condividi col cliente" sul cantiere
+ *   - tutti:   tutti quelli che entrano nel cantiere, committente compreso
+ *
+ * C'era anche un canale "capi", ed e' stato tolto: nella Zone non ci
+ * entrano tutti gli operai di un cantiere, ci entra chi gli diamo
+ * l'accesso — e quello, in pratica, e' il capo squadra. "Squadra" e "Capi"
+ * avevano dentro le stesse persone, e due chat con le stesse persone sono
+ * una chat sola in cui nessuno sa dove scrivere.
  *
  * Cose da cantiere che una chat qualsiasi non ha:
  *   - avvisi fissati in alto (capo e ufficio): "gru il 12 alle 7";
@@ -29,7 +34,7 @@ use PDO;
  */
 final class Messaggi
 {
-    public const CANALI = ['squadra', 'capi', 'cliente'];
+    public const CANALI = ['squadra', 'cliente', 'tutti'];
 
     /** Le chiavi dei messaggi rapidi: il testo lo mette chi legge. */
     public const RAPIDI = [
@@ -48,17 +53,19 @@ final class Messaggi
     {
         $conCliente = $this->clienteAcceso($worksiteId);
         $tutti = match ($ruolo) {
-            Accesso::UFFICIO, Accesso::CAPO => ['squadra', 'capi', 'cliente'],
-            Accesso::OPERAIO => ['squadra'],
-            Accesso::CLIENTE => ['cliente'],
-            default => [],
+            Accesso::UFFICIO                => ['squadra', 'cliente', 'tutti'],
+            Accesso::CANTIERE               => ['squadra', 'tutti'],
+            // il committente non vede la chat della squadra: li' si parla
+            // di come si lavora, non di cosa si consegna
+            Accesso::CLIENTE                => ['cliente', 'tutti'],
+            default                         => [],
         };
         return array_values(array_filter($tutti, fn($c) => $c !== 'cliente' || $conCliente));
     }
 
     public static function puoFissare(string $ruolo): bool
     {
-        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CAPO], true);
+        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CANTIERE], true);
     }
 
     // ── Leggere ─────────────────────────────────────────────────────────────
@@ -275,13 +282,31 @@ final class Messaggi
      */
     public function personeCanale(int $worksiteId, string $canale): array
     {
+        // Un canale che non esiste non ha nessuno dentro. Senza questa
+        // riga i ruoli venivano vuoti ma l'ufficio si aggiungeva lo
+        // stesso in fondo: un nome di canale inventato — o uno vecchio
+        // rimasto in giro, come 'capi' — mandava il messaggio all'ufficio.
+        if (!in_array($canale, self::CANALI, true)) {
+            return [];
+        }
+
         $ruoli = match ($canale) {
-            'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
-            'capi'    => [Accesso::CAPO],
-            'cliente' => [Accesso::CAPO, Accesso::CLIENTE],
+            'squadra' => [Accesso::CANTIERE],
+            // noi e il committente, nessun altro in mezzo
+            'cliente' => [Accesso::CLIENTE],
+            'tutti'   => [Accesso::CANTIERE, Accesso::CLIENTE],
             default   => [],
         };
-        return array_merge($this->personeRuoli($worksiteId, $ruoli), $this->ufficio($worksiteId));
+        // Senza togliere i doppioni, chi e' dell'ufficio ed e' anche in
+        // squadra sul cantiere comparirebbe due volte, e prenderebbe due
+        // notifiche per lo stesso messaggio. L'ufficio viene dopo e vince:
+        // chi ha il permesso Zone e' dell'ufficio, qualunque ruolo gli sia
+        // stato messo sul cantiere.
+        $chi = [];
+        foreach (array_merge($this->personeRuoli($worksiteId, $ruoli), $this->ufficio($worksiteId)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
+        }
+        return array_values($chi);
     }
 
     /**
@@ -315,36 +340,50 @@ final class Messaggi
     }
 
     /**
-     * L'ufficio di un cantiere: chi ha il permesso Zone ed e' assegnato al
-     * cantiere in BOB. Se non c'e' nessuno, tutti quelli col permesso Zone:
-     * una segnalazione che non arriva a nessuno e' peggio di una in piu'.
+     * L'ufficio di un cantiere: chi e' nel suo elenco col ruolo ufficio.
      *
+     * Non "chi ha il modulo Zone": quello dice chi puo' DARE gli accessi, e
+     * in ufficio ce l'hanno in otto. Entra in un cantiere solo chi ce lo
+     * mettiamo, anche se sta in ufficio.
+     *
+     * Qui c'era un errore che mandava un messaggio di cantiere a tutto
+     * l'ufficio: la condizione cercava chi sta in bb_worksite_users e NON
+     * in bb_zone_accessi, ma le due tabelle le scrive sempre insieme lo
+     * stesso metodo, quindi non trovava mai nessuno e partiva il ripiego
+     * "allora tutti quelli col permesso Zone". Adesso non serve piu'
+     * cercare in due tabelle: l'ufficio di un cantiere e' una riga del suo
+     * elenco, come il capo e l'operaio.
+     *
+     * @param bool $ripiegoSuTutti se qui non c'e' nessuno dell'ufficio,
+     *                             prende tutti quelli col permesso Zone.
+     *                             Vale per le segnalazioni, dove una che non
+     *                             arriva a nessuno e' peggio di una in piu'.
+     *                             NON per la chat: un messaggio di cantiere
+     *                             mandato a tutti e' il modo migliore per far
+     *                             spegnere le notifiche a tutti.
      * @return array<int, array{user_id:int, nome:string, lingua:?string, ruolo:string}>
      */
-    public function ufficio(int $worksiteId): array
+    public function ufficio(int $worksiteId, bool $ripiegoSuTutti = false): array
     {
-        $conZone = "
-            SELECT user_id FROM bb_user_company_permissions WHERE module = 'zone' AND allowed = 1
-            UNION
-            SELECT user_id FROM bb_user_permissions WHERE module = 'zone' AND allowed = 1
-        ";
-        $base = "
-            SELECT DISTINCT u.id AS user_id, u.lingua, 'ufficio' AS ruolo,
-                   TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
-            FROM   bb_users u
-            WHERE  u.active = 'Y' AND u.removed = 'N'
-              AND  u.id IN ($conZone)
-              AND  u.id NOT IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w0)
-        ";
-        $st = $this->conn->prepare($base . ' AND u.id IN (SELECT user_id FROM bb_worksite_users WHERE worksite_id = :w)');
-        $st->execute([':w0' => $worksiteId, ':w' => $worksiteId]);
-        $chi = $st->fetchAll(PDO::FETCH_ASSOC);
-        if (!$chi) {
-            $st = $this->conn->prepare($base);
-            $st->execute([':w0' => $worksiteId]);
-            $chi = $st->fetchAll(PDO::FETCH_ASSOC);
+        $chi = $this->personeRuoli($worksiteId, [Accesso::UFFICIO]);
+
+        if (!$chi && $ripiegoSuTutti) {
+            // Il permesso vive in due tabelle, per societa' e per utente:
+            // vanno guardate tutte e due.
+            $chi = $this->conn->query("
+                SELECT DISTINCT u.id AS user_id, u.lingua, 'ufficio' AS ruolo,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
+                FROM   bb_users u
+                WHERE  u.active = 'Y' AND u.removed = 'N'
+                  AND  u.id IN (
+                        SELECT user_id FROM bb_user_company_permissions WHERE module = 'zone' AND allowed = 1
+                        UNION
+                        SELECT user_id FROM bb_user_permissions         WHERE module = 'zone' AND allowed = 1
+                  )
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            $chi = array_map(fn($p) => ['user_id' => (int)$p['user_id']] + $p, $chi);
         }
-        return array_map(fn($p) => ['user_id' => (int)$p['user_id']] + $p, $chi);
+        return $chi;
     }
 
     // ── Interni ─────────────────────────────────────────────────────────────

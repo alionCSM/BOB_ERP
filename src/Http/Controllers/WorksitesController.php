@@ -1306,7 +1306,7 @@ final class WorksitesController
                     $worksiteId,
                     'disegno',
                     (int)$savedDocId,
-                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CAPO),
+                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CANTIERE),
                     (int)$auth['user_id']
                 );
             } catch (\Throwable $e) {
@@ -2431,17 +2431,12 @@ final class WorksitesController
         // Il resto del cantiere non si apre: i preventivi, le fatture e i
         // noleggi stanno sotto il modulo `worksites`, che un operaio non ha,
         // e tutto il prefisso /worksites e' chiuso prima di arrivare qui.
-        $livelli = [];
-        foreach (array_keys(\App\Service\Zone\Accesso::FAMIGLIE) as $f) {
-            $livelli[$f] = \App\Service\Zone\Accesso::VEDE;
-        }
-
         $gia = $conn->prepare('SELECT 1 FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
         $gia->execute([':w' => $worksiteId, ':u' => $userId]);
         $nuovo = !$gia->fetchColumn();
 
         (new \App\Repository\Zone\AccessoRepository($conn))->salva(
-            $worksiteId, $userId, $livelli, (int)($user->id ?? 0)
+            $worksiteId, $userId, (int)($user->id ?? 0)
         );
 
         // gli si dice che c'e' un cantiere nuovo da vedere; se l'avviso non

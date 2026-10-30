@@ -43,9 +43,13 @@ final class AvvisiZona
         }
 
         $ruoli = match ((string)$t['assegnata_a']) {
-            'squadra' => [Accesso::CAPO, Accesso::OPERAIO],
-            'capi'    => [Accesso::CAPO],
+            'squadra', 'capi', 'cantiere' => [Accesso::CANTIERE],
             'cliente' => [Accesso::CLIENTE],
+            // "all'ufficio" prima non avvisava nessuno: l'ufficio non era un
+            // ruolo nell'elenco, era chiunque avesse il modulo, e non si
+            // sapeva a chi mandarla. Adesso sono le persone dell'ufficio
+            // messe su questo cantiere.
+            'ufficio' => [Accesso::UFFICIO],
             default   => [],
         };
         $persone = $this->persone((int)$t['worksite_id'], $ruoli, (int)($t['assignee_user_id'] ?? 0) ?: null);
@@ -116,12 +120,6 @@ final class AvvisiZona
     }
 
     /**
-     * Chi del cantiere ha uno di quei ruoli, piu' una persona precisa.
-     *
-     * @param string[] $ruoli
-     * @return array<int, array{user_id:int, lingua:?string, ruolo:string}>
-     */
-    /**
      * Con chi e' condivisa una cosa, per id, da cercare con isset().
      *
      * @return array<int, true>
@@ -135,6 +133,12 @@ final class AvvisiZona
         return array_fill_keys(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)), true);
     }
 
+    /**
+     * Chi del cantiere ha uno di quei ruoli, piu' una persona precisa.
+     *
+     * @param string[] $ruoli
+     * @return array<int, array{user_id:int, lingua:?string, ruolo:string}>
+     */
     private function persone(int $worksiteId, array $ruoli, ?int $persona): array
     {
         $cond = [];

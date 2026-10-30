@@ -430,17 +430,17 @@ final class ApiV1OperaioController
 
         foreach ($cantieri as &$c) {
             $c['id']      = (int)$c['id'];
-            // il ruolo decide cosa l'app mostra; `accessi` resta per le
-            // versioni dell'app che conoscono solo i livelli
+            // il ruolo decide cosa l'app mostra; `accessi` e' quello che
+            // quel ruolo puo' fare, azione per azione
             $c['ruolo']   = $accesso->ruolo($utente, $c['id']);
-            $c['accessi'] = $accesso->tutti($utente, $c['id']);
+            $c['accessi'] = \App\Service\Zone\Permessi::tutte($c['ruolo']);
         }
         unset($c);
 
         Response::json([
             'success'  => true,
             'cantieri' => $cantieri,
-            'famiglie' => \App\Service\Zone\Accesso::FAMIGLIE,
+            'azioni'   => \App\Service\Zone\Permessi::azioni(),
         ]);
     }
 

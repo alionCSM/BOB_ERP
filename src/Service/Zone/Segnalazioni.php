@@ -40,7 +40,7 @@ final class Segnalazioni
 
     public static function puoGestire(string $ruolo): bool
     {
-        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CAPO], true);
+        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE], true);
     }
 
     /** La vede? L'ufficio sempre, chi l'ha fatta sempre, gli altri per visibilita'. */
@@ -65,7 +65,14 @@ final class Segnalazioni
                    TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))) AS presa_da_nome,
                    (SELECT COUNT(*) FROM bb_zone_messaggi m
                      WHERE m.segnalazione_id = s.id AND m.foto IS NOT NULL AND m.eliminato_at IS NULL) AS foto,
-                   (SELECT MAX(m.id) FROM bb_zone_messaggi m WHERE m.segnalazione_id = s.id) AS ultimo_msg
+                   (SELECT MAX(m.id) FROM bb_zone_messaggi m WHERE m.segnalazione_id = s.id) AS ultimo_msg,
+                   -- lo spillo sul disegno, se e' stata segnata li'. Una
+                   -- segnalazione con un posto si apre dal punto, e chi
+                   -- legge non deve indovinare in che campata siamo.
+                   (SELECT a.document_id FROM bb_zone_annotations a
+                     WHERE a.segnalazione_id = s.id ORDER BY a.id DESC LIMIT 1) AS disegno_id,
+                   (SELECT a.page FROM bb_zone_annotations a
+                     WHERE a.segnalazione_id = s.id ORDER BY a.id DESC LIMIT 1) AS disegno_pagina
             FROM   bb_zone_segnalazioni s
             JOIN   bb_users u ON u.id = s.created_by
             LEFT JOIN bb_users p ON p.id = s.presa_da
@@ -193,12 +200,15 @@ final class Segnalazioni
     {
         $w = (int)$s['worksite_id'];
         $ruoli = array_values(array_filter(
-            [Accesso::CAPO, Accesso::OPERAIO, Accesso::CLIENTE],
+            [Accesso::CANTIERE, Accesso::CLIENTE],
             fn($r) => Accesso::vedeVisibilita($r, $s['visibilita'])
         ));
+        // L'ufficio per ultimo: chi ha il permesso Zone e' dell'ufficio
+        // anche se sul cantiere gli hanno messo ruolo operaio, e nel filo di
+        // una segnalazione e' l'ufficio che risponde.
         $chi = [];
-        foreach (array_merge($this->messaggi->ufficio($w), $this->messaggi->personeRuoli($w, $ruoli)) as $p) {
-            $chi[$p['user_id']] = $p;
+        foreach (array_merge($this->messaggi->personeRuoli($w, $ruoli), $this->messaggi->ufficio($w)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
         }
         if (!isset($chi[(int)$s['created_by']])) {
             $st = $this->conn->prepare("
@@ -224,11 +234,22 @@ final class Segnalazioni
         if (!$s) return;
         $cantiere = $this->nomeCantiere((int)$s['worksite_id']);
         $urgente  = $s['gravita'] === 'blocca' || $s['tipo'] === 'sicurezza';
-        foreach ($this->persone($s) as $p) {
+
+        // Qui, e solo qui, il ripiego: se a quel cantiere non e' attaccato
+        // nessuno dell'ufficio, la segnalazione va a tutti quelli col
+        // permesso Zone. Una che non arriva a nessuno e' peggio di una in
+        // piu' — ma vale per la segnalazione, non per i messaggi di tutti i
+        // giorni, che prima prendevano la stessa strada.
+        $chi = [];
+        foreach (array_merge($this->persone($s), $this->messaggi->ufficio((int)$s['worksite_id'], true)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
+        }
+
+        foreach ($chi as $p) {
             if ($p['user_id'] === (int)$s['created_by']) continue;
             // una segnalazione da squadra la legge chi la gestisce, non tutti:
             // l'operaio la vedra' se l'ufficio la allarga, senza un push
-            if (!in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CAPO], true)) continue;
+            if (!in_array($p['ruolo'], [Accesso::UFFICIO, Accesso::CANTIERE], true)) continue;
             $n->create(
                 $p['user_id'],
                 Lingua::testo($urgente ? 'zona_segn_urgente_t' : 'zona_segn_t', $p['lingua']),
@@ -287,6 +308,10 @@ final class Segnalazioni
         $s['presa_da']  = $s['presa_da'] !== null ? (int)$s['presa_da'] : null;
         $s['task_id']   = $s['task_id'] !== null ? (int)$s['task_id'] : null;
         $s['presa_da_nome'] = trim((string)$s['presa_da_nome']) ?: null;
+        $s['disegno_id'] = isset($s['disegno_id']) && $s['disegno_id'] !== null
+            ? (int)$s['disegno_id'] : null;
+        $s['disegno_pagina'] = isset($s['disegno_pagina']) && $s['disegno_pagina'] !== null
+            ? (int)$s['disegno_pagina'] : null;
         unset($s['ultimo_msg']);
         return $s;
     }
