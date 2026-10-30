@@ -758,5 +758,19 @@ possono aprire (`offerte`, `clienti`, `aziende`, `prenotazioni`,
 | `GET /ufficio/fatturato?anno=` | `report_business` | `{anno, serie, totali}` per l'anno e quello prima, lo stesso calcolo di "Andamento fatturato"; 503 se Business non risponde |
 | `GET /ufficio/rubrica?q=` | `users` (non per chi vede solo alcune aziende) | `{persone: [{id, nome, azienda, telefono, email, attivo}]}`, da 2 lettere, max 50 |
 
-La fatturazione (`/billing`) resta sul sito: passa da Yard e serve lo
-schermo grande.
+La pagina della fatturazione (`/billing`, tutti i clienti) resta sul sito.
+La fatturazione **del singolo cantiere** si vede dall'app: sotto.
+
+## I cantieri di BOB dall'app (sola lettura)
+
+Le schede della pagina del cantiere. Voce di menu `commesse` (modulo
+`worksites`); la Zone nel menu resta `cantieri`. Stessi controlli di
+`/worksites/{id}`: modulo `worksites`, e chi non e' della societa' 1 apre solo
+i cantieri della sua. I prezzi solo con `view_prices`, come sul sito.
+
+| Rotta | Cosa torna |
+|---|---|
+| `GET /worksites/{id}/presenze?dal=&al=` | `{giornate, presenze: [{data, nome, azienda, turno, pranzo, cena, hotel, auto, note, pranzo_prezzo, cena_prezzo}]}`, max 500, i prezzi `null` senza permesso |
+| `GET /worksites/{id}/consorziate` | `{giornate, presenze: [{data, azienda, quantita, pasti, auto, hotel, note, costo}]}` |
+| `GET /worksites/{id}/mezzi` | `{mezzi: [{mezzo, tipo, stato, quantita, dal, al, calendario, festivi, giorni_extra, costo_giorno}]}` |
+| `GET /worksites/{id}/economia` | solo con `view_prices` (se no 403): `{yard, riepilogo: {contratto, consuntivo, ricavo_stimato, extra, base, fatturato, emesso, da_emettere, ancora_da_fatturare, ricavi, costi, margine}, costi: [{voce, importo}], fatture, extra, ordini}`. Stessi conti della scheda web, storico Yard compreso; `yard: false` se Yard non risponde |

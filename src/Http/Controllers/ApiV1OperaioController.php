@@ -843,6 +843,7 @@ final class ApiV1OperaioController
         // Gli altri moduli, uno per permesso: stanno sotto "Altro" nell'app.
         // Stessi permessi del menu del sito, nella societa' attiva.
         foreach ([
+            'commesse'       => ['worksites'],
             'registro'       => ['attendance'],
             'pianificazione' => ['pianificazione'],
             'programmazione' => ['programmazione'],

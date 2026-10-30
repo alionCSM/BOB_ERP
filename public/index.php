@@ -805,6 +805,10 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/noleggi/foto/elimina',     [ApiV1Controller::class, 'noleggiFotoElimina'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
+            ->get('/api/v1/worksites/{id}/presenze',    [ApiV1CantieriController::class, 'presenze'])
+            ->get('/api/v1/worksites/{id}/consorziate', [ApiV1CantieriController::class, 'consorziate'])
+            ->get('/api/v1/worksites/{id}/mezzi',       [ApiV1CantieriController::class, 'mezzi'])
+            ->get('/api/v1/worksites/{id}/economia',    [ApiV1CantieriController::class, 'economia'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda'])
 
             // ── L'app dell'operaio: le sue cose e basta ───────────────────
