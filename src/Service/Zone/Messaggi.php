@@ -281,7 +281,16 @@ final class Messaggi
             'cliente' => [Accesso::CAPO, Accesso::CLIENTE],
             default   => [],
         };
-        return array_merge($this->personeRuoli($worksiteId, $ruoli), $this->ufficio($worksiteId));
+        // Senza togliere i doppioni, chi e' dell'ufficio ed e' anche in
+        // squadra sul cantiere comparirebbe due volte, e prenderebbe due
+        // notifiche per lo stesso messaggio. L'ufficio viene dopo e vince:
+        // chi ha il permesso Zone e' dell'ufficio, qualunque ruolo gli sia
+        // stato messo sul cantiere.
+        $chi = [];
+        foreach (array_merge($this->personeRuoli($worksiteId, $ruoli), $this->ufficio($worksiteId)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
+        }
+        return array_values($chi);
     }
 
     /**
@@ -315,13 +324,34 @@ final class Messaggi
     }
 
     /**
-     * L'ufficio di un cantiere: chi ha il permesso Zone ed e' assegnato al
-     * cantiere in BOB. Se non c'e' nessuno, tutti quelli col permesso Zone:
-     * una segnalazione che non arriva a nessuno e' peggio di una in piu'.
+     * L'ufficio di un cantiere: chi ha il permesso Zone ed e' attaccato a
+     * quel cantiere.
      *
+     * Qui c'era un errore che mandava un messaggio di cantiere a tutto
+     * l'ufficio. La condizione era "sta in bb_worksite_users E NON sta in
+     * bb_zone_accessi", ma le due tabelle le scrive sempre insieme lo
+     * stesso metodo (AccessoRepository::salva): chi viene aggiunto da "Chi
+     * accede" finisce in tutte e due, quindi quella condizione non lo
+     * prendeva mai. Restavano solo le assegnazioni vecchie, fatte prima che
+     * la tabella degli accessi esistesse — su un cantiere di oggi, nessuno.
+     * Trovato zero, partiva il ripiego "allora tutti quelli col permesso
+     * Zone", e un messaggio scritto in un cantiere suonava a tutto
+     * l'ufficio.
+     *
+     * Adesso: attaccato al cantiere vuol dire stare in una delle due
+     * tabelle. Il NOT IN serviva a non contare due volte chi e' anche in
+     * squadra; se ne occupa chi chiama, togliendo i doppioni per user_id.
+     *
+     * @param bool $ripiegoSuTutti se qui non c'e' nessuno dell'ufficio,
+     *                             prende tutti quelli col permesso Zone.
+     *                             Vale per le segnalazioni, dove una che non
+     *                             arriva a nessuno e' peggio di una in piu'.
+     *                             NON per la chat: un messaggio di cantiere
+     *                             mandato a tutti e' il modo migliore per far
+     *                             spegnere le notifiche a tutti.
      * @return array<int, array{user_id:int, nome:string, lingua:?string, ruolo:string}>
      */
-    public function ufficio(int $worksiteId): array
+    public function ufficio(int $worksiteId, bool $ripiegoSuTutti = false): array
     {
         $conZone = "
             SELECT user_id FROM bb_user_company_permissions WHERE module = 'zone' AND allowed = 1
@@ -334,15 +364,20 @@ final class Messaggi
             FROM   bb_users u
             WHERE  u.active = 'Y' AND u.removed = 'N'
               AND  u.id IN ($conZone)
-              AND  u.id NOT IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w0)
         ";
-        $st = $this->conn->prepare($base . ' AND u.id IN (SELECT user_id FROM bb_worksite_users WHERE worksite_id = :w)');
-        $st->execute([':w0' => $worksiteId, ':w' => $worksiteId]);
+        // due segnaposto per lo stesso cantiere: le prepared statement non
+        // sono emulate, e un nome ripetuto fa fallire la query
+        $st = $this->conn->prepare($base . "
+              AND u.id IN (
+                    SELECT user_id FROM bb_worksite_users WHERE worksite_id = :w1
+                    UNION
+                    SELECT user_id FROM bb_zone_accessi   WHERE worksite_id = :w2
+              )");
+        $st->execute([':w1' => $worksiteId, ':w2' => $worksiteId]);
         $chi = $st->fetchAll(PDO::FETCH_ASSOC);
-        if (!$chi) {
-            $st = $this->conn->prepare($base);
-            $st->execute([':w0' => $worksiteId]);
-            $chi = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$chi && $ripiegoSuTutti) {
+            $chi = $this->conn->query($base)->fetchAll(PDO::FETCH_ASSOC);
         }
         return array_map(fn($p) => ['user_id' => (int)$p['user_id']] + $p, $chi);
     }

@@ -196,9 +196,12 @@ final class Segnalazioni
             [Accesso::CAPO, Accesso::OPERAIO, Accesso::CLIENTE],
             fn($r) => Accesso::vedeVisibilita($r, $s['visibilita'])
         ));
+        // L'ufficio per ultimo: chi ha il permesso Zone e' dell'ufficio
+        // anche se sul cantiere gli hanno messo ruolo operaio, e nel filo di
+        // una segnalazione e' l'ufficio che risponde.
         $chi = [];
-        foreach (array_merge($this->messaggi->ufficio($w), $this->messaggi->personeRuoli($w, $ruoli)) as $p) {
-            $chi[$p['user_id']] = $p;
+        foreach (array_merge($this->messaggi->personeRuoli($w, $ruoli), $this->messaggi->ufficio($w)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
         }
         if (!isset($chi[(int)$s['created_by']])) {
             $st = $this->conn->prepare("
@@ -224,7 +227,18 @@ final class Segnalazioni
         if (!$s) return;
         $cantiere = $this->nomeCantiere((int)$s['worksite_id']);
         $urgente  = $s['gravita'] === 'blocca' || $s['tipo'] === 'sicurezza';
-        foreach ($this->persone($s) as $p) {
+
+        // Qui, e solo qui, il ripiego: se a quel cantiere non e' attaccato
+        // nessuno dell'ufficio, la segnalazione va a tutti quelli col
+        // permesso Zone. Una che non arriva a nessuno e' peggio di una in
+        // piu' — ma vale per la segnalazione, non per i messaggi di tutti i
+        // giorni, che prima prendevano la stessa strada.
+        $chi = [];
+        foreach (array_merge($this->persone($s), $this->messaggi->ufficio((int)$s['worksite_id'], true)) as $p) {
+            $chi[(int)$p['user_id']] = $p;
+        }
+
+        foreach ($chi as $p) {
             if ($p['user_id'] === (int)$s['created_by']) continue;
             // una segnalazione da squadra la legge chi la gestisce, non tutti:
             // l'operaio la vedra' se l'ufficio la allarga, senza un push

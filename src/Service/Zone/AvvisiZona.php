@@ -116,12 +116,6 @@ final class AvvisiZona
     }
 
     /**
-     * Chi del cantiere ha uno di quei ruoli, piu' una persona precisa.
-     *
-     * @param string[] $ruoli
-     * @return array<int, array{user_id:int, lingua:?string, ruolo:string}>
-     */
-    /**
      * Con chi e' condivisa una cosa, per id, da cercare con isset().
      *
      * @return array<int, true>
@@ -135,6 +129,12 @@ final class AvvisiZona
         return array_fill_keys(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)), true);
     }
 
+    /**
+     * Chi del cantiere ha uno di quei ruoli, piu' una persona precisa.
+     *
+     * @param string[] $ruoli
+     * @return array<int, array{user_id:int, lingua:?string, ruolo:string}>
+     */
     private function persone(int $worksiteId, array $ruoli, ?int $persona): array
     {
         $cond = [];
