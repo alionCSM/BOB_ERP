@@ -102,6 +102,54 @@ final class Presenze
     }
 
     /**
+     * Le giornate uomo di tutto il cantiere, dall'inizio.
+     *
+     * Il conto e' quello della scheda cantiere, non un altro: giornata
+     * intera 1, mezza 0,5, e per le consorziate le persone che hanno
+     * mandato. Due numeri diversi per la stessa cosa, in due pagine di
+     * BOB, sarebbero una domanda a cui nessuno saprebbe rispondere.
+     *
+     * @return array{nostri: float, consorziate: float, giornate: float, dal: ?string, al: ?string}
+     */
+    public function totali(int $worksiteId): array
+    {
+        $nostri = $this->conn->prepare("
+            SELECT COALESCE(SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END), 0) AS giornate,
+                   MIN(data) AS dal, MAX(data) AS al
+            FROM   bb_presenze
+            WHERE  worksite_id = :ws
+        ");
+        $nostri->execute([':ws' => $worksiteId]);
+        $a = $nostri->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $cons = $this->conn->prepare("
+            SELECT COALESCE(SUM(quantita), 0) AS giornate,
+                   MIN(data_presenza) AS dal, MAX(data_presenza) AS al
+            FROM   bb_presenze_consorziate
+            WHERE  worksite_id = :ws
+        ");
+        $cons->execute([':ws' => $worksiteId]);
+        $b = $cons->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        // il primo e l'ultimo giorno guardando tutti e due gli elenchi
+        $date = array_filter([$a['dal'] ?? null, $b['dal'] ?? null]);
+        $dal  = $date ? min($date) : null;
+        $date = array_filter([$a['al'] ?? null, $b['al'] ?? null]);
+        $al   = $date ? max($date) : null;
+
+        $nostre = (float)($a['giornate'] ?? 0);
+        $loro   = (float)($b['giornate'] ?? 0);
+
+        return [
+            'nostri'      => $nostre,
+            'consorziate' => $loro,
+            'giornate'    => $nostre + $loro,
+            'dal'         => $dal ? (string)$dal : null,
+            'al'          => $al ? (string)$al : null,
+        ];
+    }
+
+    /**
      * I giorni in cui c'e' stato qualcuno, dal piu' recente.
      *
      * Nostri e consorziate insieme: un giorno in cui ha lavorato solo una

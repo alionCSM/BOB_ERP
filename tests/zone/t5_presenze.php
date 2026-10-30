@@ -130,6 +130,29 @@ foreach (['pranzo', 'cena', 'hotel', 'targa', 'auto', 'costo', 'prezzo', 'note',
     $p->check("non esce '$vietato'", stripos($fuori, $vietato) === false);
 }
 
+// ── Le giornate uomo di tutto il cantiere ────────────────────────────────
+$t = $pre->totali(CANTIERE);
+// nostri: 1 + 0,5 + 1 (oggi) + 1 (ieri) = 3,5
+$p->uguale('giornate nostre', 3.5, $t['nostri']);
+// consorziate: 3 + 2 + 4 = 9
+$p->uguale('giornate consorziate', 9.0, $t['consorziate']);
+$p->uguale('totale giornate uomo', 12.5, $t['giornate']);
+$p->uguale('dal primo giorno', $ieri, $t['dal']);
+$p->uguale('fino all\'ultimo', $oggi, $t['al']);
+
+// lo stesso conto della scheda cantiere, non un altro
+$ufficio = (float)$pdo->query("
+    SELECT COALESCE(SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END), 0)
+    FROM bb_presenze WHERE worksite_id = " . CANTIERE)->fetchColumn()
+    + (float)$pdo->query('SELECT COALESCE(SUM(quantita), 0)
+                          FROM bb_presenze_consorziate WHERE worksite_id = ' . CANTIERE)->fetchColumn();
+$p->uguale('lo stesso numero della scheda cantiere', $ufficio, $t['giornate']);
+
+// un cantiere senza presenze non e' un errore
+$vuotoTot = $pre->totali(999);
+$p->uguale('cantiere senza presenze: zero', 0.0, $vuotoTot['giornate']);
+$p->uguale('e nessun periodo', null, $vuotoTot['dal']);
+
 // ── Un altro cantiere e' un altro registro ───────────────────────────────
 $altro = $pre->giorno(ALTRO, $oggi);
 $p->uguale('nell\'altro cantiere c\'e\' una persona sola', 1, $altro['persone']);

@@ -1285,7 +1285,8 @@ final class FieldwireController
                 $data   = $giorni[0]['data'] ?? date('Y-m-d');
             }
 
-            return (new \App\Service\Zone\Presenze($this->conn))->giorno($w, $data);
+            $presenze = new \App\Service\Zone\Presenze($this->conn);
+            return $presenze->giorno($w, $data) + ['totali' => $presenze->totali($w)];
         });
     }
 

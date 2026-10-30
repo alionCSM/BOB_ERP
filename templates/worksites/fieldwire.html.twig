@@ -2242,7 +2242,24 @@ async function loadPresenze(data = null) {
         <div class="bz-pres-testa">
             <h3>${fmtDateLunga(d.data)}</h3>
             <span>${d.persone} ${d.persone === 1 ? 'persona' : 'persone'} in cantiere</span>
+            <span class="gu">${numIt(d.giornate)} ${d.giornate === 1 ? 'giornata uomo' : 'giornate uomo'}</span>
         </div>
+        ${d.totali ? `
+            <div class="bz-pres-tot">
+                <div class="v">
+                    <span class="n">${numIt(d.totali.giornate)}</span>
+                    <span class="l">giornate uomo dall'inizio</span>
+                </div>
+                <div class="v">
+                    <span class="n">${numIt(d.totali.nostri)}</span>
+                    <span class="l">nostre</span>
+                </div>
+                <div class="v">
+                    <span class="n">${numIt(d.totali.consorziate)}</span>
+                    <span class="l">consorziate</span>
+                </div>
+                ${d.totali.dal ? `<div class="p">dal ${fmtDate(d.totali.dal)} al ${fmtDate(d.totali.al)}</div>` : ''}
+            </div>` : ''}
         ${nostri ? `
             <div class="bz-pres-sez">
                 <h4>I nostri</h4>
@@ -2261,6 +2278,11 @@ async function loadPresenze(data = null) {
             </div>` : ''}
         ${!nostri && !cons ? '<div class="bz-empty">Nessuno in cantiere questo giorno.</div>' : ''}
     `;
+}
+
+/* 11.5 si scrive 11,5; 348 resta 348 (niente ",0" che non dice niente) */
+function numIt(n) {
+    return Number(n || 0).toLocaleString('it-IT', { maximumFractionDigits: 1 });
 }
 
 function fmtDateLunga(str) {
@@ -2367,6 +2389,16 @@ if (!SOLO_ACCESSI) {
 .bz-pres-testa { display:flex; align-items:baseline; gap:12px; margin-bottom:22px; }
 .bz-pres-testa h3 { margin:0; font-size:16px; font-weight:700; color:#e2e8f0; text-transform:capitalize; }
 .bz-pres-testa span { font-size:12.5px; color:#64748b; }
+.bz-pres-testa .gu { color:#94a3b8; }
+.bz-pres-testa .gu::before { content:'·'; margin-right:12px; color:#334155; }
+.bz-pres-tot { display:flex; align-items:center; gap:28px; flex-wrap:wrap;
+               border:1px solid #1e293b; border-radius:10px; padding:14px 18px; margin-bottom:26px; }
+.bz-pres-tot .v { display:flex; flex-direction:column; gap:2px; }
+.bz-pres-tot .n { font-size:19px; font-weight:700; color:#e2e8f0; line-height:1; }
+.bz-pres-tot .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+.bz-pres-tot .p { margin-left:auto; font-size:11.5px; color:#64748b; }
+[data-theme="light"] .bz-pres-tot { border-color:#e2e8f0; }
+[data-theme="light"] .bz-pres-tot .n { color:#1e293b; }
 .bz-pres-sez { margin-bottom:26px; }
 .bz-pres-sez h4 { margin:0 0 8px; font-size:11px; font-weight:700; text-transform:uppercase;
                   letter-spacing:.06em; color:#64748b; }
