@@ -9,22 +9,34 @@ php tests/zone/esegui.php
 
 ## Cosa serve
 
-Un MySQL (o MariaDB) vuoto dove scrivere, **separato da quello di lavoro**.
-Quello di XAMPP va benissimo, su una porta sua e con un datadir suo:
+Un MySQL dove poter creare un database. Le prove **si creano il loro**
+(`bob_zone_test`) usando host, utente e password del `.env`
+dell'installazione: non c'e' niente da configurare, e non possono finire
+sul database dell'applicazione.
 
 ```bash
-mysql_install_db --datadir=/tmp/bobtest/data
-mysqld --datadir=/tmp/bobtest/data --port=3307 --skip-grant-tables
-mysql -h 127.0.0.1 -P 3307 -u root -e "CREATE DATABASE bob_test"
+php tests/zone/esegui.php
 ```
 
-La connessione sta in `schema.php` (`DSN`). Il database viene **svuotato e
-ricostruito a ogni prova**: non puntarlo mai su BOB vero. C'e' una sicura —
-il nome del database deve contenere `test`, se no le prove si rifiutano di
-partire — ma e' l'ultima difesa, non la prima.
+Il database delle prove viene **svuotato e ricostruito a ogni prova**. Due
+sicure lo tengono lontano da quello vero: il nome non puo' essere quello del
+`.env`, e deve contenere `test`. Per usarne un altro:
 
-**Non si lanciano sul server di produzione.** Sono uno strumento da
-sviluppo: vogliono un MySQL da buttare, e sul server non c'e'.
+```bash
+ZONE_TEST_DB=zone_test_mio php tests/zone/esegui.php
+```
+
+Se l'utente del `.env` non puo' fare `CREATE DATABASE`, si crea a mano una
+volta sola:
+
+```sql
+CREATE DATABASE bob_zone_test CHARACTER SET utf8mb4;
+GRANT ALL ON bob_zone_test.* TO 'utente_di_bob'@'localhost';
+```
+
+**Dove lanciarle.** Sul server di collaudo va bene: si fanno il database
+loro e non toccano `bob_collaudo`. In produzione no — non c'e' motivo di
+creare database su quella macchina.
 
 ## Com'e' fatto
 

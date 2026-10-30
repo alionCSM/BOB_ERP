@@ -12,16 +12,109 @@ declare(strict_types=1);
 
 require __DIR__ . '/miniphinx.php';
 
-const DSN = 'mysql:host=127.0.0.1;port=3307;dbname=bob_test;charset=utf8mb4';
+/**
+ * Dove si collegano le prove.
+ *
+ * Host, utente e password arrivano dal `.env` dell'installazione: sul
+ * server di collaudo c'e' gia' un MySQL che funziona, e chiedere un secondo
+ * database a mano e' un passaggio in cui ci si sbaglia.
+ *
+ * Il NOME del database no: quello e' sempre un altro, e lo creano le prove
+ * se non c'e'. Cosi' non puo' succedere che puntino al database
+ * dell'applicazione — che verrebbe svuotato alla prima riga.
+ *
+ * Si puo' forzare con ZONE_TEST_DB, purche' il nome contenga "test".
+ *
+ * @return array{dsn: string, utente: string, password: string, nome: string}
+ */
+function connessione(): array
+{
+    // Il .env sta "un livello sopra il repo", ma dov'e' il repo cambia da
+    // un'installazione all'altra: si risale finche' non si trova.
+    $env = [];
+    for ($su = 2; $su <= 4 && !$env; $su++) {
+        $env = leggiEnv(dirname(__DIR__, $su) . '/.env');
+    }
+
+    $host = $env['DB_HOST'] ?? '127.0.0.1';
+    $porta = (int)($env['DB_PORT'] ?? 3306);
+    $utente = $env['DB_USER'] ?? 'root';
+    $password = $env['DB_PASS'] ?? '';
+
+    // In locale non c'e' nessun .env: li' il MySQL di prova sta sulla 3307
+    if (!$env) {
+        $porta = 3307;
+    }
+
+    $nome = getenv('ZONE_TEST_DB') ?: 'bob_zone_test';
+
+    if ($nome === ($env['DB_NAME'] ?? null)) {
+        throw new RuntimeException(
+            "Mi fermo: '$nome' e' il database dell'applicazione. "
+            . 'Le prove svuotano quello a cui si collegano.'
+        );
+    }
+
+    return [
+        'dsn'      => "mysql:host=$host;port=$porta;charset=utf8mb4",
+        'utente'   => $utente,
+        'password' => $password,
+        'nome'     => $nome,
+    ];
+}
+
+/**
+ * Legge un .env senza Dotenv: qui vendor/ non c'e' e non serve.
+ *
+ * @return array<string, string>
+ */
+function leggiEnv(string $file): array
+{
+    if (!is_readable($file)) {
+        return [];
+    }
+    $fuori = [];
+    foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $riga) {
+        $riga = trim($riga);
+        if ($riga === '' || $riga[0] === '#' || !str_contains($riga, '=')) {
+            continue;
+        }
+        [$chiave, $valore] = explode('=', $riga, 2);
+        $fuori[trim($chiave)] = trim(trim(trim($valore), '"'), "'");
+    }
+    return $fuori;
+}
 
 function db(): PDO
 {
-    $pdo = new PDO(DSN, 'root', '', [
+    static $pdo = null;
+    if ($pdo instanceof PDO) {
+        return $pdo;
+    }
+
+    $c = connessione();
+    $opzioni = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_EMULATE_PREPARES   => false,   // come in produzione
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    ]);
-    return $pdo;
+    ];
+
+    try {
+        // prima senza database: se non c'e' lo si crea
+        $radice = new PDO($c['dsn'], $c['utente'], $c['password'], $opzioni);
+        $radice->exec("CREATE DATABASE IF NOT EXISTS `{$c['nome']}` CHARACTER SET utf8mb4");
+    } catch (PDOException $e) {
+        throw new RuntimeException(
+            "Non riesco a collegarmi a MySQL ({$c['dsn']}, utente {$c['utente']}): "
+            . $e->getMessage() . "\n"
+            . "Le prove usano l'accesso del .env dell'installazione, su un database a parte "
+            . "({$c['nome']}), e lo creano da sole: serve che quell'utente possa CREATE DATABASE.",
+            0,
+            $e
+        );
+    }
+
+    return $pdo = new PDO($c['dsn'] . ";dbname={$c['nome']}", $c['utente'], $c['password'], $opzioni);
 }
 
 function costruisciSchema(PDO $pdo): void
@@ -35,8 +128,8 @@ function costruisciSchema(PDO $pdo): void
     if (!preg_match('/test/i', $nome)) {
         throw new RuntimeException(
             "Mi fermo: '$nome' non sembra un database di prova. "
-            . 'Queste prove cancellano tutte le tabelle del database a cui si collegano '
-            . '(vedi DSN in tests/zone/schema.php), e il nome deve contenere "test".'
+            . 'Queste prove cancellano tutte le tabelle del database a cui si collegano, '
+            . 'e il nome deve contenere "test". Con ZONE_TEST_DB se ne sceglie un altro.'
         );
     }
 
