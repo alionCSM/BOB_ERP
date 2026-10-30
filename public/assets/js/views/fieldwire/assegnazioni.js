@@ -17,7 +17,9 @@
     const root = document.getElementById('bz-assegnazioni-root');
     if (!root || typeof WID === 'undefined') return;
 
-    const A_CHI = { capo: 'I capi squadra', operaio: 'Gli operai', cliente: 'Il cliente', ufficio: "L'ufficio" };
+    const A_CHI = { cantiere: 'Chi e\' in cantiere', cliente: 'Il cliente', ufficio: "L'ufficio" };
+    // assegnazioni scritte prima che capo e operaio diventassero Cantiere
+    const A_CHI_VECCHI = { capo: A_CHI.cantiere, operaio: A_CHI.cantiere };
     const FREQ  = { una_volta: 'Una volta', giornaliera: 'Ogni giorno', settimanale: 'Ogni settimana' };
 
     function esc(s) {
@@ -73,7 +75,7 @@
     }
 
     function riga(a) {
-        const chi = a.a_user_id ? (a.persona || 'una persona') : (A_CHI[a.a_ruolo] || a.a_ruolo);
+        const chi = a.a_user_id ? (a.persona || 'una persona') : (A_CHI[a.a_ruolo] || A_CHI_VECCHI[a.a_ruolo] || a.a_ruolo);
         const sub = [
             FREQ[a.frequenza] || a.frequenza,
             a.scadenza ? 'entro il ' + data(a.scadenza) : '',

@@ -129,11 +129,40 @@ $p->uguale('col ripiego (solo segnalazioni) prende chi ha il modulo', [ANNA, LUC
 $form = new \App\Repository\Fieldwire\ZoneFormRepository($pdo);
 $tpl = $form->create(['worksite_id' => CANTIERE, 'name' => 'DPI', 'fields' => [], 'created_by' => ANNA]);
 $pdo->prepare("INSERT INTO bb_zone_form_assegnazioni (worksite_id, template_id, a_ruolo, frequenza, created_by)
-               VALUES (?, ?, 'operaio', 'giornaliera', ?)")->execute([CANTIERE, $tpl, ANNA]);
+               VALUES (?, ?, 'cantiere', 'giornaliera', ?)")->execute([CANTIERE, $tpl, ANNA]);
 $ass = (int)$pdo->lastInsertId();
 
+// Dato "a chi e' in cantiere": capo e operaio sono lo stesso ruolo, e il
+// modulo arriva a tutti e due. Prima che capo e operaio diventassero
+// Cantiere, un modulo dato "agli operai" non arrivava a nessuno.
 (new AvvisiZona($pdo, $notifiche))->modulo($ass, ANNA);
-$p->uguale('il modulo avvisa chi lo deve compilare', [ILIR], destinatari($pdo));
+$p->uguale('il modulo avvisa chi lo deve compilare', [MARCO, ILIR], destinatari($pdo));
+
+$leMie = new \App\Service\Zone\LeMie($pdo);
+$p->uguale('l\'operaio lo trova fra i suoi da compilare', [$ass],
+           array_map(fn($m) => (int)$m['id'], $leMie->daCompilare(ILIR)));
+$p->uguale('anche il capo', [$ass],
+           array_map(fn($m) => (int)$m['id'], $leMie->daCompilare(MARCO)));
+$p->uguale('il cliente no', [], $leMie->daCompilare(NERI));
+
+$stato = (new \App\Service\Zone\ScadenzeModuli($pdo))->stato(CANTIERE);
+$mancano = $stato[$ass]['mancano'] ?? [];
+sort($mancano);
+$p->uguale('l\'ufficio vede chi manca', ['Ilir Bequiri', 'Marco Rossi'], $mancano);
+
+// La colonna non accetta piu' i nomi vecchi: una pagina rimasta indietro
+// che manda "operaio" deve passare dal controller, che lo traduce.
+$vecchio = false;
+try {
+    $pdo->prepare("INSERT INTO bb_zone_form_assegnazioni (worksite_id, template_id, a_ruolo, frequenza, created_by)
+                   VALUES (?, ?, 'operaio', 'giornaliera', ?)")->execute([CANTIERE, $tpl, ANNA]);
+} catch (PDOException $e) {
+    $vecchio = true;
+}
+$p->check('"operaio" non entra piu\' nella colonna', $vecchio);
+$p->uguale('capo e operaio diventano Cantiere',
+           [Accesso::CANTIERE, Accesso::CANTIERE],
+           [$acc->normalizza('capo'), $acc->normalizza('operaio')]);
 
 // ── Aggiunto al cantiere ──────────────────────────────────────────────────
 (new AvvisiZona($pdo, $notifiche))->accesso(CANTIERE, MARCO, ANNA);

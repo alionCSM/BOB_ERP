@@ -170,16 +170,16 @@
             });
     }
 
-    // Si entra come operaio, o come ufficio se si ha il modulo Zone —
+    // Si entra come Cantiere, o come Ufficio se si ha il modulo Zone —
     // chi ha quel modulo quasi sempre lo si aggiunge per quello, e
-    // correggerlo dopo e' un clic in piu' ogni volta. Capo si sceglie. Un
+    // correggerlo dopo e' un clic in piu' ogni volta. Un
     // account cliente diventa cliente da solo, qualunque cosa si mandi.
     tendina.addEventListener('change', function () {
         if (!tendina.value) return;
         const opz = tendina.options[tendina.selectedIndex];
         post(base(), {
             user_id: tendina.value,
-            ruolo:   opz && opz.dataset.zone === '1' ? 'ufficio' : 'operaio',
+            ruolo:   opz && opz.dataset.zone === '1' ? 'ufficio' : 'cantiere',
         }).then(carica);
     });
 

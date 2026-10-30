@@ -399,22 +399,26 @@ non cambia niente nelle chiamate, cambia solo chi riceve 403.
 
 ### Ruoli e chi vede cosa
 
-Ogni persona assegnata ha un **ruolo**: `capo`, `operaio`, `cliente`
-(l'ufficio e' chi ha il modulo `zone`). In `/me/zone` ogni cantiere ha
-`ruolo`; `accessi` resta per le versioni vecchie dell'app.
+Ogni persona assegnata ha un **ruolo** sul cantiere: `ufficio`,
+`cantiere`, `cliente`. `capo` e `operaio` non esistono piu' (migrazione
+20261030000004): sono `cantiere`. In `/me/zone` ogni cantiere ha `ruolo` e
+`permessi` (la tabella di `Permessi`, azione per azione); `accessi` resta
+per le versioni vecchie dell'app.
 
-Ogni cosa della Zone ha una **visibilita'**: `ufficio`, `squadra` (capi e
-operai), `capi`, `cliente` (ufficio e cliente), `tutti`. Il filtro e' sul
-server: una cosa che uno non vede non arriva nella risposta. Il cliente vede
-qualcosa solo dove l'ufficio ha acceso "Condividi col cliente".
+Chi vede una cosa lo decidono le **condivisioni**, persona per persona. Le
+segnalazioni hanno ancora un'etichetta (`ufficio`, `cantiere`, `cliente`,
+`tutti`). Il filtro e' sul server; il cliente vede qualcosa solo dove
+l'ufficio ha acceso "Condividi col cliente".
 
-| | capo | operaio | cliente |
+| | ufficio | cantiere | cliente |
 |---|---|---|---|
-| crea attivita', voci di checklist | si' | no | no |
-| sposta / spunta | si' | solo le sue o della squadra | no |
-| "Verificato" | no (solo ufficio) | no | no |
-| scrive messaggi e foto | si' | si' | si' (li legge solo l'ufficio) |
-| carica file | si' | no | no |
+| vede, scrive, compila, completa, carica, annota | si' | si' | si' |
+| crea attivita', carica disegni, decide i moduli | si' | no | si' |
+| verifica, cancella la roba d'altri, decide chi accede | si' | no | no |
+
+I moduli si assegnano a una persona o a un ruolo (`a_ruolo`: `cantiere`,
+`cliente`, `ufficio`). Se arriva ancora `capo` o `operaio` il server lo
+legge come `cantiere` (migrazione 20261031000001 per quelli gia' salvati).
 
 ## GET /api/v1/me/attivita
 

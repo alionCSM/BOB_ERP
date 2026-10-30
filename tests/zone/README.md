@@ -1,7 +1,7 @@
 # Prove della BOB Zone
 
 Quattro prove che esercitano la Zone come la usano i tre tipi di persone che
-ci stanno dentro: **ufficio**, **capo/operaio**, **cliente**.
+ci stanno dentro: **ufficio**, **cantiere** (capo e operaio), **cliente**.
 
 ```bash
 php tests/zone/esegui.php

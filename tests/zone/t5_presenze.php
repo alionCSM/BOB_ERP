@@ -190,7 +190,9 @@ foreach (['fuori', 'estraneo'] as $chi) {
 
 // la regola nel controller e' quella, non un'altra
 $src = file_get_contents(dirname(__DIR__, 2) . '/src/Http/Controllers/FieldwireController.php');
-$p->check('il registro usa la regola "dentro"',
-          str_contains($src, "'presenze'              => 'dentro'"));
+// VEDERE ce l'hanno tutti e tre i ruoli: chiunque entri nel cantiere
+$p->check('il registro usa la regola "vedere"',
+          (bool)preg_match("/'presenze'\\s*=> P::VEDERE,/", $src)
+          && (bool)preg_match("/'presenzeGiorni'\\s*=> P::VEDERE,/", $src));
 
 exit($p->esito('Prova 5 — presenze'));

@@ -86,7 +86,7 @@ final class AvvisiZona
         }
         $persone = $this->persone(
             (int)$a['worksite_id'],
-            $a['a_ruolo'] && $a['a_ruolo'] !== 'ufficio' ? [(string)$a['a_ruolo']] : [],
+            $a['a_ruolo'] ? [(string)$a['a_ruolo']] : [],
             (int)($a['a_user_id'] ?? 0) ?: null,
         );
         foreach ($persone as $p) {
