@@ -836,7 +836,33 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/ufficio/approvare',             [ApiV1UfficioController::class, 'approvare'])
         ->post('/api/v1/ufficio/presenze/{id}/decidi',  [ApiV1UfficioController::class, 'decidiPresenza'])
         ->post('/api/v1/ufficio/assenze/{id}/decidi',   [ApiV1UfficioController::class, 'decidiAssenza'])
-        ->get( '/api/v1/ufficio/cantieri',              [ApiV1UfficioController::class, 'cercaCantieri']);
+        ->get( '/api/v1/ufficio/cantieri',              [ApiV1UfficioController::class, 'cercaCantieri'])
+        ->get( '/api/v1/ufficio/presenze',              [ApiV1UfficioController::class, 'presenze'])
+        ->post('/api/v1/ufficio/presenze',              [ApiV1UfficioController::class, 'salvaPresenze'])
+        ->get( '/api/v1/ufficio/operai',                [ApiV1UfficioController::class, 'operai'])
+        ->get( '/api/v1/ufficio/documenti',             [ApiV1UfficioController::class, 'documenti'])
+        ->get( '/api/v1/ufficio/flotta',                [ApiV1UfficioController::class, 'flotta']);
+
+    // Pianificazione e programmazione: i metodi del sito, non una copia. Il
+    // controllo del modulo che sul sito fa il middleware (per indirizzo),
+    // qui si fa prima di passare al metodo, con la societa' attiva.
+    $moduloApi = [
+        '/api/v1/pianificazione' => 'pianificazione',
+        '/api/v1/programmazione' => 'programmazione',
+    ];
+    foreach ($moduloApi as $prefisso => $modulo) {
+        if (str_starts_with($uri, $prefisso)) {
+            $u = $GLOBALS['user'] ?? null;
+            if (!$u || ((int)$u->id !== 1 && !$u->canAccess($modulo))) {
+                \App\Http\Response::json(['success' => false, 'ok' => false, 'message' => "Non hai questo permesso in questa societa'"], 403);
+            }
+        }
+    }
+    require_once APP_ROOT . '/src/Http/Controllers/ProgrammazioneController.php';
+    $router
+        ->get( '/api/v1/pianificazione/get',   [ProgrammazioneController::class, 'get'])
+        ->post('/api/v1/pianificazione/invia', [ProgrammazioneController::class, 'invia'])
+        ->get( '/api/v1/programmazione/api',   [ProgrammazioneController::class, 'api']);
 
     // BOB AI dall'app: lo stesso controller del sito (stessi permessi
     // 'ai_chat', stessa memoria delle chat, stesso flusso SSE). Cambia

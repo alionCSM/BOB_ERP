@@ -840,6 +840,24 @@ final class ApiV1OperaioController
         if ($puo('ai_chat')) {
             $menu[] = ['chiave' => 'ai', 'titolo' => 'BOB AI'];
         }
+        // Gli altri moduli, uno per permesso: stanno sotto "Altro" nell'app.
+        // Stessi permessi del menu del sito, nella societa' attiva.
+        foreach ([
+            'registro'       => ['attendance'],
+            'pianificazione' => ['pianificazione'],
+            'programmazione' => ['programmazione'],
+            'scadenze'       => ['documents'],
+            'flotta'         => ['fleet_view', 'fleet_manage'],
+            'autocarrate'    => ['pn_autocarrate', 'pn_autocarrate_giornata'],
+            'noleggi'        => ['pn_noleggi', 'pn_noleggi_giornata'],
+        ] as $chiave => $servono) {
+            foreach ($servono as $m) {
+                if ($puo($m)) {
+                    $menu[] = ['chiave' => $chiave, 'titolo' => $chiave];
+                    break;
+                }
+            }
+        }
 
         $cc = $GLOBALS['currentCompany'] ?? new \App\Service\CurrentCompany($this->conn);
         $attiva = $cc->current();

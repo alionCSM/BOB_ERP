@@ -716,3 +716,22 @@ comune col web), con Bearer:
 | `GET /ai/conversazioni/{id}` | `{ok, messaggi: [{ruolo, testo, sql, righe, errore, created_at}]}` |
 | `POST /ai/conversazioni/{id}/rinomina` | form `titolo` |
 | `POST /ai/conversazioni/{id}/elimina` | |
+
+## Ufficio dall'app, seconda parte
+
+Ogni voce compare nella home solo se l'utente ha il modulo nella societa'
+scelta; le rotte hanno la stessa guardia.
+
+| Rotta | Modulo | Cosa fa |
+|---|---|---|
+| `GET /ufficio/presenze?dal=&al=&cantiere_id=&worker_id=` | `attendance` | il registro, le prime 200 righe |
+| `POST /ufficio/presenze` | `attendance` | `{cantiere, start_date, end_date, overwrite, righe: [{worker_id, turno, pranzo, pranzo_prezzo, cena, cena_prezzo, hotel, auto, note}]}` — come l'inserimento del sito; se ci sono gia' presenze risponde 422 `{code: conflitti, conflitti}` e si rimanda con `overwrite: true` |
+| `GET /ufficio/operai?q=` | `attendance` | operai attivi, senza le consorziate |
+| `GET /ufficio/documenti?stato=scadenza\|scaduti` | `documents` | `{documenti: [{id, di: operaio\|azienda, tipo, scadenza, nome, azienda}]}`, entro 30 giorni o gia' scaduti |
+| `GET /ufficio/flotta` | `fleet_view` o `fleet_manage` | `{mezzi, carte, telepass}` con a chi sono adesso |
+| `GET /pianificazione/get?data=` | `pianificazione` | la stessa risposta della pagina web |
+| `POST /pianificazione/invia` | `pianificazione` | manda a ogni operaio dove va (come il bottone del sito) |
+| `GET /programmazione/api?action=list&mese=&anno=` | `programmazione` | le righe del mese |
+
+Autocarrate e noleggi del giorno usano le rotte gia' esistenti
+`/noleggi/giornata`, `/noleggi/giornata/segna`, `/noleggi/giornata/foto`.
