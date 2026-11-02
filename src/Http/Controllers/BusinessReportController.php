@@ -64,7 +64,11 @@ final class BusinessReportController
             }
         }
 
-        $dati = self::buildSeries($rows, $daAnno, $aAnno);
+        // Se l'anno piu' recente e' quello in corso, il confronto si ferma
+        // al mese che stiamo vivendo: un anno a meta' contro uno intero non
+        // e' un confronto, e' una percentuale inventata.
+        $meseLimite = $aAnno === $annoCorrente ? (int)date('n') : 12;
+        $dati = self::buildSeries($rows, $daAnno, $aAnno, $meseLimite);
 
         Response::view('report/fatturato.html.twig', $request, [
             'pageTitle'  => 'Andamento fatturato',
@@ -76,6 +80,9 @@ final class BusinessReportController
             'totali'     => $dati['totali'],
             'annoTop'    => $aAnno,
             'annoPrec'   => $aAnno - 1,
+            'meseLimite' => $meseLimite,
+            'meseNome'   => self::MESI[$meseLimite - 1] ?? '',
+            'annoInCorso' => $aAnno === $annoCorrente,
             'errore'     => $errore,
         ]);
     }
@@ -143,8 +150,14 @@ final class BusinessReportController
      * Le anagrafiche di tipo 'S' (altri soggetti) restano fuori da entrambi:
      * non sono ne' ricavi ne' costi di fornitura.
      */
-    public static function buildSeries(array $rows, int $daAnno, int $aAnno): array
+    /**
+     * @param int $meseLimite fino a che mese contare il confronto fra anni
+     *                        (12 = anno intero). Serve a non paragonare un
+     *                        anno in corso con uno finito.
+     */
+    public static function buildSeries(array $rows, int $daAnno, int $aAnno, int $meseLimite = 12): array
     {
+        $meseLimite = max(1, min(12, $meseLimite));
         $serie = [];
         for ($y = $daAnno; $y <= $aAnno; $y++) {
             $serie[$y] = [
@@ -175,12 +188,30 @@ final class BusinessReportController
             for ($i = 0; $i < 12; $i++) {
                 $serie[$y]['saldo'][$i] = $s['entrate'][$i] - $s['uscite'][$i];
             }
+            // Due totali per anno, e sono due cose diverse:
+            //
+            //  - quello pieno, che e' quanto ha fatto l'anno;
+            //  - quello "a pari periodo", fermo allo stesso mese dell'anno in
+            //    corso, che e' l'unico con cui ha senso confrontarlo.
+            //
+            // Prima c'era solo il primo, usato anche per il confronto:
+            // l'anno in corso fino a novembre veniva paragonato all'anno
+            // prima intero, e usciva sempre un calo che non esiste. Su
+            // numeri cosi' e' il genere di percentuale che fa prendere
+            // decisioni sbagliate.
+            $entratePeriodo = array_sum(array_slice($s['entrate'], 0, $meseLimite));
+            $uscitePeriodo  = array_sum(array_slice($s['uscite'],  0, $meseLimite));
+
             $totali[$y] = [
                 'entrate' => array_sum($s['entrate']),
                 'uscite'  => array_sum($s['uscite']),
                 'saldo'   => array_sum($s['entrate']) - array_sum($s['uscite']),
                 'incassato' => $s['incassato'],
                 'pagato'    => $s['pagato'],
+
+                'entrate_periodo' => $entratePeriodo,
+                'uscite_periodo'  => $uscitePeriodo,
+                'saldo_periodo'   => $entratePeriodo - $uscitePeriodo,
             ];
         }
 

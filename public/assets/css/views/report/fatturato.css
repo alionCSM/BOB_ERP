@@ -57,6 +57,9 @@
 .rp-alert small { color: #b91c1c; opacity: .85; }
 
 /* ── Card ───────────────────────────────────────────────────── */
+.rp-nota-periodo { margin: 0 0 14px; font-size: 12.5px; color: #64748b; line-height: 1.5; }
+.rp-nota-periodo strong { color: #334155; font-weight: 600; }
+
 .rp-cards {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 14px; margin-bottom: 16px;

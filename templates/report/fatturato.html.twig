@@ -62,30 +62,59 @@
     {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'incassato':0,'pagato':0} %}
     {% set tPrec = totali[annoPrec] ?? null %}
 
+    {# Il confronto fra anni va fatto sullo STESSO periodo. Su un anno in
+       corso si fermano tutti e due al mese che stiamo vivendo: prima
+       l'anno a meta' veniva paragonato all'anno prima intero, e usciva
+       sempre un calo che non esiste. #}
+    {% set riferimento = annoInCorso ? 'periodo' : 'anno' %}
+    {% set pOggi = annoInCorso ? tOggi.entrate_periodo : tOggi.entrate %}
+    {% set pPrec = tPrec ? (annoInCorso ? tPrec.entrate_periodo : tPrec.entrate) : null %}
+    {% set uOggi = annoInCorso ? tOggi.uscite_periodo : tOggi.uscite %}
+    {% set uPrec = tPrec ? (annoInCorso ? tPrec.uscite_periodo : tPrec.uscite) : null %}
+    {% set sOggiTot = annoInCorso ? tOggi.saldo_periodo : tOggi.saldo %}
+    {% set sPrecTot = tPrec ? (annoInCorso ? tPrec.saldo_periodo : tPrec.saldo) : null %}
+
+    {% if annoInCorso %}
+        <p class="rp-nota-periodo">
+            Il confronto con {{ annoPrec }} si ferma a <strong>{{ meseNome }}</strong>,
+            per paragonare lo stesso periodo. I totali grandi sono invece tutto
+            quello fatturato finora.
+        </p>
+    {% endif %}
+
     {# ── Card principali ── #}
     <div class="rp-cards">
         <div class="rp-card is-in">
             <div class="rp-card-lbl">Entrate {{ annoTop }}</div>
             <div class="rp-card-val">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.entrate, tPrec ? tPrec.entrate : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.entrate : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(pOggi, pPrec) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (pPrec ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
         <div class="rp-card is-out">
             <div class="rp-card-lbl">Uscite {{ annoTop }}</div>
             <div class="rp-card-val">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.uscite, tPrec ? tPrec.uscite : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.uscite : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(uOggi, uPrec) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (uPrec ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
         <div class="rp-card is-saldo">
             <div class="rp-card-lbl">Saldo {{ annoTop }}</div>
             <div class="rp-card-val {{ tOggi.saldo < 0 ? 'is-neg' : '' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.saldo, tPrec ? tPrec.saldo : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.saldo : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(sOggiTot, sPrecTot) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (sPrecTot ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
     </div>
@@ -207,5 +236,13 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/assets/js/views/report/fatturato.js?v=1"></script>
+{# Chart.js si carica qui. Il commento in fatturato.js diceva che stava
+   gia' nel bundle del template: il codice c'e' dentro, ma il bundle non
+   lo espone come variabile globale, quindi la pagina scriveva "Libreria
+   grafici non disponibile" e basta. Dal CDN, con il nonce perche' la CSP
+   di BOB non ha 'unsafe-inline', e con la versione fissata: cdnjs e'
+   gia' fra le sorgenti consentite. #}
+<script nonce="{{ cspNonce }}"
+        src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/assets/js/views/report/fatturato.js?v=2"></script>
 {% endblock %}
