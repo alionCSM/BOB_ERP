@@ -9,7 +9,9 @@ use PDO;
 /**
  * Letture aggregate dei documenti dal gestionale Business (TeamSystem).
  *
- * Modello dati (nrgtestm = testate documenti):
+ * Modello dati (testate documenti: `testmag` qui, `nrgtestm` altrove —
+ * il nome cambia da un'installazione all'altra e si configura con
+ * BUSINESS_TABELLA_DOC; le colonne invece sono le stesse):
  *   - tm_datdoc              data del documento  → criterio di COMPETENZA
  *   - tm_conto  → anagra.an_conto
  *   - anagra.an_tipo         'C' cliente (entrate) | 'F' fornitore (uscite) | 'S' altro
@@ -31,9 +33,15 @@ final class BusinessInvoiceRepository
     private const IMPONIBILE = '(t.tm_imponib_1 + t.tm_imponib_2 + t.tm_imponib_3 + t.tm_imponib_4
                                + t.tm_imponib_5 + t.tm_imponib_6 + t.tm_imponib_7 + t.tm_imponib_8)';
 
+    /**
+     * @param string $tabella la tabella delle testate. Il nome arriva da
+     *                        Config, che lo ripulisce: qui finisce dentro la
+     *                        query, dove un parametro non si puo' usare.
+     */
     public function __construct(
         private PDO $conn,
-        private string $codDitta
+        private string $codDitta,
+        private string $tabella = 'testmag'
     ) {}
 
     /**
@@ -54,7 +62,7 @@ final class BusinessInvoiceRepository
                 SUM(t.tm_totdoc - " . self::IMPONIBILE . ") AS iva,
                 SUM(t.tm_totdoc)                            AS totale,
                 SUM(t.tm_pagato)                            AS pagato
-            FROM   nrgtestm t
+            FROM   {$this->tabella} t
             JOIN   anagra   a ON a.an_conto = t.tm_conto AND a.codditt = t.codditt
             WHERE  t.codditt   = :ditta
               AND  t.tm_flprov = 'N'
@@ -100,7 +108,7 @@ final class BusinessInvoiceRepository
                 SUM(" . self::IMPONIBILE . ") AS imponibile,
                 SUM(t.tm_totdoc)              AS totale,
                 SUM(t.tm_pagato)              AS pagato
-            FROM   nrgtestm t
+            FROM   {$this->tabella} t
             JOIN   anagra   a ON a.an_conto = t.tm_conto AND a.codditt = t.codditt
             WHERE  t.codditt   = :ditta
               AND  t.tm_flprov = 'N'
@@ -141,7 +149,7 @@ final class BusinessInvoiceRepository
                 COUNT(*)                      AS documenti,
                 SUM(" . self::IMPONIBILE . ") AS imponibile,
                 SUM(t.tm_totdoc)              AS totale
-            FROM   nrgtestm t
+            FROM   {$this->tabella} t
             JOIN   anagra   a ON a.an_conto  = t.tm_conto AND a.codditt = t.codditt
             LEFT JOIN tabcaus c ON c.tb_codcaus = t.tm_causale
                                AND c.tb_anno    = YEAR(t.tm_datdoc)
@@ -173,7 +181,7 @@ final class BusinessInvoiceRepository
     {
         $stmt = $this->conn->prepare("
             SELECT DISTINCT YEAR(tm_datdoc) AS anno
-            FROM   nrgtestm
+            FROM   {$this->tabella}
             WHERE  codditt = :ditta AND tm_flprov = 'N' AND tm_datdoc > '1900-01-01'
             ORDER BY anno DESC
         ");
