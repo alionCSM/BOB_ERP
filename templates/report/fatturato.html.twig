@@ -59,7 +59,7 @@
         </div>
     {% endif %}
 
-    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'incassato':0,'pagato':0} %}
+    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'iva_vendite':0,'iva_acquisti':0} %}
     {% set tPrec = totali[annoPrec] ?? null %}
 
     {# Il confronto fra anni va fatto sullo STESSO periodo. Su un anno in
@@ -199,8 +199,13 @@
                         <th class="right">Entrate</th>
                         <th class="right">Uscite</th>
                         <th class="right">Saldo</th>
-                        <th class="right">Già incassato</th>
-                        <th class="right">Già pagato</th>
+                        {# L'IVA dei due registri, al posto di "gia' incassato" e
+                           "gia' pagato": quelli stavano sulle testate dei
+                           documenti, nel registro IVA non ci sono, e mostrarli
+                           a zero sarebbe peggio che non mostrarli. Quanto e'
+                           stato incassato davvero sta nello scadenzario. #}
+                        <th class="right">IVA vendite</th>
+                        <th class="right">IVA acquisti</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -210,8 +215,8 @@
                         <td class="right">€ {{ t.entrate|number_format(0, ',', '.') }}</td>
                         <td class="right rp-out">€ {{ t.uscite|number_format(0, ',', '.') }}</td>
                         <td class="right {{ t.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ t.saldo|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.incassato|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.pagato|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.iva_vendite|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.iva_acquisti|number_format(0, ',', '.') }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -235,6 +240,38 @@
 </div>
 {% endblock %}
 
+    {# ── Chi ci ha pagato, chi abbiamo pagato ──
+       Il totale in una riga sola non risponde alla domanda vera, che e'
+       "con chi": qui una riga per controparte, ordinata per importo. #}
+    <div class="rp-panel" id="rp-controparti">
+        <div class="rp-panel-head">
+            <h2 class="rp-panel-title">Chi ci ha pagato, chi abbiamo pagato</h2>
+            <div class="rp-cp-cmd">
+                <div class="rp-switch">
+                    <button type="button" class="on" data-registro="V">Clienti</button>
+                    <button type="button" data-registro="A">Fornitori</button>
+                </div>
+                <select id="rp-cp-anno" class="rp-cp-sel">
+                    {% for a in anni %}
+                        <option value="{{ a }}" {{ a == annoTop ? 'selected' : '' }}>{{ a }}</option>
+                    {% else %}
+                        <option value="{{ annoTop }}" selected>{{ annoTop }}</option>
+                    {% endfor %}
+                </select>
+                <select id="rp-cp-mese" class="rp-cp-sel">
+                    <option value="0">Tutto l'anno</option>
+                    {% for i, m in mesi %}
+                        <option value="{{ i + 1 }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" id="rp-cp-cerca" class="rp-cp-sel" placeholder="Cerca un nome…">
+            </div>
+        </div>
+        <div id="rp-cp-corpo" class="rp-table-wrap">
+            <div class="rp-empty">Carico…</div>
+        </div>
+    </div>
+
 {% block scripts %}
 {# Chart.js si carica qui. Il commento in fatturato.js diceva che stava
    gia' nel bundle del template: il codice c'e' dentro, ma il bundle non
@@ -244,5 +281,5 @@
    gia' fra le sorgenti consentite. #}
 <script nonce="{{ cspNonce }}"
         src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/assets/js/views/report/fatturato.js?v=2"></script>
+<script src="/assets/js/views/report/fatturato.js?v=3"></script>
 {% endblock %}

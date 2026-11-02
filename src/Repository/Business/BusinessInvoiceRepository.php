@@ -7,20 +7,35 @@ namespace App\Repository\Business;
 use PDO;
 
 /**
- * Letture aggregate dei documenti dal gestionale Business (TeamSystem).
+ * Letture aggregate del registro IVA dal gestionale Business (TeamSystem).
  *
- * Modello dati (testate documenti: `testmag` qui, `nrgtestm` altrove —
- * il nome cambia da un'installazione all'altra e si configura con
- * BUSINESS_TABELLA_DOC; le colonne invece sono le stesse):
- *   - tm_datdoc              data del documento  → criterio di COMPETENZA
- *   - tm_conto  → anagra.an_conto
- *   - anagra.an_tipo         'C' cliente (entrate) | 'F' fornitore (uscite) | 'S' altro
- *   - tm_imponib_1..8        imponibile per aliquota (vanno sommati)
- *   - tm_imposta_1..8        IVA per aliquota
- *   - tm_totdoc              totale documento
- *   - tm_pagato              quota gia' incassata/pagata
- *   - tm_causale → tabcaus   tipo documento (fattura, nota di credito, ...)
- *   - tm_flprov = 'S'        documento provvisorio: escluso ovunque
+ * **Perche' il registro IVA e non le fatture.** Prima si leggevano le
+ * testate dei documenti (`testmag`): li' dentro pero' ci sono solo i
+ * documenti che emettiamo NOI. Le fatture dei fornitori non ci passano, e
+ * la pagina mostrava le uscite a zero. Il registro IVA (`moviva`) tiene
+ * tutte e due le direzioni, e in piu' parte dal 2017 invece che dal 2019.
+ *
+ * Modello dati (moviva = movimenti IVA):
+ *   - mi_datdoc    data del documento → criterio di COMPETENZA
+ *   - mi_datreg    data di registrazione (qui non si usa)
+ *   - mi_tregiva   registro: 'V' vendite, 'A' acquisti
+ *   - mi_contocf → anagra.an_conto   il cliente o il fornitore
+ *   - mi_imponib   imponibile
+ *   - mi_importo   imposta
+ *   - mi_causale   tipo di documento → tabcaus
+ *   - codditt      codice ditta
+ *
+ * **Il segno.** Le vendite sono registrate in avere, quindi `mi_imponib`
+ * e' NEGATIVO; gli acquisti sono positivi. Qui esce sempre un numero
+ * positivo, girando il segno alle vendite: chi legge un fatturato non si
+ * aspetta un meno davanti. Le note di credito, dentro il loro registro,
+ * hanno il segno opposto e quindi si sottraggono da sole — nessuno deve
+ * decidere niente.
+ *
+ * **Entrate e uscite si dividono per REGISTRO, non per tipo di
+ * controparte.** Nel registro vendite ci sono anche movimenti con un
+ * fornitore come controparte (autofatture in reverse charge): dividendo
+ * per `an_tipo` finirebbero fra le uscite e conterebbero due volte.
  *
  * Le somme le esegue SQL Server: anche su anni di storico tornano poche
  * decine di righe, quindi non serve replicare i dati dentro BOB.
@@ -29,46 +44,54 @@ use PDO;
  */
 final class BusinessInvoiceRepository
 {
-    /** Somma dei campi imponibile (8 aliquote per documento). */
-    private const IMPONIBILE = '(t.tm_imponib_1 + t.tm_imponib_2 + t.tm_imponib_3 + t.tm_imponib_4
-                               + t.tm_imponib_5 + t.tm_imponib_6 + t.tm_imponib_7 + t.tm_imponib_8)';
+    /** Il registro delle vendite: quello che incassiamo. */
+    public const VENDITE = 'V';
+
+    /** Il registro degli acquisti: quello che paghiamo. */
+    public const ACQUISTI = 'A';
 
     /**
-     * @param string $tabella la tabella delle testate. Il nome arriva da
+     * L'imponibile col segno girato per le vendite.
+     *
+     * Scritto una volta sola e riusato: il giorno che si sbaglia qui si
+     * sbaglia dappertutto allo stesso modo, invece che in un posto solo.
+     */
+    private const IMPONIBILE = "(CASE WHEN m.mi_tregiva = 'V' THEN -m.mi_imponib ELSE m.mi_imponib END)";
+    private const IMPOSTA    = "(CASE WHEN m.mi_tregiva = 'V' THEN -m.mi_importo ELSE m.mi_importo END)";
+
+    /**
+     * @param string $tabella la tabella del registro IVA. Il nome arriva da
      *                        Config, che lo ripulisce: qui finisce dentro la
      *                        query, dove un parametro non si puo' usare.
      */
     public function __construct(
         private PDO $conn,
         private string $codDitta,
-        private string $tabella = 'testmag'
+        private string $tabella = 'moviva'
     ) {}
 
     /**
-     * Totali per anno/mese e tipo controparte, nell'intervallo di anni dato.
+     * Totali per anno/mese e registro, nell'intervallo di anni dato.
      *
-     * @return array<int, array{anno:int, mese:int, tipo:string, documenti:int,
-     *                          imponibile:float, iva:float, totale:float, pagato:float}>
+     * @return array<int, array{anno:int, mese:int, registro:string,
+     *                          documenti:int, imponibile:float, iva:float}>
      */
     public function monthlyTotals(int $fromYear, int $toYear): array
     {
         $stmt = $this->conn->prepare("
             SELECT
-                YEAR(t.tm_datdoc)  AS anno,
-                MONTH(t.tm_datdoc) AS mese,
-                a.an_tipo          AS tipo,
-                COUNT(*)                                    AS documenti,
-                SUM(" . self::IMPONIBILE . ")               AS imponibile,
-                SUM(t.tm_totdoc - " . self::IMPONIBILE . ") AS iva,
-                SUM(t.tm_totdoc)                            AS totale,
-                SUM(t.tm_pagato)                            AS pagato
-            FROM   {$this->tabella} t
-            JOIN   anagra   a ON a.an_conto = t.tm_conto AND a.codditt = t.codditt
-            WHERE  t.codditt   = :ditta
-              AND  t.tm_flprov = 'N'
-              AND  t.tm_datdoc >= :dal
-              AND  t.tm_datdoc <  :al
-            GROUP BY YEAR(t.tm_datdoc), MONTH(t.tm_datdoc), a.an_tipo
+                YEAR(m.mi_datdoc)  AS anno,
+                MONTH(m.mi_datdoc) AS mese,
+                m.mi_tregiva       AS registro,
+                COUNT(*)                        AS documenti,
+                SUM(" . self::IMPONIBILE . ")   AS imponibile,
+                SUM(" . self::IMPOSTA . ")      AS iva
+            FROM   {$this->tabella} m
+            WHERE  m.codditt    = :ditta
+              AND  m.mi_tregiva IN ('V', 'A')
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
+            GROUP BY YEAR(m.mi_datdoc), MONTH(m.mi_datdoc), m.mi_tregiva
             ORDER BY anno, mese
         ");
         $stmt->execute([
@@ -77,65 +100,81 @@ final class BusinessInvoiceRepository
             ':al'    => sprintf('%04d-01-01', $toYear + 1),
         ]);
 
-        $out = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $out[] = [
-                'anno'       => (int)$r['anno'],
-                'mese'       => (int)$r['mese'],
-                'tipo'       => (string)$r['tipo'],
-                'documenti'  => (int)$r['documenti'],
-                'imponibile' => (float)$r['imponibile'],
-                'iva'        => (float)$r['iva'],
-                'totale'     => (float)$r['totale'],
-                'pagato'     => (float)$r['pagato'],
-            ];
-        }
-        return $out;
+        return array_map(static fn(array $r): array => [
+            'anno'       => (int)$r['anno'],
+            'mese'       => (int)$r['mese'],
+            'registro'   => (string)$r['registro'],
+            'documenti'  => (int)$r['documenti'],
+            'imponibile' => (float)$r['imponibile'],
+            'iva'        => (float)$r['iva'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     /**
-     * Totali di un periodo libero (per il confronto periodo A / periodo B).
+     * Chi ci ha pagato, e chi abbiamo pagato: uno per riga.
      *
-     * @return array<string, array{documenti:int, imponibile:float, totale:float, pagato:float}>
-     *         indicizzato per an_tipo
+     * E' la domanda da cui si parte guardando un fatturato — non "quanto"
+     * ma "con chi". Una riga per controparte, con quante fatture e quanto.
+     *
+     * Il nome viene dall'anagrafica e non dalla copia scritta sul
+     * documento: se un cliente cambia ragione sociale, la copia lascia la
+     * stessa azienda su due righe diverse.
+     *
+     * @param string $registro 'V' vendite (chi ci ha pagato) | 'A' acquisti
+     * @return array<int, array{conto:int, nome:string, piva:string,
+     *                          documenti:int, imponibile:float}>
      */
-    public function periodTotals(string $from, string $toExclusive): array
+    public function byControparte(string $registro, string $from, string $toExclusive, int $limite = 200): array
     {
-        $stmt = $this->conn->prepare("
-            SELECT
-                a.an_tipo AS tipo,
-                COUNT(*)                      AS documenti,
-                SUM(" . self::IMPONIBILE . ") AS imponibile,
-                SUM(t.tm_totdoc)              AS totale,
-                SUM(t.tm_pagato)              AS pagato
-            FROM   {$this->tabella} t
-            JOIN   anagra   a ON a.an_conto = t.tm_conto AND a.codditt = t.codditt
-            WHERE  t.codditt   = :ditta
-              AND  t.tm_flprov = 'N'
-              AND  t.tm_datdoc >= :dal
-              AND  t.tm_datdoc <  :al
-            GROUP BY a.an_tipo
-        ");
-        $stmt->execute([':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive]);
+        $registro = $registro === self::ACQUISTI ? self::ACQUISTI : self::VENDITE;
+        // TOP non accetta un parametro: si limita qui, a un intero
+        $limite = max(1, min(1000, $limite));
 
-        $out = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $out[(string)$r['tipo']] = [
+        $stmt = $this->conn->prepare("
+            SELECT TOP {$limite}
+                m.mi_contocf                  AS conto,
+                MAX(LTRIM(RTRIM(
+                    ISNULL(a.an_descr1, '') + ' ' + ISNULL(a.an_descr2, '')
+                )))                           AS nome,
+                MAX(ISNULL(a.an_pariva, ''))  AS piva,
+                COUNT(*)                      AS documenti,
+                SUM(" . self::IMPONIBILE . ") AS imponibile
+            FROM   {$this->tabella} m
+            LEFT JOIN anagra a ON a.an_conto = m.mi_contocf AND a.codditt = m.codditt
+            WHERE  m.codditt    = :ditta
+              AND  m.mi_tregiva = :registro
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
+            GROUP BY m.mi_contocf
+            ORDER BY SUM(" . self::IMPONIBILE . ") DESC
+        ");
+        $stmt->execute([
+            ':ditta'    => $this->codDitta,
+            ':registro' => $registro,
+            ':dal'      => $from,
+            ':al'       => $toExclusive,
+        ]);
+
+        return array_map(static function (array $r): array {
+            $nome = trim((string)$r['nome']);
+            return [
+                'conto' => (int)$r['conto'],
+                // un conto senza anagrafica non deve sparire: si vede il
+                // numero, e si capisce che manca il nome invece di trovarsi
+                // una riga vuota
+                'nome'       => $nome !== '' ? $nome : 'Conto ' . (int)$r['conto'],
+                'piva'       => trim((string)$r['piva']),
                 'documenti'  => (int)$r['documenti'],
                 'imponibile' => (float)$r['imponibile'],
-                'totale'     => (float)$r['totale'],
-                'pagato'     => (float)$r['pagato'],
             ];
-        }
-        return $out;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     /**
      * Dettaglio per causale di un periodo.
      *
      * Serve a VERIFICARE i numeri: senza vedere quali causali entrano nei
-     * totali non e' possibile sapere se, per esempio, le note di credito
-     * stanno sommando invece di sottrarre.
+     * totali non si sa cosa si sta sommando.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -143,46 +182,41 @@ final class BusinessInvoiceRepository
     {
         $stmt = $this->conn->prepare("
             SELECT
-                t.tm_causale                  AS causale,
+                m.mi_causale                  AS causale,
                 MAX(c.tb_descaus)             AS descrizione,
-                a.an_tipo                     AS tipo,
+                m.mi_tregiva                  AS registro,
                 COUNT(*)                      AS documenti,
-                SUM(" . self::IMPONIBILE . ") AS imponibile,
-                SUM(t.tm_totdoc)              AS totale
-            FROM   {$this->tabella} t
-            JOIN   anagra   a ON a.an_conto  = t.tm_conto AND a.codditt = t.codditt
-            LEFT JOIN tabcaus c ON c.tb_codcaus = t.tm_causale
-                               AND c.tb_anno    = YEAR(t.tm_datdoc)
-            WHERE  t.codditt   = :ditta
-              AND  t.tm_flprov = 'N'
-              AND  t.tm_datdoc >= :dal
-              AND  t.tm_datdoc <  :al
-            GROUP BY t.tm_causale, a.an_tipo
-            ORDER BY SUM(t.tm_totdoc) DESC
+                SUM(" . self::IMPONIBILE . ") AS imponibile
+            FROM   {$this->tabella} m
+            LEFT JOIN tabcaus c ON c.tb_codcaus = m.mi_causale
+                               AND c.tb_anno    = YEAR(m.mi_datdoc)
+            WHERE  m.codditt    = :ditta
+              AND  m.mi_tregiva IN ('V', 'A')
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
+            GROUP BY m.mi_causale, m.mi_tregiva
+            ORDER BY SUM(" . self::IMPONIBILE . ") DESC
         ");
         $stmt->execute([':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive]);
 
-        $out = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $out[] = [
-                'causale'     => (int)$r['causale'],
-                'descrizione' => $r['descrizione'] !== null ? trim((string)$r['descrizione']) : null,
-                'tipo'        => (string)$r['tipo'],
-                'documenti'   => (int)$r['documenti'],
-                'imponibile'  => (float)$r['imponibile'],
-                'totale'      => (float)$r['totale'],
-            ];
-        }
-        return $out;
+        return array_map(static fn(array $r): array => [
+            'causale'     => (int)$r['causale'],
+            'descrizione' => $r['descrizione'] !== null ? trim((string)$r['descrizione']) : null,
+            'registro'    => (string)$r['registro'],
+            'documenti'   => (int)$r['documenti'],
+            'imponibile'  => (float)$r['imponibile'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    /** Anni per cui esistono documenti, dal piu' recente. */
+    /** Anni per cui esistono movimenti, dal piu' recente. */
     public function availableYears(): array
     {
         $stmt = $this->conn->prepare("
-            SELECT DISTINCT YEAR(tm_datdoc) AS anno
+            SELECT DISTINCT YEAR(mi_datdoc) AS anno
             FROM   {$this->tabella}
-            WHERE  codditt = :ditta AND tm_flprov = 'N' AND tm_datdoc > '1900-01-01'
+            WHERE  codditt = :ditta
+              AND  mi_tregiva IN ('V', 'A')
+              AND  mi_datdoc > '1900-01-01'
             ORDER BY anno DESC
         ");
         $stmt->execute([':ditta' => $this->codDitta]);

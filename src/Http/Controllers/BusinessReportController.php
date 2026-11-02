@@ -97,18 +97,7 @@ final class BusinessReportController
     {
         $this->assertAccess($request);
 
-        $anno = (int)($request->get('anno') ?: date('Y'));
-        $mese = (int)($request->get('mese') ?: 0);
-
-        if ($mese >= 1 && $mese <= 12) {
-            $dal = sprintf('%04d-%02d-01', $anno, $mese);
-            $al  = $mese === 12
-                    ? sprintf('%04d-01-01', $anno + 1)
-                    : sprintf('%04d-%02d-01', $anno, $mese + 1);
-        } else {
-            $dal = sprintf('%04d-01-01', $anno);
-            $al  = sprintf('%04d-01-01', $anno + 1);
-        }
+        [$dal, $al, $periodo] = $this->periodo($request);
 
         $config = new Config();
         if (!$config->businessConfigured()) {
@@ -123,7 +112,7 @@ final class BusinessReportController
             );
             Response::json([
                 'ok'      => true,
-                'periodo' => ($mese ? self::MESI[$mese - 1] . ' ' : '') . $anno,
+                'periodo' => $periodo,
                 'righe'   => $repo->byCausale($dal, $al),
             ]);
         } catch (\Throwable $e) {
@@ -132,7 +121,75 @@ final class BusinessReportController
         }
     }
 
+    // ── GET /report/fatturato/controparti?registro=&anno=&mese= (JSON) ───────
+
+    /**
+     * Chi ci ha pagato, e chi abbiamo pagato.
+     *
+     * E' la domanda da cui si parte guardando un fatturato: non "quanto" ma
+     * "con chi". Il totale in una riga sola non risponde a niente.
+     */
+    public function controparti(Request $request): never
+    {
+        $this->assertAccess($request);
+
+        $registro = $request->get('registro') === 'A'
+            ? BusinessInvoiceRepository::ACQUISTI
+            : BusinessInvoiceRepository::VENDITE;
+
+        [$dal, $al, $periodo] = $this->periodo($request);
+
+        $config = new Config();
+        if (!$config->businessConfigured()) {
+            Response::json(['ok' => false, 'error' => 'Business non configurato'], 503);
+        }
+
+        try {
+            $repo = new BusinessInvoiceRepository(
+                (new BusinessConnection($config))->connect(),
+                $config->businessCodDitta(),
+                $config->businessTabellaDocumenti()
+            );
+            Response::json([
+                'ok'       => true,
+                'registro' => $registro,
+                'periodo'  => $periodo,
+                'righe'    => $repo->byControparte($registro, $dal, $al),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[BusinessReport::controparti] ' . $e->getMessage());
+            Response::json(['ok' => false, 'error' => 'Business non raggiungibile'], 503);
+        }
+    }
+
     // ── Interni ──────────────────────────────────────────────────────────────
+
+    /**
+     * Il periodo chiesto: un mese o un anno intero.
+     *
+     * @return array{0:string, 1:string, 2:string} dal, al (escluso), come si legge
+     */
+    private function periodo(Request $request): array
+    {
+        $anno = (int)($request->get('anno') ?: date('Y'));
+        $mese = (int)($request->get('mese') ?: 0);
+
+        if ($mese >= 1 && $mese <= 12) {
+            return [
+                sprintf('%04d-%02d-01', $anno, $mese),
+                $mese === 12
+                    ? sprintf('%04d-01-01', $anno + 1)
+                    : sprintf('%04d-%02d-01', $anno, $mese + 1),
+                self::MESI[$mese - 1] . ' ' . $anno,
+            ];
+        }
+
+        return [
+            sprintf('%04d-01-01', $anno),
+            sprintf('%04d-01-01', $anno + 1),
+            (string)$anno,
+        ];
+    }
 
     private function assertAccess(Request $request): void
     {
@@ -164,8 +221,12 @@ final class BusinessReportController
                 'entrate' => array_fill(0, 12, 0.0),
                 'uscite'  => array_fill(0, 12, 0.0),
                 'saldo'   => array_fill(0, 12, 0.0),
-                'incassato' => 0.0,
-                'pagato'    => 0.0,
+                // L'IVA del registro, al posto di "gia' incassato" e "gia'
+                // pagato": quelli stavano sulle testate dei documenti, nel
+                // registro IVA non ci sono, e mostrarli a zero sarebbe
+                // peggio che non mostrarli.
+                'iva_vendite'  => 0.0,
+                'iva_acquisti' => 0.0,
             ];
         }
 
@@ -174,12 +235,16 @@ final class BusinessReportController
             $i = $r['mese'] - 1;
             if (!isset($serie[$y]) || $i < 0 || $i > 11) continue;
 
-            if ($r['tipo'] === 'C') {
-                $serie[$y]['entrate'][$i]  += $r['imponibile'];
-                $serie[$y]['incassato']    += $r['pagato'];
-            } elseif ($r['tipo'] === 'F') {
+            // Si divide per REGISTRO, non per tipo di controparte: nel
+            // registro vendite ci sono anche le autofatture in reverse
+            // charge, che hanno un fornitore come controparte e finirebbero
+            // fra le uscite contando due volte.
+            if ($r['registro'] === 'V') {
+                $serie[$y]['entrate'][$i] += $r['imponibile'];
+                $serie[$y]['iva_vendite'] += $r['iva'];
+            } elseif ($r['registro'] === 'A') {
                 $serie[$y]['uscite'][$i]   += $r['imponibile'];
-                $serie[$y]['pagato']       += $r['pagato'];
+                $serie[$y]['iva_acquisti'] += $r['iva'];
             }
         }
 
@@ -206,8 +271,8 @@ final class BusinessReportController
                 'entrate' => array_sum($s['entrate']),
                 'uscite'  => array_sum($s['uscite']),
                 'saldo'   => array_sum($s['entrate']) - array_sum($s['uscite']),
-                'incassato' => $s['incassato'],
-                'pagato'    => $s['pagato'],
+                'iva_vendite'  => $s['iva_vendite'],
+                'iva_acquisti' => $s['iva_acquisti'],
 
                 'entrate_periodo' => $entratePeriodo,
                 'uscite_periodo'  => $uscitePeriodo,
