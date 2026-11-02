@@ -451,7 +451,8 @@ if (str_starts_with($uri, '/report/')) {
     $router  = new \App\Http\Router();
 
     $router->get('/report/fatturato',          [BusinessReportController::class, 'index'])
-           ->get('/report/fatturato/causali',  [BusinessReportController::class, 'causali']);
+           ->get('/report/fatturato/causali',  [BusinessReportController::class, 'causali'])
+           ->get('/report/fatturato/controparti', [BusinessReportController::class, 'controparti']);
 
     $router->dispatch($request, $container);
 }

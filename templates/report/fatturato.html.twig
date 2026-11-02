@@ -59,8 +59,28 @@
         </div>
     {% endif %}
 
-    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'incassato':0,'pagato':0} %}
+    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'iva_vendite':0,'iva_acquisti':0} %}
     {% set tPrec = totali[annoPrec] ?? null %}
+
+    {# Il confronto fra anni va fatto sullo STESSO periodo. Su un anno in
+       corso si fermano tutti e due al mese che stiamo vivendo: prima
+       l'anno a meta' veniva paragonato all'anno prima intero, e usciva
+       sempre un calo che non esiste. #}
+    {% set riferimento = annoInCorso ? 'periodo' : 'anno' %}
+    {% set pOggi = annoInCorso ? tOggi.entrate_periodo : tOggi.entrate %}
+    {% set pPrec = tPrec ? (annoInCorso ? tPrec.entrate_periodo : tPrec.entrate) : null %}
+    {% set uOggi = annoInCorso ? tOggi.uscite_periodo : tOggi.uscite %}
+    {% set uPrec = tPrec ? (annoInCorso ? tPrec.uscite_periodo : tPrec.uscite) : null %}
+    {% set sOggiTot = annoInCorso ? tOggi.saldo_periodo : tOggi.saldo %}
+    {% set sPrecTot = tPrec ? (annoInCorso ? tPrec.saldo_periodo : tPrec.saldo) : null %}
+
+    {% if annoInCorso %}
+        <p class="rp-nota-periodo">
+            Il confronto con {{ annoPrec }} si ferma a <strong>{{ meseNome }}</strong>,
+            per paragonare lo stesso periodo. I totali grandi sono invece tutto
+            quello fatturato finora.
+        </p>
+    {% endif %}
 
     {# ── Card principali ── #}
     <div class="rp-cards">
@@ -68,24 +88,33 @@
             <div class="rp-card-lbl">Entrate {{ annoTop }}</div>
             <div class="rp-card-val">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.entrate, tPrec ? tPrec.entrate : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.entrate : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(pOggi, pPrec) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (pPrec ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
         <div class="rp-card is-out">
             <div class="rp-card-lbl">Uscite {{ annoTop }}</div>
             <div class="rp-card-val">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.uscite, tPrec ? tPrec.uscite : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.uscite : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(uOggi, uPrec) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (uPrec ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
         <div class="rp-card is-saldo">
             <div class="rp-card-lbl">Saldo {{ annoTop }}</div>
             <div class="rp-card-val {{ tOggi.saldo < 0 ? 'is-neg' : '' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(tOggi.saldo, tPrec ? tPrec.saldo : null) }}
-                <span class="rp-card-ref">vs {{ annoPrec }}: € {{ (tPrec ? tPrec.saldo : 0)|number_format(0, ',', '.') }}</span>
+                {{ f.delta(sOggiTot, sPrecTot) }}
+                <span class="rp-card-ref">
+                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
+                    € {{ (sPrecTot ?: 0)|number_format(0, ',', '.') }}
+                </span>
             </div>
         </div>
     </div>
@@ -170,8 +199,13 @@
                         <th class="right">Entrate</th>
                         <th class="right">Uscite</th>
                         <th class="right">Saldo</th>
-                        <th class="right">Già incassato</th>
-                        <th class="right">Già pagato</th>
+                        {# L'IVA dei due registri, al posto di "gia' incassato" e
+                           "gia' pagato": quelli stavano sulle testate dei
+                           documenti, nel registro IVA non ci sono, e mostrarli
+                           a zero sarebbe peggio che non mostrarli. Quanto e'
+                           stato incassato davvero sta nello scadenzario. #}
+                        <th class="right">IVA vendite</th>
+                        <th class="right">IVA acquisti</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -181,8 +215,8 @@
                         <td class="right">€ {{ t.entrate|number_format(0, ',', '.') }}</td>
                         <td class="right rp-out">€ {{ t.uscite|number_format(0, ',', '.') }}</td>
                         <td class="right {{ t.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ t.saldo|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.incassato|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.pagato|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.iva_vendite|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-muted">€ {{ t.iva_acquisti|number_format(0, ',', '.') }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -206,6 +240,46 @@
 </div>
 {% endblock %}
 
+    {# ── Chi ci ha pagato, chi abbiamo pagato ──
+       Il totale in una riga sola non risponde alla domanda vera, che e'
+       "con chi": qui una riga per controparte, ordinata per importo. #}
+    <div class="rp-panel" id="rp-controparti">
+        <div class="rp-panel-head">
+            <h2 class="rp-panel-title">Chi ci ha pagato, chi abbiamo pagato</h2>
+            <div class="rp-cp-cmd">
+                <div class="rp-switch">
+                    <button type="button" class="on" data-registro="V">Clienti</button>
+                    <button type="button" data-registro="A">Fornitori</button>
+                </div>
+                <select id="rp-cp-anno" class="rp-cp-sel">
+                    {% for a in anni %}
+                        <option value="{{ a }}" {{ a == annoTop ? 'selected' : '' }}>{{ a }}</option>
+                    {% else %}
+                        <option value="{{ annoTop }}" selected>{{ annoTop }}</option>
+                    {% endfor %}
+                </select>
+                <select id="rp-cp-mese" class="rp-cp-sel">
+                    <option value="0">Tutto l'anno</option>
+                    {% for i, m in mesi %}
+                        <option value="{{ i + 1 }}">{{ m }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" id="rp-cp-cerca" class="rp-cp-sel" placeholder="Cerca un nome…">
+            </div>
+        </div>
+        <div id="rp-cp-corpo" class="rp-table-wrap">
+            <div class="rp-empty">Carico…</div>
+        </div>
+    </div>
+
 {% block scripts %}
-<script src="/assets/js/views/report/fatturato.js?v=1"></script>
+{# Chart.js si carica qui. Il commento in fatturato.js diceva che stava
+   gia' nel bundle del template: il codice c'e' dentro, ma il bundle non
+   lo espone come variabile globale, quindi la pagina scriveva "Libreria
+   grafici non disponibile" e basta. Dal CDN, con il nonce perche' la CSP
+   di BOB non ha 'unsafe-inline', e con la versione fissata: cdnjs e'
+   gia' fra le sorgenti consentite. #}
+<script nonce="{{ cspNonce }}"
+        src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/assets/js/views/report/fatturato.js?v=3"></script>
 {% endblock %}

@@ -134,24 +134,25 @@ final class Config
     public function businessCodDitta(): string { return $this->get('BUSINESS_CODDITTA', 'CSM'); }
 
     /**
-     * La tabella delle testate documenti di Business.
+     * La tabella del registro IVA di Business.
      *
-     * Si configura perche' **due installazioni di Business non la chiamano
-     * allo stesso modo**: qui e' `testmag`, altrove `nrgtestm`. Le colonne
-     * invece combaciano (tm_datdoc, tm_conto, tm_imponib_1..8, tm_totdoc,
-     * tm_pagato, tm_causale, tm_flprov), quindi cambia solo il nome.
+     * Si configura perche' i nomi cambiano da un'installazione all'altra, e
+     * questa differenza e' gia' costata mezza giornata: il codice cercava
+     * `nrgtestm`, che qui esiste ma e' vuota, e la pagina mostrava zero
+     * dappertutto senza dare nessun errore.
      *
-     * Era inchiodata nel codice a `nrgtestm`, e su questa installazione
-     * quella tabella esiste ma e' vuota: la pagina Andamento Fatturato
-     * mostrava zero dappertutto senza dare nessun errore.
+     * Il valore di partenza e' `moviva`, il registro IVA: tiene vendite e
+     * acquisti insieme. Leggendo invece le testate dei documenti
+     * (`testmag`) si vedono solo le fatture che emettiamo noi, e le uscite
+     * restano a zero.
      *
      * Solo lettere, cifre e underscore: finisce dentro una query come nome
      * di tabella, dove un parametro non si puo' usare.
      */
     public function businessTabellaDocumenti(): string
     {
-        $t = $this->get('BUSINESS_TABELLA_DOC', 'testmag');
-        return preg_match('/^[A-Za-z0-9_]+$/', $t) ? $t : 'testmag';
+        $t = $this->get('BUSINESS_TABELLA_DOC', 'moviva');
+        return preg_match('/^[A-Za-z0-9_]+$/', $t) ? $t : 'moviva';
     }
 
     // ── Mail ──────────────────────────────────────────────────────────────────

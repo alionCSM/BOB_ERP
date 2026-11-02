@@ -1,6 +1,15 @@
 /*
- * Andamento fatturato — grafico multi-anno + dettaglio causali.
- * Chart.js e' gia' incluso nel bundle del template (app.js).
+ * Andamento fatturato: grafico multi-anno, dettaglio causali, e chi ci ha
+ * pagato / chi abbiamo pagato.
+ *
+ * Chart.js lo carica la pagina dal CDN. Qui c'era scritto che stava nel
+ * bundle del template: il codice la' dentro c'e', ma il bundle non lo
+ * espone come variabile globale, e la pagina scriveva "Libreria grafici
+ * non disponibile" senza che nessuno capisse perche'.
+ *
+ * Due blocchi separati, e separati apposta: il primo si ferma subito se in
+ * pagina non c'e' il grafico, e finche' il resto stava dentro quello stesso
+ * blocco moriva con lui. Un pezzo non deve portarsi dietro gli altri.
  */
 (function () {
     'use strict';
@@ -169,4 +178,126 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && modal && modal.classList.contains('is-open')) closeModal();
     });
+
+})();
+
+/* ── Chi ci ha pagato, chi abbiamo pagato ──────────────────────────────────
+   Una riga per controparte invece di un totale solo: la domanda vera,
+   guardando un fatturato, non e' "quanto" ma "con chi".
+   Blocco suo: non dipende dal grafico.                                    */
+(function () {
+    'use strict';
+
+    var cp = {
+        corpo:    document.getElementById('rp-cp-corpo'),
+        anno:     document.getElementById('rp-cp-anno'),
+        mese:     document.getElementById('rp-cp-mese'),
+        cerca:    document.getElementById('rp-cp-cerca'),
+        registro: 'V',
+        righe:    []
+    };
+
+    function euro(n) {
+        return '\u20ac ' + Math.round(n || 0).toLocaleString('it-IT');
+    }
+
+    function disegnaControparti() {
+        if (!cp.corpo) return;
+
+        var filtro = (cp.cerca.value || '').trim().toLowerCase();
+        var righe  = filtro
+            ? cp.righe.filter(function (r) { return r.nome.toLowerCase().indexOf(filtro) !== -1; })
+            : cp.righe;
+
+        if (!righe.length) {
+            cp.corpo.innerHTML = '<div class="rp-empty">' +
+                (cp.righe.length ? 'Nessun nome con questo testo.' : 'Nessun movimento in questo periodo.') +
+                '</div>';
+            return;
+        }
+
+        // Il totale e' quello del periodo, non del filtro: la quota di
+        // ciascuno deve restare confrontabile mentre si cerca.
+        var totale = cp.righe.reduce(function (t, r) { return t + r.imponibile; }, 0);
+        var intest = cp.registro === 'V' ? 'Cliente' : 'Fornitore';
+
+        var corpo = righe.map(function (r) {
+            var quota = totale > 0 ? (r.imponibile / totale * 100) : 0;
+            var nome = (r.nome || '').trim() || ('Conto ' + r.conto);
+            return '<tr>' +
+                '<td><div>' + esc(nome) + '</div>' +
+                    (r.piva ? '<div class="rp-cp-piva">P.IVA ' + esc(r.piva) + '</div>' : '') +
+                '</td>' +
+                '<td class="right rp-muted">' + r.documenti + '</td>' +
+                '<td class="right"><strong>' + euro(r.imponibile) + '</strong></td>' +
+                '<td class="right rp-cp-quota">' + quota.toFixed(1).replace('.', ',') + '%</td>' +
+            '</tr>';
+        }).join('');
+
+        cp.corpo.innerHTML =
+            '<table class="rp-table">' +
+                '<thead><tr>' +
+                    '<th>' + intest + '</th>' +
+                    '<th class="right">Fatture</th>' +
+                    '<th class="right">Imponibile</th>' +
+                    '<th class="right">Quota</th>' +
+                '</tr></thead>' +
+                '<tbody>' + corpo + '</tbody>' +
+                '<tfoot><tr>' +
+                    '<td>' + righe.length + (righe.length === 1 ? ' controparte' : ' controparti') +
+                        (filtro ? ' su ' + cp.righe.length : '') + '</td>' +
+                    '<td class="right">' + righe.reduce(function (t, r) { return t + r.documenti; }, 0) + '</td>' +
+                    '<td class="right">' + euro(righe.reduce(function (t, r) { return t + r.imponibile; }, 0)) + '</td>' +
+                    '<td></td>' +
+                '</tr></tfoot>' +
+            '</table>';
+    }
+
+    function esc(t) {
+        var d = document.createElement('div');
+        d.textContent = t == null ? '' : t;
+        return d.innerHTML;
+    }
+
+    function caricaControparti() {
+        if (!cp.corpo) return;
+        cp.corpo.innerHTML = '<div class="rp-empty">Carico\u2026</div>';
+
+        var url = '/report/fatturato/controparti?registro=' + cp.registro +
+                  '&anno=' + encodeURIComponent(cp.anno.value) +
+                  '&mese=' + encodeURIComponent(cp.mese.value);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.ok) {
+                    cp.corpo.innerHTML = '<div class="rp-empty">' + esc(d.error || 'Non disponibile') + '</div>';
+                    return;
+                }
+                cp.righe = d.righe || [];
+                disegnaControparti();
+            })
+            .catch(function () {
+                cp.corpo.innerHTML = '<div class="rp-empty">Non riesco a leggere i dati.</div>';
+            });
+    }
+
+    if (cp.corpo) {
+        document.querySelectorAll('#rp-controparti .rp-switch button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('#rp-controparti .rp-switch button')
+                        .forEach(function (x) { x.classList.remove('on'); });
+                b.classList.add('on');
+                cp.registro = b.dataset.registro;
+                caricaControparti();
+            });
+        });
+        cp.anno.addEventListener('change', caricaControparti);
+        cp.mese.addEventListener('change', caricaControparti);
+        // la ricerca lavora su quello gia' scaricato: non si ritorna al
+        // server a ogni lettera
+        cp.cerca.addEventListener('input', disegnaControparti);
+
+        caricaControparti();
+    }
 })();
