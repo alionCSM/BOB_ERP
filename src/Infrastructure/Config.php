@@ -133,6 +133,27 @@ final class Config
     /** Codice ditta usato nelle tabelle Business (colonna codditt). */
     public function businessCodDitta(): string { return $this->get('BUSINESS_CODDITTA', 'CSM'); }
 
+    /**
+     * La tabella delle testate documenti di Business.
+     *
+     * Si configura perche' **due installazioni di Business non la chiamano
+     * allo stesso modo**: qui e' `testmag`, altrove `nrgtestm`. Le colonne
+     * invece combaciano (tm_datdoc, tm_conto, tm_imponib_1..8, tm_totdoc,
+     * tm_pagato, tm_causale, tm_flprov), quindi cambia solo il nome.
+     *
+     * Era inchiodata nel codice a `nrgtestm`, e su questa installazione
+     * quella tabella esiste ma e' vuota: la pagina Andamento Fatturato
+     * mostrava zero dappertutto senza dare nessun errore.
+     *
+     * Solo lettere, cifre e underscore: finisce dentro una query come nome
+     * di tabella, dove un parametro non si puo' usare.
+     */
+    public function businessTabellaDocumenti(): string
+    {
+        $t = $this->get('BUSINESS_TABELLA_DOC', 'testmag');
+        return preg_match('/^[A-Za-z0-9_]+$/', $t) ? $t : 'testmag';
+    }
+
     // ── Mail ──────────────────────────────────────────────────────────────────
 
     public function mailHost(): string       { return $this->require('MAIL_HOST'); }

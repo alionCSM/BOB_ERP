@@ -437,6 +437,35 @@ diverso ne' una copia del codice: le pagine che li leggono guardano il
 Andamento Fatturato lo controlla gia' per conto suo; per toglierla anche
 dal menu basta non dare il permesso `report_business`.
 
+Dove invece c'e', servono tre cose nel `.env` — e la terza e' quella che
+fa perdere mezza giornata:
+
+```
+BUSINESS_DB=NomeDelDatabase
+BUSINESS_CODDITTA=CSM            # colonna codditt nelle tabelle Business
+BUSINESS_TABELLA_DOC=testmag     # la tabella delle testate documenti
+```
+
+Host, porta, utente e password si omettono se Business sta sulla stessa
+istanza di Yard: si ricade su quelli (`BUSINESS_HOST`, `BUSINESS_PORT`,
+`BUSINESS_USER`, `BUSINESS_PASS`).
+
+**La tabella delle testate non si chiama allo stesso modo ovunque.** Su
+questa installazione e' `testmag`; altrove e' `nrgtestm`, che qui esiste
+ma e' vuota. Le colonne invece combaciano, quindi cambia solo il nome. Per
+trovarla:
+
+```sql
+SELECT s.name AS schema_name, t.name AS tabella, c.name AS colonna
+FROM   sys.columns c
+JOIN   sys.tables  t ON t.object_id = c.object_id
+JOIN   sys.schemas s ON s.schema_id = t.schema_id
+WHERE  c.name IN ('tm_datdoc', 'tm_totdoc', 'tm_flprov');
+```
+
+Se il nome e' sbagliato la pagina **non da' errore**: mostra zero
+dappertutto, e sembra che l'azienda non abbia fatturato niente.
+
 Le due cose sono indipendenti: si puo' avere uno dei due, tutti e due o
 nessuno.
 

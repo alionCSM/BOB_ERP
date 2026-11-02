@@ -50,7 +50,8 @@ final class BusinessReportController
             try {
                 $repo = new BusinessInvoiceRepository(
                     (new BusinessConnection($config))->connect(),
-                    $config->businessCodDitta()
+                    $config->businessCodDitta(),
+                    $config->businessTabellaDocumenti()
                 );
                 $anni = $repo->availableYears();
                 $rows = $repo->monthlyTotals($daAnno, $aAnno);
@@ -110,7 +111,8 @@ final class BusinessReportController
         try {
             $repo = new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
-                $config->businessCodDitta()
+                $config->businessCodDitta(),
+                $config->businessTabellaDocumenti()
             );
             Response::json([
                 'ok'      => true,
