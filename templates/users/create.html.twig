@@ -29,21 +29,21 @@
             </div>
 
             <div class="ua-sidebar-steps">
-                <div class="ua-ss active" id="ss-1" onclick="goToStep(1)">
+                <div class="ua-ss active" id="ss-1" data-passo="1">
                     <div class="ua-ss-num" id="ss-num-1">1</div>
                     <div class="ua-ss-text">
                         <div class="ua-ss-label">Anagrafica</div>
                         <div class="ua-ss-desc">Nome, azienda, contatti</div>
                     </div>
                 </div>
-                <div class="ua-ss" id="ss-2" onclick="goToStep(2)">
+                <div class="ua-ss" id="ss-2" data-passo="2">
                     <div class="ua-ss-num" id="ss-num-2">2</div>
                     <div class="ua-ss-text">
                         <div class="ua-ss-label">Dettagli Personali</div>
                         <div class="ua-ss-desc">Nascita, assunzione, CF</div>
                     </div>
                 </div>
-                <div class="ua-ss" id="ss-3" onclick="goToStep(3)">
+                <div class="ua-ss" id="ss-3" data-passo="3">
                     <div class="ua-ss-num" id="ss-num-3">3</div>
                     <div class="ua-ss-text">
                         <div class="ua-ss-label">Foto & Conferma</div>
@@ -148,7 +148,7 @@
                             <div class="ua-field">
                                 <label class="ua-label">Codice Fiscale *</label>
                                 <input type="text" name="fiscal_code" class="ua-input"
-                                       style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase();" required>
+                                       style="text-transform:uppercase;" data-maiuscolo required>
                             </div>
                         </div>
                     </div>
@@ -177,7 +177,7 @@
                     </div>
                     <div class="ua-card-body">
                         <div class="ua-photo-area">
-                            <div class="ua-photo-circle" onclick="document.getElementById('profile-photo').click()">
+                            <div class="ua-photo-circle" data-apri-file="profile-photo">
                                 <img id="profile-preview" src="/uploads/default-avatar.png" alt="">
                             </div>
                             <div class="ua-photo-info">

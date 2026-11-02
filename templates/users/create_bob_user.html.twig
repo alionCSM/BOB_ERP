@@ -36,7 +36,7 @@
                 {% if tempPassword %}
                     <div class="cu-pw-box">
                         <span id="pw-display">{{ tempPassword }}</span>
-                        <button type="button" class="cu-pw-copy" onclick="navigator.clipboard.writeText(document.getElementById('pw-display').textContent).then(()=>this.textContent='Copiato!')">Copia</button>
+                        <button type="button" class="cu-pw-copy" data-copia="pw-display">Copia</button>
                     </div>
                     <div style="font-size:11px; color:#64748b; margin-top:6px; font-weight:400;">
                         L'utente dovrà cambiare la password al primo accesso.

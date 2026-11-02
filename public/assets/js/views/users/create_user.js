@@ -1,3 +1,21 @@
+// "Copia" la password temporanea. Stava in un onclick nell'attributo, che
+// la CSP di BOB non fa partire: il bottone non copiava niente e non lo
+// diceva — la password andava selezionata a mano.
+document.addEventListener('click', function (e) {
+    const b = e.target.closest('[data-copia]');
+    if (!b) return;
+
+    const testo = (document.getElementById(b.dataset.copia)?.textContent || '').trim();
+    if (!testo) return;
+
+    navigator.clipboard.writeText(testo).then(
+        () => { b.textContent = 'Copiato!'; },
+        // Senza HTTPS, o senza permesso, gli appunti non si scrivono:
+        // meglio dirlo che lasciare un bottone che sembra aver funzionato.
+        () => { b.textContent = 'Copia a mano'; }
+    );
+});
+
 // Auto-fill username from email
 document.getElementById('email').addEventListener('blur', function() {
     const usernameField = document.getElementById('username');
