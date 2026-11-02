@@ -53,6 +53,50 @@
         </div>
     {% endif %}
 
+    {# ── Versione minima (app dagli store) ───────────────────────────────── #}
+    {# Gli store aggiornano l'app quando vogliono loro. Quando una versione
+       vecchia non va piu' bene si alza la minima: l'app sotto quel numero si
+       ferma su "Aggiorna BOB" e porta allo store. Il numero e' il build
+       (quello dopo il +, es. 1.2.0+7 → 7), uno per piattaforma. #}
+    <form method="POST" action="/app/minima" class="ap-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        <div class="ap-form-tit">Aggiornamento obbligatorio (app dagli store)</div>
+
+        <label class="ap-f">
+            <span>Android: build minimo</span>
+            <input type="number" min="0" name="minima_android" value="{{ minime.android.version_code ?? 0 }}">
+        </label>
+        <label class="ap-f">
+            <span>iPhone: build minimo</span>
+            <input type="number" min="0" name="minima_ios" value="{{ minime.ios.version_code ?? 0 }}">
+        </label>
+
+        <label class="ap-f ap-f-largo">
+            <span>Messaggio per chi deve aggiornare (facoltativo)</span>
+            <textarea name="messaggio" rows="2" placeholder="Questa versione non funziona piu': aggiorna per continuare a segnare le presenze.">{{ minime.android.messaggio ?? '' }}</textarea>
+        </label>
+
+        <label class="ap-f">
+            <span>Link Play Store (vuoto = quello di BOB)</span>
+            <input type="url" name="url_android" value="{{ minime.android.store_url ?? '' }}" placeholder="https://play.google.com/store/apps/details?id=it.csmontaggi.bob">
+        </label>
+        <label class="ap-f">
+            <span>Link App Store</span>
+            <input type="url" name="url_ios" value="{{ minime.ios.store_url ?? '' }}" placeholder="https://apps.apple.com/app/id…">
+        </label>
+
+        <div class="ap-f ap-f-largo ap-nota-form">
+            0 = nessun blocco. Chi ha un build piu' basso non puo' usare l'app finche' non aggiorna;
+            se il telefono e' senza rete non viene bloccato.
+            {% if minime.android and minime.android.aggiornato_da %}Ultima modifica: {{ minime.android.aggiornato_da }}, {{ minime.android.updated_at|date('d/m/Y H:i') }}.{% endif %}
+        </div>
+
+        <div class="ap-azioni">
+            <button class="ap-btn ap-btn-primary">Salva</button>
+        </div>
+    </form>
+
     {# ── Caricamento ──────────────────────────────────────────────────────── #}
     <form method="POST" action="/app/carica" enctype="multipart/form-data" class="ap-form">
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
