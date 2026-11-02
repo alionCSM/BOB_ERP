@@ -80,8 +80,7 @@
             {# Cancel — always available except terminal states #}
             {% if draft.status != 'fatturata' and draft.status != 'annullata' %}
             <form method="post" action="/billing/client/{{ client.id }}/draft/{{ draft.id }}/cancel"
-                  onsubmit="return confirm('Annullare la bozza? Le righe torneranno disponibili in da-emettere.');"
-                  style="margin:0;">
+                  data-confirm="Annullare la bozza? Le righe torneranno disponibili in da-emettere." style="margin:0;">
                 <button type="submit" class="bd-btn-danger-outline">
                     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                     Annulla bozza

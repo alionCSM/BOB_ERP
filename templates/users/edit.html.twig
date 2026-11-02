@@ -22,7 +22,15 @@
         <!-- ── Sidebar ── -->
         <div class="ue-sidebar">
             <div class="ue-sidebar-top">
-                <div class="ue-photo-wrap" onclick="openImageModal('{{ photoSrc }}', '{{ (workerData.first_name ~ ' ' ~ workerData.last_name)|e('js') }}')" title="Clicca per ingrandire">
+                {# Niente onclick nell'attributo: la CSP di BOB non ha
+                   'unsafe-inline' e li' dentro non parte niente — cliccare
+                   la foto non faceva nulla. I dati si passano con gli
+                   attributi e il click lo aggancia edit.js, come fa gia'
+                   l'elenco operai. #}
+                <div class="ue-photo-wrap" data-apri-foto
+                     data-src="{{ photoSrc }}"
+                     data-nome="{{ workerData.first_name ~ ' ' ~ workerData.last_name }}"
+                     title="Clicca per ingrandire">
                     <img id="profile-preview" src="{{ photoSrc }}" alt="Profile">
                     <div class="ue-photo-overlay">
                         <svg width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="3"/><path d="M3 11a8 8 0 1116 0 8 8 0 01-16 0z"/></svg>

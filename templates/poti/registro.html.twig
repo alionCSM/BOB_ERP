@@ -154,7 +154,7 @@
                    puo' rimettere indietro: i mezzi non si eliminano, si
                    mettono fuori servizio #}
                 <form method="POST" action="{{ urlRipristina }}" id="rg-form-ripristina" hidden
-                      onsubmit="return confirm('Rimettere questa riga nell\'elenco?')">
+                      data-confirm="Rimettere questa riga nell&#39;elenco?" >
                     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
                     <input type="hidden" name="id" id="rg-rip-id">
                     <button class="ac-btn ac-btn-primary">Ripristina</button>

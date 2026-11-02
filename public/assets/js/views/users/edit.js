@@ -121,6 +121,15 @@
         });
     });
 
+    // La foto del profilo: il click si aggancia qui perche' nell'attributo
+    // onclick la CSP non lo fa partire.
+    const foto = document.querySelector('[data-apri-foto]');
+    if (foto) {
+        foto.addEventListener('click', function () {
+            openImageModal(this.dataset.src, this.dataset.nome);
+        });
+    }
+
     function openImageModal(imageUrl, fullName) {
         const imgElement = document.getElementById('preview-image');
         const nameElement = document.getElementById('preview-worker-name');
