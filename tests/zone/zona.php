@@ -23,6 +23,7 @@ require $repo . '/src/Infrastructure/Config.php';
 require $repo . '/src/Http/Response.php';
 require $repo . '/src/Security/AccessControl.php';
 require $repo . '/src/Service/Lingua.php';
+require $repo . '/src/Service/Zone/Permessi.php';
 require $repo . '/src/Service/Zone/Accesso.php';
 require $repo . '/src/Service/Zone/Condivisione.php';
 require $repo . '/src/Service/Zone/Messaggi.php';

@@ -174,6 +174,280 @@ final class ApiV1CantieriController
         ]);
     }
 
+    // ── Le schede del cantiere, come sul sito ────────────────────────────────
+    //
+    // Le stesse schede della pagina del cantiere: presenze nostre, presenze
+    // delle consorziate, mezzi di sollevamento, e la parte economica
+    // (fatturazione, extra, ordini, costi). Dal telefono si guardano: si
+    // inserisce e si modifica dal sito. I prezzi solo a chi li vede sul sito.
+
+    /**
+     * GET /api/v1/worksites/{id}/presenze?dal=&al=
+     * Le presenze dei nostri, dalla piu' recente. Senza date: le ultime 500.
+     */
+    public function presenze(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $prezzi = $user->canSeePrices();
+
+        $where  = 'p.worksite_id = :id';
+        $par    = [':id' => $id];
+        foreach (['dal' => '>=', 'al' => '<='] as $k => $op) {
+            $v = (string)($_GET[$k] ?? '');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
+                $where .= " AND p.data $op :$k";
+                $par[":$k"] = $v;
+            }
+        }
+        // stessa query di AttendanceRepository::getByWorksiteId, con le date
+        $st = $this->conn->prepare("
+            SELECT p.*, CONCAT(w.first_name, ' ', w.last_name) AS lavoratore
+            FROM bb_presenze p
+            JOIN bb_workers w ON p.worker_id = w.id
+            WHERE $where
+            ORDER BY p.data DESC, w.last_name, w.first_name
+            LIMIT 500
+        ");
+        $st->execute($par);
+
+        $righe = array_map(fn(array $p) => [
+            'id'      => (int)$p['id'],
+            'data'    => $p['data'],
+            'nome'    => trim((string)$p['lavoratore']),
+            'azienda' => $p['azienda'] ?? null,
+            'turno'   => $p['turno'] ?? null,
+            'pranzo'  => $p['pranzo'] ?? null,
+            'cena'    => $p['cena'] ?? null,
+            'hotel'   => $p['hotel'] ?? null,
+            'auto'    => $p['targa_auto'] ?? null,
+            'note'    => $p['note'] ?? null,
+            'pranzo_prezzo' => $prezzi && isset($p['pranzo_prezzo']) ? (float)$p['pranzo_prezzo'] : null,
+            'cena_prezzo'   => $prezzi && isset($p['cena_prezzo']) ? (float)$p['cena_prezzo'] : null,
+        ], $st->fetchAll(\PDO::FETCH_ASSOC));
+
+        Response::json([
+            'success'  => true,
+            'giornate' => $this->avanzamento($id)['giornateNostri'],
+            'presenze' => $righe,
+        ]);
+    }
+
+    /** GET /api/v1/worksites/{id}/consorziate — le giornate delle consorziate. */
+    public function consorziate(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $prezzi = $user->canSeePrices();
+        $righe = (new \App\Repository\AttendanceRepository($this->conn))
+            ->getConsorziateFiltered(null, null, $id, null, 1000);
+
+        Response::json([
+            'success'  => true,
+            'giornate' => $this->avanzamento($id)['giornateConsorziate'],
+            'presenze' => array_map(fn(array $p) => [
+                'id'       => (int)$p['id'],
+                'data'     => $p['data_presenza'],
+                'azienda'  => $p['consorziata_name'],
+                'quantita' => (float)$p['quantita'],
+                'pasti'    => $p['pasti'],
+                'auto'     => $p['auto'],
+                'hotel'    => $p['hotel'],
+                'note'     => $p['note'],
+                'costo'    => $prezzi && $p['costo_unitario'] !== null ? (float)$p['costo_unitario'] : null,
+            ], $righe),
+        ]);
+    }
+
+    /** GET /api/v1/worksites/{id}/mezzi — i mezzi di sollevamento noleggiati. */
+    public function mezzi(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $prezzi = $user->canSeePrices();
+        $righe = (new \App\Repository\Equipment\EquipmentRepository($this->conn))->getByWorksite($id);
+
+        Response::json([
+            'success' => true,
+            'mezzi'   => array_map(fn(array $m) => [
+                'id'          => (int)$m['id'],
+                'mezzo'       => $m['mezzo_descrizione'],
+                'tipo'        => $m['tipo_noleggio'] ?? null,
+                'stato'       => $m['stato'] ?? null,
+                'quantita'    => isset($m['quantita']) ? (float)$m['quantita'] : null,
+                'dal'         => $m['data_inizio'] ?? null,
+                'al'          => $m['data_fine'] ?? null,
+                'calendario'  => $m['calendario'] ?? null,
+                'festivi'     => (bool)($m['festivi_inclusi'] ?? false),
+                'giorni_extra'=> (int)($m['extra_days_count'] ?? 0),
+                'costo_giorno'=> $prezzi && isset($m['costo_giornaliero']) ? (float)$m['costo_giornaliero'] : null,
+            ], $righe),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/worksites/{id}/economia
+     *
+     * La fatturazione, gli extra, gli ordini alle consorziate e i costi: le
+     * stesse cifre della pagina del cantiere (WorksitesController::show),
+     * con gli stessi conti. Solo a chi vede i prezzi.
+     *
+     * Se Yard non risponde la scheda si apre lo stesso, senza lo stato
+     * delle fatture: 'yard' => false lo dice.
+     */
+    public function economia(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        if (!$user->canSeePrices()) {
+            Response::json(['success' => false, 'message' => 'Non vedi i prezzi'], 403);
+        }
+
+        $ws     = new \App\Domain\Worksite($this->conn, $id);
+        $stats  = new \App\Domain\WorksiteStats($this->conn, $id);
+        $somma  = $stats->getSummary();
+        $costi  = $somma['costi'];
+        $ricavi = $somma['ricavi'];
+        $margine = $somma['andamento'];
+
+        // lo storico di Yard sommato ai numeri di BOB, come sul sito
+        try {
+            $st = $this->conn->prepare("
+                SELECT * FROM bb_cantiere_stats_2025
+                WHERE cantiere_id_sqlsrv = (SELECT yard_worksite_id FROM bb_worksites WHERE id = :wid LIMIT 1)
+            ");
+            $st->execute([':wid' => $id]);
+            $y = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            $y = null;
+        }
+        if ($y) {
+            $margine -= (float)$y['totale_complessivo'];
+            $costi['nostri']       += (float)$y['presenze_consorzio_costo'];
+            $costi['ordini']       += (float)$y['correct_costo_consorziate'];
+            $costi['mezzi']        += (float)$y['mezzi_costo'];
+            $costi['hotel']        += (float)$y['hotel_costo'];
+            $costi['pasti_nostri'] += (float)$y['pasti_costo'];
+            $costi['tot_costi']    += (float)$y['presenze_consorzio_costo'] + (float)$y['correct_costo_consorziate']
+                                    + (float)$y['mezzi_costo'] + (float)$y['hotel_costo'] + (float)$y['pasti_costo'];
+        }
+
+        // le righe di fatturazione, con lo stato vero da Yard
+        $fatture = (new \App\Repository\Billing\BillingRepository($this->conn))->getByWorksiteId($id);
+        $yard    = (new \App\Infrastructure\Config())->yardConfigured();
+        $info    = [];
+        if ($yard) {
+            try {
+                $info = (new \App\Domain\YardWorksiteBilling(
+                    new \App\Infrastructure\SqlServerConnection(new \App\Infrastructure\Config())
+                ))->getDocumentInfoMap(
+                    array_column(array_filter($fatture, fn($f) => !empty($f['yard_id'])), 'yard_id')
+                );
+            } catch (\Throwable $e) {
+                error_log('[ApiV1Cantieri] Yard non raggiungibile: ' . $e->getMessage());
+                $yard = false;
+            }
+        }
+        $totFatture = 0.0;
+        $totEmesse  = 0.0;
+        $righeFatt  = [];
+        foreach ($fatture as $f) {
+            $i   = !empty($f['yard_id']) ? ($info[(int)$f['yard_id']] ?? null) : null;
+            $imp = (float)($f['totale_imponibile'] ?? 0);
+            $emessa = (bool)($i['emessa'] ?? false);
+            $totFatture += $imp;
+            if ($emessa) {
+                $totEmesse += $imp;
+            }
+            $righeFatt[] = [
+                'id'          => (int)$f['id'],
+                'data'        => $f['data'] ?? null,
+                'descrizione' => $f['descrizione'] ?? null,
+                'articolo'    => $f['articolo_descrizione'] ?? null,
+                'imponibile'  => $imp,
+                'emessa'      => $emessa,
+                'numero'      => $i['numero_label'] ?? null,
+                'data_doc'    => $i['tm_datdoc'] ?? null,
+                'extra'       => !empty($f['extra_id']),
+            ];
+        }
+
+        $extra = (new \App\Repository\Extra\ExtraRepository($this->conn))->getByWorksiteId($id);
+        $totExtra = array_sum(array_map(fn($e) => (float)($e['totale'] ?? 0), $extra));
+
+        // contratto + extra meno quello messo in fatturazione; sul consuntivo
+        // la base e' il ricavo stimato dalle presenze. Puo' essere negativo:
+        // vuol dire che si e' fatturato piu' di quanto vale.
+        $base = ($ws->isConsuntivo() && !empty($ricavi['ricavo_stimato']))
+            ? (float)$ricavi['ricavo_stimato'] + (float)($ricavi['extra'] ?? 0)
+            : $ws->getTotalOffer() + $totExtra;
+
+        $ordini = (new \App\Repository\Orders\OrderRepository($this->conn))->getByWorksiteId($id);
+
+        Response::json([
+            'success' => true,
+            'yard'    => $yard,
+            'riepilogo' => [
+                'contratto'          => $ws->getTotalOffer(),
+                'consuntivo'         => $ws->isConsuntivo(),
+                'prezzo_persona'     => $ricavi['prezzo_persona'],
+                'ricavo_stimato'     => $ricavi['ricavo_stimato'],
+                'extra'              => $totExtra,
+                'base'               => $base,
+                'fatturato'          => $totFatture,
+                'emesso'             => $totEmesse,
+                'da_emettere'        => max(0.0, $totFatture - $totEmesse),
+                'ancora_da_fatturare'=> $base - $totFatture,
+                'ricavi'             => (float)$ricavi['tot_ricavi'],
+                'costi'              => (float)$costi['tot_costi'],
+                'margine'            => $margine,
+            ],
+            'costi' => [
+                ['voce' => 'Presenze nostri', 'importo' => (float)$costi['nostri']],
+                ['voce' => 'Consorziate',     'importo' => (float)$costi['ordini']],
+                ['voce' => 'Pasti',           'importo' => (float)$costi['pasti_nostri'] + (float)$costi['pasti_cons']],
+                ['voce' => 'Hotel',           'importo' => (float)$costi['hotel']],
+                ['voce' => 'Mezzi sollev.',   'importo' => (float)$costi['mezzi']],
+            ],
+            'fatture' => $righeFatt,
+            'extra'   => array_map(fn(array $e) => [
+                'id'          => (int)$e['id'],
+                'data'        => $e['data'] ?? null,
+                'descrizione' => $e['descrizione'] ?? null,
+                'totale'      => (float)($e['totale'] ?? 0),
+                'fatturato'   => (float)($e['billing_total'] ?? 0),
+                'da_seguire'  => (int)($e['tracks_billing'] ?? 0) === 1,
+            ], $extra),
+            'ordini'  => array_map(fn(array $o) => [
+                'id'      => (int)$o['id'],
+                'numero'  => $o['order_number'] ?? null,
+                'data'    => $o['order_date'] ?? null,
+                'azienda' => $o['company_name'] ?? null,
+                'totale'  => isset($o['total']) ? (float)$o['total'] : null,
+                'note'    => $o['note'] ?? null,
+            ], $ordini),
+        ]);
+    }
+
+    /**
+     * Il cantiere chiesto, se questo utente lo puo' aprire: il permesso
+     * 'worksites' e, per chi lavora in un'altra societa', solo i suoi.
+     *
+     * @return array{0: \User, 1: int}
+     */
+    private function cantiere(Request $request): array
+    {
+        $user = $this->utente($request);
+        $id   = $request->intParam('id');
+        $st = $this->conn->prepare('SELECT company_id FROM bb_worksites WHERE id = :id');
+        $st->execute([':id' => $id]);
+        $azienda = $st->fetchColumn();
+        if ($azienda === false) {
+            Response::json(['success' => false, 'message' => 'Cantiere non trovato'], 404);
+        }
+        $companyId = (int)($user->getCompanyId() ?? 0);
+        if ($companyId !== 1 && (int)$azienda !== $companyId) {
+            Response::json(['success' => false, 'message' => 'Cantiere non accessibile'], 403);
+        }
+        return [$user, $id];
+    }
+
     // ── Pezzi ────────────────────────────────────────────────────────────────
 
     /**

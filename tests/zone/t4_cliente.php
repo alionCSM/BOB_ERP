@@ -112,17 +112,23 @@ $p->check('e nemmeno la squadra lo vede',
           && !$c->vede($u['capo'], CANTIERE, 'cartella', $cartella));
 
 // ── 5. Cosa puo' toccare ─────────────────────────────────────────────────
-$p->check('il cliente non crea attivita\' (serve essere capo)',
-          $acc->ruolo($u['cliente'], CANTIERE) !== Accesso::CAPO
-          && $acc->ruolo($u['cliente'], CANTIERE) !== Accesso::UFFICIO);
+// sui nostri cantieri il committente dirige: crea attivita' come l'ufficio,
+// ma l'ultima parola (verificare) e cancellare la roba d'altri restano a noi
+$p->check('il cliente e\' Cliente, non Ufficio',
+          $acc->ruolo($u['cliente'], CANTIERE) === Accesso::CLIENTE);
+$p->check('il cliente crea attivita\'',
+          $acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::ATTIVITA));
+$p->check('il cliente non verifica e non cancella',
+          !$acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::VERIFICARE)
+          && !$acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::CANCELLARE));
 // il report lo scarica, ma dentro c'e' solo quello che gli e' condiviso:
 // il filtro delle attivita' passa dalle condivisioni, non dal PDF
 $p->check('il cliente scarica il report (filtrato su quello che vede)',
-          $acc->livello($u['cliente'], CANTIERE, 'report') === 1);
+          $acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::VEDERE));
 $p->check('il cliente puo\' compilare i moduli che gli diamo',
-          $acc->livello($u['cliente'], CANTIERE, 'moduli') >= 2);
-$p->check('il cliente non modifica i file',
-          $acc->livello($u['cliente'], CANTIERE, 'file') < 2);
+          $acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::COMPILARE));
+$p->check('il cliente non cancella i file degli altri',
+          !$acc->puo($u['cliente'], CANTIERE, \App\Service\Zone\Permessi::CANCELLARE));
 
 // ── 6. L'elenco delle persone: non deve uscire l'azienda ─────────────────
 $sorgente = file_get_contents($repo . '/src/Http/Controllers/FieldwireController.php');

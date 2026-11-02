@@ -805,6 +805,10 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->post('/api/v1/noleggi/foto/elimina',     [ApiV1Controller::class, 'noleggiFotoElimina'])
             // Cantieri: elenco con gli stessi filtri del web, e scheda
             ->get('/api/v1/worksites',                 [ApiV1CantieriController::class, 'elenco'])
+            ->get('/api/v1/worksites/{id}/presenze',    [ApiV1CantieriController::class, 'presenze'])
+            ->get('/api/v1/worksites/{id}/consorziate', [ApiV1CantieriController::class, 'consorziate'])
+            ->get('/api/v1/worksites/{id}/mezzi',       [ApiV1CantieriController::class, 'mezzi'])
+            ->get('/api/v1/worksites/{id}/economia',    [ApiV1CantieriController::class, 'economia'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda'])
 
             // ── L'app dell'operaio: le sue cose e basta ───────────────────
@@ -827,6 +831,76 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/me/home',                   [ApiV1OperaioController::class, 'home'])
             ->get('/api/v1/me/documenti/{id}/file',    [ApiV1OperaioController::class, 'documentoFile'])
             ->post('/api/v1/me/password',              [ApiV1OperaioController::class, 'cambiaPassword']);
+
+    // ── L'app per l'ufficio ───────────────────────────────────────────────
+    // Gli stessi repository e le stesse regole delle pagine web; i permessi
+    // sono quelli della societa' attiva, come sul sito.
+    require_once APP_ROOT . '/src/Http/Controllers/ApiV1UfficioController.php';
+    $router
+        ->get( '/api/v1/ufficio/approvare',             [ApiV1UfficioController::class, 'approvare'])
+        ->post('/api/v1/ufficio/presenze/{id}/decidi',  [ApiV1UfficioController::class, 'decidiPresenza'])
+        ->post('/api/v1/ufficio/assenze/{id}/decidi',   [ApiV1UfficioController::class, 'decidiAssenza'])
+        ->get( '/api/v1/ufficio/cantieri',              [ApiV1UfficioController::class, 'cercaCantieri'])
+        ->get( '/api/v1/ufficio/presenze',              [ApiV1UfficioController::class, 'presenze'])
+        ->post('/api/v1/ufficio/presenze',              [ApiV1UfficioController::class, 'salvaPresenze'])
+        ->get( '/api/v1/ufficio/operai',                [ApiV1UfficioController::class, 'operai'])
+        ->get( '/api/v1/ufficio/documenti',             [ApiV1UfficioController::class, 'documenti'])
+        ->get( '/api/v1/ufficio/flotta',                [ApiV1UfficioController::class, 'flotta']);
+
+    // La parte "da scrivania", in sola lettura: si guarda dal telefono, si
+    // modifica dal sito.
+    require_once APP_ROOT . '/src/Http/Controllers/ApiV1ScrivaniaController.php';
+    $router
+        ->get( '/api/v1/ufficio/offerte',         [ApiV1ScrivaniaController::class, 'offerte'])
+        ->get( '/api/v1/ufficio/clienti',         [ApiV1ScrivaniaController::class, 'clienti'])
+        ->get( '/api/v1/ufficio/clienti/{id}',    [ApiV1ScrivaniaController::class, 'cliente'])
+        ->get( '/api/v1/ufficio/aziende',         [ApiV1ScrivaniaController::class, 'aziende'])
+        ->get( '/api/v1/ufficio/prenotazioni',    [ApiV1ScrivaniaController::class, 'prenotazioni'])
+        ->get( '/api/v1/ufficio/ordini-aziende',  [ApiV1ScrivaniaController::class, 'ordiniAziende'])
+        ->get( '/api/v1/ufficio/fatturato',       [ApiV1ScrivaniaController::class, 'fatturato'])
+        ->get( '/api/v1/ufficio/rubrica',         [ApiV1ScrivaniaController::class, 'rubrica']);
+
+    // Pianificazione e programmazione: i metodi del sito, non una copia. Il
+    // controllo del modulo che sul sito fa il middleware (per indirizzo),
+    // qui si fa prima di passare al metodo, con la societa' attiva.
+    $moduloApi = [
+        '/api/v1/pianificazione' => 'pianificazione',
+        '/api/v1/programmazione' => 'programmazione',
+    ];
+    foreach ($moduloApi as $prefisso => $modulo) {
+        if (str_starts_with($uri, $prefisso)) {
+            $u = $GLOBALS['user'] ?? null;
+            if (!$u || ((int)$u->id !== 1 && !$u->canAccess($modulo))) {
+                \App\Http\Response::json(['success' => false, 'ok' => false, 'message' => "Non hai questo permesso in questa societa'"], 403);
+            }
+        }
+    }
+    require_once APP_ROOT . '/src/Http/Controllers/ProgrammazioneController.php';
+    $router
+        ->get( '/api/v1/pianificazione/get',   [ProgrammazioneController::class, 'get'])
+        ->post('/api/v1/pianificazione/invia', [ProgrammazioneController::class, 'invia'])
+        ->get( '/api/v1/programmazione/api',   [ProgrammazioneController::class, 'api']);
+
+    // BOB AI dall'app: lo stesso controller del sito (stessi permessi
+    // 'ai_chat', stessa memoria delle chat, stesso flusso SSE). Cambia
+    // solo come si entra: Bearer invece della sessione.
+    if (str_starts_with($uri, '/api/v1/ai/')) {
+        $aiClient = new \App\Service\OllamaClient(
+            $_ENV['OLLAMA_URL']           ?? 'http://192.168.1.10:8000/v1/chat/completions',
+            $_ENV['MODEL']                ?? 'Qwen3-30B-A3B-Q4_K_M.gguf',
+            (int)($_ENV['AI_TIMEOUT']     ?? 180),
+            (int)($_ENV['AI_CONNESSIONE'] ?? 5),
+            ($_ENV['AI_SENZA_RAGIONAMENTO'] ?? '1') !== '0',
+        );
+        $aiController = new \App\Http\Controllers\AiSqlController($connection, $aiClient);
+        $container->set(\App\Http\Controllers\AiSqlController::class, fn() => $aiController);
+        $router
+            ->post('/api/v1/ai/chat',                        [\App\Http\Controllers\AiSqlController::class, 'chat'])
+            ->get( '/api/v1/ai/conversazioni',               [\App\Http\Controllers\AiSqlController::class, 'elencoConversazioni'])
+            ->get( '/api/v1/ai/conversazioni/{id}',          [\App\Http\Controllers\AiSqlController::class, 'apriConversazione'])
+            ->post('/api/v1/ai/conversazioni/{id}/rinomina', [\App\Http\Controllers\AiSqlController::class, 'rinominaConversazione'])
+            ->post('/api/v1/ai/conversazioni/{id}/elimina',  [\App\Http\Controllers\AiSqlController::class, 'eliminaConversazione']);
+    }
 
     // ── BOB Zone dall'app ─────────────────────────────────────────────────
     // Stessi metodi del sito, non una seconda copia: cambia solo come si

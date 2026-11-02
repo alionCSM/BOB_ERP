@@ -27,7 +27,7 @@
         </div>
     </div>
     {% if canManage %}
-    <form method="POST" action="/fleet/analyze" style="display:inline;" onsubmit="return confirm('Lanciare una nuova analisi su tutti i dati importati?');">
+    <form method="POST" action="/fleet/analyze" style="display:inline;" data-confirm="Lanciare una nuova analisi su tutti i dati importati?" >
         <button type="submit" class="fl-btn-primary" style="background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);">
             <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
             Ri-analizza
@@ -46,27 +46,27 @@
         <input type="text" placeholder="Cerca per veicolo, operaio, descrizione..." data-fl-filter=".fl-table">
     </div>
 
-    <select name="severity" class="fl-select" style="width:auto;" onchange="this.form.submit()">
+    <select name="severity" class="fl-select" style="width:auto;" data-invia-al-cambio>
         <option value="">Tutte severita</option>
         <option value="high"   {{ filterSeverity == 'high'   ? 'selected' : '' }}>Solo HIGH</option>
         <option value="medium" {{ filterSeverity == 'medium' ? 'selected' : '' }}>Solo MEDIUM</option>
         <option value="low"    {{ filterSeverity == 'low'    ? 'selected' : '' }}>Solo LOW</option>
     </select>
 
-    <select name="rule_code" class="fl-select" style="width:auto;min-width:180px;" onchange="this.form.submit()">
+    <select name="rule_code" class="fl-select" style="width:auto;min-width:180px;" data-invia-al-cambio>
         <option value="">Tutte le regole</option>
         {% for r, label in ruleLabels %}
             <option value="{{ r }}" {{ filterRuleCode == r ? 'selected' : '' }}>{{ label }}</option>
         {% endfor %}
     </select>
 
-    <select name="status" class="fl-select" style="width:auto;" onchange="this.form.submit()">
+    <select name="status" class="fl-select" style="width:auto;" data-invia-al-cambio>
         <option value="open"      {{ filterStatus == 'open'      ? 'selected' : '' }}>Aperte</option>
         <option value="dismissed" {{ filterStatus == 'dismissed' ? 'selected' : '' }}>Archiviate</option>
     </select>
 
     <label class="fl-check" style="margin-left:6px;">
-        <input type="checkbox" name="only_last_run" value="1" {{ filterLastRun ? 'checked' : '' }} onchange="this.form.submit()">
+        <input type="checkbox" name="only_last_run" value="1" {{ filterLastRun ? 'checked' : '' }} data-invia-al-cambio>
         <span>Solo ultima run</span>
     </label>
 </form>
@@ -151,7 +151,7 @@
                     </td>
                     <td class="center">
                         {% if a.status == 'open' and canManage %}
-                            <form method="POST" action="/fleet/anomaly/dismiss" class="inline" onsubmit="return confirm('Archiviare questa anomalia?');">
+                            <form method="POST" action="/fleet/anomaly/dismiss" class="inline" data-confirm="Archiviare questa anomalia?" >
                                 <input type="hidden" name="id" value="{{ a.id }}">
                                 <button type="submit" class="fl-act" title="Archivia">
                                     <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>

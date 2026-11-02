@@ -62,64 +62,145 @@
         }
     });
 
-    function validateForm(form) {
-        let isValid = true;
-        const requiredFields = form.querySelectorAll('[required]');
+    /** Il nome del campo come lo legge chi compila, non quello del database. */
+    function etichetta(campo) {
+        const l = campo.closest('.ue-field')?.querySelector('label');
+        return (l?.textContent || campo.name || 'campo').trim().replace(/\s*\*$/, '');
+    }
 
-        requiredFields.forEach(function(field) {
-            if (!field.value.trim()) {
-                field.classList.add('border-red-500');
-                isValid = false;
+    function segna(campo, rotto) {
+        campo.classList.toggle('border-red-500', rotto);
+    }
+
+    /**
+     * Il telefono: si contano le CIFRE, non i caratteri.
+     *
+     * Prima la regola era /^[0-9\s\+\-\(\)]{7,15}$/, cioe' da 7 a 15
+     * caratteri spazi compresi. "+39 333 123 4567" — il formato che BOB
+     * stesso suggerisce nel segnaposto — sono 16 caratteri e veniva
+     * rifiutato, mentre "3331234567" passava: due persone scrivevano lo
+     * stesso numero in due modi e a una sola si apriva. E il messaggio non
+     * diceva quale campo fosse, quindi non c'era modo di capirlo.
+     *
+     * Adesso gli spazi, i trattini e le parentesi non contano piu' niente:
+     * contano le cifre, al massimo quindici, che e' il limite di un numero
+     * di telefono al mondo (E.164, prefisso internazionale compreso).
+     *
+     * Lo "00" iniziale non si conta, perche' non e' parte del numero: e'
+     * l'altro modo di scrivere il +. Senza questa riga un numero estero
+     * lungo scritto all'italiana — 0049 30 1234567890 — arrivava a sedici
+     * cifre e veniva rifiutato, mentre lo stesso numero con il + passava.
+     *
+     * Il minimo e' basso apposta: ci sono numeri brevi veri (centralini
+     * interni, servizi), e un campo di rubrica non e' il posto dove
+     * mettersi a fare i difficili.
+     */
+    function telefonoValido(valore) {
+        const v = valore.trim();
+        if (!/^[+]?[0-9\s\-().]*$/.test(v)) {
+            return 'puo\' contenere solo cifre, spazi, + - ( ) e punti';
+        }
+
+        let cifre = v.replace(/\D/g, '');
+        // "00" davanti = "+": e' prefisso internazionale, non numero
+        if (cifre.startsWith('00')) {
+            cifre = cifre.slice(2);
+        }
+
+        if (cifre.length < 6)  return 'e\' troppo corto: servono almeno 6 cifre';
+        if (cifre.length > 15) return 'e\' troppo lungo: al massimo 15 cifre';
+        return null;
+    }
+
+    /**
+     * Cosa non va, campo per campo.
+     *
+     * Torna un elenco di frasi gia' scritte per chi compila: prima si
+     * diceva solo "completa tutti i campi obbligatori" e il campo colpevole
+     * lo si doveva indovinare — su una scheda operaio con dodici campi, e
+     * col codice fiscale che puo' arrivare vuoto dal database, era un
+     * indovinello senza soluzione.
+     *
+     * @return {{problemi: string[], primo: HTMLElement|null}}
+     */
+    function controlla(form) {
+        const problemi = [];
+        let primo = null;
+
+        const guasto = (campo, frase) => {
+            segna(campo, true);
+            problemi.push(frase);
+            if (!primo) primo = campo;
+        };
+
+        form.querySelectorAll('[required]').forEach(function (campo) {
+            if (!campo.value.trim()) {
+                guasto(campo, etichetta(campo) + ': manca');
             } else {
-                field.classList.remove('border-red-500');
+                segna(campo, false);
             }
         });
 
-        const emailField = form.querySelector('input[type="email"]');
-        if (emailField && emailField.value.trim() && !validateEmail(emailField.value)) {
-            emailField.classList.add('border-red-500');
-            isValid = false;
-        } else if (emailField) {
-            emailField.classList.remove('border-red-500');
+        const email = form.querySelector('input[type="email"]');
+        if (email && email.value.trim() && !validateEmail(email.value)) {
+            guasto(email, etichetta(email) + ': indirizzo non valido');
+        } else if (email) {
+            segna(email, false);
         }
 
-        const cfField = form.querySelector('input[name="fiscal_code"]');
-        if (cfField && cfField.value.trim() && cfField.value.length !== 16) {
-            cfField.classList.add('border-red-500');
-            isValid = false;
-        } else if (cfField) {
-            cfField.classList.remove('border-red-500');
+        const cf = form.querySelector('input[name="fiscal_code"]');
+        if (cf && cf.value.trim() && cf.value.trim().length !== 16) {
+            guasto(cf, etichetta(cf) + ': deve essere di 16 caratteri (adesso sono '
+                     + cf.value.trim().length + ')');
+        } else if (cf && cf.value.trim()) {
+            segna(cf, false);
         }
 
-        const phoneField = form.querySelector('input[name="phone"]');
-        if (phoneField && phoneField.value.trim() && !validatePhoneNumber(phoneField.value)) {
-            phoneField.classList.add('border-red-500');
-            isValid = false;
-        } else if (phoneField) {
-            phoneField.classList.remove('border-red-500');
+        const tel = form.querySelector('input[name="phone"]');
+        if (tel && tel.value.trim()) {
+            const perche = telefonoValido(tel.value);
+            if (perche) {
+                guasto(tel, etichetta(tel) + ': ' + perche);
+            } else {
+                segna(tel, false);
+            }
+        } else if (tel) {
+            segna(tel, false);
         }
 
-        return isValid;
-    }
-
-    function validateEmail(email) {
-        const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        return emailPattern.test(email);
-    }
-
-    function validatePhoneNumber(phone) {
-        const phonePattern = /^[0-9\s\+\-\(\)]{7,15}$/;
-        return phonePattern.test(phone);
+        return { problemi, primo };
     }
 
     document.querySelectorAll('form.needs-validation').forEach(form => {
-        form.addEventListener('submit', function(event) {
-            if (!validateForm(form)) {
-                event.preventDefault();
-                alert('Per favore completa tutti i campi obbligatori correttamente.');
+        form.addEventListener('submit', function (event) {
+            const { problemi, primo } = controlla(form);
+            if (!problemi.length) {
+                return;
             }
+            event.preventDefault();
+
+            // Il campo colpevole si porta sotto gli occhi: su questa pagina
+            // sta spesso fuori schermo, e un bordo rosso che non si vede
+            // non dice niente a nessuno.
+            if (primo) {
+                primo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                primo.focus({ preventScroll: true });
+            }
+
+            alert(problemi.length === 1
+                ? problemi[0]
+                : 'Ci sono ' + problemi.length + ' campi da sistemare:\n\n• ' + problemi.join('\n• '));
         });
     });
+
+    // La foto del profilo: il click si aggancia qui perche' nell'attributo
+    // onclick la CSP non lo fa partire.
+    const foto = document.querySelector('[data-apri-foto]');
+    if (foto) {
+        foto.addEventListener('click', function () {
+            openImageModal(this.dataset.src, this.dataset.nome);
+        });
+    }
 
     function openImageModal(imageUrl, fullName) {
         const imgElement = document.getElementById('preview-image');

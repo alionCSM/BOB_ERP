@@ -42,7 +42,11 @@
 <link rel="stylesheet" href="/assets/css/includes/template/footer.css">
 <script src="/assets/js/includes/template/footer.js"></script>
 <script src="{{ asset('/includes/template/dist/js/app.js') }}"></script>
-<script>window._attestatoUrl = "{{ attestatoUrl }}";</script>
+{# Senza il nonce la CSP di BOB lo blocca, e questo sta nel layout: era
+   bloccato su ogni pagina. worker_qr.js ripiega su un indirizzo scritto a
+   mano, quindi il QR usciva lo stesso ma puntando sempre li', qualunque
+   cosa fosse configurata. Un guasto che non si vede. #}
+<script nonce="{{ cspNonce }}">window._attestatoUrl = "{{ attestatoUrl }}";</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

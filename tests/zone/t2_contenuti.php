@@ -36,7 +36,7 @@ $p->check('l\'attivita\' si crea', $taskId > 0);
 // nasce condivisa con la squadra, non col cliente: cosa va al committente
 // lo decide l'ufficio
 $messi = $cond->salva(CANTIERE, 'attivita', $taskId,
-                      $cond->predefinite(CANTIERE, Accesso::CAPO), MARCO);
+                      $cond->predefinite(CANTIERE, Accesso::CANTIERE), MARCO);
 sort($messi);
 $p->uguale('nasce per capi e operai, non per il cliente', [MARCO, ILIR], $messi);
 
@@ -135,7 +135,7 @@ $p->check('l\'operaio NON legge la risposta',!$cond5->vede($u['operaio'], CANTIE
 // ── Il pannello "Chi la vede" ─────────────────────────────────────────────
 $gruppi = $cond->persone(CANTIERE);
 $titoli = array_column($gruppi, 'titolo');
-$p->uguale('tre gruppi, senza l\'ufficio', ['Capi squadra', 'Operai', 'Cliente'], $titoli);
+$p->uguale('due gruppi, senza l\'ufficio', ['In cantiere', 'Cliente'], $titoli);
 
 $tuttiGliId = [];
 foreach ($gruppi as $g) {

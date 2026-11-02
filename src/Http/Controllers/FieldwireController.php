@@ -2132,22 +2132,26 @@ final class FieldwireController
             $tutte = $st->fetchAll(\PDO::FETCH_ASSOC);
 
             if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
-                $capo   = $ruolo === \App\Service\Zone\Accesso::CANTIERE;
-                $operai = [];
-                if ($capo) {
-                    $q = $this->conn->prepare("SELECT user_id FROM bb_zone_accessi WHERE worksite_id = :w AND ruolo = 'operaio'");
+                $acc      = new \App\Service\Zone\Accesso($this->conn);
+                $cantiere = $ruolo === \App\Service\Zone\Accesso::CANTIERE;
+                // i colleghi di cantiere: dei loro moduli personali si vede
+                // chi l'ha fatto e chi no, senza compilarli
+                $colleghi = [];
+                if ($cantiere) {
+                    $q = $this->conn->prepare("SELECT user_id, ruolo FROM bb_zone_accessi WHERE worksite_id = :w");
                     $q->execute([':w' => $w]);
-                    $operai = array_fill_keys(array_map('intval', $q->fetchAll(\PDO::FETCH_COLUMN)), true);
+                    foreach ($q->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                        if ($acc->normalizza((string)$r['ruolo']) === \App\Service\Zone\Accesso::CANTIERE) {
+                            $colleghi[(int)$r['user_id']] = true;
+                        }
+                    }
                 }
                 $fuori = [];
                 foreach ($tutte as $a) {
-                    $mio = (int)($a['a_user_id'] ?? 0) === $io || ($a['a_ruolo'] ?? null) === $ruolo;
-                    // il capo segue anche quelli della squadra, senza compilarli
-                    // lui: vede chi l'ha fatto e chi no
-                    $squadra = $capo && !$mio && (
-                        in_array($a['a_ruolo'] ?? null, ['operaio', 'capo', \App\Service\Zone\Accesso::CANTIERE], true)
-                        || isset($operai[(int)($a['a_user_id'] ?? 0)])
-                    );
+                    // capo e operaio scritti da prima sono Cantiere
+                    $aRuolo = $a['a_ruolo'] !== null ? $acc->normalizza((string)$a['a_ruolo']) : null;
+                    $mio = (int)($a['a_user_id'] ?? 0) === $io || ($aRuolo !== null && $aRuolo === $ruolo);
+                    $squadra = $cantiere && !$mio && isset($colleghi[(int)($a['a_user_id'] ?? 0)]);
                     if ($mio || $squadra) {
                         $a['solo_stato'] = !$mio;
                         $fuori[] = $a;
@@ -2186,8 +2190,10 @@ final class FieldwireController
             }
 
             $aUser  = (int)($body['a_user_id'] ?? 0) ?: null;
-            $aRuolo = in_array($body['a_ruolo'] ?? null, ['capo', 'operaio', 'cliente', 'ufficio'], true)
-                ? $body['a_ruolo'] : null;
+            // capo e operaio (pagine o app di prima) sono Cantiere
+            $aRuolo = is_string($body['a_ruolo'] ?? null)
+                ? (new \App\Service\Zone\Accesso($this->conn))->normalizza($body['a_ruolo'])
+                : null;
             if (!$aUser && !$aRuolo) throw new \RuntimeException('Scegli a chi tocca compilarlo');
 
             $frequenza = in_array($body['frequenza'] ?? '', ['una_volta', 'giornaliera', 'settimanale'], true)

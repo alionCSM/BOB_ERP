@@ -399,22 +399,26 @@ non cambia niente nelle chiamate, cambia solo chi riceve 403.
 
 ### Ruoli e chi vede cosa
 
-Ogni persona assegnata ha un **ruolo**: `capo`, `operaio`, `cliente`
-(l'ufficio e' chi ha il modulo `zone`). In `/me/zone` ogni cantiere ha
-`ruolo`; `accessi` resta per le versioni vecchie dell'app.
+Ogni persona assegnata ha un **ruolo** sul cantiere: `ufficio`,
+`cantiere`, `cliente`. `capo` e `operaio` non esistono piu' (migrazione
+20261030000004): sono `cantiere`. In `/me/zone` ogni cantiere ha `ruolo` e
+`permessi` (la tabella di `Permessi`, azione per azione); `accessi` resta
+per le versioni vecchie dell'app.
 
-Ogni cosa della Zone ha una **visibilita'**: `ufficio`, `squadra` (capi e
-operai), `capi`, `cliente` (ufficio e cliente), `tutti`. Il filtro e' sul
-server: una cosa che uno non vede non arriva nella risposta. Il cliente vede
-qualcosa solo dove l'ufficio ha acceso "Condividi col cliente".
+Chi vede una cosa lo decidono le **condivisioni**, persona per persona. Le
+segnalazioni hanno ancora un'etichetta (`ufficio`, `cantiere`, `cliente`,
+`tutti`). Il filtro e' sul server; il cliente vede qualcosa solo dove
+l'ufficio ha acceso "Condividi col cliente".
 
-| | capo | operaio | cliente |
+| | ufficio | cantiere | cliente |
 |---|---|---|---|
-| crea attivita', voci di checklist | si' | no | no |
-| sposta / spunta | si' | solo le sue o della squadra | no |
-| "Verificato" | no (solo ufficio) | no | no |
-| scrive messaggi e foto | si' | si' | si' (li legge solo l'ufficio) |
-| carica file | si' | no | no |
+| vede, scrive, compila, completa, carica, annota | si' | si' | si' |
+| crea attivita', carica disegni, decide i moduli | si' | no | si' |
+| verifica, cancella la roba d'altri, decide chi accede | si' | no | no |
+
+I moduli si assegnano a una persona o a un ruolo (`a_ruolo`: `cantiere`,
+`cliente`, `ufficio`). Se arriva ancora `capo` o `operaio` il server lo
+legge come `cantiere` (migrazione 20261031000001 per quelli gia' salvati).
 
 ## GET /api/v1/me/attivita
 
@@ -666,3 +670,107 @@ finche' non la apre. Link `/worksites/{id}/zone#segnalazione-{sid}`.
 - Nella lista dell'operaio, finche' l'ufficio non sceglie, `cantiere_nome` e'
   il testo scritto a mano. Dopo l'approvazione la dichiarazione prende il
   cantiere dove e' stata registrata; `cantiere_testo` resta.
+
+## Un'app per tutti: il profilo decide cosa si vede (`GET /me/home`)
+
+`/me/home` risponde a ogni utente, con `profilo` e `menu` (le chiavi che
+l'app disegna, gia' filtrate). Gli stessi profili del sito
+(`AccessProfileResolver`):
+
+| `profilo` | chi | `menu` possibile |
+|---|---|---|
+| `operaio` | type `worker` con operaio collegato | oggi, presenze, assenze, documenti, cantieri |
+| `ufficio` | tutti gli altri interni; il superadmin (id 1) sempre | home, (presenze, assenze, documenti se ha un operaio collegato), approvare (`attendance`), cantieri (Zone), ai (`ai_chat`) |
+| `cliente` | type `client` o legato a un cliente | cantieri |
+| `consorziata` | role `company_viewer` | nessuno: `messaggio` dice di usare il sito |
+
+**Societa'.** I permessi sono per societa'. Chi ne ha piu' d'una riceve
+**409 `needs_company_selection`** (con `companies`) su qualunque chiamata
+finche' non sceglie: `POST /switch-company {group_company_id}`. La scelta
+resta sul token. La home dell'ufficio riporta `societa: {attiva, elenco}` e
+`moduli` della societa' attiva; il menu si ricalcola quando si cambia.
+
+Campi in piu' per `ufficio`: `superadmin`, `utente.operaio`,
+`da_approvare: {presenze, assenze}` (solo con `attendance`).
+
+Il superadmin vede nella Zone i cantieri dove la Zone e' in uso (almeno un
+accesso dato); gli altri, quelli dove li abbiamo messi per nome.
+
+## Ufficio dall'app
+
+Stessi repository e stesse notifiche delle pagine web. Permesso
+`attendance` nella societa' attiva (il superadmin passa sempre).
+
+| | |
+|---|---|
+| `GET /ufficio/approvare` | `{presenze, assenze}` in attesa, con gli `avvisi` della pagina web |
+| `POST /ufficio/presenze/{id}/decidi` | `{azione: approva, correzioni: {worksite_id, turno, pranzo, cena, pranzo_prezzo, cena_prezzo, hotel, targa_auto, trasferta, azienda, note}}` oppure `{azione: rifiuta, motivo}` |
+| `POST /ufficio/assenze/{id}/decidi` | `{azione: approva|rifiuta, motivo}` (motivo obbligatorio per rifiutare) |
+| `GET /ufficio/cantieri?q=` | per scegliere il cantiere giusto prima di approvare |
+
+## BOB AI dall'app
+
+Lo stesso `AiSqlController` del sito (permesso `ai_chat`, chat salvate in
+comune col web), con Bearer:
+
+| | |
+|---|---|
+| `POST /ai/chat` | form `domanda`, `conversazione`, `stream=1`: risposta **SSE** — `inizio`, `stato {fase: penso/scrivo/riprovo/eseguo/pronto, righe}`, `fine {ok, answer (markdown), query, righe, conversazione, titolo}` oppure `fine {ok:false, error}` |
+| `GET /ai/conversazioni` | `{ok, conversazioni: [{id, titolo, updated_at, messaggi}]}` |
+| `GET /ai/conversazioni/{id}` | `{ok, messaggi: [{ruolo, testo, sql, righe, errore, created_at}]}` |
+| `POST /ai/conversazioni/{id}/rinomina` | form `titolo` |
+| `POST /ai/conversazioni/{id}/elimina` | |
+
+## Ufficio dall'app, seconda parte
+
+Ogni voce compare nella home solo se l'utente ha il modulo nella societa'
+scelta; le rotte hanno la stessa guardia.
+
+| Rotta | Modulo | Cosa fa |
+|---|---|---|
+| `GET /ufficio/presenze?dal=&al=&cantiere_id=&worker_id=` | `attendance` | il registro, le prime 200 righe |
+| `POST /ufficio/presenze` | `attendance` | `{cantiere, start_date, end_date, overwrite, righe: [{worker_id, turno, pranzo, pranzo_prezzo, cena, cena_prezzo, hotel, auto, note}]}` — come l'inserimento del sito; se ci sono gia' presenze risponde 422 `{code: conflitti, conflitti}` e si rimanda con `overwrite: true` |
+| `GET /ufficio/operai?q=` | `attendance` | operai attivi, senza le consorziate |
+| `GET /ufficio/documenti?stato=scadenza\|scaduti` | `documents` | `{documenti: [{id, di: operaio\|azienda, tipo, scadenza, nome, azienda}]}`, entro 30 giorni o gia' scaduti |
+| `GET /ufficio/flotta` | `fleet_view` o `fleet_manage` | `{mezzi, carte, telepass}` con a chi sono adesso |
+| `GET /pianificazione/get?data=` | `pianificazione` | la stessa risposta della pagina web |
+| `POST /pianificazione/invia` | `pianificazione` | manda a ogni operaio dove va (come il bottone del sito) |
+| `GET /programmazione/api?action=list&mese=&anno=` | `programmazione` | le righe del mese |
+
+Autocarrate e noleggi del giorno usano le rotte gia' esistenti
+`/noleggi/giornata`, `/noleggi/giornata/segna`, `/noleggi/giornata/foto`.
+
+## Ufficio dall'app, terza parte: la scrivania (sola lettura)
+
+Si guarda dal telefono, si modifica dal sito. Stessi repository e stessi
+permessi della societa' attiva; nella home compaiono solo le voci che si
+possono aprire (`offerte`, `clienti`, `aziende`, `prenotazioni`,
+`ordini_aziende`, `fatturato`, `rubrica`).
+
+| Rotta | Modulo | Cosa torna |
+|---|---|---|
+| `GET /ufficio/offerte?stato=&q=` | `offers` | `{offerte: [{id, numero, oggetto, cliente, societa, stato, totale, creata, da}]}`, max 300; la societa' 1 le vede tutte, le altre solo le proprie |
+| `GET /ufficio/clienti` | `clients` (solo societa' 1, come sul sito) | `{clienti: [{id, nome, indirizzo, filiale, piva, email, offerte, cantieri}]}` |
+| `GET /ufficio/clienti/{id}` | `clients` | `{cliente, cantieri: [{id, codice, nome}], offerte}` |
+| `GET /ufficio/aziende` | `companies` | `{aziende: [{id, nome, codice, consorziata, attiva, operai}]}` |
+| `GET /ufficio/prenotazioni?tipo=hotel\|restaurant&attive=1&q=` | `bookings` | `{prenotazioni: [{struttura, citta, telefono, cantiere, capo, persone, dal, al, totale, attiva, pagata}]}` |
+| `GET /ufficio/ordini-aziende?anno=` | `ordini_aziende` | `{anno, ordini: [{azienda, mese, numero, data, totale, descrizione}]}` |
+| `GET /ufficio/fatturato?anno=` | `report_business` | `{anno, serie, totali}` per l'anno e quello prima, lo stesso calcolo di "Andamento fatturato"; 503 se Business non risponde |
+| `GET /ufficio/rubrica?q=` | `users` (non per chi vede solo alcune aziende) | `{persone: [{id, nome, azienda, telefono, email, attivo}]}`, da 2 lettere, max 50 |
+
+La pagina della fatturazione (`/billing`, tutti i clienti) resta sul sito.
+La fatturazione **del singolo cantiere** si vede dall'app: sotto.
+
+## I cantieri di BOB dall'app (sola lettura)
+
+Le schede della pagina del cantiere. Voce di menu `commesse` (modulo
+`worksites`); la Zone nel menu resta `cantieri`. Stessi controlli di
+`/worksites/{id}`: modulo `worksites`, e chi non e' della societa' 1 apre solo
+i cantieri della sua. I prezzi solo con `view_prices`, come sul sito.
+
+| Rotta | Cosa torna |
+|---|---|
+| `GET /worksites/{id}/presenze?dal=&al=` | `{giornate, presenze: [{data, nome, azienda, turno, pranzo, cena, hotel, auto, note, pranzo_prezzo, cena_prezzo}]}`, max 500, i prezzi `null` senza permesso |
+| `GET /worksites/{id}/consorziate` | `{giornate, presenze: [{data, azienda, quantita, pasti, auto, hotel, note, costo}]}` |
+| `GET /worksites/{id}/mezzi` | `{mezzi: [{mezzo, tipo, stato, quantita, dal, al, calendario, festivi, giorni_extra, costo_giorno}]}` |
+| `GET /worksites/{id}/economia` | solo con `view_prices` (se no 403): `{yard, riepilogo: {contratto, consuntivo, ricavo_stimato, extra, base, fatturato, emesso, da_emettere, ancora_da_fatturare, ricavi, costi, margine}, costi: [{voce, importo}], fatture, extra, ordini}`. Stessi conti della scheda web, storico Yard compreso; `yard: false` se Yard non risponde |
