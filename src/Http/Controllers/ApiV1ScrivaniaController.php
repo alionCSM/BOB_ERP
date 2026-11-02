@@ -222,11 +222,17 @@ final class ApiV1ScrivaniaController
             Response::json(['success' => false, 'message' => 'Collegamento a Business non configurato.'], 503);
         }
         try {
+            // stessa lettura della pagina web: il registro IVA, e il confronto
+            // fra anni fermo al mese in corso
             $repo = new \App\Repository\Business\BusinessInvoiceRepository(
                 (new \App\Infrastructure\BusinessConnection($config))->connect(),
-                $config->businessCodDitta()
+                $config->businessCodDitta(),
+                $config->businessTabellaDocumenti()
             );
-            $dati = \BusinessReportController::buildSeries($repo->monthlyTotals($anno - 1, $anno), $anno - 1, $anno);
+            $meseLimite = $anno === (int)date('Y') ? (int)date('n') : 12;
+            $dati = \BusinessReportController::buildSeries(
+                $repo->monthlyTotals($anno - 1, $anno), $anno - 1, $anno, $meseLimite
+            );
         } catch (\Throwable $e) {
             error_log('[ApiV1 fatturato] ' . $e->getMessage());
             Response::json(['success' => false, 'message' => 'Impossibile leggere i dati da Business in questo momento.'], 503);
