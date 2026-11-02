@@ -83,17 +83,32 @@
      * diceva quale campo fosse, quindi non c'era modo di capirlo.
      *
      * Adesso gli spazi, i trattini e le parentesi non contano piu' niente:
-     * contano le cifre, da 6 a 15 (quindici e' il massimo di un numero di
-     * telefono al mondo, E.164), col prefisso + se c'e'.
+     * contano le cifre, al massimo quindici, che e' il limite di un numero
+     * di telefono al mondo (E.164, prefisso internazionale compreso).
+     *
+     * Lo "00" iniziale non si conta, perche' non e' parte del numero: e'
+     * l'altro modo di scrivere il +. Senza questa riga un numero estero
+     * lungo scritto all'italiana — 0049 30 1234567890 — arrivava a sedici
+     * cifre e veniva rifiutato, mentre lo stesso numero con il + passava.
+     *
+     * Il minimo e' basso apposta: ci sono numeri brevi veri (centralini
+     * interni, servizi), e un campo di rubrica non e' il posto dove
+     * mettersi a fare i difficili.
      */
     function telefonoValido(valore) {
         const v = valore.trim();
-        if (!/^\+?[0-9\s\-().]*$/.test(v)) {
+        if (!/^[+]?[0-9\s\-().]*$/.test(v)) {
             return 'puo\' contenere solo cifre, spazi, + - ( ) e punti';
         }
-        const cifre = v.replace(/\D/g, '').length;
-        if (cifre < 6)  return 'e\' troppo corto: servono almeno 6 cifre';
-        if (cifre > 15) return 'e\' troppo lungo: al massimo 15 cifre';
+
+        let cifre = v.replace(/\D/g, '');
+        // "00" davanti = "+": e' prefisso internazionale, non numero
+        if (cifre.startsWith('00')) {
+            cifre = cifre.slice(2);
+        }
+
+        if (cifre.length < 6)  return 'e\' troppo corto: servono almeno 6 cifre';
+        if (cifre.length > 15) return 'e\' troppo lungo: al massimo 15 cifre';
         return null;
     }
 
