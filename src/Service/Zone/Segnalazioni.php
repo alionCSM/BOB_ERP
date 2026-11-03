@@ -125,7 +125,7 @@ final class Segnalazioni
         $gravita = in_array($dati['gravita'] ?? '', self::GRAVITA, true) ? $dati['gravita'] : 'bassa';
         $vis = match ($ruolo) {
             Accesso::CLIENTE => 'cliente',
-            Accesso::UFFICIO => in_array($dati['visibilita'] ?? '', Accesso::VISIBILITA, true) ? $dati['visibilita'] : 'capi',
+            Accesso::UFFICIO => in_array($dati['visibilita'] ?? '', Accesso::VISIBILITA, true) ? $dati['visibilita'] : 'cantiere',
             default          => 'capi',
         };
 

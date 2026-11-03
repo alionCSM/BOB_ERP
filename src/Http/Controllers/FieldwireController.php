@@ -429,6 +429,17 @@ final class FieldwireController
             $existing = $this->taskVisibile($request, $taskId);
             $ruolo = (string)$this->ruoloQui($request);
 
+            // Cambiare un'attivita' (nome, descrizione, date, a chi tocca):
+            // l'ufficio tutte, gli altri quelle che hanno creato loro. Prima
+            // un cliente riscriveva le attivita' dell'ufficio che vedeva.
+            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO
+                && (int)($existing['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
+                \App\Service\Zone\Accesso::nega('Questa attivita\' la cambia chi l\'ha creata, o l\'ufficio');
+            }
+            // Lo stato passa solo da /status, che controlla chi puo' cosa:
+            // dentro la modifica arrivava a "verificato" anche chi non puo'.
+            unset($body['status']);
+
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
             $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, false, $request);
@@ -497,8 +508,9 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
-            $task       = $this->zoneRepo->find($taskId);
-            if (!$task) throw new \RuntimeException('Task non trovato');
+            // di QUESTO cantiere: prima bastava il numero, e l'ufficio di un
+            // cantiere cancellava le attivita' di un altro
+            $task       = $this->taskVisibile($request, $taskId);
 
             // delete su Fieldwire prima di cancellare in locale
             if (!empty($task['fw_id'])) {
@@ -948,6 +960,24 @@ final class FieldwireController
             }
 
             $assegnazione = $this->assegnazioneDi($worksiteId, (int)($body['assegnazione_id'] ?? 0));
+            // La compilazione conta per l'assegnazione solo se e' quel
+            // modulo e tocca a chi lo compila. Prima un modulo qualsiasi,
+            // mandato con il numero del DPI, segnava il DPI come fatto e
+            // finiva a chi legge le risposte del DPI.
+            $ufficio = $this->accesso->daUfficio($user, $worksiteId);
+            if ($assegnazione) {
+                $ruoloMio = $this->accesso->ruolo($user, $worksiteId);
+                $aRuolo   = $assegnazione['a_ruolo'] !== null ? $this->accesso->normalizza((string)$assegnazione['a_ruolo']) : null;
+                $tocca    = (int)($assegnazione['a_user_id'] ?? 0) === (int)($user?->id ?? -1)
+                    || ($aRuolo !== null && $aRuolo === $ruoloMio);
+                if ((int)$assegnazione['template_id'] !== $tplId || (!$tocca && !$ufficio)) {
+                    \App\Service\Zone\Accesso::nega('Questo modulo non e\' assegnato a te');
+                }
+            } elseif (!$ufficio) {
+                // fuori dall'ufficio si compila quello che ci e' stato
+                // assegnato, come gia' fa l'app
+                \App\Service\Zone\Accesso::nega('Si compilano i moduli assegnati: chiedi all\'ufficio');
+            }
 
             $id = $this->formRepo->createSubmission([
                 'template_id'    => $tplId,
@@ -1337,7 +1367,10 @@ final class FieldwireController
             // essere un operaio — o un cliente — per farsi dare nomi e
             // cognomi di tutta l'azienda. L'ufficio li vede tutti perche'
             // assegna le attivita' e aggiunge la gente ai cantieri.
-            $soloQui = $this->accesso->daUfficio($request->user(), $w)
+            // ?qui=1: solo chi sta in questo cantiere anche per l'ufficio.
+            // Serve ad "Assegnato a": un'attivita' data a qualcuno che nel
+            // cantiere non c'e' non la puo' aprire nessuno.
+            $soloQui = $this->accesso->daUfficio($request->user(), $w) && empty($_GET['qui'])
                 ? ''
                 : ' AND u.id IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = ' . $w . ')';
 
@@ -2342,7 +2375,6 @@ final class FieldwireController
     // chi entra in un cantiere potrebbe toccare le attivita' di un altro
     // cambiando un numero nell'indirizzo.
 
-    /** Il ruolo di chi chiede su questo cantiere (la guardia e' gia' passata). */
     /**
      * Il modello di un modulo, se si usa in questo cantiere.
      *
@@ -2372,6 +2404,7 @@ final class FieldwireController
         return $tpl;
     }
 
+    /** Il ruolo di chi chiede su questo cantiere (la guardia e' gia' passata). */
     private function ruoloQui(Request $request): string
     {
         return $this->accesso->ruolo($request->user(), (int)$request->param('id'))
@@ -2411,19 +2444,37 @@ final class FieldwireController
         if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
             return;
         }
-        if ($stato === 'verified') {
-            \App\Service\Zone\Accesso::nega("Solo l'ufficio puo' verificare");
+        if (!in_array($stato, ['open', 'in_progress', 'complete', 'verified'], true)) {
+            throw new \RuntimeException('Stato non valido');
         }
-        if ($ruolo === \App\Service\Zone\Accesso::CLIENTE) {
-            \App\Service\Zone\Accesso::nega('Puoi guardare ma non modificare');
+        if ($stato === 'verified' || ($task['status'] ?? '') === 'verified') {
+            \App\Service\Zone\Accesso::nega("Verificare, o riaprire un'attivita' verificata, lo fa l'ufficio");
         }
-        if ($ruolo === \App\Service\Zone\Accesso::CANTIERE) {
-            $mia = ($task['assegnata_a'] ?? 'squadra') === 'squadra'
-                || (int)($task['assignee_user_id'] ?? 0) === (int)($request->user()->id ?? -1);
-            if (!$mia) {
-                \App\Service\Zone\Accesso::nega('Questa attivita non e assegnata a te');
-            }
+        // Porta avanti un'attivita' chi ce l'ha: l'ha creata, e' sua per
+        // nome, o tocca al suo gruppo. Prima il cliente non poteva chiudere
+        // nemmeno le attivita' che aveva aperto lui, e quelle "dei capi"
+        // non le chiudeva nessuno del cantiere, perche' capi e squadra
+        // erano diventati la stessa cosa e il controllo guardava solo
+        // "squadra".
+        $io     = (int)($request->user()->id ?? -1);
+        $gruppo = self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra'));
+        $mia    = (int)($task['created_by'] ?? 0) === $io
+            || (int)($task['assignee_user_id'] ?? 0) === $io
+            || ($gruppo !== null && $gruppo === $ruolo);
+        if (!$mia) {
+            \App\Service\Zone\Accesso::nega("Questa attivita' non e' assegnata a te");
         }
+    }
+
+    /** Il ruolo a cui tocca un'attivita' assegnata a un gruppo (null = a una persona). */
+    private static function gruppoTask(string $assegnataA): ?string
+    {
+        return match ($assegnataA) {
+            'squadra', 'capi', 'cantiere' => \App\Service\Zone\Accesso::CANTIERE,
+            'cliente'                     => \App\Service\Zone\Accesso::CLIENTE,
+            'ufficio'                     => \App\Service\Zone\Accesso::UFFICIO,
+            default                       => null,
+        };
     }
 
     /**
@@ -2448,16 +2499,26 @@ final class FieldwireController
         $campi = [];
         if ($nuova || array_key_exists('assegnata_a', $body)) {
             $a = (string)($body['assegnata_a'] ?? '');
-            if (!in_array($a, ['persona', 'squadra', 'capi', 'ufficio', 'cliente'], true)) {
-                $a = !empty($body['assignee_user_id']) ? 'persona' : 'squadra';
+            // capi e squadra sono le stesse persone: una parola sola
+            if ($a === 'capi' || $a === 'cantiere') {
+                $a = 'squadra';
             }
-            // assegnare all'ufficio o al cliente e' una decisione dell'ufficio
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO && in_array($a, ['ufficio', 'cliente'], true)) {
+            if (!in_array($a, ['persona', 'squadra', 'ufficio', 'cliente'], true)) {
+                // senza scelta: il cliente chiede all'ufficio, gli altri
+                // danno lavoro alla squadra
+                $a = !empty($body['assignee_user_id']) ? 'persona'
+                   : ($ruolo === \App\Service\Zone\Accesso::CLIENTE ? 'ufficio' : 'squadra');
+            }
+            // Al cliente assegna l'ufficio, o il cliente stesso. All'ufficio
+            // puo' assegnare chiunque: prima il cliente che apriva
+            // un'attivita' "per l'ufficio" se la vedeva girare alla squadra.
+            if ($a === 'cliente' && !in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CLIENTE], true)) {
                 $a = 'squadra';
             }
             $campi['assegnata_a'] = $a;
         }
         if (!$campi) {
+            $this->condivisione->aggiungiAssegnatari($worksiteId, $taskId);
             return;
         }
         $set = implode(', ', array_map(fn($k) => "$k = :$k", array_keys($campi)));
@@ -2466,6 +2527,7 @@ final class FieldwireController
             $par[":$k"] = $v;
         }
         $this->conn->prepare("UPDATE bb_zone_tasks SET $set WHERE id = :id")->execute($par);
+        $this->condivisione->aggiungiAssegnatari($worksiteId, $taskId);
     }
 
     /**

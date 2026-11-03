@@ -61,7 +61,9 @@ final class AvvisiZona
         foreach ($persone as $p) {
             if ((int)$p['user_id'] === $daChi) continue;
             if ($p['ruolo'] === Accesso::CLIENTE && empty($t['zone_cliente'])) continue;
-            if (!isset($condivisa[(int)$p['user_id']])) continue;
+            // l'ufficio vede tutto senza righe di condivisione: senza questa
+            // eccezione un'attivita' "per l'ufficio" non avvisava nessuno
+            if ($p['ruolo'] !== Accesso::UFFICIO && !isset($condivisa[(int)$p['user_id']])) continue;
             $p['worksite_id'] = (int)$t['worksite_id'];
             $p['dove'] = 'attivita-' . $taskId;
             $this->manda($p, 'zona_attivita_t', 'zona_attivita', [

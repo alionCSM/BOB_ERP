@@ -245,6 +245,61 @@ final class Condivisione
     }
 
     /**
+     * A chi tocca un'attivita', la vede.
+     *
+     * Sembra ovvio e non lo era: assegnare e condividere erano due cose
+     * separate. Un'attivita' dell'ufficio "per la squadra", o una nata da
+     * una segnalazione, non era condivisa con nessuno — la squadra non la
+     * vedeva, e l'avviso, che parte solo verso chi la vede, non partiva.
+     * Quella aperta da un cliente per la squadra lo stesso.
+     *
+     * Qui si aggiungono le persone a cui tocca, senza togliere nessuno.
+     */
+    public function aggiungiAssegnatari(int $worksiteId, int $taskId): void
+    {
+        $st = $this->conn->prepare('SELECT assegnata_a, assignee_user_id FROM bb_zone_tasks WHERE id = :t AND worksite_id = :w');
+        $st->execute([':t' => $taskId, ':w' => $worksiteId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) {
+            return;
+        }
+
+        $chi  = [];
+        $par  = [':w' => $worksiteId];
+        $ruolo = match ((string)$t['assegnata_a']) {
+            'squadra', 'capi', 'cantiere' => Accesso::CANTIERE,
+            'cliente'                     => Accesso::CLIENTE,
+            default                       => null,
+        };
+        if ($ruolo !== null) {
+            $chi[]      = 'a.ruolo = :r';
+            $par[':r']  = $ruolo;
+        }
+        if (!empty($t['assignee_user_id'])) {
+            $chi[]      = 'a.user_id = :p';
+            $par[':p']  = (int)$t['assignee_user_id'];
+        }
+        if (!$chi) {
+            return; // all'ufficio: vede gia' tutto
+        }
+
+        $q = $this->conn->prepare("
+            SELECT a.user_id FROM bb_zone_accessi a JOIN bb_worksites w ON w.id = a.worksite_id
+            WHERE a.worksite_id = :w AND a.ruolo <> 'ufficio'
+              AND " . Accesso::SQL_CLIENTE_ENTRA . "
+              AND (" . implode(' OR ', $chi) . ")
+        ");
+        $q->execute($par);
+        $ins = $this->conn->prepare(
+            'INSERT IGNORE INTO bb_zone_condivisioni (tipo, oggetto_id, user_id) VALUES (\'attivita\', :o, :u)'
+        );
+        foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $uid) {
+            $ins->execute([':o' => $taskId, ':u' => (int)$uid]);
+        }
+        $this->cache = [];
+    }
+
+    /**
      * Chi arriva dopo vede quello che vedono gli altri col suo ruolo.
      *
      * Le condivisioni sono per nome: il secondo geometra del committente,
