@@ -774,3 +774,19 @@ i cantieri della sua. I prezzi solo con `view_prices`, come sul sito.
 | `GET /worksites/{id}/consorziate` | `{giornate, presenze: [{data, azienda, quantita, pasti, auto, hotel, note, costo}]}` |
 | `GET /worksites/{id}/mezzi` | `{mezzi: [{mezzo, tipo, stato, quantita, dal, al, calendario, festivi, giorni_extra, costo_giorno}]}` |
 | `GET /worksites/{id}/economia` | solo con `view_prices` (se no 403): `{yard, riepilogo: {contratto, consuntivo, ricavo_stimato, extra, base, fatturato, emesso, da_emettere, ancora_da_fatturare, ricavi, costi, margine}, costi: [{voce, importo}], fatture, extra, ordini}`. Stessi conti della scheda web, storico Yard compreso; `yard: false` se Yard non risponde |
+
+## Aggiornamenti obbligatori (`GET /api/v1/app/versione`, aperta)
+
+`?piattaforma=android|ios&version_code=N` (N = il build, quello dopo il `+`).
+Torna `{obbligatorio, minima, messaggio, store_url}`: `obbligatorio` e' vero
+se N e' sotto la minima impostata in `/app` per quella piattaforma oppure,
+su Android, sotto la versione APK obbligatoria piu' nuova fra le attive.
+L'app sotto la minima si ferma su "Aggiorna BOB". Senza rete non blocca.
+I campi `aggiornamento` e `versione` restano per l'app vecchia che scarica
+l'APK da BOB.
+
+## Informativa privacy
+
+`/privacy` (anche `/privacy-app`): pagina pubblica, servita prima di tutto il
+resto, che Google Play e App Store chiedono. Contiene anche come chiedere la
+cancellazione dell'account (`/privacy#cancellazione`).

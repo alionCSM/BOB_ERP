@@ -40,6 +40,7 @@ final class AppReleaseController
         $this->assertGestione($request);
 
         Response::view('app/index.html.twig', $request, [
+            'minime'   => ['android' => $this->minima('android'), 'ios' => $this->minima('ios')],
             'versioni' => $this->tutte(),
             'ultima'   => $this->ultimaAttiva(),
             'salvato'  => isset($_GET['salvato']),
@@ -235,35 +236,101 @@ final class AppReleaseController
      */
     public function versione(Request $request): void
     {
-        $ultima = $this->ultimaAttiva();
+        $ultima      = $this->ultimaAttiva();
+        $suo         = (int)($_GET['version_code'] ?? 0);
+        $piattaforma = ($_GET['piattaforma'] ?? 'android') === 'ios' ? 'ios' : 'android';
 
-        if (!$ultima) {
-            Response::json([
-                'success'       => true,
-                'aggiornamento' => false,
-                'versione'      => null,
-            ]);
+        // Obbligatorio vuol dire "sotto questo numero non si lavora". Vale la
+        // minima impostata per la piattaforma e, per l'APK caricato in BOB,
+        // la versione obbligatoria piu' nuova — non solo l'ultima: se la 5 e'
+        // obbligatoria e la 6 no, chi e' fermo alla 4 deve aggiornare lo stesso.
+        $minima = $this->minima($piattaforma);
+        $soglia = (int)($minima['version_code'] ?? 0);
+        if ($piattaforma === 'android') {
+            $soglia = max($soglia, $this->ultimaObbligatoria());
         }
-
-        $suo = (int)($_GET['version_code'] ?? 0);
 
         Response::json([
             'success'       => true,
-            'aggiornamento' => $suo > 0 && (int)$ultima['version_code'] > $suo,
-            'versione'      => [
+            // per l'app nuova (store): basta questo
+            'obbligatorio'  => $suo > 0 && $suo < $soglia,
+            'minima'        => $soglia,
+            'messaggio'     => (string)($minima['messaggio'] ?? ''),
+            'store_url'     => (string)(($minima['store_url'] ?? '') ?: self::storeUrl($piattaforma)),
+            // per l'app vecchia, che si aggiorna scaricando l'APK da BOB
+            'aggiornamento' => $ultima !== null && $suo > 0 && (int)$ultima['version_code'] > $suo,
+            'versione'      => $ultima ? [
                 'version_code' => (int)$ultima['version_code'],
                 'version_name' => (string)$ultima['version_name'],
                 'note'         => (string)($ultima['note'] ?? ''),
-                'obbligatorio' => (bool)$ultima['obbligatorio'],
+                'obbligatorio' => $suo > 0 && $suo < $soglia,
                 'dimensione'   => (int)$ultima['dimensione'],
                 'sha256'       => (string)($ultima['sha256'] ?? ''),
                 'url'          => $this->baseUrl() . '/app/scarica/' . $ultima['token'],
                 'pubblicata'   => (string)$ultima['created_at'],
-            ],
+            ] : null,
         ]);
     }
 
+    /** POST /app/minima — la versione sotto la quale l'app si ferma */
+    public function salvaMinima(Request $request): void
+    {
+        $this->assertGestione($request);
+
+        $chi = trim((string)($request->user()->first_name ?? '') . ' ' . (string)($request->user()->last_name ?? ''));
+        $st  = $this->conn->prepare('
+            INSERT INTO bb_app_minima (piattaforma, version_code, messaggio, store_url, aggiornato_da)
+            VALUES (:p, :v, :m, :u, :chi)
+            ON DUPLICATE KEY UPDATE version_code = VALUES(version_code), messaggio = VALUES(messaggio),
+                                    store_url = VALUES(store_url), aggiornato_da = VALUES(aggiornato_da)
+        ');
+        foreach (['android', 'ios'] as $p) {
+            $url = trim((string)($_POST["url_$p"] ?? ''));
+            if ($url !== '' && !preg_match('~^https://~', $url)) {
+                $this->torna("L'indirizzo dello store deve cominciare con https://");
+            }
+            $st->execute([
+                ':p'   => $p,
+                ':v'   => max(0, (int)($_POST["minima_$p"] ?? 0)),
+                ':m'   => trim((string)($_POST['messaggio'] ?? '')) ?: null,
+                ':u'   => $url ?: null,
+                ':chi' => $chi ?: null,
+            ]);
+        }
+        Response::redirect('/app?salvato=1');
+    }
+
     // ── Aiutanti ─────────────────────────────────────────────────────────────
+
+    /** @return array<string,mixed>|null la minima di una piattaforma */
+    private function minima(string $piattaforma): ?array
+    {
+        try {
+            $st = $this->conn->prepare('SELECT * FROM bb_app_minima WHERE piattaforma = :p');
+            $st->execute([':p' => $piattaforma]);
+            return $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            // tabella non ancora creata: nessuna minima, nessuno bloccato
+            return null;
+        }
+    }
+
+    /** Il numero della versione obbligatoria piu' nuova fra gli APK attivi. */
+    private function ultimaObbligatoria(): int
+    {
+        return (int)$this->conn->query('
+            SELECT COALESCE(MAX(version_code), 0) FROM bb_app_releases
+            WHERE  attiva = 1 AND obbligatorio = 1
+        ')->fetchColumn();
+    }
+
+    /** La pagina di BOB nello store, se non se ne e' scritta un'altra. */
+    private static function storeUrl(string $piattaforma): string
+    {
+        return $piattaforma === 'ios'
+            ? ''
+            : 'https://play.google.com/store/apps/details?id=it.csmontaggi.bob';
+    }
 
     /** @return array<int, array<string,mixed>> */
     private function tutte(): array

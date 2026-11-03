@@ -6,6 +6,18 @@
 
 define('APP_ROOT', dirname(__DIR__));
 
+// L'informativa privacy dell'app, aperta a tutti: la chiedono Google Play e
+// l'App Store, e la deve poter leggere chiunque prima di installare. Una
+// pagina fissa, prima di tutto il resto: si apre anche col database giu'.
+$uriPrivacy = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if ($uriPrivacy === '/privacy' || $uriPrivacy === '/privacy-app') {
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: public, max-age=3600');
+    readfile(APP_ROOT . '/templates/pubblico/privacy.html');
+    exit;
+}
+
+
 // Load bootstrap first to get autoloader and env
 require_once APP_ROOT . '/includes/bootstrap.php';
 
@@ -141,7 +153,7 @@ if (in_array($uri, ['/login', '/logout', '/verify-login'], true)) {
 }
 
 // ── App Android: pubblicazione (riservato) ────────────────────────────────────
-if ($uri === '/app' || in_array($uri, ['/app/carica', '/app/stato', '/app/elimina'], true)) {
+if ($uri === '/app' || in_array($uri, ['/app/carica', '/app/stato', '/app/elimina', '/app/minima'], true)) {
     require_once APP_ROOT . '/includes/middleware.php';
     $container = \App\Infrastructure\ContainerFactory::build($connection);
 
@@ -151,7 +163,8 @@ if ($uri === '/app' || in_array($uri, ['/app/carica', '/app/stato', '/app/elimin
     $router->get('/app',           [AppReleaseController::class, 'index'])
            ->post('/app/carica',   [AppReleaseController::class, 'carica'])
            ->post('/app/stato',    [AppReleaseController::class, 'stato'])
-           ->post('/app/elimina',  [AppReleaseController::class, 'elimina']);
+           ->post('/app/elimina',  [AppReleaseController::class, 'elimina'])
+           ->post('/app/minima',   [AppReleaseController::class, 'salvaMinima']);
 
     $router->dispatch($request, $container);
 }
