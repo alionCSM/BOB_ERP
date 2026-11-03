@@ -823,6 +823,12 @@ if (str_starts_with($uri, '/api/v1/')) {
             ->get('/api/v1/worksites/{id}/consorziate', [ApiV1CantieriController::class, 'consorziate'])
             ->get('/api/v1/worksites/{id}/mezzi',       [ApiV1CantieriController::class, 'mezzi'])
             ->get('/api/v1/worksites/{id}/economia',    [ApiV1CantieriController::class, 'economia'])
+            ->get('/api/v1/worksites/{id}/statistiche', [ApiV1CantieriController::class, 'statistiche'])
+            ->post('/api/v1/worksites/{id}/chiedi',     [ApiV1CantieriController::class, 'chiedi'])
+            ->get('/api/v1/worksites/{id}/ordini',      [ApiV1CantieriController::class, 'ordini'])
+            ->get('/api/v1/worksites/{id}/extra',       [ApiV1CantieriController::class, 'extra'])
+            ->get('/api/v1/worksites/{id}/attivita',    [ApiV1CantieriController::class, 'attivita'])
+            ->get('/api/v1/worksites/{id}/note',        [ApiV1CantieriController::class, 'note'])
             ->get('/api/v1/worksites/{id}',            [ApiV1CantieriController::class, 'scheda'])
 
             // ── L'app dell'operaio: le sue cose e basta ───────────────────
