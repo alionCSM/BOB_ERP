@@ -84,8 +84,74 @@ final class NotificationService
         $id = (int)$this->conn->lastInsertId();
 
         $this->pushToDevices($userId, $id, $title, $message, $link, $category, $priority);
+        $this->emailAlCliente($userId, $id, $title, $message, $link);
 
         return $id;
+    }
+
+    // ── Email ai clienti ──────────────────────────────────────────────────────
+
+    /**
+     * Al cliente la notifica arriva anche per email.
+     *
+     * Un committente usa BOB dal sito, quando se ne ricorda: senza l'app la
+     * campanella non la vede nessuno, e una domanda dell'ufficio restava li'
+     * finche' non gli capitava di entrare. L'email lo porta dentro.
+     *
+     * Una sola email finche' non ha letto: se ha gia' notifiche non lette
+     * della mezz'ora prima, l'email l'ha gia' avuta e una chat vivace non
+     * gli riempie la casella. Come il push, non deve mai rompere la
+     * notifica: se l'email non parte, resta quella in BOB.
+     */
+    private function emailAlCliente(int $userId, int $notificationId, string $title, string $message, string $link): void
+    {
+        try {
+            $st = $this->conn->prepare("
+                SELECT email, first_name FROM bb_users
+                WHERE  id = :u AND type = 'client' AND active = 'Y' AND removed = 'N'
+            ");
+            $st->execute([':u' => $userId]);
+            $u = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$u || !filter_var((string)$u['email'], FILTER_VALIDATE_EMAIL)) {
+                return;
+            }
+
+            $prima = $this->conn->prepare("
+                SELECT 1 FROM bb_notifications
+                WHERE  user_id = :u AND id <> :id AND is_read = 0
+                  AND  created_at >= NOW() - INTERVAL 30 MINUTE
+                LIMIT 1
+            ");
+            $prima->execute([':u' => $userId, ':id' => $notificationId]);
+            if ($prima->fetchColumn()) {
+                return;
+            }
+
+            $sito  = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
+            $url   = $sito . ($link !== '' ? $link : '/worksites/my');
+            $h     = static fn(string $x): string => htmlspecialchars($x, ENT_QUOTES, 'UTF-8');
+            $nome  = trim((string)($u['first_name'] ?? ''));
+
+            $mailer = new \App\Service\Mailer();
+            $mailer->setSender('system');
+            $mail = $mailer->getMailer();
+            $mail->addAddress((string)$u['email']);
+            $mail->Subject = 'BOB – ' . $title;
+            $mail->Body    = '
+                <div style="font-family:Arial,sans-serif;font-size:15px;color:#1E293B;max-width:560px">
+                    <p>' . ($nome !== '' ? 'Buongiorno ' . $h($nome) . ',' : 'Buongiorno,') . '</p>
+                    <p><strong>' . $h($title) . '</strong><br>' . nl2br($h($message)) . '</p>
+                    <p style="margin:24px 0">
+                        <a href="' . $h($url) . '" style="background:#1E40AF;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Apri in BOB</a>
+                    </p>
+                    <p style="color:#64748B;font-size:13px">Consorzio Soluzione Montaggi · BOB<br>
+                    Ricevi questa email perche\' hai accesso a un cantiere in BOB. Altri avvisi arrivano solo dopo che hai letto questo.</p>
+                </div>';
+            $mail->AltBody = $title . "\n\n" . $message . "\n\n" . $url;
+            $mail->send();
+        } catch (\Throwable $e) {
+            error_log('[Email cliente] ' . $e->getMessage());
+        }
     }
 
     // ── Push ──────────────────────────────────────────────────────────────────

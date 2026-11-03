@@ -271,6 +271,15 @@ if ($user->type === 'client' && !$routePolicyMap->isClientRouteAllowed($uri)) {
 if (in_array($user->type, ['worker', 'client'], true)
     && preg_match('#^/worksites/(\d+)(/|$)#', $uri, $pezzi)
     && !$scopeService->canAccessWorksite($allowedWorksites, (int)$pezzi[1])) {
+    // Chi ci arriva da un link vecchio o da una notifica di un cantiere
+    // che non e' piu' condiviso merita il suo elenco, non una pagina
+    // bianca con scritto "Access denied". Le chiamate JSON restano 403.
+    $vuoleJson = str_contains((string)($_SERVER['HTTP_ACCEPT'] ?? ''), 'application/json')
+        || ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET';
+    if (!$vuoleJson && preg_match('#^/worksites/\d+/zone$#', $uri)) {
+        header('Location: /worksites/my?non_disponibile=1');
+        exit;
+    }
     http_response_code(403);
     exit('Access denied to this worksite');
 }

@@ -245,6 +245,50 @@ final class Condivisione
     }
 
     /**
+     * Chi arriva dopo vede quello che vedono gli altri col suo ruolo.
+     *
+     * Le condivisioni sono per nome: il secondo geometra del committente,
+     * aggiunto un mese dopo il primo, trovava la Zone vuota, e l'ufficio
+     * doveva ricondividergli a mano ogni attivita', file e disegno. Adesso
+     * eredita quello che e' gia' condiviso con gli altri del suo ruolo su
+     * questo cantiere. Solo di questo cantiere: le righe non hanno il
+     * cantiere, e copiarle senza guardare l'oggetto aprirebbe le cose degli
+     * altri cantieri dove quelle persone stanno.
+     *
+     * @return int le righe aggiunte
+     */
+    public function comeGliAltri(int $worksiteId, int $userId, string $ruolo): int
+    {
+        $tabelle = [
+            'attivita' => 'bb_zone_tasks',
+            'cartella' => 'bb_zone_folders',
+            'file'     => 'bb_zone_files',
+            'disegno'  => 'bb_worksite_documents',
+            'modulo'   => 'bb_zone_form_assegnazioni',
+            'risposta' => 'bb_zone_form_submissions',
+        ];
+        $aggiunte = 0;
+        foreach ($tabelle as $tipo => $tabella) {
+            // la tabella viene da questo elenco, non dalla richiesta
+            $st = $this->conn->prepare("
+                INSERT IGNORE INTO bb_zone_condivisioni (tipo, oggetto_id, user_id, created_by)
+                SELECT DISTINCT c.tipo, c.oggetto_id, :io, NULL
+                FROM   bb_zone_condivisioni c
+                JOIN   `$tabella` o ON o.id = c.oggetto_id AND o.worksite_id = :w
+                JOIN   bb_zone_accessi a ON a.user_id = c.user_id AND a.worksite_id = :w2
+                WHERE  c.tipo = :t AND a.ruolo = :r AND c.user_id <> :io2
+            ");
+            $st->execute([
+                ':io' => $userId, ':w' => $worksiteId, ':w2' => $worksiteId,
+                ':t' => $tipo, ':r' => $ruolo, ':io2' => $userId,
+            ]);
+            $aggiunte += $st->rowCount();
+        }
+        $this->cache = [];
+        return $aggiunte;
+    }
+
+    /**
      * Con chi nasce condivisa una cosa appena creata.
      *
      * Chi la crea non deve fermarsi a spuntare nomi per caricare una foto:

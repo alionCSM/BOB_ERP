@@ -58,6 +58,21 @@ final class Accesso
         'tutti'    => [self::CANTIERE, self::CLIENTE],
     ];
 
+    /**
+     * Quando una riga di accesso fa entrare davvero, scritto in SQL.
+     *
+     * Per chi non e' cliente basta la riga. Un cliente entra solo se
+     * l'ufficio ha acceso "Condividi col cliente" E il cantiere e' del suo
+     * committente: le stesse due condizioni del sito (ScopeService), cosi'
+     * app e sito mostrano gli stessi cantieri. Prima l'app guardava solo la
+     * riga, e un cliente aggiunto per sbaglio al cantiere di un altro
+     * committente lo apriva dal telefono.
+     *
+     * Da usare con `a` = bb_zone_accessi e `w` = bb_worksites.
+     */
+    public const SQL_CLIENTE_ENTRA = "(a.ruolo <> 'cliente' OR (w.zone_cliente = 1 AND w.client_id IS NOT NULL
+        AND w.client_id = (SELECT uc.client_id FROM bb_users uc WHERE uc.id = a.user_id)))";
+
     /** Le visibilita' che si possono scegliere su una segnalazione. */
     public const VISIBILITA = ['ufficio', 'cantiere', 'cliente', 'tutti'];
 
@@ -90,7 +105,7 @@ final class Accesso
         }
 
         $stmt = $this->conn->prepare("
-            SELECT a.ruolo, w.zone_cliente
+            SELECT a.ruolo, " . self::SQL_CLIENTE_ENTRA . " AS entra
             FROM   bb_zone_accessi a
             JOIN   bb_worksites w ON w.id = a.worksite_id
             WHERE  a.user_id = :u AND a.worksite_id = :w
@@ -99,8 +114,9 @@ final class Accesso
         $r = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $ruolo = $r ? $this->normalizza((string)$r['ruolo']) : null;
-        // il cliente entra solo se l'ufficio ha acceso la condivisione
-        if ($ruolo === self::CLIENTE && empty($r['zone_cliente'])) {
+        // il cliente entra solo se l'ufficio ha acceso la condivisione e il
+        // cantiere e' del suo committente
+        if ($ruolo === self::CLIENTE && empty($r['entra'])) {
             $ruolo = null;
         }
         return $this->cache[$chiave] = $ruolo;

@@ -1097,8 +1097,20 @@ final class UsersController
                 $lingua = 'it';
             }
 
+            // Un cliente senza il suo committente prende un errore su ogni
+            // pagina ("Client user not linked to a client"), e un operaio
+            // senza la sua scheda lo stesso. Si ferma qui, non dopo. Tipo e
+            // profilo arrivano da due campi: per un cliente valgono insieme.
+            if ($type === 'client' || $accessProf === 'CLIENT') {
+                $type       = 'client';
+                $accessProf = 'CLIENT';
+            }
             if ($username === '' || $email === '' || $firstName === '' || $lastName === '') {
                 $error = 'Username, email, nome e cognome sono obbligatori.';
+            } elseif ($accessProf === 'CLIENT' && empty($_POST['client_id'])) {
+                $error = 'Per un account cliente scegli il cliente: vedrà solo i cantieri di quel cliente.';
+            } elseif ($accessProf === 'WORKER' && empty($_POST['worker_id'])) {
+                $error = 'Per un account operaio scegli l\'operaio a cui è collegato.';
             } else {
                 $chk = $this->conn->prepare("SELECT id FROM bb_users WHERE username = :u AND removed = 'N' LIMIT 1");
                 $chk->execute([':u' => $username]);
@@ -1240,23 +1252,27 @@ final class UsersController
                             $mailer->setSender('system');
                             $mail = $mailer->getMailer();
                             $mail->addAddress($email);
-                            $mail->Subject = 'Accesso BOB';
-                            $mail->Body    = "
-                                <p>Ciao <strong>{$firstName} {$lastName}</strong>,</p>
-                                <p>Il tuo account <strong>BOB</strong> è stato creato.</p>
-                                <p>
-                                    <strong>Username:</strong> {$username}<br>
-                                    <strong>Password temporanea:</strong> {$rawPassword}
-                                </p>
-                                <p>Al primo accesso dovrai cambiare la password.</p>
-                            ";
+                            $mail->Subject = 'Il tuo accesso a BOB';
+                            $mail->Body    = $this->emailBenvenuto(
+                                $firstName, $lastName, $username, $rawPassword, $accessProf
+                            );
                             $mail->send();
+                            $emailPartita = true;
                         } catch (\Exception $mailErr) {
-                            // Email failed but user was created
+                            error_log('[Benvenuto] ' . $mailErr->getMessage());
                         }
                     }
 
                     $success = "Utente creato con successo (ID: {$newUserId}).";
+                    // Prima diceva "creato" anche se l'email non partiva, e
+                    // la persona aspettava credenziali che non arrivavano.
+                    if ($sendEmail && empty($emailPartita)) {
+                        $success .= ' Attenzione: l\'email con le credenziali non è partita. '
+                                  . 'Comunica tu username e password temporanea.';
+                    } elseif ($accessProf === 'CLIENT') {
+                        $success .= ' Ora aggiungilo da "Chi accede" nei cantieri da mostrargli, '
+                                  . 'e accendi "Condividi col cliente".';
+                    }
                 } catch (\Exception $e) {
                     $error = 'Errore: ' . $e->getMessage();
                 }
@@ -1695,5 +1711,52 @@ final class UsersController
         foreach ($params as $key => $value) {
             $statement->bindValue($key, $value, \PDO::PARAM_STR);
         }
+    }
+
+    /**
+     * L'email di benvenuto.
+     *
+     * Prima c'erano solo username e password: niente indirizzo del sito,
+     * niente app, niente due righe su cos'e' BOB. Un committente che la
+     * riceve non sa dove metterle.
+     */
+    private function emailBenvenuto(
+        string $nome, string $cognome, string $username, string $password, string $profilo
+    ): string {
+        $h    = static fn(string $x): string => htmlspecialchars($x, ENT_QUOTES, 'UTF-8');
+        $sito = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
+        $play = 'https://play.google.com/store/apps/details?id=it.csmontaggi.bob';
+        $ios  = trim((string)($_ENV['APP_STORE_URL'] ?? ''));
+
+        $cosa = match ($profilo) {
+            'CLIENT' => 'In BOB trovi i cantieri che seguiamo per te: attività, foto, disegni, '
+                      . 'documenti, moduli e la chat con il nostro ufficio e la squadra.',
+            'WORKER' => 'In BOB trovi le tue presenze, i tuoi cantieri, i documenti e le comunicazioni con l\'ufficio.',
+            default  => 'BOB è il gestionale del Consorzio Soluzione Montaggi.',
+        };
+        $app = '<a href="' . $h($play) . '">Android (Google Play)</a>'
+             . ($ios !== '' ? ' · <a href="' . $h($ios) . '">iPhone (App Store)</a>' : '');
+
+        return '
+            <div style="font-family:Arial,sans-serif;font-size:15px;color:#1E293B;max-width:560px">
+                <p>Buongiorno <strong>' . $h(trim($nome . ' ' . $cognome)) . '</strong>,</p>
+                <p>è stato creato il tuo accesso a <strong>BOB</strong>. ' . $h($cosa) . '</p>
+                <table style="border-collapse:collapse;margin:16px 0">
+                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Indirizzo</td>
+                        <td><a href="' . $h($sito) . '">' . $h($sito) . '</a></td></tr>
+                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Username</td>
+                        <td><strong>' . $h($username) . '</strong></td></tr>
+                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Password temporanea</td>
+                        <td><strong>' . $h($password) . '</strong></td></tr>
+                </table>
+                <p>Al primo accesso ti chiederemo di scegliere una password tua. Da un dispositivo nuovo
+                potresti ricevere un codice di conferma via email.</p>
+                <p style="margin:24px 0">
+                    <a href="' . $h($sito) . '" style="background:#1E40AF;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Entra in BOB</a>
+                </p>
+                <p>Puoi usare BOB anche dal telefono: ' . $app . '.</p>
+                <p style="color:#64748B;font-size:13px">Per qualsiasi domanda rispondi a questa email o scrivi a
+                <a href="mailto:info@csmontaggi.it">info@csmontaggi.it</a>.<br>Consorzio Soluzione Montaggi · BOB</p>
+            </div>';
     }
 }

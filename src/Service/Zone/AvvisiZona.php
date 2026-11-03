@@ -62,6 +62,8 @@ final class AvvisiZona
             if ((int)$p['user_id'] === $daChi) continue;
             if ($p['ruolo'] === Accesso::CLIENTE && empty($t['zone_cliente'])) continue;
             if (!isset($condivisa[(int)$p['user_id']])) continue;
+            $p['worksite_id'] = (int)$t['worksite_id'];
+            $p['dove'] = 'attivita-' . $taskId;
             $this->manda($p, 'zona_attivita_t', 'zona_attivita', [
                 'cantiere' => $t['cantiere'],
                 'nome'     => mb_substr((string)$t['name'], 0, 120),
@@ -92,6 +94,8 @@ final class AvvisiZona
         foreach ($persone as $p) {
             if ((int)$p['user_id'] === $daChi) continue;
             if ($p['ruolo'] === Accesso::CLIENTE && empty($a['zone_cliente'])) continue;
+            $p['worksite_id'] = (int)$a['worksite_id'];
+            $p['dove'] = 'moduli';
             $this->manda($p, 'zona_modulo_t', 'zona_modulo', [
                 'cantiere' => $a['cantiere'],
                 'modulo'   => $a['modulo'],
@@ -108,6 +112,7 @@ final class AvvisiZona
             JOIN bb_users u ON u.id = a.user_id
             JOIN bb_worksites w ON w.id = a.worksite_id
             WHERE a.worksite_id = :w AND a.user_id = :u AND u.active = 'Y' AND u.removed = 'N'
+              AND " . Accesso::SQL_CLIENTE_ENTRA . "
         ");
         $st->execute([':w' => $worksiteId, ':u' => $userId]);
         $p = $st->fetch(PDO::FETCH_ASSOC);
@@ -116,6 +121,8 @@ final class AvvisiZona
         if (!$p || $userId === $daChi || ($p['ruolo'] === Accesso::CLIENTE && empty($p['zone_cliente']))) {
             return;
         }
+        $p['worksite_id'] = $worksiteId;
+        $p['dove'] = '';
         $this->manda($p, 'zona_accesso_t', 'zona_accesso', ['cantiere' => $p['cantiere']], 'normal', $daChi);
     }
 
@@ -161,7 +168,9 @@ final class AvvisiZona
         $st = $this->conn->prepare("
             SELECT a.user_id, u.lingua, a.ruolo
             FROM bb_zone_accessi a JOIN bb_users u ON u.id = a.user_id
+            JOIN bb_worksites w ON w.id = a.worksite_id
             WHERE a.worksite_id = :w AND u.active = 'Y' AND u.removed = 'N'
+              AND " . Accesso::SQL_CLIENTE_ENTRA . "
               AND (" . implode(' OR ', $cond) . ")
         ");
         $st->execute($par);
@@ -174,7 +183,11 @@ final class AvvisiZona
             (int)$p['user_id'],
             Lingua::testo($titolo, $p['lingua'] ?? null),
             Lingua::testo($corpo, $p['lingua'] ?? null, $valori),
-            self::LINK,
+            // "/io" e' la pagina degli operai: il cliente e l'ufficio ci
+            // prendevano "Access denied". Loro vanno dritti al cantiere.
+            ($p['ruolo'] ?? '') === Accesso::CANTIERE || empty($p['worksite_id'])
+                ? self::LINK
+                : Segnalazioni::link((int)$p['worksite_id'], (string)($p['dove'] ?? '')),
             'zone',
             $priorita,
             $daChi ?: null,

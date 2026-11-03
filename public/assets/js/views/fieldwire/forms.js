@@ -165,7 +165,7 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="bzf-dest" class="bzf-dest">
                         <option value="cantiere" ${!builder.universal ? 'selected' : ''}>Salva per: questo cantiere</option>
-                        <option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>
+                        ${DA_UFFICIO ? `<option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>` : ''}
                     </select>
                     <button class="bzf-btn-ghost" id="bzf-preview"><i class="fas fa-eye"></i> Anteprima</button>
                     <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva</button>

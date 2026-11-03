@@ -203,7 +203,11 @@ final class FieldwireController
             // "Chi accede" (vedi $soloAccessi): deve poter aggiungere
             // qualcuno, non leggere il cantiere.
             if (!$this->accesso->qualcosa($utente, $w) && !$this->accesso->gestisce($utente)) {
-                Response::redirect('/dashboard?no_permission=1');
+                // operai e clienti tornano ai loro cantieri, con due righe
+                // che spiegano; la dashboard per loro non c'e'
+                Response::redirect(in_array($utente->type ?? '', ['worker', 'client'], true)
+                    ? '/worksites/my?non_disponibile=1'
+                    : '/dashboard?no_permission=1');
             }
             $this->guardiaPassata = true;
             return;
@@ -333,7 +337,7 @@ final class FieldwireController
             'fieldwire_enabled'    => $this->config->fieldwireEnabled(),
             // le sezioni che questa persona puo' vedere: nascondere una
             // scheda che risponderebbe 403 e' meglio che farcela sbattere
-            'accessi'              => P::tutte($this->accesso->ruolo($request->user(), $worksiteId)),
+            'accessi'              => self::livelliPagina($this->accesso->ruolo($request->user(), $worksiteId)),
             'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
@@ -342,6 +346,34 @@ final class FieldwireController
                                       && $this->accesso->gestisce($request->user()),
             'puoGestire'           => $this->accesso->gestisce($request->user()),
         ]);
+    }
+
+    /**
+     * Le sezioni della pagina, nel formato che la pagina legge.
+     *
+     * La pagina chiede un livello per sezione (0 niente, 1 guarda, 2 anche
+     * scrive) — era il formato dei sei livelli di una volta. Quando i
+     * permessi sono diventati la tabella di {@see P}, alla pagina e' andato
+     * l'elenco delle azioni vere/false, e true > 1 e' falso: sparivano a
+     * tutti le schede Foto e File, il Report PDF, "Nuovo Task" e "Carica
+     * file", e al ruolo Cantiere anche Attivita', Disegni e Moduli.
+     *
+     * Qui la tabella si traduce in livelli, cosi' la pagina resta com'e'.
+     *
+     * @return array<string, int>
+     */
+    private static function livelliPagina(?string $ruolo): array
+    {
+        $vede = P::puo($ruolo, P::VEDERE) ? 1 : 0;
+        $piu  = static fn(string $azione): int => $vede && P::puo($ruolo, $azione) ? 2 : $vede;
+        return [
+            'attivita' => $piu(P::ATTIVITA),
+            'disegni'  => $piu(P::ANNOTARE),
+            'foto'     => $piu(P::CARICARE),
+            'file'     => $piu(P::CARICARE),
+            'moduli'   => $piu(P::COMPILARE),
+            'report'   => $vede,
+        ];
     }
 
     // ─── Tasks ────────────────────────────────────────────────────────────────
@@ -829,9 +861,7 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $t = $this->formRepo->find((int)$request->param('tplId'));
-            if (!$t) throw new \RuntimeException('Modulo non trovato');
-            return $t;
+            return $this->templateDelCantiere($request, (int)$request->param('tplId'));
         });
     }
 
@@ -848,8 +878,17 @@ final class FieldwireController
             $fields = $body['fields'] ?? [];
             if (!is_array($fields) || !count($fields)) throw new \RuntimeException('Aggiungi almeno un campo');
 
-            // universale (worksite_id null) o di questo cantiere
+            // universale (worksite_id null) o di questo cantiere. Un modulo
+            // universale compare in tutti i cantieri: lo decide solo
+            // l'ufficio, non un cliente o una squadra.
+            $ufficio = $this->accesso->daUfficio($user, $worksiteId);
+            if (!empty($body['universal']) && !$ufficio) {
+                \App\Service\Zone\Accesso::nega('I moduli per tutti i cantieri li crea solo l\'ufficio');
+            }
             $wsId = !empty($body['universal']) ? null : $worksiteId;
+            if (!empty($body['id'])) {
+                $this->templateDelCantiere($request, (int)$body['id'], true);
+            }
 
             $data = [
                 'worksite_id' => $wsId,
@@ -871,7 +910,9 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $this->formRepo->delete((int)$request->param('tplId'));
+            $tplId = (int)$request->param('tplId');
+            $this->templateDelCantiere($request, $tplId, true);
+            $this->formRepo->delete($tplId);
             return ['deleted' => true];
         });
     }
@@ -886,8 +927,7 @@ final class FieldwireController
             $user       = $request->user();
             $body       = $this->jsonBody();
 
-            $tpl = $this->formRepo->find($tplId);
-            if (!$tpl) throw new \RuntimeException('Modulo non trovato');
+            $tpl = $this->templateDelCantiere($request, $tplId);
 
             $values = is_array($body['values'] ?? null) ? $body['values'] : [];
 
@@ -1313,6 +1353,9 @@ final class FieldwireController
                        ) AS ha_modulo_zone
                 FROM bb_users u
                 WHERE u.active = 'Y' AND u.removed = 'N'
+                      -- i clienti di un altro committente qui non entrano:
+                      -- proporli vorrebbe dire farsi rispondere di no
+                      AND (u.type <> 'client' OR u.client_id = (SELECT client_id FROM bb_worksites WHERE id = $w))
                       $soloQui
                 ORDER BY u.username ASC
             ");
@@ -1368,6 +1411,12 @@ final class FieldwireController
                 isset($_POST['ruolo']) ? (string)$_POST['ruolo'] : null
             );
             if ($nuovo) {
+                $ruolo = $this->accesso->normalizza((string)$this->conn
+                    ->query('SELECT ruolo FROM bb_zone_accessi WHERE worksite_id = ' . $w . ' AND user_id = ' . $userId)
+                    ->fetchColumn());
+                if ($ruolo === \App\Service\Zone\Accesso::CLIENTE || $ruolo === \App\Service\Zone\Accesso::CANTIERE) {
+                    $this->condivisione->comeGliAltri($w, $userId, $ruolo);
+                }
                 $this->avvisa(fn($a) => $a->accesso($w, $userId, (int)($request->user()->id ?? 0)));
             }
 
@@ -2294,6 +2343,35 @@ final class FieldwireController
     // cambiando un numero nell'indirizzo.
 
     /** Il ruolo di chi chiede su questo cantiere (la guardia e' gia' passata). */
+    /**
+     * Il modello di un modulo, se si usa in questo cantiere.
+     *
+     * Prima si cercava solo per numero: dall'indirizzo di un cantiere
+     * qualsiasi si leggeva, si cambiava o si cancellava il modello di un
+     * altro cantiere, o uno universale che usano tutti. Bastava il ruolo
+     * cliente, che i moduli li puo' gestire.
+     *
+     * Per leggerlo basta che sia di qui o universale. Per cambiarlo:
+     * l'ufficio quelli di qui e gli universali, gli altri solo quelli di
+     * qui che hanno fatto loro.
+     */
+    private function templateDelCantiere(Request $request, int $tplId, bool $modifica = false): array
+    {
+        $w   = (int)$request->param('id');
+        $tpl = $this->formRepo->find($tplId);
+        $suo = $tpl && ($tpl['worksite_id'] === null || (int)$tpl['worksite_id'] === $w);
+        if (!$suo) {
+            throw new \RuntimeException('Modulo non trovato');
+        }
+        if (!$modifica || $this->accesso->daUfficio($request->user(), $w)) {
+            return $tpl;
+        }
+        if ($tpl['worksite_id'] === null || (int)($tpl['created_by'] ?? 0) !== (int)($request->user()->id ?? 0)) {
+            \App\Service\Zone\Accesso::nega('Questo modulo lo cambia solo chi l\'ha creato, o l\'ufficio');
+        }
+        return $tpl;
+    }
+
     private function ruoloQui(Request $request): string
     {
         return $this->accesso->ruolo($request->user(), (int)$request->param('id'))
