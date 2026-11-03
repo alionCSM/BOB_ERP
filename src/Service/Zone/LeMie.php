@@ -48,6 +48,11 @@ final class LeMie
                         SELECT 1 FROM bb_zone_condivisioni c
                         WHERE c.tipo = 'attivita' AND c.oggetto_id = t.id
                           AND c.user_id = :u2
+                   ) OR EXISTS (
+                        -- o condivisa con tutta la mia parte del cantiere
+                        SELECT 1 FROM bb_zone_condivisioni_ruoli cr
+                        WHERE cr.tipo = 'attivita' AND cr.oggetto_id = t.id
+                          AND cr.ruolo = a.ruolo
                    ) OR t.created_by = :u3)
         ");
         // tre segnaposto per lo stesso valore: le prepared statement non

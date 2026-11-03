@@ -32,10 +32,11 @@
     };
     // le parole vecchie salvate nel database
     const VIS_VECCHIE = { squadra: 'cantiere', capi: 'cantiere' };
-    const visDi = v => VIS_VECCHIE[v] || v || 'cantiere';
+    const visDi = v => VIS_VECCHIE[v] || v || 'tutti';
+    // "tutti" e' il caso normale: il bollino serve quando e' piu' stretta
     function visBadge(v, sempre = false) {
         const x = VIS[visDi(v)];
-        if (!x || (!sempre && visDi(v) === 'cantiere')) return '';
+        if (!x || (!sempre && visDi(v) === 'tutti')) return '';
         return '<span class="bz-vis-badge" style="color:' + x.color + '" title="' + x.label + '">'
              + '<i class="fas ' + x.icon + '"></i> ' + x.label + '</span>';
     }
@@ -219,7 +220,7 @@
                 <textarea id="bzd-nuova-testo" placeholder="Es. manca la bulloneria M12 per la campata 4"></textarea>
                 <label>Foto (facoltative)</label>
                 <input type="file" id="bzd-nuova-foto" accept="image/*" multiple>
-                ${DA_UFFICIO ? `<label>Chi la vede</label><select id="bzd-nuova-vis">${Object.keys(VIS).map(k => `<option value="${k}" ${k === 'cantiere' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>` : ''}
+                ${DA_UFFICIO ? `<label>Chi la vede</label><select id="bzd-nuova-vis">${Object.keys(VIS).map(k => `<option value="${k}" ${k === 'tutti' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>` : ''}
                 <div class="bzd-azioni" style="margin-top:16px">
                     <button class="bzd-btn" data-bzd-annulla>Annulla</button>
                     <button class="bzd-btn blu" data-bzd-invia-nuova><i class="fas fa-paper-plane"></i> Invia</button>

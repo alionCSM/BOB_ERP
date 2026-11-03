@@ -57,13 +57,16 @@ final class AvvisiZona
         // modo piu' sicuro di fargli pensare che BOB sia rotto: la notifica
         // va solo a chi l'attivita' e' stata condivisa.
         $condivisa = $this->condivisaCon('attivita', $taskId);
+        $parti     = (new Condivisione($this->conn, new Accesso($this->conn)))
+                         ->partiDi('attivita', [$taskId])[$taskId] ?? [];
 
         foreach ($persone as $p) {
             if ((int)$p['user_id'] === $daChi) continue;
             if ($p['ruolo'] === Accesso::CLIENTE && empty($t['zone_cliente'])) continue;
             // l'ufficio vede tutto senza righe di condivisione: senza questa
             // eccezione un'attivita' "per l'ufficio" non avvisava nessuno
-            if ($p['ruolo'] !== Accesso::UFFICIO && !isset($condivisa[(int)$p['user_id']])) continue;
+            if ($p['ruolo'] !== Accesso::UFFICIO && !isset($condivisa[(int)$p['user_id']])
+                && !in_array($p['ruolo'], $parti, true)) continue;
             $p['worksite_id'] = (int)$t['worksite_id'];
             $p['dove'] = 'attivita-' . $taskId;
             $this->manda($p, 'zona_attivita_t', 'zona_attivita', [

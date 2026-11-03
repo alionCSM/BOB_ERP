@@ -248,18 +248,23 @@ final class FieldwireController
         string $campoCreatore = 'created_by'
     ): callable {
         $utente  = $request->user();
-        $ufficio = $this->accesso->daUfficio($utente, (int)($request->param('id') ?? 0));
+        $w       = (int)($request->param('id') ?? 0);
+        $ruolo   = $this->accesso->ruolo($utente, $w);
+        $ufficio = $ruolo === \App\Service\Zone\Accesso::UFFICIO;
         $io      = (int)($utente->id ?? 0);
-        $visti   = $io > 0 ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
+        $visti   = $io > 0 && $ruolo !== null ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
+        // quello condiviso con tutta la sua parte (la squadra, il cliente)
+        $parte   = $this->condivisione->vistiDaParte($w, $ruolo)[$tipo] ?? [];
 
-        return static function (array $r) use ($ufficio, $io, $visti, $campoId, $campoCreatore): bool {
+        return static function (array $r) use ($ufficio, $io, $visti, $parte, $campoId, $campoCreatore): bool {
             if ($ufficio) {
                 return true;
             }
             if ($io > 0 && (int)($r[$campoCreatore] ?? 0) === $io) {
                 return true;
             }
-            return isset($visti[(int)($r[$campoId] ?? 0)]);
+            $id = (int)($r[$campoId] ?? 0);
+            return isset($visti[$id]) || isset($parte[$id]);
         };
     }
 
@@ -280,9 +285,12 @@ final class FieldwireController
             return $righe;
         }
 
-        $persone = $this->condivisione->conChi($tipo, array_column($righe, $campoId));
+        $ids     = array_column($righe, $campoId);
+        $persone = $this->condivisione->conChi($tipo, $ids);
+        $parti   = $this->condivisione->partiDi($tipo, $ids);
         foreach ($righe as &$r) {
-            $r['condivisa_con'] = $persone[(int)($r[$campoId] ?? 0)] ?? [];
+            $r['condivisa_con']   = $persone[(int)($r[$campoId] ?? 0)] ?? [];
+            $r['condivisa_parti'] = $parti[(int)($r[$campoId] ?? 0)] ?? [];
         }
         return $righe;
     }
@@ -999,13 +1007,18 @@ final class FieldwireController
             // risposta a un modulo DPI non la deve leggere la squadra
             // perche' qualcuno ha dimenticato di dire a chi va.
             if ($assegnazione) {
-                $persone = $this->condivisione->conChi('modulo', [(int)$assegnazione['id']]);
+                $aid     = (int)$assegnazione['id'];
+                $persone = $this->condivisione->conChi('modulo', [$aid]);
                 $this->condivisione->salva(
                     $worksiteId,
                     'risposta',
                     $id,
-                    $persone[(int)$assegnazione['id']] ?? [],
+                    $persone[$aid] ?? [],
                     (int)($user?->id ?? 0)
+                );
+                $this->condivisione->salvaParti(
+                    $worksiteId, 'risposta', $id,
+                    $this->condivisione->partiDi('modulo', [$aid])[$aid] ?? []
                 );
             }
             return ['id' => $id];
@@ -2042,6 +2055,7 @@ final class FieldwireController
             return [
                 'gruppi' => $this->condivisione->persone($w),
                 'con'    => $this->condivisione->conChi($tipo, [$id])[$id] ?? [],
+                'parti'  => $this->condivisione->partiDi($tipo, [$id])[$id] ?? [],
             ];
         });
     }
@@ -2109,7 +2123,12 @@ final class FieldwireController
                 is_array($body['persone'] ?? null) ? $body['persone'] : [],
                 (int)($request->user()->id ?? 0)
             );
-            return ['con' => $con];
+            // le parti intere: senza il campo (pagine o app di prima) si
+            // lasciano come sono
+            $parti = is_array($body['parti'] ?? null)
+                ? $this->condivisione->salvaParti($w, $tipo, $id, $body['parti'])
+                : ($this->condivisione->partiDi($tipo, [$id])[$id] ?? []);
+            return ['con' => $con, 'parti' => $parti];
         });
     }
 
@@ -2164,19 +2183,22 @@ final class FieldwireController
         bool $nuova = true
     ): array {
         $ruolo = $this->ruoloQui($request);
+        $haPersone = is_array($body['persone'] ?? null);
+        $haParti   = is_array($body['parti'] ?? null);
 
-        if (is_array($body['persone'] ?? null)) {
-            $persone = array_map('intval', $body['persone']);
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
-                $suoi    = $this->condivisione->predefinite($worksiteId, $ruolo);
-                $persone = array_values(array_intersect($persone, $suoi));
-            }
-        } elseif ($nuova) {
-            $persone = $this->condivisione->predefinite($worksiteId, $ruolo);
-        } else {
+        if (!$haPersone && !$haParti && !$nuova) {
             return [];
         }
 
+        // Le parti: quelle scelte, o tutte e due se nessuno ha scelto. La
+        // Zone e' lo spazio comune del cantiere: cio' che uno mette lo
+        // vedono gli altri, e l'ufficio stringe quando serve.
+        $parti = $haParti
+            ? $body['parti']
+            : ($haPersone ? [] : \App\Service\Zone\Condivisione::PARTI_PREDEFINITE);
+        $this->condivisione->salvaParti($worksiteId, $tipo, $oggettoId, $parti);
+
+        $persone = $haPersone ? array_map('intval', $body['persone']) : [];
         // chi la crea la vede sempre, anche se non si e' messo nell'elenco
         $io = (int)($request->user()->id ?? 0);
         if ($io > 0 && $ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
@@ -2300,6 +2322,14 @@ final class FieldwireController
                 $id,
                 is_array($body['persone'] ?? null) ? $body['persone'] : [],
                 (int)($request->user()->id ?? 0)
+            );
+            // chi legge le risposte: di base le leggono tutti e tre, come il
+            // resto della Zone; l'ufficio stringe per i moduli interni
+            $this->condivisione->salvaParti(
+                $w, 'modulo', $id,
+                is_array($body['parti'] ?? null)
+                    ? $body['parti']
+                    : (is_array($body['persone'] ?? null) && $body['persone'] ? [] : \App\Service\Zone\Condivisione::PARTI_PREDEFINITE)
             );
             $this->avvisa(fn($a) => $a->modulo($id, (int)($request->user()->id ?? 0)));
             return ['id' => $id];
@@ -2531,11 +2561,12 @@ final class FieldwireController
     }
 
     /**
-     * Chi ha scritto, e chi lo legge.
+     * Chi ha scritto, e se e' una nota interna.
      *
-     * - "nota interna" la scrive solo l'ufficio: la leggono solo loro.
-     * - "per il cliente" lo decide l'ufficio; quello che scrive un cliente
-     *   e' per forza tra lui e l'ufficio.
+     * "Nota interna" la scrive solo l'ufficio e la legge solo l'ufficio.
+     * Tutto il resto lo legge chi vede l'attivita': e' la conversazione
+     * del cantiere fra noi, il cliente e la squadra. per_cliente si scrive
+     * ancora per le righe vecchie ma non decide piu' niente.
      */
     private function scriviCommento(int $commentId, Request $request, array $body): void
     {
@@ -2556,39 +2587,25 @@ final class FieldwireController
     }
 
     /**
-     * I messaggi (e le foto) che chi chiede puo' leggere.
+     * I messaggi (e le foto) di un'attivita' che chi chiede puo' leggere:
+     * tutti, tranne le note interne dell'ufficio.
      *
-     * - ufficio: tutto
-     * - capi e operai: niente note interne, niente messaggi dei clienti
-     * - cliente: quello segnato "per il cliente" e i messaggi dei clienti
-     *
-     * I messaggi vecchi, scritti prima che si sapesse chi li ha scritti,
-     * valgono come scritti dalla squadra.
+     * Prima ogni parte aveva il suo pezzo di conversazione: il cliente
+     * leggeva solo quello che l'ufficio segnava "per il cliente", la
+     * squadra non leggeva mai il cliente. Sulla stessa attivita' tre
+     * persone parlavano senza sentirsi, e le foto della squadra al cliente
+     * non arrivavano. La Zone e' lo spazio comune: chi vede l'attivita'
+     * legge il filo. Per parlare a parte ci sono le chat Squadra e Cliente.
      */
     private function filtraCommenti(array $commenti, string $ruolo, int $io): array
     {
         if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
             return $commenti;
         }
-        $autori = array_values(array_unique(array_filter(array_map(
-            fn($c) => (int)($c['author_user_id'] ?? 0), $commenti
-        ))));
-        $clienti = [];
-        if ($autori) {
-            $in = implode(',', array_fill(0, count($autori), '?'));
-            $st = $this->conn->prepare("SELECT id FROM bb_users WHERE type = 'client' AND id IN ($in)");
-            $st->execute($autori);
-            $clienti = array_flip(array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN)));
-        }
-
-        return array_values(array_filter($commenti, function (array $c) use ($ruolo, $clienti, $io) {
-            $autore    = (int)($c['author_user_id'] ?? 0);
-            $diCliente = isset($clienti[$autore]);
-            if ($ruolo === \App\Service\Zone\Accesso::CLIENTE) {
-                return !empty($c['per_cliente']) || $diCliente || $autore === $io;
-            }
-            return empty($c['interna']) && !$diCliente;
-        }));
+        return array_values(array_filter(
+            $commenti,
+            fn(array $c) => empty($c['interna']) || (int)($c['author_user_id'] ?? 0) === $io
+        ));
     }
 
     /**

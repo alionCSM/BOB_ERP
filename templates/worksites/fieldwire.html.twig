@@ -574,11 +574,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
             {% if daUfficio %}
-            {# Solo l'ufficio sceglie: una nota interna la leggono solo loro,
-               un messaggio "per il cliente" lo vede anche il cliente. #}
+            {# Il filo lo legge chi vede l'attivita': noi, il cliente e la
+               squadra. Una nota interna la legge solo l'ufficio. #}
             <div class="bz-comment-flags">
-                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna</label>
-                <label><input type="checkbox" id="bz-flag-cliente"> <i class="fas fa-handshake"></i> Per il cliente</label>
+                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo ufficio)</label>
             </div>
             {% endif %}
         </div>
@@ -805,20 +804,30 @@ const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completat
    decide qualcuno puo' essere stato aggiunto al cantiere.                 */
 let chiAperto = null;   // { tipo, oggetto, onSalva }
 
-function chiBadge(con) {
+/* Chi vede una cosa, in due parole. riga = l'oggetto col suo
+   condivisa_con (persone) e condivisa_parti (squadra, cliente). Accetta
+   anche il solo elenco di persone, come prima. */
+function chiTesto(riga) {
+    const con   = Array.isArray(riga) ? riga : ((riga && riga.condivisa_con) || []);
+    const parti = Array.isArray(riga) ? [] : ((riga && riga.condivisa_parti) || []);
+    const sq = parti.includes('cantiere'), cl = parti.includes('cliente');
+    let t = sq && cl ? 'Tutti' : sq ? 'Ufficio e squadra' : cl ? 'Ufficio e cliente' : '';
+    if (con.length) t += (t ? ' + ' : '') + con.length + (con.length === 1 ? ' persona' : ' persone');
+    return t || 'Solo ufficio';
+}
+function chiBadge(riga) {
     if (!DA_UFFICIO) return '';
-    const n = (con || []).length;
-    if (!n) {
-        return `<span class="bz-vis-badge" style="color:#f87171" title="Nessuno fuori dall'ufficio la vede"><i class="fas fa-lock"></i> solo ufficio</span>`;
-    }
-    return `<span class="bz-vis-badge" style="color:#94a3b8" title="Persone che la vedono, oltre all'ufficio"><i class="fas fa-user-check"></i> ${n}</span>`;
+    const t = chiTesto(riga);
+    if (t === 'Tutti') return '';   // il caso normale non ha bisogno di bollino
+    const solo = t === 'Solo ufficio';
+    return `<span class="bz-vis-badge" style="color:${solo ? '#f87171' : '#94a3b8'}" title="Chi la vede oltre all'ufficio">`
+         + `<i class="fas ${solo ? 'fa-lock' : 'fa-user-check'}"></i> ${escHtml(t)}</span>`;
 }
 
-function chiBottone(tipo, oggetto, con) {
+function chiBottone(tipo, oggetto, riga) {
     if (!DA_UFFICIO) return '';
-    const n = (con || []).length;
     return `<button type="button" class="bz-chi-btn" data-chi-tipo="${tipo}" data-chi-oggetto="${oggetto}">`
-         + `<i class="fas fa-eye"></i> ${n ? n + (n === 1 ? ' persona' : ' persone') : 'Chi la vede'}</button>`;
+         + `<i class="fas fa-eye"></i> ${escHtml(chiTesto(riga))}</button>`;
 }
 
 /* Il pannello. onSalva riceve l'elenco scelto; se non c'e', si salva da
@@ -826,55 +835,60 @@ function chiBottone(tipo, oggetto, con) {
    gia'. Nei moduli di creazione l'oggetto non esiste ancora, quindi la
    scelta resta in pagina e parte con il resto del modulo. */
 async function apriChi(tipo, oggetto, scelte, onSalva) {
+    // scelte: un elenco di persone (come prima) o { persone, parti }
+    const scelteParti = scelte && !Array.isArray(scelte) ? (scelte.parti ?? null) : null;
+    if (scelte && !Array.isArray(scelte)) scelte = scelte.persone || [];
     const pan = document.getElementById('bz-chi-modal');
     const box = document.getElementById('bz-chi-corpo');
     chiAperto = { tipo, oggetto, onSalva };
     box.innerHTML = '<p class="bz-chi-vuoto">Carico…</p>';
     pan.classList.remove('hidden');
 
-    let gruppi = [];
-    let con = scelte || [];
+    let persone = [];
+    let con   = scelte || [];
+    // una cosa nuova nasce condivisa con tutte e due le parti
+    let parti = scelteParti ?? ['cantiere', 'cliente'];
     if (oggetto) {
         const r = await api(`/worksites/${WID}/zone/condivisione?tipo=${tipo}&oggetto=${oggetto}`);
         if (!r.ok) { box.innerHTML = `<p class="bz-chi-vuoto">${escHtml(r.error || 'Non riesco a leggere')}</p>`; return; }
-        gruppi = (r.data || r).gruppi || [];
-        if (!scelte) con = (r.data || r).con || [];
+        const d = r.data || r;
+        persone = (d.gruppi || []).flatMap(g => g.persone.map(x => ({ ...x, ruolo: g.ruolo })));
+        if (!scelte) con = d.con || [];
+        if (scelteParti === null) parti = d.parti || [];
     } else {
         const r = await api(`/worksites/${WID}/zone/accessi`);
-        const persone = ((r.data || r).persone) || [];
-        const titoli = { capo: 'Capi squadra', operaio: 'Operai', cliente: 'Cliente' };
-        gruppi = Object.keys(titoli)
-            .map(ruolo => ({
-                ruolo,
-                titolo: titoli[ruolo],
-                persone: persone.filter(x => x.ruolo === ruolo)
-                                .map(x => ({ id: x.user_id, nome: x.nome, azienda: x.company || '' })),
-            }))
-            .filter(g => g.persone.length);
+        persone = (((r.data || r).persone) || [])
+            .map(x => ({ id: x.user_id, nome: x.nome, azienda: x.company || '', ruolo: x.ruolo }));
     }
 
-    if (!gruppi.length) {
-        box.innerHTML = '<p class="bz-chi-vuoto">In questo cantiere non c\'e\' ancora nessuno. '
-                      + 'Si aggiungono da "Chi accede".</p>';
-        return;
-    }
+    // Le due parti del cantiere ci sono sempre, anche vuote: condividere
+    // con "il cliente" prima che il cliente entri vuol dire che appena
+    // entra lo trova.
+    const gruppi = [
+        { ruolo: 'cantiere', titolo: 'La squadra in cantiere' },
+        { ruolo: 'cliente',  titolo: 'Il cliente' },
+    ].map(g => ({ ...g, persone: persone.filter(x => x.ruolo === g.ruolo) }));
 
     const dentro = new Set(con.map(Number));
-    box.innerHTML = gruppi.map(g => `
+    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">L'ufficio vede sempre tutto.</p>`
+      + gruppi.map(g => {
+        const tutta = parti.includes(g.ruolo);
+        return `
         <div class="bz-chi-gruppo">
-            <div class="bz-chi-titolo">
-                <span>${escHtml(g.titolo)}</span>
-                <button type="button" class="bz-chi-tutti" data-gruppo="${g.ruolo}">tutti</button>
-            </div>
-            ${g.persone.map(pr => `
+            <label class="bz-chi-titolo" style="cursor:pointer">
+                <span><input type="checkbox" class="bz-chi-parte" data-parte="${g.ruolo}" ${tutta ? 'checked' : ''}>
+                    ${escHtml(g.titolo)} <em style="font-weight:400">— tutti, anche chi entra dopo</em></span>
+            </label>
+            ${g.persone.length ? g.persone.map(pr => `
                 <label class="bz-chi-riga">
-                    <input type="checkbox" value="${pr.id}" data-gruppo="${g.ruolo}" ${dentro.has(pr.id) ? 'checked' : ''}>
+                    <input type="checkbox" value="${pr.id}" data-gruppo="${g.ruolo}"
+                        ${tutta || dentro.has(pr.id) ? 'checked' : ''} ${tutta ? 'disabled' : ''}>
                     <span>${escHtml(pr.nome)}</span>
                     ${pr.azienda ? `<em>${escHtml(pr.azienda)}</em>` : ''}
                 </label>
-            `).join('')}
-        </div>
-    `).join('');
+            `).join('') : `<p class="bz-chi-vuoto" style="text-align:left">Nessuno per ora.</p>`}
+        </div>`;
+      }).join('');
 }
 
 function chiudiChi() {
@@ -882,21 +896,26 @@ function chiudiChi() {
     chiAperto = null;
 }
 
+/* { persone, parti }: le persone spuntate una per una (fuori dalle parti
+   intere, che le comprendono gia') e le parti intere. */
 function chiScelte() {
-    return [...document.querySelectorAll('#bz-chi-corpo input[type=checkbox]:checked')]
+    const parti = [...document.querySelectorAll('#bz-chi-corpo .bz-chi-parte:checked')].map(c => c.dataset.parte);
+    const persone = [...document.querySelectorAll('#bz-chi-corpo input[data-gruppo]:checked')]
+        .filter(c => !parti.includes(c.dataset.gruppo))
         .map(c => parseInt(c.value));
+    return { persone, parti };
 }
 
 async function salvaChi() {
     if (!chiAperto) return;
-    const persone = chiScelte();
+    const { persone, parti } = chiScelte();
     const { tipo, oggetto, onSalva } = chiAperto;
 
-    if (onSalva) { onSalva(persone); chiudiChi(); return; }
+    if (onSalva) { onSalva(persone, parti); chiudiChi(); return; }
 
     const res = await api(`/worksites/${WID}/zone/condivisione`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, oggetto, persone }),
+        body: JSON.stringify({ tipo, oggetto, persone, parti }),
     });
     if (!res.ok) { alert(res.error || res.message || 'Non salvato'); return; }
     chiudiChi();
@@ -1078,7 +1097,7 @@ function cardHtml(t) {
     return `
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
             <div class="bz-card-name">${escHtml(t.name)}</div>
-            ${chiBadge(t.condivisa_con)}
+            ${chiBadge(t)}
             <div class="bz-card-foot">
                 ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
@@ -1388,8 +1407,7 @@ function openEditModal(taskId) {
     const chiEdit = document.getElementById('edit-task-chi');
     chiEdit.dataset.chiTipo    = 'attivita';
     chiEdit.dataset.chiOggetto = t.id;
-    chiEdit.innerHTML = '<i class="fas fa-eye"></i> '
-        + ((t.condivisa_con || []).length ? (t.condivisa_con.length + ' persone') : 'Chi la vede');
+    chiEdit.innerHTML = '<i class="fas fa-eye"></i> ' + escHtml(chiTesto(t));
     document.getElementById('task-edit-modal').classList.remove('hidden');
     document.getElementById('edit-task-name').focus();
 }
@@ -1482,8 +1500,6 @@ async function loadComments(taskId) {
                     <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
                     ${c.interna == 1 ? '<span class="bz-vis-badge" style="color:#f87171"><i class="fas fa-lock"></i> interna</span>' : ''}
-                    ${c.per_cliente == 1 ? '<span class="bz-vis-badge" style="color:#a78bfa"><i class="fas fa-handshake"></i> cliente</span>' : ''}
-                    ${DA_UFFICIO ? `<button class="bz-x-btn" data-flag-cliente="${c.id}" data-val="${c.per_cliente == 1 ? 0 : 1}" title="${c.per_cliente == 1 ? 'Non mostrare al cliente' : 'Mostra al cliente'}" style="background:transparent;border:0;cursor:pointer;color:${c.per_cliente == 1 ? '#a78bfa' : '#475569'};"><i class="fas fa-handshake"></i></button>` : ''}
                     <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
                             title="Elimina commento"
                             style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
@@ -1565,7 +1581,7 @@ function renderDisegni(items, fwReady) {
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${DA_UFFICIO
-                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d.condivisa_con)}</div>`
+                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d)}</div>`
                 : ''}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
@@ -1734,7 +1750,7 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) {
         box.innerHTML = DA_UFFICIO && cart
-            ? chiBottone('cartella', cart.id, cart.condivisa_con)
+            ? chiBottone('cartella', cart.id, cart)
             : '';
     }
 }
@@ -1745,7 +1761,7 @@ function renderFolders(folders) {
         <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
         ${folders.map(f => `
             <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
-                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f.condivisa_con)}
+                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 <em>${f.file_count}</em>
                 <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
             </button>`).join('')}
@@ -1889,10 +1905,11 @@ function quickAdd(status) {
 }
 
 function openModal() {
-    // vuoto = come prima: la squadra. Si tocca solo per stringere.
+    // vuoto = di base: la vedono tutti. Si tocca solo per stringere.
     const chiNuovo = document.getElementById('task-chi');
     chiNuovo.dataset.persone = '';
-    chiNuovo.innerHTML = '<i class="fas fa-eye"></i> La squadra';
+    chiNuovo.dataset.parti   = '';
+    chiNuovo.innerHTML = '<i class="fas fa-eye"></i> Tutti';
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
@@ -2342,7 +2359,10 @@ document.addEventListener('click', e => {
 function personeDalBottone(idBottone) {
     const b = document.getElementById(idBottone);
     const v = (b?.dataset.persone || '').trim();
-    return v === '' ? {} : { persone: JSON.parse(v) };
+    const p = (b?.dataset.parti || '').trim();
+    // niente scelto: decide il server (di base tutti)
+    if (v === '' && p === '') return {};
+    return { persone: v === '' ? [] : JSON.parse(v), parti: p === '' ? [] : JSON.parse(p) };
 }
 
 document.addEventListener('click', async e => {
@@ -2358,12 +2378,15 @@ document.addEventListener('click', async e => {
     const nuovo = e.target.closest('#task-chi');
     if (nuovo) {
         e.stopPropagation();
-        const gia = (nuovo.dataset.persone || '').trim();
-        apriChi('attivita', 0, gia === '' ? [] : JSON.parse(gia), persone => {
+        const gia  = (nuovo.dataset.persone || '').trim();
+        const giaP = (nuovo.dataset.parti || '').trim();
+        apriChi('attivita', 0, {
+            persone: gia === '' ? [] : JSON.parse(gia),
+            parti:   giaP === '' && gia === '' ? null : (giaP === '' ? [] : JSON.parse(giaP)),
+        }, (persone, parti) => {
             nuovo.dataset.persone = JSON.stringify(persone);
-            nuovo.innerHTML = '<i class="fas fa-eye"></i> '
-                + (persone.length ? persone.length + (persone.length === 1 ? ' persona' : ' persone')
-                                  : 'Nessuno fuori dall\'ufficio');
+            nuovo.dataset.parti   = JSON.stringify(parti);
+            nuovo.innerHTML = '<i class="fas fa-eye"></i> ' + escHtml(chiTesto({ condivisa_con: persone, condivisa_parti: parti }));
         });
         return;
     }
@@ -2371,14 +2394,12 @@ document.addEventListener('click', async e => {
     if (e.target.closest('#bz-chi-salva'))   { await salvaChi(); return; }
     if (e.target.closest('#bz-chi-annulla')) { chiudiChi();      return; }
 
-    // "tutti" su un gruppo: spunta i nomi di quel gruppo, non salva un
-    // ruolo. Se domani entra qualcuno nel cantiere, non eredita niente.
-    const tutti = e.target.closest('.bz-chi-tutti');
-    if (tutti) {
-        const caselle = [...document.querySelectorAll(
-            `#bz-chi-corpo input[data-gruppo="${tutti.dataset.gruppo}"]`)];
-        const accendi = caselle.some(c => !c.checked);
-        caselle.forEach(c => { c.checked = accendi; });
+    // la parte intera: comprende tutti i nomi di quel gruppo, anche chi
+    // entrera' dopo, quindi i nomi si spuntano e si fermano
+    const parte = e.target.closest('.bz-chi-parte');
+    if (parte) {
+        document.querySelectorAll(`#bz-chi-corpo input[data-gruppo="${parte.dataset.parte}"]`)
+            .forEach(c => { c.disabled = parte.checked; if (parte.checked) c.checked = true; });
         return;
     }
 
@@ -2663,8 +2684,8 @@ if (!SOLO_ACCESSI) {
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
 {% if puoGestire %}<script src="/assets/js/views/fieldwire/accessi.js?v=3"></script>{% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=2"></script>
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=3"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
-{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=2"></script>{% endif %}
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
 </body>
 </html>

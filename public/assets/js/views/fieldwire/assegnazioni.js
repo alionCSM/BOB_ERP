@@ -83,9 +83,8 @@
         ].filter(Boolean).join(' · ');
         // chi legge le risposte: un numero, e il pannello per cambiarlo.
         // L'ufficio le legge sempre e non si conta.
-        const quanti = (a.condivisa_con || []).length;
         const vis = DA_UFFICIO
-            ? `<button type="button" class="bz-chi-btn" data-chi-tipo="modulo" data-chi-oggetto="${a.id}" title="Chi legge le risposte"><i class="fas fa-eye"></i> ${quanti ? quanti : 'solo ufficio'}</button>`
+            ? `<button type="button" class="bz-chi-btn" data-chi-tipo="modulo" data-chi-oggetto="${a.id}" title="Chi legge le risposte"><i class="fas fa-eye"></i> ${esc(window.chiTesto ? chiTesto(a) : '')}</button>`
             : '';
         return `
             <div class="bz-assegna-row">
@@ -131,7 +130,7 @@
                     </select>
                     <select id="bza-freq">${Object.keys(FREQ).map(k => `<option value="${k}">${FREQ[k]}</option>`).join('')}</select>
                     <input type="date" id="bza-scad" title="Scadenza (facoltativa)">
-                    <button type="button" class="bz-chi-btn" id="bza-vis" data-persone="" title="Chi legge le risposte"><i class="fas fa-eye"></i> Solo ufficio</button>
+                    <button type="button" class="bz-chi-btn" id="bza-vis" data-persone="" data-parti="" title="Chi legge le risposte"><i class="fas fa-eye"></i> Tutti</button>
                     <button id="bza-assegna">Assegna</button>
                 </div>` : '<div class="sub" style="font-size:12px;color:#64748b;">Crea prima un modello qui sotto, poi assegnalo.</div>';
         }
@@ -164,12 +163,16 @@
         // ovunque.
         const sceltaVis = e.target.closest('#bza-vis');
         if (sceltaVis && typeof window.apriChi === 'function') {
-            const gia = (sceltaVis.dataset.persone || '').trim();
-            window.apriChi('modulo', 0, gia === '' ? [] : JSON.parse(gia), function (persone) {
+            const gia  = (sceltaVis.dataset.persone || '').trim();
+            const giaP = (sceltaVis.dataset.parti || '').trim();
+            window.apriChi('modulo', 0, {
+                persone: gia === '' ? [] : JSON.parse(gia),
+                parti:   gia === '' && giaP === '' ? null : (giaP === '' ? [] : JSON.parse(giaP)),
+            }, function (persone, parti) {
                 sceltaVis.dataset.persone = JSON.stringify(persone);
+                sceltaVis.dataset.parti   = JSON.stringify(parti);
                 sceltaVis.innerHTML = '<i class="fas fa-eye"></i> '
-                    + (persone.length ? persone.length + (persone.length === 1 ? ' persona' : ' persone')
-                                      : 'Solo ufficio');
+                    + esc(chiTesto({ condivisa_con: persone, condivisa_parti: parti }));
             });
             return;
         }
@@ -177,6 +180,7 @@
         if (e.target.closest('#bza-assegna')) {
             const chi = document.getElementById('bza-chi').value;
             const scelte = (document.getElementById('bza-vis')?.dataset.persone || '').trim();
+            const sceltiP = (document.getElementById('bza-vis')?.dataset.parti || '').trim();
             const r = await post(base(), {
                 template_id: parseInt(document.getElementById('bza-modello').value),
                 a_ruolo:     chi.startsWith('r:') ? chi.slice(2) : null,
@@ -184,6 +188,8 @@
                 frequenza:   document.getElementById('bza-freq').value,
                 scadenza:    document.getElementById('bza-scad').value || null,
                 persone:     scelte === '' ? [] : JSON.parse(scelte),
+                // niente scelto: le leggono tutti (lo decide il server)
+                ...(scelte === '' && sceltiP === '' ? {} : { parti: sceltiP === '' ? [] : JSON.parse(sceltiP) }),
             });
             if (!r.ok) { alert(r.error || 'Non salvato'); return; }
             carica();

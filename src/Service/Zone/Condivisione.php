@@ -40,8 +40,27 @@ final class Condivisione
      */
     public const TIPI = ['attivita', 'cartella', 'file', 'disegno', 'modulo', 'risposta'];
 
+    /**
+     * Le parti con cui si condivide in blocco. L'ufficio non c'e': vede
+     * gia' tutto.
+     */
+    public const PARTI = [Accesso::CANTIERE, Accesso::CLIENTE];
+
+    /**
+     * Con chi nasce condivisa una cosa nuova: con tutte e due le parti.
+     *
+     * La Zone e' lo spazio che dividiamo con il cliente e la squadra: quello
+     * che uno mette lo vedono gli altri due, e l'ufficio stringe quando
+     * serve. Prima nasceva "solo ufficio", e la Zone del cliente restava
+     * vuota finche' qualcuno non condivideva le cose una per una.
+     */
+    public const PARTI_PREDEFINITE = self::PARTI;
+
     /** @var array<int, array<string, array<int, true>>> cache per richiesta */
     private array $cache = [];
+
+    /** @var array<string, array<string, array<int, true>>> cache: cantiere|parte => tipo => id */
+    private array $cacheParti = [];
 
     public function __construct(private PDO $conn, private Accesso $accesso) {}
 
@@ -80,6 +99,97 @@ final class Condivisione
      *
      * @param int $creatoDa chi l'ha caricato: lo vede sempre (0 = non si sa)
      */
+    /**
+     * Tutto quello che una parte vede in un cantiere, in un colpo solo.
+     *
+     * @return array<string, array<int, true>> tipo => [id => true]
+     */
+    public function vistiDaParte(int $worksiteId, ?string $parte): array
+    {
+        if (!in_array($parte, self::PARTI, true)) {
+            return [];
+        }
+        $chiave = $worksiteId . '|' . $parte;
+        if (isset($this->cacheParti[$chiave])) {
+            return $this->cacheParti[$chiave];
+        }
+        $fuori = array_fill_keys(self::TIPI, []);
+        try {
+            $st = $this->conn->prepare(
+                'SELECT tipo, oggetto_id FROM bb_zone_condivisioni_ruoli WHERE worksite_id = :w AND ruolo = :r'
+            );
+            $st->execute([':w' => $worksiteId, ':r' => $parte]);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $fuori[(string)$r['tipo']][(int)$r['oggetto_id']] = true;
+            }
+        } catch (\PDOException $e) {
+            // tabella non ancora creata (migrazione da lanciare): si
+            // continua con le sole condivisioni per nome
+        }
+        return $this->cacheParti[$chiave] = $fuori;
+    }
+
+    /**
+     * Con quali parti sono condivisi questi oggetti.
+     *
+     * @param  int[] $oggettoIds
+     * @return array<int, string[]> id => parti
+     */
+    public function partiDi(string $tipo, array $oggettoIds): array
+    {
+        $oggettoIds = array_values(array_unique(array_map('intval', $oggettoIds)));
+        $fuori = array_fill_keys($oggettoIds, []);
+        if (!$oggettoIds || !in_array($tipo, self::TIPI, true)) {
+            return $fuori;
+        }
+        $segni = implode(', ', array_map(static fn($i) => ':o' . $i, array_keys($oggettoIds)));
+        $par   = [':t' => $tipo];
+        foreach ($oggettoIds as $i => $id) {
+            $par[':o' . $i] = $id;
+        }
+        try {
+            $st = $this->conn->prepare("SELECT oggetto_id, ruolo FROM bb_zone_condivisioni_ruoli WHERE tipo = :t AND oggetto_id IN ($segni)");
+            $st->execute($par);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $fuori[(int)$r['oggetto_id']][] = (string)$r['ruolo'];
+            }
+        } catch (\PDOException $e) {
+            // tabella non ancora creata
+        }
+        return $fuori;
+    }
+
+    /** Mette esattamente queste parti su un oggetto. */
+    public function salvaParti(int $worksiteId, string $tipo, int $oggettoId, array $parti): array
+    {
+        if (!in_array($tipo, self::TIPI, true)) {
+            throw new \RuntimeException('Tipo non valido');
+        }
+        $parti = array_values(array_intersect(self::PARTI, $parti));
+        $this->conn->prepare('DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo = :t AND oggetto_id = :o')
+            ->execute([':t' => $tipo, ':o' => $oggettoId]);
+        $ins = $this->conn->prepare(
+            'INSERT INTO bb_zone_condivisioni_ruoli (worksite_id, tipo, oggetto_id, ruolo) VALUES (:w, :t, :o, :r)'
+        );
+        foreach ($parti as $r) {
+            $ins->execute([':w' => $worksiteId, ':t' => $tipo, ':o' => $oggettoId, ':r' => $r]);
+        }
+        $this->cacheParti = [];
+        return $parti;
+    }
+
+    /** Aggiunge una parte senza togliere le altre. */
+    public function aggiungiParte(int $worksiteId, string $tipo, int $oggettoId, string $parte): void
+    {
+        if (!in_array($parte, self::PARTI, true)) {
+            return;
+        }
+        $this->conn->prepare(
+            'INSERT IGNORE INTO bb_zone_condivisioni_ruoli (worksite_id, tipo, oggetto_id, ruolo) VALUES (:w, :t, :o, :r)'
+        )->execute([':w' => $worksiteId, ':t' => $tipo, ':o' => $oggettoId, ':r' => $parte]);
+        $this->cacheParti = [];
+    }
+
     public function vede(?object $utente, int $worksiteId, string $tipo, int $oggettoId, int $creatoDa = 0): bool
     {
         if (!$utente) {
@@ -96,11 +206,13 @@ final class Condivisione
         }
         // Entrare nel cantiere e' il primo cancello: senza, non conta
         // nemmeno avere una riga di condivisione.
-        if ($this->accesso->ruolo($utente, $worksiteId) === null) {
+        $ruolo = $this->accesso->ruolo($utente, $worksiteId);
+        if ($ruolo === null) {
             return false;
         }
 
-        return isset($this->vistiDa($io)[$tipo][$oggettoId]);
+        return isset($this->vistiDa($io)[$tipo][$oggettoId])
+            || isset($this->vistiDaParte($worksiteId, $ruolo)[$tipo][$oggettoId]);
     }
 
     /**
@@ -264,39 +376,30 @@ final class Condivisione
             return;
         }
 
-        $chi  = [];
-        $par  = [':w' => $worksiteId];
-        $ruolo = match ((string)$t['assegnata_a']) {
+        // a un gruppo: lo vede tutta quella parte, anche chi arriva dopo
+        $parte = match ((string)$t['assegnata_a']) {
             'squadra', 'capi', 'cantiere' => Accesso::CANTIERE,
             'cliente'                     => Accesso::CLIENTE,
             default                       => null,
         };
-        if ($ruolo !== null) {
-            $chi[]      = 'a.ruolo = :r';
-            $par[':r']  = $ruolo;
+        if ($parte !== null) {
+            $this->aggiungiParte($worksiteId, 'attivita', $taskId, $parte);
         }
+        // a una persona: lei, se e' nel cantiere (all'ufficio non serve)
         if (!empty($t['assignee_user_id'])) {
-            $chi[]      = 'a.user_id = :p';
-            $par[':p']  = (int)$t['assignee_user_id'];
+            $q = $this->conn->prepare("
+                SELECT a.user_id FROM bb_zone_accessi a JOIN bb_worksites w ON w.id = a.worksite_id
+                WHERE a.worksite_id = :w AND a.user_id = :p AND a.ruolo <> 'ufficio'
+                  AND " . Accesso::SQL_CLIENTE_ENTRA
+            );
+            $q->execute([':w' => $worksiteId, ':p' => (int)$t['assignee_user_id']]);
+            if ($uid = (int)$q->fetchColumn()) {
+                $this->conn->prepare(
+                    'INSERT IGNORE INTO bb_zone_condivisioni (tipo, oggetto_id, user_id) VALUES (\'attivita\', :o, :u)'
+                )->execute([':o' => $taskId, ':u' => $uid]);
+                $this->cache = [];
+            }
         }
-        if (!$chi) {
-            return; // all'ufficio: vede gia' tutto
-        }
-
-        $q = $this->conn->prepare("
-            SELECT a.user_id FROM bb_zone_accessi a JOIN bb_worksites w ON w.id = a.worksite_id
-            WHERE a.worksite_id = :w AND a.ruolo <> 'ufficio'
-              AND " . Accesso::SQL_CLIENTE_ENTRA . "
-              AND (" . implode(' OR ', $chi) . ")
-        ");
-        $q->execute($par);
-        $ins = $this->conn->prepare(
-            'INSERT IGNORE INTO bb_zone_condivisioni (tipo, oggetto_id, user_id) VALUES (\'attivita\', :o, :u)'
-        );
-        foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $uid) {
-            $ins->execute([':o' => $taskId, ':u' => (int)$uid]);
-        }
-        $this->cache = [];
     }
 
     /**

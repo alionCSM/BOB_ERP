@@ -1304,21 +1304,18 @@ final class WorksitesController
                 'subcategory' => $category,
             ]);
 
-            // Un disegno nuovo nasce condiviso con la squadra — capi e
-            // operai — e non col cliente. E' quello che faceva prima
-            // l'etichetta predefinita, e i disegni sono la cosa per cui in
-            // cantiere si apre BOB: se nascessero visibili a nessuno,
-            // caricarne uno e non dirlo a nessuno sarebbe la stessa cosa.
-            // Cosa va al committente lo decide l'ufficio, uno per uno.
+            // Un disegno nuovo nasce condiviso con la squadra e col
+            // cliente, come tutto nella Zone: e' lo spazio comune del
+            // cantiere. Vale anche per chi entra dopo. L'ufficio lo
+            // stringe dal pannello "Chi la vede" se un disegno e' interno.
             try {
                 $acc  = new \App\Service\Zone\Accesso($this->conn);
                 $cond = new \App\Service\Zone\Condivisione($this->conn, $acc);
-                $cond->salva(
+                $cond->salvaParti(
                     $worksiteId,
                     'disegno',
                     (int)$savedDocId,
-                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CANTIERE),
-                    (int)$auth['user_id']
+                    \App\Service\Zone\Condivisione::PARTI_PREDEFINITE
                 );
             } catch (\Throwable $e) {
                 // il disegno e' gia' caricato: se la condivisione non va,

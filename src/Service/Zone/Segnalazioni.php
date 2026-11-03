@@ -13,12 +13,10 @@ use PDO;
  * qualcuno prende in carico e chiude.
  *
  * Chi la fa: chiunque entri nel cantiere (capo, operaio, cliente).
- * Chi la vede: l'ufficio, chi l'ha fatta, e la visibilita' scelta:
- *   - da capo o operaio nasce "capi" (ufficio e capi): il capo deve saperlo,
- *     il resto della squadra no finche' l'ufficio non decide;
- *   - dal cliente nasce "cliente" (ufficio e cliente): un reclamo del
- *     cliente non lo legge la squadra.
- * L'ufficio puo' allargarla (alla squadra, a tutti) quando serve.
+ * Chi la vede: l'ufficio, chi l'ha fatta, e la visibilita' scelta. Di
+ * base "tutti" — noi, il cliente e la squadra — perche' la Zone e' lo
+ * spazio comune del cantiere. L'ufficio la stringe quando serve (solo
+ * ufficio, ufficio e cantiere, ufficio e cliente).
  *
  * Chi la muove: l'ufficio e il capo. Aperta → presa in carico → risolta.
  * Ogni passaggio scrive una riga nel filo ("Presa in carico da Rossi") e
@@ -123,11 +121,12 @@ final class Segnalazioni
         }
         $tipo    = in_array($dati['tipo'] ?? '', self::TIPI, true) ? $dati['tipo'] : 'altro';
         $gravita = in_array($dati['gravita'] ?? '', self::GRAVITA, true) ? $dati['gravita'] : 'bassa';
-        $vis = match ($ruolo) {
-            Accesso::CLIENTE => 'cliente',
-            Accesso::UFFICIO => in_array($dati['visibilita'] ?? '', Accesso::VISIBILITA, true) ? $dati['visibilita'] : 'cantiere',
-            default          => 'capi',
-        };
+        // Di base la vedono tutti e tre: un problema in cantiere riguarda
+        // noi, il cliente e la squadra. L'ufficio puo' sceglierne un'altra
+        // mentre la scrive, e chiunque dell'ufficio stringerla dopo.
+        $vis = $ruolo === Accesso::UFFICIO && in_array($dati['visibilita'] ?? '', Accesso::VISIBILITA, true)
+            ? $dati['visibilita']
+            : 'tutti';
 
         $this->conn->prepare("
             INSERT INTO bb_zone_segnalazioni (worksite_id, tipo, gravita, testo, visibilita, created_by)
