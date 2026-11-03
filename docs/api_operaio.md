@@ -800,3 +800,12 @@ casella. I nomi utente scritti in `.env` come
 virgola) entrano dall'app senza codice; ogni accesso finisce nel registro
 come `api_login_review_account`. Solo per account finti, su un cantiere di
 prova. Vuoto o assente = nessuna eccezione.
+
+## Telefoni fidati (niente codice email dopo la prima volta)
+
+Dopo il primo `POST /auth/verify` giusto la risposta ha anche `dispositivo`:
+un segreto che l'app tiene nel portachiavi del telefono e manda come
+`dispositivo` ai `POST /auth/login` successivi. Se e' valido il codice via
+email non arriva piu', anche cambiando rete. In `bb_api_dispositivi` sta solo
+lo sha256. Il telefono smette di essere fidato se si cambia la password (app
+o sito) o se non entra da 180 giorni. "Esci" non lo toglie.

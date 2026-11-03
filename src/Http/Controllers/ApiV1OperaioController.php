@@ -664,6 +664,14 @@ final class ApiV1OperaioController
             ':id'  => (int)($request->user()->id ?? 0),
         ]);
 
+        // password nuova: i telefoni fidati devono rifare il codice
+        try {
+            $this->conn->prepare('UPDATE bb_api_dispositivi SET revoked_at = NOW() WHERE user_id = :id AND revoked_at IS NULL')
+                       ->execute([':id' => (int)($request->user()->id ?? 0)]);
+        } catch (\Throwable $e) {
+            // tabella non ancora creata
+        }
+
         Response::json(['success' => true]);
     }
 

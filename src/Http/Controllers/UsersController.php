@@ -1434,6 +1434,13 @@ final class UsersController
                     $hash = password_hash($newPwd, PASSWORD_DEFAULT);
                     $upd  = $this->conn->prepare("UPDATE bb_users SET password = :pwd WHERE id = :id");
                     $upd->execute([':pwd' => $hash, ':id' => $userId]);
+                    // password nuova: i telefoni fidati dell'app rifanno il codice
+                    try {
+                        $this->conn->prepare('UPDATE bb_api_dispositivi SET revoked_at = NOW() WHERE user_id = :id AND revoked_at IS NULL')
+                                   ->execute([':id' => $userId]);
+                    } catch (\Throwable $e) {
+                        // tabella non ancora creata
+                    }
                     $pwdMsg = 'Password aggiornata con successo.';
                 }
             }
