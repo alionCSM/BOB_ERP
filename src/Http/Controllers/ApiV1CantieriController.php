@@ -894,7 +894,7 @@ final class ApiV1CantieriController
         if (!$user) {
             Response::json(['success' => false, 'message' => 'Accesso negato'], 403);
         }
-        if ((int)$user->id !== 1 && !$user->canAccess('worksites')) {
+        if (!$user->canAccess('worksites')) {
             Response::json(['success' => false, 'message' => "Permesso 'worksites' richiesto"], 403);
         }
         return $user;

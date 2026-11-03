@@ -319,7 +319,7 @@ final class ApiV1UfficioController
     public function flotta(Request $request): never
     {
         $u = $request->user();
-        if (!($u && ((int)$u->id === 1 || $u->canAccess('fleet_view') || $u->canAccess('fleet_manage')))) {
+        if (!($u && ($u->canAccess('fleet_view') || $u->canAccess('fleet_manage')))) {
             Response::json(['success' => false, 'message' => 'Non hai questo permesso in questa societa\''], 403);
         }
         $f = new \App\Repository\Fleet\FleetRepository($this->conn);
@@ -343,7 +343,7 @@ final class ApiV1UfficioController
     private function pretende(Request $request, string $modulo): void
     {
         $u = $request->user();
-        if ($u && ((int)$u->id === 1 || $u->canAccess($modulo))) {
+        if ($u && $u->canAccess($modulo)) {
             return;
         }
         Response::json(['success' => false, 'message' => 'Non hai questo permesso in questa societa\''], 403);

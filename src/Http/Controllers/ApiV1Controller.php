@@ -784,16 +784,16 @@ final class ApiV1Controller
      */
     private function noleggiAccesso(User $user, string $tipo): array
     {
-        $super = (int)$user->id === 1;
-
+        // niente scorciatoia per il superadmin: anche lui vede la giornata solo
+        // nella societa' che ha il modulo (canAccess lo lascia passare li')
         if ($tipo === 'macchina') {
-            if ($super || $user->canAccess('pn_noleggi') || $user->canAccess('pn_noleggi_giornata')) {
+            if ($user->canAccess('pn_noleggi') || $user->canAccess('pn_noleggi_giornata')) {
                 return [true, new \App\Repository\Poti\MacchinaRepository($this->conn), ''];
             }
             return [false, null, "Permesso 'pn_noleggi_giornata' richiesto"];
         }
 
-        if ($super || $user->canAccess('pn_autocarrate') || $user->canAccess('pn_autocarrate_giornata')) {
+        if ($user->canAccess('pn_autocarrate') || $user->canAccess('pn_autocarrate_giornata')) {
             return [true, new \App\Repository\Poti\AutocarrataRepository($this->conn), ''];
         }
         return [false, null, "Permesso 'pn_autocarrate_giornata' richiesto"];

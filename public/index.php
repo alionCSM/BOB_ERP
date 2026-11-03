@@ -890,7 +890,7 @@ if (str_starts_with($uri, '/api/v1/')) {
     foreach ($moduloApi as $prefisso => $modulo) {
         if (str_starts_with($uri, $prefisso)) {
             $u = $GLOBALS['user'] ?? null;
-            if (!$u || ((int)$u->id !== 1 && !$u->canAccess($modulo))) {
+            if (!$u || !$u->canAccess($modulo)) {
                 \App\Http\Response::json(['success' => false, 'ok' => false, 'message' => "Non hai questo permesso in questa societa'"], 403);
             }
         }

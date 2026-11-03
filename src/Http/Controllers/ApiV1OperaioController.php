@@ -758,6 +758,10 @@ final class ApiV1OperaioController
             return (new \App\Repository\Zone\AccessoRepository($this->conn))
                 ->cantieriDi((int)($utente->id ?? 0));
         }
+        // il superadmin solo nella societa' che ha la Zone, come gli altri moduli
+        if (!($utente instanceof \App\Domain\User) || !$utente->canAccess('zone')) {
+            return [];
+        }
         return $this->conn->query("
             SELECT w.id, w.worksite_code, w.name, w.location, w.status, 'ufficio' AS ruolo
             FROM   bb_worksites w
@@ -788,8 +792,11 @@ final class ApiV1OperaioController
                 }
             }
         }
-        $puo = fn(string $m) => (int)($utente->id ?? 0) === 1
-            || ($utente instanceof \App\Domain\User && $utente->canAccess($m));
+        // Come il menu del sito: il modulo deve esserci nella societa' scelta,
+        // anche per il superadmin (canAccess lo fa gia', superadmin compreso).
+        // Senza questo controllo chi lavora in piu' societa' vedeva i moduli
+        // di tutte.
+        $puo = fn(string $m) => $utente instanceof \App\Domain\User && $utente->canAccess($m);
 
         // la sua giornata, se e' anche un operaio
         $prossimo = null;
