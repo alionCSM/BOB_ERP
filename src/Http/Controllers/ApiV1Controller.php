@@ -89,6 +89,18 @@ final class ApiV1Controller
             Response::json($this->issueToken($user, $row, $device, $ip, $ua));
         }
 
+        // Gli account per chi esamina l'app negli store (Google, Apple)
+        // entrano senza il codice via email: il revisore non legge la
+        // casella dell'account, e l'app verrebbe rifiutata al primo
+        // accesso. Valgono solo i nomi scritti a mano nel .env del server
+        // (APP_REVIEW_USERS=nome1,nome2) e solo dall'app; ogni accesso resta
+        // nel registro. Da usare per account finti, senza dati veri.
+        $revisori = array_filter(array_map('trim', explode(',', (string)($_ENV['APP_REVIEW_USERS'] ?? ''))));
+        if ($revisori && in_array(strtolower((string)$user->username), array_map('strtolower', $revisori), true)) {
+            AuditLogger::log($this->conn, $user, 'api_login_review_account', 'user', (int)$user->id, (string)$user->username, ['ip' => $ip]);
+            Response::json($this->issueToken($user, $row, $device, $ip, $ua));
+        }
+
         $code        = (string)random_int(100000, 999999);
         $verifyToken = $user->createLoginVerification($ip, $code);
         $this->sendVerificationEmail($user, $row, $code, $ip, $ua);

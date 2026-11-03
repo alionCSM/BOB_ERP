@@ -790,3 +790,13 @@ l'APK da BOB.
 `/privacy` (anche `/privacy-app`): pagina pubblica, servita prima di tutto il
 resto, che Google Play e App Store chiedono. Contiene anche come chiedere la
 cancellazione dell'account (`/privacy#cancellazione`).
+
+## Account per la revisione degli store (`APP_REVIEW_USERS`)
+
+Google e Apple, per esaminare l'app, entrano con un account che diamo noi.
+Il codice via email del primo accesso li fermerebbe: non leggono quella
+casella. I nomi utente scritti in `.env` come
+`APP_REVIEW_USERS=alion+demo@csmontaggi.it` (piu' di uno separati da
+virgola) entrano dall'app senza codice; ogni accesso finisce nel registro
+come `api_login_review_account`. Solo per account finti, su un cantiere di
+prova. Vuoto o assente = nessuna eccezione.
