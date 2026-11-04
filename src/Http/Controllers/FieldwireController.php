@@ -93,6 +93,9 @@ final class FieldwireController
         'report'                => P::VEDERE,
         'presenze'              => P::VEDERE,
         'presenzeGiorni'        => P::VEDERE,
+        // il nome e il codice che il cliente da' al cantiere: lo scrive
+        // il cliente, il metodo controlla il ruolo
+        'salvaRiferimento'      => P::VEDERE,
 
         // ── Scrivere ────────────────────────────────────────────────────
         // commenti, foto e voci di checklist: le mani di tutti i giorni
@@ -127,10 +130,13 @@ final class FieldwireController
         'saveFormTemplate'      => P::MODULI,
         'deleteFormTemplate'    => P::MODULI,
 
-        // ── Cancellare roba di altri ────────────────────────────────────
-        'deleteTask'            => P::CANCELLARE,
-        'deleteFolder'          => P::CANCELLARE,
-        'deleteFile'            => P::CANCELLARE,
+        // ── Cancellare ──────────────────────────────────────────────────
+        // Le proprie cose le cancella chiunque le abbia messe; quelle degli
+        // altri solo l'ufficio (CANCELLARE). Il controllo "e' tua?" lo fa
+        // il metodo, con pretendeMio().
+        'deleteTask'            => P::SCRIVERE,
+        'deleteFolder'          => P::SCRIVERE,
+        'deleteFile'            => P::SCRIVERE,
 
         // ── Decidere ────────────────────────────────────────────────────
         // chi vede cosa, e com'e' collegato il cantiere: roba nostra
@@ -353,6 +359,8 @@ final class FieldwireController
             'soloAccessi'          => !$this->accesso->qualcosa($request->user(), $worksiteId)
                                       && $this->accesso->gestisce($request->user()),
             'puoGestire'           => $this->accesso->gestisce($request->user()),
+            // come chiama il cliente questo cantiere (lo scrive lui)
+            'riferimento'          => (new \App\Service\Zone\RiferimentoCliente($this->conn))->delCantiere($worksiteId),
         ]);
     }
 
@@ -414,7 +422,18 @@ final class FieldwireController
             // creare attivita' e' del capo e dell'ufficio
             $ruolo = (string)$this->ruoloQui($request);
 
+            // un'attivita' nuova e' da fare: lo stato si cambia lavorandoci
+            $body['status'] = 'open';
             $taskId = $this->zoneRepo->create($worksiteId, $body, (int)($user?->id ?? 0));
+            $this->scriviDettagliTask($taskId, $body);
+            // i passaggi della checklist, scritti insieme all'attivita':
+            // prima si creava e poi si tornava dentro ad aggiungerli
+            foreach (array_slice((array)($body['checklist'] ?? []), 0, 50) as $voce) {
+                $voce = mb_substr(trim((string)$voce), 0, 200);
+                if ($voce !== '') {
+                    $this->zoneRepo->addChecklistItem($taskId, $voce);
+                }
+            }
             $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, true, $request);
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
@@ -450,6 +469,7 @@ final class FieldwireController
 
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
+            $this->scriviDettagliTask($taskId, $body);
             $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, false, $request);
 
             // avvisa se e' cambiato a chi tocca
@@ -519,6 +539,7 @@ final class FieldwireController
             // di QUESTO cantiere: prima bastava il numero, e l'ufficio di un
             // cantiere cancellava le attivita' di un altro
             $task       = $this->taskVisibile($request, $taskId);
+            $this->pretendeMio($request, (int)($task['created_by'] ?? 0), 'attivita');
 
             // delete su Fieldwire prima di cancellare in locale
             if (!empty($task['fw_id'])) {
@@ -770,9 +791,9 @@ final class FieldwireController
             $itemId     = (int) $request->param('itemId');
             $body       = $this->jsonBody();
             $done       = (bool) ($body['completed'] ?? true);
-            // spuntare e' di chi ci lavora: il cliente guarda
-            $this->taskVisibile($request, $taskId);
-            $this->accesso->pretende($request->user(), $worksiteId, P::COMPLETARE);
+            // spuntare e' di chi ci lavora: le stesse regole dello stato
+            $task = $this->taskVisibile($request, $taskId);
+            $this->pretendeChiCiLavora($request, $task);
             $this->voceDelTask($itemId, $taskId);
 
             $this->zoneRepo->completeChecklistItem($itemId, $done);
@@ -864,6 +885,7 @@ final class FieldwireController
             $io    = (int)($request->user()->id ?? 0);
             $segn  = (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
                          ->elenco($worksiteId, $ruolo, $io);
+            $worksite['riferimento'] = (new \App\Service\Zone\RiferimentoCliente($this->conn))->delCantiere($worksiteId);
             $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate(
                 $worksiteId,
                 $worksite,
@@ -1178,6 +1200,20 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = (int) $request->param('folderId');
+            $st = $this->conn->prepare('SELECT created_by FROM bb_zone_folders WHERE id = :f AND worksite_id = :w');
+            $st->execute([':f' => $folderId, ':w' => $worksiteId]);
+            $creata = $st->fetchColumn();
+            if ($creata === false) throw new \RuntimeException('Cartella non trovata');
+            $this->pretendeMio($request, (int)$creata, 'cartelle');
+            // una cartella non dell'ufficio si cancella solo vuota: dentro
+            // ci possono essere file di altri
+            if (!$this->accesso->daUfficio($request->user(), $worksiteId)) {
+                $c = $this->conn->prepare('SELECT COUNT(*) FROM bb_zone_files WHERE folder_id = :f');
+                $c->execute([':f' => $folderId]);
+                if ((int)$c->fetchColumn() > 0) {
+                    throw new \RuntimeException('La cartella non e\' vuota: togli prima i file');
+                }
+            }
             $this->fileRepo->deleteFolder($worksiteId, $folderId);
             return ['deleted' => true];
         });
@@ -1253,6 +1289,9 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $fileId     = (int) $request->param('fileId');
+            $file = $this->fileRepo->find($fileId);
+            if (!$file || (int)$file['worksite_id'] !== $worksiteId) throw new \RuntimeException('File non trovato');
+            $this->pretendeMio($request, (int)($file['uploaded_by'] ?? 0), 'file');
             $row = $this->fileRepo->delete($worksiteId, $fileId);
             // rimuovi anche il file fisico
             if ($row && !empty($row['file_path'])) {
@@ -1388,6 +1427,29 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             return (new \App\Service\Zone\Presenze($this->conn))
                 ->giorni((int)$request->param('id'), 60);
+        });
+    }
+
+    // ─── Il riferimento del cliente ───────────────────────────────────────────
+
+    /** Il cliente scrive come chiama lui questo cantiere: un nome, un codice commessa. */
+    public function salvaRiferimento(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+            if ($this->ruoloQui($request) !== \App\Service\Zone\Accesso::CLIENTE) {
+                \App\Service\Zone\Accesso::nega('Il riferimento lo scrive il cliente');
+            }
+            $body = $this->jsonBody();
+            return (new \App\Service\Zone\RiferimentoCliente($this->conn))->salva(
+                $w,
+                (int)($request->user()->client_id ?? 0),
+                (string)($body['nome'] ?? ''),
+                (string)($body['codice'] ?? ''),
+                (int)($request->user()->id ?? 0)
+            );
         });
     }
 
@@ -1550,7 +1612,8 @@ final class FieldwireController
             // disegni BOB (sorgente di verita') + stato sync
             $stmt = $this->conn->prepare("
                 SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
-                       d.created_at, d.created_by,
+                       d.created_at, d.created_by, d.current_version,
+                       (SELECT COUNT(*) FROM bb_worksite_document_versions v WHERE v.document_id = d.id) AS n_versioni,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
                        r.status AS dwg_status
@@ -1578,6 +1641,9 @@ final class FieldwireController
                     'folder'       => $r['subcategory'] ?: 'altri',
                     'uploader'     => trim($r['uploader']) ?: '—',
                     'created_at'   => $r['created_at'],
+                    // le versioni: quella in uso e quante ce ne sono di prima
+                    'versione'     => (int)($r['current_version'] ?? 1) ?: 1,
+                    'n_versioni'   => (int)($r['n_versioni'] ?? 0),
                     'view_url'     => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
                     'fw_synced'    => !empty($r['pushed_at']),
                     'fw_pushed_at' => $r['pushed_at'],
@@ -1772,6 +1838,13 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $annId = (int) $request->param('annId');
+            // di questo cantiere, e tua (o sei l'ufficio): prima chiunque
+            // cancellava gli spilli di chiunque, anche di altri cantieri
+            $ann = $this->annRepo->find($annId);
+            if (!$ann || (int)($ann['worksite_id'] ?? 0) !== (int)$request->param('id')) {
+                throw new \RuntimeException('Segno non trovato');
+            }
+            $this->pretendeMio($request, (int)($ann['created_by'] ?? 0), 'segni');
             $this->annRepo->delete($annId);
             return ['deleted' => true];
         });
@@ -2470,6 +2543,21 @@ final class FieldwireController
         return $tpl;
     }
 
+    /**
+     * Cancella chi l'ha messo, o l'ufficio. Prima i file, le cartelle e le
+     * attivita' le cancellava solo l'ufficio: un cliente che caricava la
+     * foto sbagliata se la teneva.
+     */
+    private function pretendeMio(Request $request, int $autore, string $cosa): void
+    {
+        if ($this->accesso->daUfficio($request->user(), (int)$request->param('id'))) {
+            return;
+        }
+        if ($autore <= 0 || $autore !== (int)($request->user()->id ?? -1)) {
+            \App\Service\Zone\Accesso::nega("Puoi cancellare solo i tuoi $cosa");
+        }
+    }
+
     /** Il ruolo di chi chiede su questo cantiere (la guardia e' gia' passata). */
     private function ruoloQui(Request $request): string
     {
@@ -2516,19 +2604,47 @@ final class FieldwireController
         if ($stato === 'verified' || ($task['status'] ?? '') === 'verified') {
             \App\Service\Zone\Accesso::nega("Verificare, o riaprire un'attivita' verificata, lo fa l'ufficio");
         }
-        // Porta avanti un'attivita' chi ce l'ha: l'ha creata, e' sua per
-        // nome, o tocca al suo gruppo. Prima il cliente non poteva chiudere
-        // nemmeno le attivita' che aveva aperto lui, e quelle "dei capi"
-        // non le chiudeva nessuno del cantiere, perche' capi e squadra
-        // erano diventati la stessa cosa e il controllo guardava solo
-        // "squadra".
-        $io     = (int)($request->user()->id ?? -1);
-        $gruppo = self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra'));
-        $mia    = (int)($task['created_by'] ?? 0) === $io
-            || (int)($task['assignee_user_id'] ?? 0) === $io
-            || ($gruppo !== null && $gruppo === $ruolo);
+        $this->pretendeChiCiLavora($request, $task);
+    }
+
+    /**
+     * Porta avanti un'attivita' (stato, checklist) solo chi ce l'ha.
+     *
+     * Data a una persona: quella persona. Data a un gruppo (la squadra, il
+     * cliente, l'ufficio): chi ne fa parte. E sempre l'ufficio. Chi l'ha
+     * creata no, se l'ha data a un altro: assegnare vuol dire "la fai tu",
+     * e prima chiunque la vedesse la poteva chiudere al posto suo.
+     */
+    private function pretendeChiCiLavora(Request $request, array $task): void
+    {
+        $ruolo = $this->ruoloQui($request);
+        if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
+            return;
+        }
+        $io      = (int)($request->user()->id ?? -1);
+        $persona = (int)($task['assignee_user_id'] ?? 0);
+        $mia = $persona > 0
+            ? $persona === $io
+            : self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra')) === $ruolo;
         if (!$mia) {
-            \App\Service\Zone\Accesso::nega("Questa attivita' non e' assegnata a te");
+            \App\Service\Zone\Accesso::nega(
+                $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' tocca a un altro gruppo"
+            );
+        }
+    }
+
+    /** I campi che il repository non conosce: per ora il luogo. */
+    private function scriviDettagliTask(int $taskId, array $body): void
+    {
+        if (!array_key_exists('luogo', $body)) {
+            return;
+        }
+        $luogo = mb_substr(trim((string)$body['luogo']), 0, 160);
+        try {
+            $this->conn->prepare('UPDATE bb_zone_tasks SET luogo = :l WHERE id = :id')
+                ->execute([':l' => $luogo !== '' ? $luogo : null, ':id' => $taskId]);
+        } catch (\PDOException $e) {
+            // colonna non ancora creata (migrazione da lanciare)
         }
     }
 

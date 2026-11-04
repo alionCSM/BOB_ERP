@@ -160,12 +160,12 @@ final class WorksitesController
 
         $stmt = $this->conn->prepare($soloCondivisi
             // le stesse condizioni di ScopeService, sulla stessa tabella
-            ? "SELECT w.id, w.name, w.worksite_code, w.location
+            ? "SELECT w.id, w.name, w.worksite_code, w.location, w.status
                FROM bb_worksites w
                INNER JOIN bb_zone_accessi a ON a.worksite_id = w.id AND a.ruolo = 'cliente'
                WHERE a.user_id = :uid AND w.client_id = :cid AND w.zone_cliente = 1
                ORDER BY w.name"
-            : "SELECT w.id, w.name, w.worksite_code, w.location
+            : "SELECT w.id, w.name, w.worksite_code, w.location, w.status
                FROM bb_worksites w
                INNER JOIN bb_worksite_users wu ON wu.worksite_id = w.id
                WHERE wu.user_id = :uid
@@ -179,12 +179,71 @@ final class WorksitesController
 
         // Un cliente con un cantiere solo va dritto alla sua Zone: un elenco
         // di una riga da cliccare ogni volta e' un passaggio in piu' e basta.
+        // Per ogni cantiere quello che serve a scegliere dove entrare: le
+        // attivita' aperte che vede, le segnalazioni aperte, i messaggi non
+        // letti e l'ultima volta che e' successo qualcosa. E il nome che
+        // gli ha dato il cliente.
+        $worksites = $this->riassuntoZone($user, $worksites);
+
         $nonDisponibile = isset($_GET['non_disponibile']);
         if ($soloCondivisi && count($worksites) === 1 && !$nonDisponibile) {
             Response::redirect('/worksites/' . (int)$worksites[0]['id'] . '/zone');
         }
 
         Response::view('worksites/my.html.twig', $request, compact('worksites', 'nonDisponibile'));
+    }
+
+    /**
+     * Il riassunto di ogni cantiere per "I miei cantieri".
+     *
+     * Con le regole della Zone: si contano solo le cose che questa persona
+     * vede. Pochi cantieri per persona, quindi una manciata di query.
+     */
+    private function riassuntoZone(\App\Domain\User $user, array $worksites): array
+    {
+        $acc   = new \App\Service\Zone\Accesso($this->conn);
+        $cond  = new \App\Service\Zone\Condivisione($this->conn, $acc);
+        $mess  = new \App\Service\Zone\Messaggi($this->conn);
+        $segn  = new \App\Service\Zone\Segnalazioni($this->conn, $mess);
+        $rif   = $user->type === 'client' && !empty($user->client_id)
+            ? (new \App\Service\Zone\RiferimentoCliente($this->conn))->diCliente((int)$user->client_id)
+            : [];
+        $io = (int)$user->id;
+
+        $tasks = $this->conn->prepare("
+            SELECT id, created_by, status, updated_at FROM bb_zone_tasks WHERE worksite_id = :w
+        ");
+        foreach ($worksites as &$w) {
+            $id    = (int)$w['id'];
+            $ruolo = $acc->ruolo($user, $id);
+            $w['riferimento'] = $rif[$id] ?? null;
+            $w['aperte'] = $w['segnalazioni'] = $w['non_letti'] = 0;
+            $w['ultima'] = null;
+            if ($ruolo === null) {
+                continue;
+            }
+            try {
+                $tasks->execute([':w' => $id]);
+                foreach ($tasks->fetchAll(\PDO::FETCH_ASSOC) as $t) {
+                    if (!$cond->vede($user, $id, 'attivita', (int)$t['id'], (int)($t['created_by'] ?? 0))) continue;
+                    if (!in_array($t['status'], ['complete', 'verified'], true)) $w['aperte']++;
+                    if ($t['updated_at'] > ($w['ultima'] ?? '')) $w['ultima'] = $t['updated_at'];
+                }
+                foreach ($segn->elenco($id, $ruolo, $io) as $s) {
+                    if (($s['stato'] ?? '') !== 'risolta') $w['segnalazioni']++;
+                }
+                $w['non_letti'] = array_sum($mess->nonLetti($io, $id, $mess->canali($ruolo, $id)));
+                $st = $this->conn->prepare('SELECT MAX(created_at) FROM bb_zone_messaggi WHERE worksite_id = :w');
+                $st->execute([':w' => $id]);
+                $m = $st->fetchColumn();
+                if ($m && $m > ($w['ultima'] ?? '')) $w['ultima'] = $m;
+            } catch (\Throwable $e) {
+                // un riassunto che non si calcola non deve togliere il cantiere
+                error_log('[I miei cantieri] ' . $e->getMessage());
+            }
+        }
+        unset($w);
+        return $worksites;
     }
 
     // ── Drafts (permission worksites_drafts) ──────────────────────────────────
@@ -1324,6 +1383,19 @@ final class WorksitesController
             }
         }
 
+        // Una versione nuova: lo sa chi lavora su quel disegno. In cantiere
+        // si monta dal disegno che si ha in mano, e se e' vecchio si sbaglia.
+        if ($replaceId > 0 && $savedDocId > 0) {
+            try {
+                (new \App\Service\Zone\AvvisiZona(
+                    $this->conn,
+                    new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+                ))->disegno($worksiteId, (int)$savedDocId, (int)$auth['user_id']);
+            } catch (\Throwable $e) {
+                error_log('[uploadDisegno] avviso versione: ' . $e->getMessage());
+            }
+        }
+
         // DWG/DXF → conversione in SVG vettoriale per il viewer BOB Zone.
         // Best-effort: se fallisce, il disegno resta caricato (status=error).
         $dwgRender = null;
@@ -1439,6 +1511,11 @@ final class WorksitesController
         $docId = $request->intParam('docId');
         if ($docId <= 0) {
             Response::json([], 400);
+        }
+        // il disegno dev'essere di questo cantiere: prima bastava il numero
+        $doc = $this->documentRepo->getById($docId);
+        if (!$doc || (int)$doc['worksite_id'] !== $request->intParam('id')) {
+            Response::json([], 404);
         }
         $versions = $this->documentRepo->getVersions($docId);
         Response::json($versions);

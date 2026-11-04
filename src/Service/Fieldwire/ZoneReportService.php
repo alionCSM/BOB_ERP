@@ -134,6 +134,9 @@ final class ZoneReportService
         $h .= "<div class='testa'><div class='marchio'>Consorzio Soluzione Montaggi · BOB</div>"
             . "<h1>Rapporto di cantiere</h1>"
             . "<div class='cantiere'>{$nome}" . ($codice ? " · {$codice}" : '') . "</div>"
+            . (!empty($worksite['riferimento'])
+                ? "<div class='sub'>Riferimento del cliente: " . $e(implode(' · ', array_filter([$worksite['riferimento']['nome'] ?? '', $worksite['riferimento']['codice'] ?? '']))) . "</div>"
+                : '')
             . "<div class='sub'>" . ($cliente ? "Cliente: {$cliente} · " : '')
             . "Periodo: {$d($dal)} – {$d($al)} · Generato il " . date('d/m/Y H:i') . " · Copia per: {$e($perChi)}</div></div>";
 
