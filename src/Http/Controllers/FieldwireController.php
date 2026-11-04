@@ -121,7 +121,9 @@ final class FieldwireController
         // ── Aprire lavoro nuovo ─────────────────────────────────────────
         'createTask'            => P::ATTIVITA,
         'updateTask'            => P::ATTIVITA,
-        'deleteChecklistItem'   => P::ATTIVITA,
+        // i passaggi: li toglie chi ha creato l'attivita' (o l'ufficio),
+        // controllato nel metodo
+        'deleteChecklistItem'   => P::SCRIVERE,
         'dwgConvert'            => P::DISEGNI,
         'pushDisegno'           => P::DISEGNI,
         'setCalibration'        => P::DISEGNI,
@@ -400,10 +402,37 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
-            return $this->conChiSuRighe($request, 'attivita', array_values(array_filter(
+            $righe = $this->conChiSuRighe($request, 'attivita', array_values(array_filter(
                 $this->zoneRepo->allForWorksite($worksiteId),
                 $this->filtro($request, 'attivita')
             )));
+            // lo spillo sul disegno, se c'e' e il disegno si vede: il dettaglio
+            // ha "Sul disegno" per aprirlo
+            try {
+                $st = $this->conn->prepare("
+                    SELECT a.task_id, a.document_id, a.page, d.file_name, d.file_type, d.created_by
+                    FROM bb_zone_annotations a JOIN bb_worksite_documents d ON d.id = a.document_id AND d.is_deleted = 0
+                    WHERE a.worksite_id = :w AND a.task_id IS NOT NULL ORDER BY a.id
+                ");
+                $st->execute([':w' => $worksiteId]);
+                $vede = $this->filtro($request, 'disegno');
+                $spilli = [];
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $a) {
+                    if ($vede(['id' => $a['document_id'], 'created_by' => $a['created_by']])) {
+                        $spilli[(int)$a['task_id']] ??= [
+                            'document_id' => (int)$a['document_id'], 'page' => (int)$a['page'],
+                            'nome' => $a['file_name'], 'tipo' => $a['file_type'],
+                        ];
+                    }
+                }
+                foreach ($righe as &$r) {
+                    $r['disegno'] = $spilli[(int)$r['id']] ?? null;
+                }
+                unset($r);
+            } catch (\PDOException $e) {
+                // tabelle dei disegni non pronte: le attivita' si mostrano lo stesso
+            }
+            return $righe;
         });
     }
 
@@ -435,6 +464,25 @@ final class FieldwireController
                 }
             }
             $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $body, true, $request);
+            // "Dove": il punto scelto su un disegno diventa lo spillo dell'attivita'
+            if (is_array($body['punto'] ?? null)) {
+                $pt  = $body['punto'];
+                $doc = (int)($pt['document_id'] ?? 0);
+                if ($doc > 0 && $this->disegnoDelCantiere($request, $doc)) {
+                    $this->annRepo->create([
+                        'worksite_id' => $worksiteId,
+                        'document_id' => $doc,
+                        'page'        => max(1, (int)($pt['page'] ?? 1)),
+                        'type'        => 'pin',
+                        'geom'        => ['x' => (float)($pt['x'] ?? 0), 'y' => (float)($pt['y'] ?? 0)],
+                        'task_id'     => $taskId,
+                        'segnalazione_id' => null,
+                        'text'        => null,
+                        'color'       => '#3b82f6',
+                        'created_by'  => (int)($user?->id ?? 0),
+                    ]);
+                }
+            }
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
             // avvisa a chi tocca: la persona, la squadra, i capi, il cliente
@@ -760,7 +808,12 @@ final class FieldwireController
             $body       = $this->jsonBody();
             $name       = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome elemento obbligatorio');
-            $this->taskVisibile($request, $taskId);
+            $task = $this->taskVisibile($request, $taskId);
+            // un passaggio lo aggiunge chi l'ha creata o chi ci lavora: prima
+            // bastava vederla, e il cliente riempiva la checklist della squadra
+            if ((int)($task['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
+                $this->pretendeChiCiLavora($request, $task);
+            }
 
             $id = $this->zoneRepo->addChecklistItem($taskId, $name);
 
@@ -828,7 +881,9 @@ final class FieldwireController
             $taskId     = (int) $request->param('taskId');
             $itemId     = (int) $request->param('itemId');
 
-            $this->taskVisibile($request, $taskId);
+            $task = $this->taskVisibile($request, $taskId);
+            // toglierne uno: chi ha creato l'attivita', o l'ufficio
+            $this->pretendeMio($request, (int)($task['created_by'] ?? 0), 'passaggi (sono di chi ha creato l\'attività)');
             $this->voceDelTask($itemId, $taskId);
             $item = $this->zoneRepo->findChecklistItem($itemId);
             if (!$item) throw new \RuntimeException('Elemento checklist non trovato');
@@ -1771,8 +1826,25 @@ final class FieldwireController
             if ($type === '') throw new \RuntimeException('Tipo annotazione mancante');
             if (empty($body['geom'])) throw new \RuntimeException('Geometria mancante');
 
+            // il disegno e' di questo cantiere e chi scrive lo vede
+            if (!$this->disegnoDelCantiere($request, $docId)) {
+                throw new \RuntimeException('Disegno non trovato');
+            }
+            // cambiare un segno: solo il proprio, o l'ufficio
+            if (!empty($body['id'])) {
+                $vecchio = $this->annRepo->find((int)$body['id']);
+                if (!$vecchio || (int)$vecchio['worksite_id'] !== $worksiteId) {
+                    throw new \RuntimeException('Segno non trovato');
+                }
+                $this->pretendeMio($request, (int)($vecchio['created_by'] ?? 0), 'segni');
+            }
+
             $taskId = !empty($body['task_id']) ? (int)$body['task_id'] : null;
             $segnId = !empty($body['segnalazione_id']) ? (int)$body['segnalazione_id'] : null;
+            // collegare un'attivita' esistente: di questo cantiere, e che si vede
+            if ($taskId) {
+                $this->taskVisibile($request, $taskId);
+            }
 
             // Una segnalazione aperta da qui: la scrive il servizio delle
             // segnalazioni, non questo metodo. Li' dentro ci sono la
@@ -1798,14 +1870,20 @@ final class FieldwireController
             }
 
             // pin che deve creare un task nuovo "qui"
+            // Le stesse regole della "Nuova attivita'": chi puo' crearla, a chi
+            // tocca, chi la vede, l'avviso. Prima da qui nasceva senza
+            // niente di questo: la poteva creare anche chi non puo', non la
+            // vedeva nessuno e nessuno era avvisato.
             if ($type === 'pin' && !empty($body['create_task']) && !$taskId) {
-                $taskName = trim($body['task_name'] ?? '') ?: ($body['text'] ?? 'Task da disegno');
-                $taskId = $this->zoneRepo->create($worksiteId, [
-                    'name'          => $taskName,
-                    'assignee_name' => $body['assignee_name'] ?? null,
-                    'status'        => 'open',
-                ], (int)($user?->id ?? 0));
-                // push del task su Fieldwire se collegato
+                $this->accesso->pretende($user, $worksiteId, P::ATTIVITA);
+                $ruolo    = (string)$this->ruoloQui($request);
+                $taskName = trim($body['task_name'] ?? '') ?: ($body['text'] ?? 'Attività dal disegno');
+                $nuova    = ['name' => mb_substr($taskName, 0, 200), 'status' => 'open']
+                          + array_intersect_key($body, array_flip(['assegnata_a', 'assignee_user_id', 'due_date', 'priority', 'luogo', 'persone', 'parti']));
+                $taskId = $this->zoneRepo->create($worksiteId, $nuova, (int)($user?->id ?? 0));
+                $this->scriviDettagliTask($taskId, $nuova);
+                $this->scriviVisibilitaTask($worksiteId, $taskId, $ruolo, $nuova, true, $request);
+                $this->avvisa(fn($a) => $a->attivita($taskId, (int)($user?->id ?? 0)));
                 $this->pushTaskToFieldwire($worksiteId, $taskId, []);
             }
 
@@ -2409,7 +2487,7 @@ final class FieldwireController
                 : null;
             if (!$aUser && !$aRuolo) throw new \RuntimeException('Scegli a chi tocca compilarlo');
 
-            $frequenza = in_array($body['frequenza'] ?? '', ['una_volta', 'giornaliera', 'settimanale'], true)
+            $frequenza = in_array($body['frequenza'] ?? '', ['una_volta', 'giornaliera', 'settimanale', 'mensile'], true)
                 ? $body['frequenza'] : 'una_volta';
             $scadenza = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($body['scadenza'] ?? ''))
                 ? $body['scadenza'] : null;
@@ -2631,6 +2709,15 @@ final class FieldwireController
                 $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' tocca a un altro gruppo"
             );
         }
+    }
+
+    /** Il disegno e' di questo cantiere, e chi chiede lo vede? */
+    private function disegnoDelCantiere(Request $request, int $docId): bool
+    {
+        $st = $this->conn->prepare('SELECT created_by FROM bb_worksite_documents WHERE id = :d AND worksite_id = :w AND is_deleted = 0');
+        $st->execute([':d' => $docId, ':w' => (int)$request->param('id')]);
+        $creato = $st->fetchColumn();
+        return $creato !== false && $this->condiviso($request, 'disegno', $docId, (int)$creato);
     }
 
     /** I campi che il repository non conosce: per ora il luogo. */

@@ -251,6 +251,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-dati { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin:0; font-size:12.5px; }
 .bz-dati dt { color:#94a3b8; white-space:nowrap; } .bz-dati dt i { width:14px; text-align:center; margin-right:4px; }
 .bz-dati dd { margin:0; color:#e2e8f0; } .bz-dati dd.alta { color:#fbbf24; font-weight:600; } .bz-dati dd.urgente { color:#f87171; font-weight:600; }
+.bz-link { background:none; border:0; padding:0; color:#60a5fa; cursor:pointer; font:inherit; text-align:left; text-decoration:underline; }
+[data-theme="light"] .bz-link { color:#1d4ed8; }
 .bz-dati-desc { font-size:13px; color:#cbd5e1; margin-top:10px; line-height:1.5; white-space:pre-line; }
 .bz-foto-striscia { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
 .bz-foto-striscia a { flex:0 0 auto; width:76px; height:76px; border-radius:8px; overflow:hidden; border:1px solid #334155; }
@@ -313,6 +315,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width:560px) { .bz-modal-row { grid-template-columns: 1fr; } }
 .bz-task-form { width: 560px; max-height: 92vh; overflow-y: auto; }
+.bz-task-punto { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; align-items:center; }
+.bz-task-punto select { flex:1 1 140px; min-width:0; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 8px; font-size:12px; color:#1e293b; }
+.bz-task-punto button#task-punto-scegli { background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+#task-punto-scelto { flex-basis:100%; font-size:12px; color:#1d4ed8; }
+#task-punto-scelto button { background:none; border:0; color:#94a3b8; cursor:pointer; font-size:15px; }
 .bz-task-sez { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #1e40af; margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
 .bz-task-sez span { text-transform: none; letter-spacing: 0; font-weight: 400; color: #64748b; margin-left: 6px; }
 .bz-task-passi { list-style: none; margin: 0 0 6px; padding: 0; }
@@ -739,6 +746,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <div class="bz-modal-field">
                 <label>Dove in cantiere</label>
                 <input type="text" id="task-luogo" maxlength="160" placeholder="Es. Campata 3, livello 2">
+                <div class="bz-task-punto" id="task-punto-box" hidden>
+                    <select id="task-disegno"></select>
+                    <button type="button" id="task-punto-scegli"><i class="fas fa-location-crosshairs"></i> Segna sul disegno</button>
+                    <span id="task-punto-scelto" hidden></span>
+                </div>
             </div>
             <div class="bz-modal-field">
                 <label>Tipo</label>
@@ -1523,6 +1535,7 @@ async function openTask(id) {
                     ? (task.assignee_name || 'una persona')
                     : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</dd>
                 ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Dove</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
+                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Sul disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
                 ${Number(task.priority) > 0 ? `<dt><i class="fas fa-flag"></i> Priorità</dt><dd class="${Number(task.priority) > 1 ? 'urgente' : 'alta'}">${Number(task.priority) > 1 ? 'Urgente' : 'Alta'}</dd>` : ''}
                 ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
                 ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
@@ -1538,12 +1551,12 @@ async function openTask(id) {
         </div>
 
         <div class="bz-detail-section">
-            <div class="bz-detail-section-title">Checklist</div>
+            <div class="bz-detail-section-title">Passaggi</div>
             <div class="bz-check-list" id="bz-checklist-${id}">
                 <div style="font-size:12px;color:#334155">Caricamento...</div>
             </div>
-            <div class="bz-check-add">
-                <input id="new-check-input" placeholder="Nuovo elemento..." data-check-enter="${id}">
+            <div class="bz-check-add" ${taskModifica(task) || taskAvanza(task) ? '' : 'hidden'}>
+                <input id="new-check-input" placeholder="Aggiungi un passaggio…" data-check-enter="${id}">
                 <button data-add-check="${id}"><i class="fas fa-plus"></i></button>
             </div>
         </div>
@@ -1589,15 +1602,16 @@ async function loadChecklist(taskId) {
     const el  = document.getElementById(`bz-checklist-${taskId}`);
     if (!el) return;
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun elemento.</div>'; return; }
+    // spunta chi ci lavora, toglie chi l'ha creata: le stesse regole del server
+    const task = allTasks.find(t => t.id == taskId) || {};
+    const spunta = taskAvanza(task), togli = taskModifica(task);
+    if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun passaggio.</div>'; return; }
     el.innerHTML = items.map(c => `
         <div class="bz-check-row" id="crow-${c.id}" style="display:flex;align-items:center;gap:6px;">
             <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
-                   data-toggle-check="${taskId}:${c.id}">
-            <label for="chk-${c.id}" class="${c.completed ? 'done' : ''}" style="flex:1;">${escHtml(c.name)}</label>
-            <button class="bz-x-btn" data-delete-check="${taskId}:${c.id}"
-                    title="Elimina elemento"
-                    style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:2px 6px;line-height:1;">×</button>
+                   ${spunta ? `data-toggle-check="${taskId}:${c.id}"` : 'disabled'}>
+            <label ${spunta ? `for="chk-${c.id}"` : ''} class="${c.completed ? 'done' : ''}" style="flex:1;">${escHtml(c.name)}</label>
+            ${togli ? `<button class="bz-x-btn bz-comment-del" data-delete-check="${taskId}:${c.id}" title="Togli passaggio">×</button>` : ''}
         </div>`).join('');
 }
 
@@ -2225,6 +2239,44 @@ function quickAdd(status) {
 
 /* I passaggi e le foto della nuova attivita', in pagina finche' non si crea. */
 let passiNuovi = [], fotoNuove = [];
+/* Il punto su un disegno: {document_id, page, x, y, nome}. */
+let puntoNuovo = null;
+
+/* I disegni che si possono segnare, nella tendina di "Dove". */
+async function preparaPunto() {
+    puntoNuovo = null;
+    const box = document.getElementById('task-punto-box');
+    const sel = document.getElementById('task-disegno');
+    document.getElementById('task-punto-scelto').hidden = true;
+    const r = await api(`/worksites/${WID}/zone/disegni`);
+    const segnabili = ((r.ok && r.data && r.data.bob) || []).filter(d => d.annotatable);
+    box.hidden = !segnabili.length;
+    sel.innerHTML = segnabili.map(d => `<option value="${d.id}" data-tipo="${escAttr(d.file_type)}">${escHtml(d.file_name)}</option>`).join('');
+}
+function scriviPunto() {
+    const el = document.getElementById('task-punto-scelto');
+    el.hidden = !puntoNuovo;
+    el.innerHTML = puntoNuovo
+        ? `<i class="fas fa-location-dot"></i> ${escHtml(puntoNuovo.nome)}${puntoNuovo.page > 1 ? ' · pag. ' + puntoNuovo.page : ''} <button type="button" id="task-punto-via" title="Togli">×</button>`
+        : '';
+    document.getElementById('task-punto-scegli').innerHTML = puntoNuovo
+        ? '<i class="fas fa-location-crosshairs"></i> Cambia punto'
+        : '<i class="fas fa-location-crosshairs"></i> Segna sul disegno';
+}
+document.getElementById('task-punto-scegli')?.addEventListener('click', () => {
+    const sel = document.getElementById('task-disegno');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !window.BZAnnotator) return;
+    window.BZAnnotator.open({
+        worksiteId: WID, csrf: CSRF,
+        docId: parseInt(opt.value), fileType: opt.dataset.tipo, fileName: opt.textContent,
+        viewUrl: `/worksites/${WID}/disegni/${opt.value}/view`,
+        onPick: p => { puntoNuovo = { document_id: parseInt(opt.value), nome: opt.textContent, ...p }; scriviPunto(); },
+    });
+});
+document.getElementById('task-punto-scelto')?.addEventListener('click', e => {
+    if (e.target.closest('#task-punto-via')) { puntoNuovo = null; scriviPunto(); }
+});
 function disegnaPassi() {
     document.getElementById('task-passi').innerHTML = passiNuovi.map((p, i) =>
         `<li><i class="far fa-square"></i><span>${escHtml(p)}</span><button type="button" data-passo-via="${i}" title="Togli">×</button></li>`).join('');
@@ -2260,6 +2312,7 @@ function openModal() {
     chiNuovo.dataset.persone = '';
     chiNuovo.dataset.parti   = '';
     chiNuovo.innerHTML = '<i class="fas fa-eye"></i> Tutti';
+    preparaPunto();
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
@@ -2288,6 +2341,7 @@ async function submitTask() {
         priority:        parseInt(document.getElementById('task-priority').value) || 0,
         // anche un passaggio scritto e non ancora confermato con Invio
         checklist:       [...passiNuovi, document.getElementById('task-passo').value.trim()].filter(Boolean),
+        punto:           puntoNuovo ? { document_id: puntoNuovo.document_id, page: puntoNuovo.page, x: puntoNuovo.x, y: puntoNuovo.y } : null,
         ...assegnazioneDaSelect(aSel),
         ...personeDalBottone('task-chi'),
         due_date:        document.getElementById('task-due').value || null,
@@ -3030,6 +3084,14 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-assegna .fatti { color:#22c55e; } .bz-assegna .mancano { color:#f87171; }
 [data-theme="light"] .bz-assegna .fatti { color:#15803d; } [data-theme="light"] .bz-assegna .mancano { color:#b91c1c; }
 .bz-assegna-form { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.bz-assegna-form .ts-wrapper { flex:1 1 260px; min-width:220px; }
+.bz-assegna-form .ts-control { background:#0f172a; border-color:#334155; color:#cbd5e1; border-radius:7px; min-height:32px; font-size:12px; }
+.bz-assegna-form .ts-control input { color:#cbd5e1; }
+.bz-assegna-form .ts-control .item { background:#1e293b; color:#e2e8f0; border-radius:5px; }
+.bz-assegna-form .ts-dropdown { font-size:12.5px; }
+[data-theme="light"] .bz-assegna-form .ts-control { background:#f8fafc; border-color:#e2e8f0; color:#1e293b; }
+[data-theme="light"] .bz-assegna-form .ts-control input { color:#1e293b; }
+[data-theme="light"] .bz-assegna-form .ts-control .item { background:#e0e7ff; color:#1e3a8a; }
 .bz-assegna-form select, .bz-assegna-form input { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:7px; padding:6px 8px; font-size:12px; }
 .bz-assegna-form button, .bz-assegna-row button { background:#2563eb; color:#fff; border:0; border-radius:7px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; }
 .bz-assegna-row button { background:none; color:#f87171; border:1px solid #7f1d1d; padding:3px 9px; margin-left:auto; }
@@ -3219,7 +3281,7 @@ html .bz-dz-empty { color:#94a3b8; }
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 <script src="/assets/js/views/fieldwire/accessi.js?v=4"></script>
 {% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=4"></script>
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=5"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
 {% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
 </body>

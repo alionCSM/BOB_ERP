@@ -25,6 +25,8 @@ use PDO;
  *   - giornaliero: a capi e operai solo se oggi sono in pianificazione su
  *     quel cantiere. Il DPI di un cantiere dove oggi non sei non ti riguarda;
  *   - settimanale: il venerdi', a chi in settimana e' passato da li';
+ *   - mensile: dal 25 del mese, ogni giorno finche' non e' fatto, a chi
+ *     nel mese e' passato da li';
  *   - una volta: il giorno prima della scadenza, il giorno stesso e il giorno
  *     dopo; senza scadenza, il lunedi', finche' non e' fatto.
  * Un giornaliero o settimanale con la scadenza passata e' finito: niente.
@@ -40,6 +42,7 @@ final class ScadenzeModuli
         return match ($frequenza) {
             'giornaliera' => $oggi,
             'settimanale' => date('Y-m-d', strtotime($oggi . ' -' . ((int)date('N', strtotime($oggi)) - 1) . ' days')),
+            'mensile'     => date('Y-m-01', strtotime($oggi)),
             default       => null,
         };
     }
@@ -150,6 +153,9 @@ final class ScadenzeModuli
                 continue; // finito
             }
             if ($freq === 'settimanale' && $dow !== 5) {
+                continue;
+            }
+            if ($freq === 'mensile' && (int)date('j', strtotime($oggi)) < 25) {
                 continue;
             }
             if ($freq === 'una_volta') {

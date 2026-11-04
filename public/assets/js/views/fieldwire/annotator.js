@@ -5,6 +5,10 @@
  *
  * Esposto come window.BZAnnotator.open({worksiteId, csrf, docId, fileType,
  * fileName, viewUrl}).
+ *
+ * Con onPick(punto) si apre in modo "scegli un punto": niente strumenti,
+ * un clic sul disegno e torna {page, x, y} a chi l'ha aperto. Serve a
+ * "Dove" della nuova attivita'.
  */
 (function () {
     'use strict';
@@ -148,12 +152,15 @@
             annotations: [], calibration: null,
             drawing: null, // stato disegno in corso
         };
-        dom.title.textContent = cfg.fileName || 'Disegno';
+        dom.title.textContent = cfg.onPick
+            ? 'Clicca il punto dell\'attività · ' + (cfg.fileName || 'Disegno')
+            : (cfg.fileName || 'Disegno');
+        dom.ov.classList.toggle('bza-pick', !!cfg.onPick);
         dom.ov.classList.add('open');
         dom.stage.style.display = 'none';
         dom.loading.style.display = 'block';
         dom.side.classList.remove('open');
-        setTool('select');
+        setTool(cfg.onPick ? 'pin' : 'select');
 
         const ft = (cfg.fileType || '').toLowerCase();
         if (ft === 'pdf')                    await loadPdf();
@@ -365,6 +372,15 @@
         if (S.tool === 'select') {
             const annEl = e.target.closest('[data-ann]');
             if (annEl) openAnnPanel(parseInt(annEl.dataset.ann));
+            return;
+        }
+
+        // scegliere un punto per un'attivita' che si sta creando
+        if (S.onPick) {
+            const fatto = S.onPick;
+            const punto = { page: S.page, x: p.x, y: p.y };
+            close();
+            fatto(punto);
             return;
         }
 

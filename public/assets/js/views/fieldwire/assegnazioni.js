@@ -20,7 +20,7 @@
     const A_CHI = { cantiere: 'Chi e\' in cantiere', cliente: 'Il cliente', ufficio: "L'ufficio" };
     // assegnazioni scritte prima che capo e operaio diventassero Cantiere
     const A_CHI_VECCHI = { capo: A_CHI.cantiere, operaio: A_CHI.cantiere };
-    const FREQ  = { una_volta: 'Una volta', giornaliera: 'Ogni giorno', settimanale: 'Ogni settimana' };
+    const FREQ  = { una_volta: 'Una volta', giornaliera: 'Ogni giorno', settimanale: 'Ogni settimana', mensile: 'Ogni mese' };
 
     function esc(s) {
         const d = document.createElement('div');
@@ -49,7 +49,7 @@
         return isNaN(d) ? s : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit' });
     }
 
-    const PERIODO = { giornaliera: 'Oggi', settimanale: 'Questa settimana', una_volta: '' };
+    const PERIODO = { giornaliera: 'Oggi', settimanale: 'Questa settimana', mensile: 'Questo mese', una_volta: '' };
 
     /**
      * Chi l'ha fatto e chi manca nel periodo (oggi, questa settimana, o da
@@ -122,11 +122,11 @@
             form = tpls.length ? `
                 <div class="bz-assegna-form">
                     <select id="bza-modello">${tpls.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select>
-                    <select id="bza-chi">
-                        <optgroup label="Un ruolo">
+                    <select id="bza-chi" multiple>
+                        <optgroup label="Un gruppo">
                             ${Object.keys(A_CHI).map(k => `<option value="r:${k}">${A_CHI[k]}</option>`).join('')}
                         </optgroup>
-                        ${persone.length ? `<optgroup label="Una persona">${persone.map(p => `<option value="u:${p.user_id}">${esc(p.nome)}</option>`).join('')}</optgroup>` : ''}
+                        ${persone.length ? `<optgroup label="Delle persone">${persone.map(p => `<option value="u:${p.user_id}">${esc(p.nome + (p.company ? ' · ' + p.company : ''))}</option>`).join('')}</optgroup>` : ''}
                     </select>
                     <select id="bza-freq">${Object.keys(FREQ).map(k => `<option value="${k}">${FREQ[k]}</option>`).join('')}</select>
                     <input type="date" id="bza-scad" title="Scadenza (facoltativa)">
@@ -135,12 +135,21 @@
                 </div>` : '<div class="sub" style="font-size:12px;color:#64748b;">Crea prima un modello qui sotto, poi assegnalo.</div>';
         }
 
+        if (window.__bzaChi) { try { window.__bzaChi.destroy(); } catch (e) {} window.__bzaChi = null; }
         root.innerHTML = `
             <div class="bz-assegna">
                 <h4><i class="fas fa-tasks"></i> Da compilare</h4>
                 ${tutte.length ? tutte.map(riga).join('') : '<div style="font-size:12px;color:#64748b;">Nessun modulo assegnato.</div>'}
                 ${form}
             </div>`;
+        // a chi: un gruppo, o piu' persone insieme (ognuna compila il suo)
+        const chi = document.getElementById('bza-chi');
+        if (chi && window.TomSelect) {
+            window.__bzaChi = new TomSelect(chi, {
+                plugins: ['remove_button'], maxOptions: 200,
+                placeholder: 'A chi: un gruppo o delle persone',
+            });
+        }
     }
 
     root.addEventListener('click', async function (e) {
@@ -178,20 +187,27 @@
         }
 
         if (e.target.closest('#bza-assegna')) {
-            const chi = document.getElementById('bza-chi').value;
+            const sel = document.getElementById('bza-chi');
+            const chi = [...sel.selectedOptions].map(o => o.value);
+            if (!chi.length) { alert('Scegli a chi tocca compilarlo'); return; }
             const scelte = (document.getElementById('bza-vis')?.dataset.persone || '').trim();
             const sceltiP = (document.getElementById('bza-vis')?.dataset.parti || '').trim();
-            const r = await post(base(), {
-                template_id: parseInt(document.getElementById('bza-modello').value),
-                a_ruolo:     chi.startsWith('r:') ? chi.slice(2) : null,
-                a_user_id:   chi.startsWith('u:') ? parseInt(chi.slice(2)) : null,
-                frequenza:   document.getElementById('bza-freq').value,
-                scadenza:    document.getElementById('bza-scad').value || null,
-                persone:     scelte === '' ? [] : JSON.parse(scelte),
-                // niente scelto: le leggono tutti (lo decide il server)
-                ...(scelte === '' && sceltiP === '' ? {} : { parti: sceltiP === '' ? [] : JSON.parse(sceltiP) }),
-            });
-            if (!r.ok) { alert(r.error || 'Non salvato'); return; }
+            // un'assegnazione per ogni gruppo o persona scelta
+            const errori = [];
+            for (const c of chi) {
+                const r = await post(base(), {
+                    template_id: parseInt(document.getElementById('bza-modello').value),
+                    a_ruolo:     c.startsWith('r:') ? c.slice(2) : null,
+                    a_user_id:   c.startsWith('u:') ? parseInt(c.slice(2)) : null,
+                    frequenza:   document.getElementById('bza-freq').value,
+                    scadenza:    document.getElementById('bza-scad').value || null,
+                    persone:     scelte === '' ? [] : JSON.parse(scelte),
+                    // niente scelto: le leggono tutti (lo decide il server)
+                    ...(scelte === '' && sceltiP === '' ? {} : { parti: sceltiP === '' ? [] : JSON.parse(sceltiP) }),
+                });
+                if (!r.ok) errori.push(r.error || 'Non salvato');
+            }
+            if (errori.length) alert(errori.join('\n'));
             carica();
         }
     });
