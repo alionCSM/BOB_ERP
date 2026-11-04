@@ -33,10 +33,21 @@ class AuthorizationService
         return $user->canAccess($module);
     }
 
+    /**
+     * Un account di una consorziata: vede solo la scheda della sua azienda.
+     *
+     * Il cliente non c'entra. Prima contava anche lui, e al login il
+     * middleware lo mandava a /companies/my come una consorziata; la lista
+     * bianca dei clienti quella pagina non la conosce, e rispondeva "Access
+     * denied". Nessun cliente riusciva a entrare nel sito. Il cliente ha
+     * le sue regole, piu' sotto nel middleware: i suoi cantieri e la Zone.
+     */
     public function isCompanyScopedUser(User $user, array $companyScopedIds = []): bool
     {
-        $profile = $this->profileResolver->resolve($user, $companyScopedIds);
-        return $profile === AccessProfileResolver::COMPANY || $profile === AccessProfileResolver::CLIENT;
+        if (($user->type ?? '') === 'client') {
+            return false;
+        }
+        return $this->profileResolver->resolve($user, $companyScopedIds) === AccessProfileResolver::COMPANY;
     }
 
     public function allowedCompanyIds(User $user, array $companyScopedIds = []): array
