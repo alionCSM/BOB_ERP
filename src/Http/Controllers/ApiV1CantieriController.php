@@ -425,6 +425,266 @@ final class ApiV1CantieriController
         ]);
     }
 
+    /** GET /api/v1/worksites/{id}/ordini — gli ordini alle consorziate (importi solo con i prezzi). */
+    public function ordini(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $prezzi = $user->canSeePrices();
+        $righe = (new \App\Repository\Orders\OrderRepository($this->conn))->getByWorksiteId($id);
+        Response::json([
+            'success' => true,
+            'totale'  => $prezzi ? array_sum(array_map(fn($o) => (float)($o['total'] ?? 0), $righe)) : null,
+            'ordini'  => array_map(fn(array $o) => [
+                'id'      => (int)$o['id'],
+                'numero'  => $o['order_number'] ?? null,
+                'data'    => $o['order_date'] ?? null,
+                'azienda' => $o['company_name'] ?? null,
+                'totale'  => $prezzi && isset($o['total']) ? (float)$o['total'] : null,
+                'note'    => $o['note'] ?? null,
+            ], $righe),
+        ]);
+    }
+
+    /** GET /api/v1/worksites/{id}/extra — come la scheda Extra: solo con i prezzi. */
+    public function extra(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $this->soloPrezzi($user);
+        $righe = (new \App\Repository\Extra\ExtraRepository($this->conn))->getByWorksiteId($id);
+        $out = [];
+        $tot = 0.0; $daFatt = 0.0;
+        foreach ($righe as $e) {
+            $t = (float)($e['totale'] ?? 0);
+            $f = (float)($e['billing_total'] ?? 0);
+            $segue = (int)($e['tracks_billing'] ?? 0) === 1;
+            $tot += $t;
+            if ($segue) { $daFatt += max(0.0, $t - $f); }
+            $out[] = [
+                'id'          => (int)$e['id'],
+                'data'        => $e['data'] ?? null,
+                'descrizione' => $e['descrizione'] ?? null,
+                'ordine'      => $e['ordine'] ?? null,
+                'totale'      => $t,
+                'fatturato'   => $f,
+                'da_seguire'  => $segue,
+                'stato'       => !$segue ? null
+                    : ((int)($e['billing_linked_count'] ?? 0) === 0 ? 'da_fatturare'
+                    : (abs($t - $f) < 0.005 ? 'fatturato' : ($f > $t ? 'oltre' : 'parziale'))),
+            ];
+        }
+        Response::json(['success' => true, 'totale' => $tot, 'da_fatturare' => $daFatt, 'extra' => $out]);
+    }
+
+    /** GET /api/v1/worksites/{id}/attivita — il diario lavori (scheda Attività, solo con i prezzi). */
+    public function attivita(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $this->soloPrezzi($user);
+        $repo = new \App\Repository\Activity\ActivityRepository($this->conn);
+        Response::json([
+            'success'        => true,
+            'giornate_uomo'  => $repo->getTotaleGiornateUomo($id),
+            'attivita'       => array_map(fn(array $a) => [
+                'id'            => (int)$a['id'],
+                'data'          => $a['data'] ?? null,
+                'attivita'      => $a['attivita'] ?? null,
+                'quantita'      => $a['quantita'] ?? null,
+                'persone'       => $a['persone_impiegate'] ?? null,
+                'attrezzature'  => $a['attrezzature_impiegate'] ?? null,
+                'ore'           => $a['tempo_ore'] ?? null,
+                'giornata_uomo' => $a['giornata_uomo'] ?? null,
+                'problemi'      => $a['problemi'] ?? null,
+                'soluzioni'     => $a['soluzioni'] ?? null,
+                'note'          => $a['note'] ?? null,
+                'da'            => $a['created_by_name'] ?? null,
+            ], $repo->getByWorksiteId($id)),
+        ]);
+    }
+
+    /** GET /api/v1/worksites/{id}/note — le note economiche (scheda Note, solo con i prezzi). */
+    public function note(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $this->soloPrezzi($user);
+        $righe = (new \App\Repository\Worksites\WorksiteFinanceNotesRepository($this->conn))->getByWorksite($id);
+        Response::json(['success' => true, 'note' => array_map(fn(array $n) => [
+            'id'        => (int)$n['id'],
+            'testo'     => $n['content'] ?? '',
+            'tipo'      => $n['tipo'] ?? null,
+            'stato'     => $n['status'] ?? null,
+            'da'        => $n['author_username'] ?? null,
+            'creata'    => $n['created_at'] ?? null,
+            'applicata' => $n['applied_at'] ?? null,
+            'da_chi'    => $n['applier_username'] ?? null,
+        ], $righe)]);
+    }
+
+    private function soloPrezzi(object $user): void
+    {
+        if (!$user->canSeePrices()) {
+            Response::json(['success' => false, 'message' => 'Non vedi i prezzi'], 403);
+        }
+    }
+
+    /**
+     * GET /api/v1/worksites/{id}/statistiche
+     *
+     * La scheda "Statistiche" della pagina del cantiere, con gli stessi conti
+     * di WorksitesController::show (storico Yard 2025 compreso): giorni
+     * lavorati, contratto o ricavo stimato, costo totale, margine, e le
+     * tabelle di presenze, pasti, hotel e dettaglio costi. Come sul sito, i
+     * riquadri economici e il dettaglio costi solo a chi vede i prezzi.
+     */
+    public function statistiche(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $prezzi = $user->canSeePrices();
+
+        $stats  = new \App\Domain\WorksiteStats($this->conn, $id);
+        $somma  = $stats->getSummary();
+        $costi  = $somma['costi'];
+        $ricavi = $somma['ricavi'];
+        $margine = $somma['andamento'];
+
+        $lavoratori = $stats->getTotaleLavoratori();
+        $pasti      = $stats->getTotalePasti();
+        $hotel      = $stats->getTotaleHotel();
+        $giorni     = $stats->getGiorniLavorati();
+
+        try {
+            $st = $this->conn->prepare("
+                SELECT * FROM bb_cantiere_stats_2025
+                WHERE cantiere_id_sqlsrv = (SELECT yard_worksite_id FROM bb_worksites WHERE id = :wid LIMIT 1)
+            ");
+            $st->execute([':wid' => $id]);
+            $y = $st->fetch(\PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            $y = null;
+        }
+        if ($y) {
+            $margine -= (float)$y['totale_complessivo'];
+            $costi['nostri']       += (float)$y['presenze_consorzio_costo'];
+            $costi['ordini']       += (float)$y['correct_costo_consorziate'];
+            $costi['mezzi']        += (float)$y['mezzi_costo'];
+            $costi['hotel']        += (float)$y['hotel_costo'];
+            $costi['pasti_nostri'] += (float)$y['pasti_costo'];
+            $costi['tot_costi']    += (float)$y['presenze_consorzio_costo'] + (float)$y['correct_costo_consorziate']
+                                    + (float)$y['mezzi_costo'] + (float)$y['hotel_costo'] + (float)$y['pasti_costo'];
+            $lavoratori['nostri']      += (int)$y['presenze_consorzio_qta'];
+            $lavoratori['consorziate'] += (int)$y['presenze_consorziate_qta'];
+            $lavoratori['totale']       = $lavoratori['nostri'] + $lavoratori['consorziate'];
+            $pasti['noi']['qta']       += (int)$y['pasti_qta'];
+            $pasti['noi']['euro']      += (float)$y['pasti_costo'];
+            $pasti['totale']['qta']    += (int)$y['pasti_qta'];
+            $pasti['totale']['euro']   += (float)$y['pasti_costo'];
+            $hotel['nostri']['qta']    += (int)$y['presenze_consorzio_qta'];
+            $hotel['nostri']['euro']   += (float)$y['hotel_costo'];
+            $hotel['totale']['qta']    += (int)$y['presenze_consorzio_qta'] + (int)$y['presenze_consorziate_qta'];
+            $hotel['totale']['euro']   += (float)$y['hotel_costo'];
+        }
+
+        Response::json([
+            'success' => true,
+            'yard'    => (bool)$y, // dentro ci sono anche i dati storici 2025 di Yard
+            'riquadri' => $prezzi ? [
+                'giorni_lavorati' => $giorni,
+                'consuntivo'      => (bool)$ricavi['is_consuntivo'],
+                'contratto'       => (float)$ricavi['tot_ricavi'],
+                'ricavo_stimato'  => $ricavi['ricavo_stimato'] !== null ? (float)$ricavi['ricavo_stimato'] : null,
+                'prezzo_persona'  => $ricavi['prezzo_persona'] !== null ? (float)$ricavi['prezzo_persona'] : null,
+                'costo_totale'    => (float)$costi['tot_costi'],
+                'margine'         => (float)$margine,
+            ] : null,
+            'presenze' => [
+                'nostri'      => (float)$lavoratori['nostri'],
+                'consorziate' => (float)$lavoratori['consorziate'],
+                'totale'      => (float)$lavoratori['totale'],
+            ],
+            'pasti' => [
+                'noi'    => ['qta' => (int)$pasti['noi']['qta'],    'euro' => (float)$pasti['noi']['euro']],
+                'loro'   => ['qta' => (int)$pasti['loro']['qta'],   'euro' => (float)$pasti['loro']['euro']],
+                'totale' => ['qta' => (int)$pasti['totale']['qta'], 'euro' => (float)$pasti['totale']['euro']],
+            ],
+            'hotel' => [
+                'nostri'      => ['qta' => (int)$hotel['nostri']['qta'],      'euro' => (float)$hotel['nostri']['euro']],
+                'consorziate' => ['qta' => (int)$hotel['consorziate']['qta'], 'euro' => (float)$hotel['consorziate']['euro']],
+                'totale'      => ['qta' => (int)$hotel['totale']['qta'],      'euro' => (float)$hotel['totale']['euro']],
+            ],
+            'costi' => $prezzi ? [
+                ['voce' => 'Presenze nostri', 'importo' => (float)$costi['nostri']],
+                ['voce' => 'Consorziate',     'importo' => (float)$costi['ordini']],
+                ['voce' => 'Pasti',           'importo' => (float)$costi['pasti_nostri'] + (float)$costi['pasti_cons']],
+                ['voce' => 'Hotel',           'importo' => (float)$costi['hotel']],
+                ['voce' => 'Mezzi sollev.',   'importo' => (float)$costi['mezzi']],
+            ] : null,
+        ]);
+    }
+
+    /**
+     * POST /api/v1/worksites/{id}/chiedi  {domanda, storia: [{role, content}]}
+     *
+     * BOB AI del cantiere, come la scheda "BOB AI" della pagina: lo stesso
+     * contesto (WorksiteContextBuilder, con i prezzi solo a chi li vede), lo
+     * stesso limite di richieste e lo stesso registro bb_ai_worksite_logs.
+     */
+    public function chiedi(Request $request): never
+    {
+        [$user, $id] = $this->cantiere($request);
+        $body = json_decode((string)file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            $body = $_POST;
+        }
+        $domanda = trim((string)($body['domanda'] ?? ''));
+        if ($domanda === '' || mb_strlen($domanda) > 2000) {
+            Response::json(['success' => false, 'message' => 'Scrivi una domanda'], 422);
+        }
+        $io = (int)$user->id;
+
+        $log = function (string $stato, ?string $risposta, ?string $motivo, int $ms) use ($io, $id, $domanda): void {
+            try {
+                $this->conn->prepare("
+                    INSERT INTO bb_ai_worksite_logs (user_id, worksite_id, question, response, status, blocked_reason, latency_ms)
+                    VALUES (:u, :w, :q, :r, :s, :m, :l)
+                ")->execute([':u' => $io, ':w' => $id, ':q' => $domanda, ':r' => $risposta,
+                             ':s' => $stato, ':m' => $motivo, ':l' => $ms]);
+            } catch (\Throwable $e) {
+                // il registro non deve fermare la risposta
+            }
+        };
+
+        $rl = (new \App\Service\RateLimiter($this->conn, 20, 10))->allow($io);
+        if (!$rl['ok']) {
+            $log('BLOCKED', null, $rl['reason'] ?? 'rate_limit', 0);
+            Response::json(['success' => false, 'message' => 'Troppe richieste, riprova tra poco'], 429);
+        }
+
+        $contesto = (new \App\Service\WorksiteContextBuilder($this->conn))->build($id, $user->canSeePrices());
+        if (isset($contesto['error'])) {
+            Response::json(['success' => false, 'message' => 'Cantiere non trovato'], 404);
+        }
+
+        $storia = array_values(array_filter((array)($body['storia'] ?? []), fn($m) =>
+            is_array($m) && in_array($m['role'] ?? '', ['user', 'assistant'], true)
+            && is_string($m['content'] ?? null) && mb_strlen($m['content']) <= 2000));
+        $storia = array_slice($storia, -10);
+
+        $client = new \App\Service\OllamaClient(
+            $_ENV['OLLAMA_URL']         ?? (getenv('OLLAMA_URL') ?: 'http://192.168.1.10:8000/v1/chat/completions'),
+            $_ENV['MODEL']              ?? (getenv('MODEL') ?: 'Qwen3-30B-A3B-Q4_K_M.gguf'),
+            (int)($_ENV['AI_TIMEOUT']   ?? 180),
+            (int)($_ENV['AI_CONNESSIONE'] ?? 5),
+            ($_ENV['AI_SENZA_RAGIONAMENTO'] ?? '1') !== '0',
+        );
+        $res = (new \App\Service\WorksiteAIService($client))->answer($contesto, $domanda, $storia);
+        if (!$res['ok']) {
+            $log('ERROR', null, (string)($res['error'] ?? 'ollama_error'), (int)($res['latency_ms'] ?? 0));
+            Response::json(['success' => false, 'message' => 'BOB AI non risponde, riprova tra poco'], 502);
+        }
+        $risposta = trim((string)$res['response']);
+        $log('OK', $risposta, null, (int)($res['latency_ms'] ?? 0));
+        Response::json(['success' => true, 'risposta' => $risposta]);
+    }
+
     /**
      * Il cantiere chiesto, se questo utente lo puo' aprire: il permesso
      * 'worksites' e, per chi lavora in un'altra societa', solo i suoi.
@@ -634,7 +894,7 @@ final class ApiV1CantieriController
         if (!$user) {
             Response::json(['success' => false, 'message' => 'Accesso negato'], 403);
         }
-        if ((int)$user->id !== 1 && !$user->canAccess('worksites')) {
+        if (!$user->canAccess('worksites')) {
             Response::json(['success' => false, 'message' => "Permesso 'worksites' richiesto"], 403);
         }
         return $user;

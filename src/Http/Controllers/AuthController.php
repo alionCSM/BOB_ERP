@@ -386,6 +386,13 @@ final class AuthController
                 $hash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $this->conn->prepare('UPDATE bb_users SET password = :pwd, must_change_password = 0 WHERE id = :id');
                 $stmt->execute([':pwd' => $hash, ':id' => $user->id]);
+                // password nuova: i telefoni fidati dell'app rifanno il codice
+                try {
+                    $this->conn->prepare('UPDATE bb_api_dispositivi SET revoked_at = NOW() WHERE user_id = :id AND revoked_at IS NULL')
+                               ->execute([':id' => $user->id]);
+                } catch (\Throwable $e) {
+                    // tabella non ancora creata
+                }
                 Response::redirect('/login?pwd_changed=1');
             }
         }

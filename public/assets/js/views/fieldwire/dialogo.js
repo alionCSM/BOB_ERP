@@ -21,16 +21,22 @@
        fermarsi a spuntare quindici nomi per dire che manca un tirante
        vorrebbe dire non scriverla. Prima questa mappa arrivava dalla
        pagina, che adesso non ce l'ha piu'. */
+    // Le quattro scelte che il server accetta. "Squadra" e "capi" erano due
+    // voci con dentro le stesse persone, e cambiare una segnalazione a
+    // "squadra" rispondeva "visibilita' non valida".
     const VIS = {
-        ufficio: { icon: 'fa-lock',        label: 'Solo ufficio',      color: '#f87171' },
-        squadra: { icon: 'fa-hard-hat',    label: 'Ufficio e squadra', color: '#94a3b8' },
-        capi:    { icon: 'fa-user-shield', label: 'Ufficio e capi',    color: '#fbbf24' },
-        cliente: { icon: 'fa-handshake',   label: 'Ufficio e cliente', color: '#a78bfa' },
-        tutti:   { icon: 'fa-globe',       label: 'Tutti',             color: '#4ade80' },
+        ufficio:  { icon: 'fa-lock',      label: 'Solo ufficio',        color: '#f87171' },
+        cantiere: { icon: 'fa-hard-hat',  label: 'Ufficio e cantiere',  color: '#94a3b8' },
+        cliente:  { icon: 'fa-handshake', label: 'Ufficio e cliente',   color: '#a78bfa' },
+        tutti:    { icon: 'fa-globe',     label: 'Tutti',               color: '#4ade80' },
     };
+    // le parole vecchie salvate nel database
+    const VIS_VECCHIE = { squadra: 'cantiere', capi: 'cantiere' };
+    const visDi = v => VIS_VECCHIE[v] || v || 'tutti';
+    // "tutti" e' il caso normale: il bollino serve quando e' piu' stretta
     function visBadge(v, sempre = false) {
-        const x = VIS[v || 'capi'];
-        if (!x || (!sempre && (v || 'capi') === 'capi')) return '';
+        const x = VIS[visDi(v)];
+        if (!x || (!sempre && visDi(v) === 'tutti')) return '';
         return '<span class="bz-vis-badge" style="color:' + x.color + '" title="' + x.label + '">'
              + '<i class="fas ' + x.icon + '"></i> ' + x.label + '</span>';
     }
@@ -53,10 +59,17 @@
         blocca: { label: 'Blocca il lavoro' },
     };
     const STATI = { aperta: 'Aperta', presa: 'Presa in carico', risolta: 'Risolta' };
-    const CANALI = {
-        squadra: { label: 'Squadra', icon: 'fa-hard-hat',  desc: 'Noi e chi lavora in cantiere. Il cliente non la vede.' },
-        cliente: { label: 'Cliente', icon: 'fa-handshake', desc: 'Noi e il committente, nessun altro.' },
-        tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'Tutti quelli che entrano nel cantiere, committente compreso.' },
+    // I nomi dei canali visti da chi li apre: per il cliente il canale
+    // "Cliente" e' quello con il nostro ufficio, e chiamarlo col suo nome
+    // non gli diceva con chi stava parlando.
+    const PER_CLIENTE = typeof RUOLO !== 'undefined' && RUOLO === 'cliente';
+    const CANALI = PER_CLIENTE ? {
+        cliente: { label: 'Ufficio',             icon: 'fa-handshake', desc: 'Tu e il nostro ufficio. La squadra non la legge.' },
+        tutti:   { label: 'Tutto il cantiere',   icon: 'fa-users',     desc: 'Tu, il nostro ufficio e la squadra in cantiere.' },
+    } : {
+        squadra: { label: 'Squadra', icon: 'fa-hard-hat',  desc: 'Ufficio e chi lavora in cantiere. Il cliente non la vede.' },
+        cliente: { label: 'Cliente', icon: 'fa-handshake', desc: 'Ufficio e committente. La squadra non la vede.' },
+        tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'Ufficio, squadra e committente insieme.' },
     };
     const RAPIDI = {
         materiale_arrivato: 'Materiale arrivato',
@@ -207,7 +220,7 @@
                 <textarea id="bzd-nuova-testo" placeholder="Es. manca la bulloneria M12 per la campata 4"></textarea>
                 <label>Foto (facoltative)</label>
                 <input type="file" id="bzd-nuova-foto" accept="image/*" multiple>
-                ${DA_UFFICIO ? `<label>Chi la vede</label><select id="bzd-nuova-vis">${Object.keys(VIS).map(k => `<option value="${k}" ${k === 'capi' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>` : ''}
+                ${DA_UFFICIO ? `<label>Chi la vede</label><select id="bzd-nuova-vis">${Object.keys(VIS).map(k => `<option value="${k}" ${k === 'tutti' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>` : ''}
                 <div class="bzd-azioni" style="margin-top:16px">
                     <button class="bzd-btn" data-bzd-annulla>Annulla</button>
                     <button class="bzd-btn blu" data-bzd-invia-nuova><i class="fas fa-paper-plane"></i> Invia</button>
@@ -259,7 +272,7 @@
             if (!s.task_id) azioni.push('<button class="bzd-btn" data-bzd-attivita><i class="fas fa-list-check"></i> Crea attività</button>');
         }
         if (r.data.da_ufficio) {
-            azioni.push(`<select data-bzd-vis title="Chi la vede">${Object.keys(VIS).map(k => `<option value="${k}" ${k === s.visibilita ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>`);
+            azioni.push(`<select data-bzd-vis title="Chi la vede">${Object.keys(VIS).map(k => `<option value="${k}" ${k === visDi(s.visibilita) ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>`);
         }
         dett.innerHTML = `
             <div class="bzd-testa">
@@ -348,13 +361,13 @@
                     <div class="bzd-fissato"><i class="fas fa-thumbtack"></i><span class="chi">${esc(f.autore || '')}</span>
                     <span>${f.rapido ? esc(RAPIDI[f.rapido] || f.rapido) : ''} ${esc(f.testo || (f.ha_foto ? 'Foto' : ''))}</span></div>`).join('')}</div>` : ''}
                 <div class="bzd-msgs">${messaggi.map(m => rigaMessaggio(m, C.puoFissare)).join('') || '<div class="bzd-vuoto">Ancora nessun messaggio.</div>'}</div>
-                <div class="bzd-rapidi">${Object.keys(RAPIDI).filter(k => !k.startsWith('sys_')).map(k => `<button data-bzd-rapido="${k}">${esc(RAPIDI[k])}</button>`).join('')}</div>
+                <div class="bzd-rapidi"${PER_CLIENTE ? ' hidden' : ''}>${Object.keys(RAPIDI).filter(k => !k.startsWith('sys_')).map(k => `<button data-bzd-rapido="${k}">${esc(RAPIDI[k])}</button>`).join('')}</div>
                 <div class="bzd-scrivi">
                     <label class="ico" title="Foto"><i class="fas fa-camera"></i><input type="file" accept="image/*" hidden data-bzd-foto-chat></label>
-                    <textarea rows="1" placeholder="Scrivi alla ${esc(c.label.toLowerCase())}..." data-bzd-testo-chat></textarea>
+                    <textarea rows="1" placeholder="Scrivi in ${esc(c.label)}..." data-bzd-testo-chat></textarea>
                     <button class="ico invia" data-bzd-invia-chat><i class="fas fa-paper-plane"></i></button>
                 </div>
-                ${C.puoFissare ? '<label class="bzd-fissa"><input type="checkbox" data-bzd-fissa-nuovo> <i class="fas fa-thumbtack"></i> Fissa come avviso (arriva a tutti)</label>' : ''}
+                ${C.puoFissare ? '<label class="bzd-fissa"><input type="checkbox" data-bzd-fissa-nuovo> <i class="fas fa-thumbtack"></i> Fissa in alto come avviso (per tutti in questo canale)</label>' : ''}
             </div>`;
         C.ultimo = messaggi.length ? messaggi[messaggi.length - 1].id : 0;
         inFondo(rootC().querySelector('.bzd-msgs'));

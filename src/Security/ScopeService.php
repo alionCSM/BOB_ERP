@@ -55,14 +55,20 @@ class ScopeService
             //     sbagliata non apre i lavori di un altro cliente);
             //   - sul cantiere e' acceso "Condividi col cliente", che e'
             //     l'interruttore con cui l'ufficio decide quando e' pronto.
-            $stmt = $connection->prepare('
-                SELECT wu.worksite_id
-                FROM   bb_worksite_users wu
-                JOIN   bb_worksites w ON w.id = wu.worksite_id
-                WHERE  wu.user_id     = :uid
+            //
+            // Si legge bb_zone_accessi, la stessa tabella da cui la Zone
+            // decide chi entra (Accesso::ruolo). Leggendo bb_worksite_users,
+            // un'assegnazione vecchia senza accesso Zone metteva il cantiere
+            // in elenco e poi la Zone lo rimandava indietro.
+            $stmt = $connection->prepare("
+                SELECT a.worksite_id
+                FROM   bb_zone_accessi a
+                JOIN   bb_worksites w ON w.id = a.worksite_id
+                WHERE  a.user_id      = :uid
+                  AND  a.ruolo        = 'cliente'
                   AND  w.client_id    = :cid
                   AND  w.zone_cliente = 1
-            ');
+            ");
             $stmt->execute([':uid' => $user->id, ':cid' => $user->client_id]);
             return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
         }

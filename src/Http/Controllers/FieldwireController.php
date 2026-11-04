@@ -203,7 +203,11 @@ final class FieldwireController
             // "Chi accede" (vedi $soloAccessi): deve poter aggiungere
             // qualcuno, non leggere il cantiere.
             if (!$this->accesso->qualcosa($utente, $w) && !$this->accesso->gestisce($utente)) {
-                Response::redirect('/dashboard?no_permission=1');
+                // operai e clienti tornano ai loro cantieri, con due righe
+                // che spiegano; la dashboard per loro non c'e'
+                Response::redirect(in_array($utente->type ?? '', ['worker', 'client'], true)
+                    ? '/worksites/my?non_disponibile=1'
+                    : '/dashboard?no_permission=1');
             }
             $this->guardiaPassata = true;
             return;
@@ -244,18 +248,23 @@ final class FieldwireController
         string $campoCreatore = 'created_by'
     ): callable {
         $utente  = $request->user();
-        $ufficio = $this->accesso->daUfficio($utente, (int)($request->param('id') ?? 0));
+        $w       = (int)($request->param('id') ?? 0);
+        $ruolo   = $this->accesso->ruolo($utente, $w);
+        $ufficio = $ruolo === \App\Service\Zone\Accesso::UFFICIO;
         $io      = (int)($utente->id ?? 0);
-        $visti   = $io > 0 ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
+        $visti   = $io > 0 && $ruolo !== null ? ($this->condivisione->vistiDa($io)[$tipo] ?? []) : [];
+        // quello condiviso con tutta la sua parte (la squadra, il cliente)
+        $parte   = $this->condivisione->vistiDaParte($w, $ruolo)[$tipo] ?? [];
 
-        return static function (array $r) use ($ufficio, $io, $visti, $campoId, $campoCreatore): bool {
+        return static function (array $r) use ($ufficio, $io, $visti, $parte, $campoId, $campoCreatore): bool {
             if ($ufficio) {
                 return true;
             }
             if ($io > 0 && (int)($r[$campoCreatore] ?? 0) === $io) {
                 return true;
             }
-            return isset($visti[(int)($r[$campoId] ?? 0)]);
+            $id = (int)($r[$campoId] ?? 0);
+            return isset($visti[$id]) || isset($parte[$id]);
         };
     }
 
@@ -276,9 +285,12 @@ final class FieldwireController
             return $righe;
         }
 
-        $persone = $this->condivisione->conChi($tipo, array_column($righe, $campoId));
+        $ids     = array_column($righe, $campoId);
+        $persone = $this->condivisione->conChi($tipo, $ids);
+        $parti   = $this->condivisione->partiDi($tipo, $ids);
         foreach ($righe as &$r) {
-            $r['condivisa_con'] = $persone[(int)($r[$campoId] ?? 0)] ?? [];
+            $r['condivisa_con']   = $persone[(int)($r[$campoId] ?? 0)] ?? [];
+            $r['condivisa_parti'] = $parti[(int)($r[$campoId] ?? 0)] ?? [];
         }
         return $righe;
     }
@@ -333,7 +345,7 @@ final class FieldwireController
             'fieldwire_enabled'    => $this->config->fieldwireEnabled(),
             // le sezioni che questa persona puo' vedere: nascondere una
             // scheda che risponderebbe 403 e' meglio che farcela sbattere
-            'accessi'              => P::tutte($this->accesso->ruolo($request->user(), $worksiteId)),
+            'accessi'              => self::livelliPagina($this->accesso->ruolo($request->user(), $worksiteId)),
             'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
@@ -342,6 +354,34 @@ final class FieldwireController
                                       && $this->accesso->gestisce($request->user()),
             'puoGestire'           => $this->accesso->gestisce($request->user()),
         ]);
+    }
+
+    /**
+     * Le sezioni della pagina, nel formato che la pagina legge.
+     *
+     * La pagina chiede un livello per sezione (0 niente, 1 guarda, 2 anche
+     * scrive) — era il formato dei sei livelli di una volta. Quando i
+     * permessi sono diventati la tabella di {@see P}, alla pagina e' andato
+     * l'elenco delle azioni vere/false, e true > 1 e' falso: sparivano a
+     * tutti le schede Foto e File, il Report PDF, "Nuovo Task" e "Carica
+     * file", e al ruolo Cantiere anche Attivita', Disegni e Moduli.
+     *
+     * Qui la tabella si traduce in livelli, cosi' la pagina resta com'e'.
+     *
+     * @return array<string, int>
+     */
+    private static function livelliPagina(?string $ruolo): array
+    {
+        $vede = P::puo($ruolo, P::VEDERE) ? 1 : 0;
+        $piu  = static fn(string $azione): int => $vede && P::puo($ruolo, $azione) ? 2 : $vede;
+        return [
+            'attivita' => $piu(P::ATTIVITA),
+            'disegni'  => $piu(P::ANNOTARE),
+            'foto'     => $piu(P::CARICARE),
+            'file'     => $piu(P::CARICARE),
+            'moduli'   => $piu(P::COMPILARE),
+            'report'   => $vede,
+        ];
     }
 
     // ─── Tasks ────────────────────────────────────────────────────────────────
@@ -396,6 +436,17 @@ final class FieldwireController
 
             $existing = $this->taskVisibile($request, $taskId);
             $ruolo = (string)$this->ruoloQui($request);
+
+            // Cambiare un'attivita' (nome, descrizione, date, a chi tocca):
+            // l'ufficio tutte, gli altri quelle che hanno creato loro. Prima
+            // un cliente riscriveva le attivita' dell'ufficio che vedeva.
+            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO
+                && (int)($existing['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
+                \App\Service\Zone\Accesso::nega('Questa attivita\' la cambia chi l\'ha creata, o l\'ufficio');
+            }
+            // Lo stato passa solo da /status, che controlla chi puo' cosa:
+            // dentro la modifica arrivava a "verificato" anche chi non puo'.
+            unset($body['status']);
 
             $merged = array_merge($existing, $body);
             $this->zoneRepo->update($taskId, $merged);
@@ -465,8 +516,9 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $taskId     = (int) $request->param('taskId');
-            $task       = $this->zoneRepo->find($taskId);
-            if (!$task) throw new \RuntimeException('Task non trovato');
+            // di QUESTO cantiere: prima bastava il numero, e l'ufficio di un
+            // cantiere cancellava le attivita' di un altro
+            $task       = $this->taskVisibile($request, $taskId);
 
             // delete su Fieldwire prima di cancellare in locale
             if (!empty($task['fw_id'])) {
@@ -829,9 +881,7 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $t = $this->formRepo->find((int)$request->param('tplId'));
-            if (!$t) throw new \RuntimeException('Modulo non trovato');
-            return $t;
+            return $this->templateDelCantiere($request, (int)$request->param('tplId'));
         });
     }
 
@@ -848,8 +898,17 @@ final class FieldwireController
             $fields = $body['fields'] ?? [];
             if (!is_array($fields) || !count($fields)) throw new \RuntimeException('Aggiungi almeno un campo');
 
-            // universale (worksite_id null) o di questo cantiere
+            // universale (worksite_id null) o di questo cantiere. Un modulo
+            // universale compare in tutti i cantieri: lo decide solo
+            // l'ufficio, non un cliente o una squadra.
+            $ufficio = $this->accesso->daUfficio($user, $worksiteId);
+            if (!empty($body['universal']) && !$ufficio) {
+                \App\Service\Zone\Accesso::nega('I moduli per tutti i cantieri li crea solo l\'ufficio');
+            }
             $wsId = !empty($body['universal']) ? null : $worksiteId;
+            if (!empty($body['id'])) {
+                $this->templateDelCantiere($request, (int)$body['id'], true);
+            }
 
             $data = [
                 'worksite_id' => $wsId,
@@ -871,7 +930,9 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $this->formRepo->delete((int)$request->param('tplId'));
+            $tplId = (int)$request->param('tplId');
+            $this->templateDelCantiere($request, $tplId, true);
+            $this->formRepo->delete($tplId);
             return ['deleted' => true];
         });
     }
@@ -886,8 +947,7 @@ final class FieldwireController
             $user       = $request->user();
             $body       = $this->jsonBody();
 
-            $tpl = $this->formRepo->find($tplId);
-            if (!$tpl) throw new \RuntimeException('Modulo non trovato');
+            $tpl = $this->templateDelCantiere($request, $tplId);
 
             $values = is_array($body['values'] ?? null) ? $body['values'] : [];
 
@@ -908,6 +968,24 @@ final class FieldwireController
             }
 
             $assegnazione = $this->assegnazioneDi($worksiteId, (int)($body['assegnazione_id'] ?? 0));
+            // La compilazione conta per l'assegnazione solo se e' quel
+            // modulo e tocca a chi lo compila. Prima un modulo qualsiasi,
+            // mandato con il numero del DPI, segnava il DPI come fatto e
+            // finiva a chi legge le risposte del DPI.
+            $ufficio = $this->accesso->daUfficio($user, $worksiteId);
+            if ($assegnazione) {
+                $ruoloMio = $this->accesso->ruolo($user, $worksiteId);
+                $aRuolo   = $assegnazione['a_ruolo'] !== null ? $this->accesso->normalizza((string)$assegnazione['a_ruolo']) : null;
+                $tocca    = (int)($assegnazione['a_user_id'] ?? 0) === (int)($user?->id ?? -1)
+                    || ($aRuolo !== null && $aRuolo === $ruoloMio);
+                if ((int)$assegnazione['template_id'] !== $tplId || (!$tocca && !$ufficio)) {
+                    \App\Service\Zone\Accesso::nega('Questo modulo non e\' assegnato a te');
+                }
+            } elseif (!$ufficio) {
+                // fuori dall'ufficio si compila quello che ci e' stato
+                // assegnato, come gia' fa l'app
+                \App\Service\Zone\Accesso::nega('Si compilano i moduli assegnati: chiedi all\'ufficio');
+            }
 
             $id = $this->formRepo->createSubmission([
                 'template_id'    => $tplId,
@@ -929,13 +1007,18 @@ final class FieldwireController
             // risposta a un modulo DPI non la deve leggere la squadra
             // perche' qualcuno ha dimenticato di dire a chi va.
             if ($assegnazione) {
-                $persone = $this->condivisione->conChi('modulo', [(int)$assegnazione['id']]);
+                $aid     = (int)$assegnazione['id'];
+                $persone = $this->condivisione->conChi('modulo', [$aid]);
                 $this->condivisione->salva(
                     $worksiteId,
                     'risposta',
                     $id,
-                    $persone[(int)$assegnazione['id']] ?? [],
+                    $persone[$aid] ?? [],
                     (int)($user?->id ?? 0)
+                );
+                $this->condivisione->salvaParti(
+                    $worksiteId, 'risposta', $id,
+                    $this->condivisione->partiDi('modulo', [$aid])[$aid] ?? []
                 );
             }
             return ['id' => $id];
@@ -1297,7 +1380,10 @@ final class FieldwireController
             // essere un operaio — o un cliente — per farsi dare nomi e
             // cognomi di tutta l'azienda. L'ufficio li vede tutti perche'
             // assegna le attivita' e aggiunge la gente ai cantieri.
-            $soloQui = $this->accesso->daUfficio($request->user(), $w)
+            // ?qui=1: solo chi sta in questo cantiere anche per l'ufficio.
+            // Serve ad "Assegnato a": un'attivita' data a qualcuno che nel
+            // cantiere non c'e' non la puo' aprire nessuno.
+            $soloQui = $this->accesso->daUfficio($request->user(), $w) && empty($_GET['qui'])
                 ? ''
                 : ' AND u.id IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = ' . $w . ')';
 
@@ -1313,6 +1399,9 @@ final class FieldwireController
                        ) AS ha_modulo_zone
                 FROM bb_users u
                 WHERE u.active = 'Y' AND u.removed = 'N'
+                      -- i clienti di un altro committente qui non entrano:
+                      -- proporli vorrebbe dire farsi rispondere di no
+                      AND (u.type <> 'client' OR u.client_id = (SELECT client_id FROM bb_worksites WHERE id = $w))
                       $soloQui
                 ORDER BY u.username ASC
             ");
@@ -1368,6 +1457,12 @@ final class FieldwireController
                 isset($_POST['ruolo']) ? (string)$_POST['ruolo'] : null
             );
             if ($nuovo) {
+                $ruolo = $this->accesso->normalizza((string)$this->conn
+                    ->query('SELECT ruolo FROM bb_zone_accessi WHERE worksite_id = ' . $w . ' AND user_id = ' . $userId)
+                    ->fetchColumn());
+                if ($ruolo === \App\Service\Zone\Accesso::CLIENTE || $ruolo === \App\Service\Zone\Accesso::CANTIERE) {
+                    $this->condivisione->comeGliAltri($w, $userId, $ruolo);
+                }
                 $this->avvisa(fn($a) => $a->accesso($w, $userId, (int)($request->user()->id ?? 0)));
             }
 
@@ -1960,6 +2055,7 @@ final class FieldwireController
             return [
                 'gruppi' => $this->condivisione->persone($w),
                 'con'    => $this->condivisione->conChi($tipo, [$id])[$id] ?? [],
+                'parti'  => $this->condivisione->partiDi($tipo, [$id])[$id] ?? [],
             ];
         });
     }
@@ -2027,7 +2123,12 @@ final class FieldwireController
                 is_array($body['persone'] ?? null) ? $body['persone'] : [],
                 (int)($request->user()->id ?? 0)
             );
-            return ['con' => $con];
+            // le parti intere: senza il campo (pagine o app di prima) si
+            // lasciano come sono
+            $parti = is_array($body['parti'] ?? null)
+                ? $this->condivisione->salvaParti($w, $tipo, $id, $body['parti'])
+                : ($this->condivisione->partiDi($tipo, [$id])[$id] ?? []);
+            return ['con' => $con, 'parti' => $parti];
         });
     }
 
@@ -2082,19 +2183,22 @@ final class FieldwireController
         bool $nuova = true
     ): array {
         $ruolo = $this->ruoloQui($request);
+        $haPersone = is_array($body['persone'] ?? null);
+        $haParti   = is_array($body['parti'] ?? null);
 
-        if (is_array($body['persone'] ?? null)) {
-            $persone = array_map('intval', $body['persone']);
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
-                $suoi    = $this->condivisione->predefinite($worksiteId, $ruolo);
-                $persone = array_values(array_intersect($persone, $suoi));
-            }
-        } elseif ($nuova) {
-            $persone = $this->condivisione->predefinite($worksiteId, $ruolo);
-        } else {
+        if (!$haPersone && !$haParti && !$nuova) {
             return [];
         }
 
+        // Le parti: quelle scelte, o tutte e due se nessuno ha scelto. La
+        // Zone e' lo spazio comune del cantiere: cio' che uno mette lo
+        // vedono gli altri, e l'ufficio stringe quando serve.
+        $parti = $haParti
+            ? $body['parti']
+            : ($haPersone ? [] : \App\Service\Zone\Condivisione::PARTI_PREDEFINITE);
+        $this->condivisione->salvaParti($worksiteId, $tipo, $oggettoId, $parti);
+
+        $persone = $haPersone ? array_map('intval', $body['persone']) : [];
         // chi la crea la vede sempre, anche se non si e' messo nell'elenco
         $io = (int)($request->user()->id ?? 0);
         if ($io > 0 && $ruolo !== \App\Service\Zone\Accesso::UFFICIO) {
@@ -2219,6 +2323,14 @@ final class FieldwireController
                 is_array($body['persone'] ?? null) ? $body['persone'] : [],
                 (int)($request->user()->id ?? 0)
             );
+            // chi legge le risposte: di base le leggono tutti e tre, come il
+            // resto della Zone; l'ufficio stringe per i moduli interni
+            $this->condivisione->salvaParti(
+                $w, 'modulo', $id,
+                is_array($body['parti'] ?? null)
+                    ? $body['parti']
+                    : (is_array($body['persone'] ?? null) && $body['persone'] ? [] : \App\Service\Zone\Condivisione::PARTI_PREDEFINITE)
+            );
             $this->avvisa(fn($a) => $a->modulo($id, (int)($request->user()->id ?? 0)));
             return ['id' => $id];
         });
@@ -2293,6 +2405,35 @@ final class FieldwireController
     // chi entra in un cantiere potrebbe toccare le attivita' di un altro
     // cambiando un numero nell'indirizzo.
 
+    /**
+     * Il modello di un modulo, se si usa in questo cantiere.
+     *
+     * Prima si cercava solo per numero: dall'indirizzo di un cantiere
+     * qualsiasi si leggeva, si cambiava o si cancellava il modello di un
+     * altro cantiere, o uno universale che usano tutti. Bastava il ruolo
+     * cliente, che i moduli li puo' gestire.
+     *
+     * Per leggerlo basta che sia di qui o universale. Per cambiarlo:
+     * l'ufficio quelli di qui e gli universali, gli altri solo quelli di
+     * qui che hanno fatto loro.
+     */
+    private function templateDelCantiere(Request $request, int $tplId, bool $modifica = false): array
+    {
+        $w   = (int)$request->param('id');
+        $tpl = $this->formRepo->find($tplId);
+        $suo = $tpl && ($tpl['worksite_id'] === null || (int)$tpl['worksite_id'] === $w);
+        if (!$suo) {
+            throw new \RuntimeException('Modulo non trovato');
+        }
+        if (!$modifica || $this->accesso->daUfficio($request->user(), $w)) {
+            return $tpl;
+        }
+        if ($tpl['worksite_id'] === null || (int)($tpl['created_by'] ?? 0) !== (int)($request->user()->id ?? 0)) {
+            \App\Service\Zone\Accesso::nega('Questo modulo lo cambia solo chi l\'ha creato, o l\'ufficio');
+        }
+        return $tpl;
+    }
+
     /** Il ruolo di chi chiede su questo cantiere (la guardia e' gia' passata). */
     private function ruoloQui(Request $request): string
     {
@@ -2333,19 +2474,37 @@ final class FieldwireController
         if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
             return;
         }
-        if ($stato === 'verified') {
-            \App\Service\Zone\Accesso::nega("Solo l'ufficio puo' verificare");
+        if (!in_array($stato, ['open', 'in_progress', 'complete', 'verified'], true)) {
+            throw new \RuntimeException('Stato non valido');
         }
-        if ($ruolo === \App\Service\Zone\Accesso::CLIENTE) {
-            \App\Service\Zone\Accesso::nega('Puoi guardare ma non modificare');
+        if ($stato === 'verified' || ($task['status'] ?? '') === 'verified') {
+            \App\Service\Zone\Accesso::nega("Verificare, o riaprire un'attivita' verificata, lo fa l'ufficio");
         }
-        if ($ruolo === \App\Service\Zone\Accesso::CANTIERE) {
-            $mia = ($task['assegnata_a'] ?? 'squadra') === 'squadra'
-                || (int)($task['assignee_user_id'] ?? 0) === (int)($request->user()->id ?? -1);
-            if (!$mia) {
-                \App\Service\Zone\Accesso::nega('Questa attivita non e assegnata a te');
-            }
+        // Porta avanti un'attivita' chi ce l'ha: l'ha creata, e' sua per
+        // nome, o tocca al suo gruppo. Prima il cliente non poteva chiudere
+        // nemmeno le attivita' che aveva aperto lui, e quelle "dei capi"
+        // non le chiudeva nessuno del cantiere, perche' capi e squadra
+        // erano diventati la stessa cosa e il controllo guardava solo
+        // "squadra".
+        $io     = (int)($request->user()->id ?? -1);
+        $gruppo = self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra'));
+        $mia    = (int)($task['created_by'] ?? 0) === $io
+            || (int)($task['assignee_user_id'] ?? 0) === $io
+            || ($gruppo !== null && $gruppo === $ruolo);
+        if (!$mia) {
+            \App\Service\Zone\Accesso::nega("Questa attivita' non e' assegnata a te");
         }
+    }
+
+    /** Il ruolo a cui tocca un'attivita' assegnata a un gruppo (null = a una persona). */
+    private static function gruppoTask(string $assegnataA): ?string
+    {
+        return match ($assegnataA) {
+            'squadra', 'capi', 'cantiere' => \App\Service\Zone\Accesso::CANTIERE,
+            'cliente'                     => \App\Service\Zone\Accesso::CLIENTE,
+            'ufficio'                     => \App\Service\Zone\Accesso::UFFICIO,
+            default                       => null,
+        };
     }
 
     /**
@@ -2370,16 +2529,26 @@ final class FieldwireController
         $campi = [];
         if ($nuova || array_key_exists('assegnata_a', $body)) {
             $a = (string)($body['assegnata_a'] ?? '');
-            if (!in_array($a, ['persona', 'squadra', 'capi', 'ufficio', 'cliente'], true)) {
-                $a = !empty($body['assignee_user_id']) ? 'persona' : 'squadra';
+            // capi e squadra sono le stesse persone: una parola sola
+            if ($a === 'capi' || $a === 'cantiere') {
+                $a = 'squadra';
             }
-            // assegnare all'ufficio o al cliente e' una decisione dell'ufficio
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO && in_array($a, ['ufficio', 'cliente'], true)) {
+            if (!in_array($a, ['persona', 'squadra', 'ufficio', 'cliente'], true)) {
+                // senza scelta: il cliente chiede all'ufficio, gli altri
+                // danno lavoro alla squadra
+                $a = !empty($body['assignee_user_id']) ? 'persona'
+                   : ($ruolo === \App\Service\Zone\Accesso::CLIENTE ? 'ufficio' : 'squadra');
+            }
+            // Al cliente assegna l'ufficio, o il cliente stesso. All'ufficio
+            // puo' assegnare chiunque: prima il cliente che apriva
+            // un'attivita' "per l'ufficio" se la vedeva girare alla squadra.
+            if ($a === 'cliente' && !in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CLIENTE], true)) {
                 $a = 'squadra';
             }
             $campi['assegnata_a'] = $a;
         }
         if (!$campi) {
+            $this->condivisione->aggiungiAssegnatari($worksiteId, $taskId);
             return;
         }
         $set = implode(', ', array_map(fn($k) => "$k = :$k", array_keys($campi)));
@@ -2388,14 +2557,16 @@ final class FieldwireController
             $par[":$k"] = $v;
         }
         $this->conn->prepare("UPDATE bb_zone_tasks SET $set WHERE id = :id")->execute($par);
+        $this->condivisione->aggiungiAssegnatari($worksiteId, $taskId);
     }
 
     /**
-     * Chi ha scritto, e chi lo legge.
+     * Chi ha scritto, e se e' una nota interna.
      *
-     * - "nota interna" la scrive solo l'ufficio: la leggono solo loro.
-     * - "per il cliente" lo decide l'ufficio; quello che scrive un cliente
-     *   e' per forza tra lui e l'ufficio.
+     * "Nota interna" la scrive solo l'ufficio e la legge solo l'ufficio.
+     * Tutto il resto lo legge chi vede l'attivita': e' la conversazione
+     * del cantiere fra noi, il cliente e la squadra. per_cliente si scrive
+     * ancora per le righe vecchie ma non decide piu' niente.
      */
     private function scriviCommento(int $commentId, Request $request, array $body): void
     {
@@ -2416,39 +2587,25 @@ final class FieldwireController
     }
 
     /**
-     * I messaggi (e le foto) che chi chiede puo' leggere.
+     * I messaggi (e le foto) di un'attivita' che chi chiede puo' leggere:
+     * tutti, tranne le note interne dell'ufficio.
      *
-     * - ufficio: tutto
-     * - capi e operai: niente note interne, niente messaggi dei clienti
-     * - cliente: quello segnato "per il cliente" e i messaggi dei clienti
-     *
-     * I messaggi vecchi, scritti prima che si sapesse chi li ha scritti,
-     * valgono come scritti dalla squadra.
+     * Prima ogni parte aveva il suo pezzo di conversazione: il cliente
+     * leggeva solo quello che l'ufficio segnava "per il cliente", la
+     * squadra non leggeva mai il cliente. Sulla stessa attivita' tre
+     * persone parlavano senza sentirsi, e le foto della squadra al cliente
+     * non arrivavano. La Zone e' lo spazio comune: chi vede l'attivita'
+     * legge il filo. Per parlare a parte ci sono le chat Squadra e Cliente.
      */
     private function filtraCommenti(array $commenti, string $ruolo, int $io): array
     {
         if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
             return $commenti;
         }
-        $autori = array_values(array_unique(array_filter(array_map(
-            fn($c) => (int)($c['author_user_id'] ?? 0), $commenti
-        ))));
-        $clienti = [];
-        if ($autori) {
-            $in = implode(',', array_fill(0, count($autori), '?'));
-            $st = $this->conn->prepare("SELECT id FROM bb_users WHERE type = 'client' AND id IN ($in)");
-            $st->execute($autori);
-            $clienti = array_flip(array_map('intval', $st->fetchAll(\PDO::FETCH_COLUMN)));
-        }
-
-        return array_values(array_filter($commenti, function (array $c) use ($ruolo, $clienti, $io) {
-            $autore    = (int)($c['author_user_id'] ?? 0);
-            $diCliente = isset($clienti[$autore]);
-            if ($ruolo === \App\Service\Zone\Accesso::CLIENTE) {
-                return !empty($c['per_cliente']) || $diCliente || $autore === $io;
-            }
-            return empty($c['interna']) && !$diCliente;
-        }));
+        return array_values(array_filter(
+            $commenti,
+            fn(array $c) => empty($c['interna']) || (int)($c['author_user_id'] ?? 0) === $io
+        ));
     }
 
     /**

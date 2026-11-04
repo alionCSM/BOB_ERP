@@ -97,7 +97,7 @@ final class AccessoRepository
             FROM   bb_zone_accessi a
             JOIN   bb_worksites w ON w.id = a.worksite_id
             WHERE  a.user_id = :u
-              AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
+              AND  " . \App\Service\Zone\Accesso::SQL_CLIENTE_ENTRA . "
             ORDER BY w.worksite_code DESC
         ");
         $stmt->execute([':u' => $userId]);
@@ -118,6 +118,29 @@ final class AccessoRepository
     public function salva(int $worksiteId, int $userId, int $daChi, ?string $ruolo = null): void
     {
         $ruolo = $this->ruoloValido($ruolo, $userId, $worksiteId);
+
+        // Un cliente si mette solo sui cantieri del suo committente. Prima
+        // la riga si scriveva lo stesso: dall'app il cliente apriva il
+        // cantiere di un altro committente, dal sito prendeva "Access
+        // denied". Meglio dirlo qui, a chi lo sta aggiungendo.
+        if ($ruolo === Accesso::CLIENTE) {
+            $c = $this->conn->prepare('
+                SELECT w.client_id AS del_cantiere, u.client_id AS suo, cl.name AS committente
+                FROM   bb_worksites w
+                JOIN   bb_users u ON u.id = :u
+                LEFT JOIN bb_clients cl ON cl.id = w.client_id
+                WHERE  w.id = :w
+            ');
+            $c->execute([':u' => $userId, ':w' => $worksiteId]);
+            $r = $c->fetch(PDO::FETCH_ASSOC) ?: [];
+            if (empty($r['del_cantiere']) || (int)$r['del_cantiere'] !== (int)($r['suo'] ?? 0)) {
+                throw new \RuntimeException(
+                    empty($r['del_cantiere'])
+                        ? 'Questo cantiere non ha un cliente: un account cliente non ci puo\' entrare'
+                        : 'Questo account e\' di un altro cliente: il cantiere e\' di ' . ($r['committente'] ?? '—')
+                );
+            }
+        }
 
         $this->conn->prepare("
             INSERT INTO bb_zone_accessi (worksite_id, user_id, ruolo, created_by)

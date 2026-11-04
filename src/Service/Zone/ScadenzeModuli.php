@@ -88,8 +88,9 @@ final class ScadenzeModuli
         $per = [];
         foreach ($this->daRicordare($oggi) as $r) {
             $id = (int)$r['user_id'];
-            $per[$id] ??= ['lingua' => $r['lingua'], 'moduli' => []];
+            $per[$id] ??= ['lingua' => $r['lingua'], 'moduli' => [], 'ruolo' => $r['ruolo'] ?? '', 'cantieri' => []];
             $per[$id]['moduli'][] = $r['modulo'] . ' (' . $r['cantiere'] . ')';
+            $per[$id]['cantieri'][(int)($r['worksite_id'] ?? 0)] = true;
         }
 
         $moduli = 0;
@@ -103,7 +104,7 @@ final class ScadenzeModuli
                     $p['lingua'],
                     ['elenco' => implode(', ', $p['moduli'])]
                 ),
-                '/io',
+                self::linkPer($p),
                 'zone',
                 'normal',
             );
@@ -117,6 +118,23 @@ final class ScadenzeModuli
      *
      * @return array<int, array{user_id:int, lingua:?string, modulo:string, cantiere:string}>
      */
+    /**
+     * Dove porta il promemoria. "/io" e' la pagina degli operai: un
+     * cliente o uno dell'ufficio che ci cliccava prendeva "Access denied".
+     * Loro vanno al cantiere, o all'elenco se i cantieri sono piu' d'uno.
+     */
+    private static function linkPer(array $p): string
+    {
+        if (($p['ruolo'] ?? '') === Accesso::CANTIERE) {
+            return '/io';
+        }
+        $cantieri = array_keys(array_filter($p['cantieri'] ?? []));
+        if (count($cantieri) === 1 && $cantieri[0] > 0) {
+            return Segnalazioni::link($cantieri[0], 'moduli');
+        }
+        return ($p['ruolo'] ?? '') === Accesso::CLIENTE ? '/worksites/my' : '/dashboard';
+    }
+
     public function daRicordare(string $oggi): array
     {
         $ieri   = date('Y-m-d', strtotime($oggi . ' -1 day'));
@@ -163,6 +181,8 @@ final class ScadenzeModuli
                     'user_id'  => (int)$p['user_id'],
                     'lingua'   => $p['lingua'],
                     'modulo'   => (string)$a['modulo'],
+                    'ruolo'    => (string)$p['ruolo'],
+                    'worksite_id' => (int)$a['worksite_id'],
                     'cantiere' => (string)$a['cantiere'],
                 ];
             }
@@ -204,7 +224,9 @@ final class ScadenzeModuli
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
             FROM   bb_zone_accessi a
             JOIN   bb_users u ON u.id = a.user_id
+            JOIN   bb_worksites w ON w.id = a.worksite_id
             WHERE  a.worksite_id = :w AND u.active = 'Y' AND u.removed = 'N'
+              AND  " . Accesso::SQL_CLIENTE_ENTRA . "
               AND  " . (!empty($a['a_user_id']) ? 'a.user_id = :x' : 'a.ruolo = :x') . "
             ORDER BY nome
         ");

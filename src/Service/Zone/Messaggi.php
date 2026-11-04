@@ -332,7 +332,7 @@ final class Messaggi
             JOIN   bb_worksites w ON w.id = a.worksite_id
             WHERE  a.worksite_id = :w AND u.active = 'Y' AND u.removed = 'N'
               AND  a.ruolo IN (" . implode(',', $segni) . ")
-              AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
+              AND  " . \App\Service\Zone\Accesso::SQL_CLIENTE_ENTRA . "
             ORDER BY nome
         ");
         $st->execute($par);

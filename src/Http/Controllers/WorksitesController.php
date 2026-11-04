@@ -158,14 +158,18 @@ final class WorksitesController
         // che e' il modo peggiore di dire "non e' tuo".
         $soloCondivisi = $user->type === 'client';
 
-        $stmt = $this->conn->prepare("
-            SELECT w.id, w.name, w.worksite_code, w.location
-            FROM bb_worksites w
-            INNER JOIN bb_worksite_users wu ON wu.worksite_id = w.id
-            WHERE wu.user_id = :uid
-            " . ($soloCondivisi ? "AND w.client_id = :cid AND w.zone_cliente = 1" : "") . "
-            ORDER BY w.name
-        ");
+        $stmt = $this->conn->prepare($soloCondivisi
+            // le stesse condizioni di ScopeService, sulla stessa tabella
+            ? "SELECT w.id, w.name, w.worksite_code, w.location
+               FROM bb_worksites w
+               INNER JOIN bb_zone_accessi a ON a.worksite_id = w.id AND a.ruolo = 'cliente'
+               WHERE a.user_id = :uid AND w.client_id = :cid AND w.zone_cliente = 1
+               ORDER BY w.name"
+            : "SELECT w.id, w.name, w.worksite_code, w.location
+               FROM bb_worksites w
+               INNER JOIN bb_worksite_users wu ON wu.worksite_id = w.id
+               WHERE wu.user_id = :uid
+               ORDER BY w.name");
         $parametri = [':uid' => $auth['user_id']];
         if ($soloCondivisi) {
             $parametri[':cid'] = $user->client_id;
@@ -173,7 +177,14 @@ final class WorksitesController
         $stmt->execute($parametri);
         $worksites = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
-        Response::view('worksites/my.html.twig', $request, compact('worksites'));
+        // Un cliente con un cantiere solo va dritto alla sua Zone: un elenco
+        // di una riga da cliccare ogni volta e' un passaggio in piu' e basta.
+        $nonDisponibile = isset($_GET['non_disponibile']);
+        if ($soloCondivisi && count($worksites) === 1 && !$nonDisponibile) {
+            Response::redirect('/worksites/' . (int)$worksites[0]['id'] . '/zone');
+        }
+
+        Response::view('worksites/my.html.twig', $request, compact('worksites', 'nonDisponibile'));
     }
 
     // ── Drafts (permission worksites_drafts) ──────────────────────────────────
@@ -1293,21 +1304,18 @@ final class WorksitesController
                 'subcategory' => $category,
             ]);
 
-            // Un disegno nuovo nasce condiviso con la squadra — capi e
-            // operai — e non col cliente. E' quello che faceva prima
-            // l'etichetta predefinita, e i disegni sono la cosa per cui in
-            // cantiere si apre BOB: se nascessero visibili a nessuno,
-            // caricarne uno e non dirlo a nessuno sarebbe la stessa cosa.
-            // Cosa va al committente lo decide l'ufficio, uno per uno.
+            // Un disegno nuovo nasce condiviso con la squadra e col
+            // cliente, come tutto nella Zone: e' lo spazio comune del
+            // cantiere. Vale anche per chi entra dopo. L'ufficio lo
+            // stringe dal pannello "Chi la vede" se un disegno e' interno.
             try {
                 $acc  = new \App\Service\Zone\Accesso($this->conn);
                 $cond = new \App\Service\Zone\Condivisione($this->conn, $acc);
-                $cond->salva(
+                $cond->salvaParti(
                     $worksiteId,
                     'disegno',
                     (int)$savedDocId,
-                    $cond->predefinite($worksiteId, \App\Service\Zone\Accesso::CANTIERE),
-                    (int)$auth['user_id']
+                    \App\Service\Zone\Condivisione::PARTI_PREDEFINITE
                 );
             } catch (\Throwable $e) {
                 // il disegno e' gia' caricato: se la condivisione non va,

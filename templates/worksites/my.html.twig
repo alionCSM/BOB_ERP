@@ -4,6 +4,10 @@
 <div class="intro-y box p-5 mt-5">
     <h2 class="font-medium text-lg mb-4">{{ t('menu_cantieri') }}</h2>
 
+    {% if nonDisponibile %}
+        <div class="alert alert-warning-soft mb-4">{{ t('cantiere_non_disponibile') }}</div>
+    {% endif %}
+
     {% if worksites is empty %}
         <div class="text-slate-500">
             {{ t('nessun_cantiere') }}

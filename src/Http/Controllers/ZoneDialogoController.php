@@ -304,6 +304,10 @@ final class ZoneDialogoController
             ], $io);
             $this->conn->prepare("UPDATE bb_zone_tasks SET visibilita = 'squadra', assegnata_a = 'squadra' WHERE id = :id")
                 ->execute([':id' => $taskId]);
+            // "per la squadra" vuol dire che la squadra la vede: senza le
+            // condivisioni restava visibile solo all'ufficio
+            (new \App\Service\Zone\Condivisione($this->conn, new Accesso($this->conn)))
+                ->aggiungiAssegnatari($w, $taskId);
 
             $this->segnalazioni->collegaAttivita((int)$s['id'], $taskId);
             if ($s['stato'] === 'aperta') {

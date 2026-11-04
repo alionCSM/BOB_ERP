@@ -298,7 +298,7 @@ final class ApiV1ScrivaniaController
     private function pretende(Request $request, string $modulo): void
     {
         $u = $request->user();
-        if ($u && ((int)$u->id === 1 || $u->canAccess($modulo))) {
+        if ($u && $u->canAccess($modulo)) {
             return;
         }
         Response::json(['success' => false, 'message' => 'Non hai questo permesso in questa societa\''], 403);

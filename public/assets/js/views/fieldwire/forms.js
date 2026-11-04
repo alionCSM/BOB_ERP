@@ -97,6 +97,16 @@
 
     function renderTemplates(tpls) {
         const c = root.querySelector('#bzf-content');
+        // Fuori dall'ufficio si compila quello che ci e' stato assegnato,
+        // nel riquadro "Da compilare" qui sopra, come nell'app. L'elenco
+        // di tutti i modelli mostrava al cliente anche quelli interni della
+        // squadra (DPI, verbali), con un "Compila" che non serviva a niente
+        // e un numero di compilazioni che lui non poteva vedere.
+        if (!DA_UFFICIO) {
+            c.innerHTML = '<div class="bzf-empty">I moduli da compilare li trovi nel riquadro "Da compilare" qui sopra. '
+                + 'Quelli che hai gia\' compilato sono in "Compilazioni".</div>';
+            return;
+        }
         if (!tpls.length) {
             c.innerHTML = DA_UFFICIO
                 ? '<div class="bzf-empty">Nessun modulo. Creane uno con "Nuovo modulo".</div>'
@@ -165,7 +175,7 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="bzf-dest" class="bzf-dest">
                         <option value="cantiere" ${!builder.universal ? 'selected' : ''}>Salva per: questo cantiere</option>
-                        <option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>
+                        ${DA_UFFICIO ? `<option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>` : ''}
                     </select>
                     <button class="bzf-btn-ghost" id="bzf-preview"><i class="fas fa-eye"></i> Anteprima</button>
                     <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva</button>

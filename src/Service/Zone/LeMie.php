@@ -40,7 +40,7 @@ final class LeMie
             JOIN   bb_zone_accessi a ON a.worksite_id = t.worksite_id AND a.user_id = :u
             JOIN   bb_worksites w   ON w.id = t.worksite_id
             WHERE  t.status IN ($stati)
-              AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
+              AND  " . \App\Service\Zone\Accesso::SQL_CLIENTE_ENTRA . "
               -- condivisa con me, o l'ho creata io: un'attivita' che
               -- nessuno mi ha condiviso non e' mia, nemmeno se tocca al
               -- mio ruolo
@@ -48,6 +48,11 @@ final class LeMie
                         SELECT 1 FROM bb_zone_condivisioni c
                         WHERE c.tipo = 'attivita' AND c.oggetto_id = t.id
                           AND c.user_id = :u2
+                   ) OR EXISTS (
+                        -- o condivisa con tutta la mia parte del cantiere
+                        SELECT 1 FROM bb_zone_condivisioni_ruoli cr
+                        WHERE cr.tipo = 'attivita' AND cr.oggetto_id = t.id
+                          AND cr.ruolo = a.ruolo
                    ) OR t.created_by = :u3)
         ");
         // tre segnaposto per lo stesso valore: le prepared statement non
@@ -104,7 +109,7 @@ final class LeMie
             JOIN   bb_worksites w ON w.id = fa.worksite_id
             WHERE  fa.attiva = 1
               AND  (fa.a_user_id = :u3 OR (fa.a_user_id IS NULL AND fa.a_ruolo = a.ruolo))
-              AND  (a.ruolo <> 'cliente' OR w.zone_cliente = 1)
+              AND  " . \App\Service\Zone\Accesso::SQL_CLIENTE_ENTRA . "
             ORDER BY w.name, t.name
         ");
         $stmt->execute([':u' => $userId, ':u2' => $userId, ':u3' => $userId]);

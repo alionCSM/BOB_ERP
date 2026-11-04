@@ -574,11 +574,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
             {% if daUfficio %}
-            {# Solo l'ufficio sceglie: una nota interna la leggono solo loro,
-               un messaggio "per il cliente" lo vede anche il cliente. #}
+            {# Il filo lo legge chi vede l'attivita': noi, il cliente e la
+               squadra. Una nota interna la legge solo l'ufficio. #}
             <div class="bz-comment-flags">
-                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna</label>
-                <label><input type="checkbox" id="bz-flag-cliente"> <i class="fas fa-handshake"></i> Per il cliente</label>
+                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo ufficio)</label>
             </div>
             {% endif %}
         </div>
@@ -765,6 +764,24 @@ const CSRF = '{{ csrfToken }}';
 // un guasto, e chi lo trova continua a premerlo.
 const ACC = {{ accessi|json_encode|raw }};
 const DA_UFFICIO = {{ daUfficio ? 'true' : 'false' }};
+// il ruolo su questo cantiere: ufficio, cantiere o cliente
+const RUOLO = {{ ruolo|default('')|json_encode|raw }};
+const IO    = {{ (user.id ?? 0)|json_encode|raw }};
+
+/* Cosa puo' fare questa persona su un'attivita': le stesse regole del
+   server (FieldwireController::pretendeStato), cosi' non si disegnano
+   bottoni che poi rispondono di no. */
+const GRUPPO_TASK = { squadra: 'cantiere', capi: 'cantiere', cantiere: 'cantiere', cliente: 'cliente', ufficio: 'ufficio' };
+const TOCCA_A     = { squadra: 'la squadra in cantiere', capi: 'la squadra in cantiere', cantiere: 'la squadra in cantiere',
+                      ufficio: 'il nostro ufficio', cliente: 'il cliente' };
+function taskMio(t)      { return Number(t.created_by) === Number(IO); }
+function taskModifica(t) { return DA_UFFICIO || taskMio(t); }
+function taskAvanza(t) {
+    if (DA_UFFICIO) return true;
+    if (t.status === 'verified') return false;
+    return taskMio(t) || Number(t.assignee_user_id) === Number(IO)
+        || (GRUPPO_TASK[t.assegnata_a || 'squadra'] === RUOLO);
+}
 // ha il modulo Zone ma non e' nell'elenco di questo cantiere
 const SOLO_ACCESSI = {{ soloAccessi ? 'true' : 'false' }};
 const puoScrivere = (sezione) => (ACC[sezione] || 0) > 1;
@@ -787,20 +804,30 @@ const STATUSES = { open: 'Aperto', in_progress: 'In corso', complete: 'Completat
    decide qualcuno puo' essere stato aggiunto al cantiere.                 */
 let chiAperto = null;   // { tipo, oggetto, onSalva }
 
-function chiBadge(con) {
+/* Chi vede una cosa, in due parole. riga = l'oggetto col suo
+   condivisa_con (persone) e condivisa_parti (squadra, cliente). Accetta
+   anche il solo elenco di persone, come prima. */
+function chiTesto(riga) {
+    const con   = Array.isArray(riga) ? riga : ((riga && riga.condivisa_con) || []);
+    const parti = Array.isArray(riga) ? [] : ((riga && riga.condivisa_parti) || []);
+    const sq = parti.includes('cantiere'), cl = parti.includes('cliente');
+    let t = sq && cl ? 'Tutti' : sq ? 'Ufficio e squadra' : cl ? 'Ufficio e cliente' : '';
+    if (con.length) t += (t ? ' + ' : '') + con.length + (con.length === 1 ? ' persona' : ' persone');
+    return t || 'Solo ufficio';
+}
+function chiBadge(riga) {
     if (!DA_UFFICIO) return '';
-    const n = (con || []).length;
-    if (!n) {
-        return `<span class="bz-vis-badge" style="color:#f87171" title="Nessuno fuori dall'ufficio la vede"><i class="fas fa-lock"></i> solo ufficio</span>`;
-    }
-    return `<span class="bz-vis-badge" style="color:#94a3b8" title="Persone che la vedono, oltre all'ufficio"><i class="fas fa-user-check"></i> ${n}</span>`;
+    const t = chiTesto(riga);
+    if (t === 'Tutti') return '';   // il caso normale non ha bisogno di bollino
+    const solo = t === 'Solo ufficio';
+    return `<span class="bz-vis-badge" style="color:${solo ? '#f87171' : '#94a3b8'}" title="Chi la vede oltre all'ufficio">`
+         + `<i class="fas ${solo ? 'fa-lock' : 'fa-user-check'}"></i> ${escHtml(t)}</span>`;
 }
 
-function chiBottone(tipo, oggetto, con) {
+function chiBottone(tipo, oggetto, riga) {
     if (!DA_UFFICIO) return '';
-    const n = (con || []).length;
     return `<button type="button" class="bz-chi-btn" data-chi-tipo="${tipo}" data-chi-oggetto="${oggetto}">`
-         + `<i class="fas fa-eye"></i> ${n ? n + (n === 1 ? ' persona' : ' persone') : 'Chi la vede'}</button>`;
+         + `<i class="fas fa-eye"></i> ${escHtml(chiTesto(riga))}</button>`;
 }
 
 /* Il pannello. onSalva riceve l'elenco scelto; se non c'e', si salva da
@@ -808,55 +835,60 @@ function chiBottone(tipo, oggetto, con) {
    gia'. Nei moduli di creazione l'oggetto non esiste ancora, quindi la
    scelta resta in pagina e parte con il resto del modulo. */
 async function apriChi(tipo, oggetto, scelte, onSalva) {
+    // scelte: un elenco di persone (come prima) o { persone, parti }
+    const scelteParti = scelte && !Array.isArray(scelte) ? (scelte.parti ?? null) : null;
+    if (scelte && !Array.isArray(scelte)) scelte = scelte.persone || [];
     const pan = document.getElementById('bz-chi-modal');
     const box = document.getElementById('bz-chi-corpo');
     chiAperto = { tipo, oggetto, onSalva };
     box.innerHTML = '<p class="bz-chi-vuoto">Carico…</p>';
     pan.classList.remove('hidden');
 
-    let gruppi = [];
-    let con = scelte || [];
+    let persone = [];
+    let con   = scelte || [];
+    // una cosa nuova nasce condivisa con tutte e due le parti
+    let parti = scelteParti ?? ['cantiere', 'cliente'];
     if (oggetto) {
         const r = await api(`/worksites/${WID}/zone/condivisione?tipo=${tipo}&oggetto=${oggetto}`);
         if (!r.ok) { box.innerHTML = `<p class="bz-chi-vuoto">${escHtml(r.error || 'Non riesco a leggere')}</p>`; return; }
-        gruppi = (r.data || r).gruppi || [];
-        if (!scelte) con = (r.data || r).con || [];
+        const d = r.data || r;
+        persone = (d.gruppi || []).flatMap(g => g.persone.map(x => ({ ...x, ruolo: g.ruolo })));
+        if (!scelte) con = d.con || [];
+        if (scelteParti === null) parti = d.parti || [];
     } else {
         const r = await api(`/worksites/${WID}/zone/accessi`);
-        const persone = ((r.data || r).persone) || [];
-        const titoli = { capo: 'Capi squadra', operaio: 'Operai', cliente: 'Cliente' };
-        gruppi = Object.keys(titoli)
-            .map(ruolo => ({
-                ruolo,
-                titolo: titoli[ruolo],
-                persone: persone.filter(x => x.ruolo === ruolo)
-                                .map(x => ({ id: x.user_id, nome: x.nome, azienda: x.company || '' })),
-            }))
-            .filter(g => g.persone.length);
+        persone = (((r.data || r).persone) || [])
+            .map(x => ({ id: x.user_id, nome: x.nome, azienda: x.company || '', ruolo: x.ruolo }));
     }
 
-    if (!gruppi.length) {
-        box.innerHTML = '<p class="bz-chi-vuoto">In questo cantiere non c\'e\' ancora nessuno. '
-                      + 'Si aggiungono da "Chi accede".</p>';
-        return;
-    }
+    // Le due parti del cantiere ci sono sempre, anche vuote: condividere
+    // con "il cliente" prima che il cliente entri vuol dire che appena
+    // entra lo trova.
+    const gruppi = [
+        { ruolo: 'cantiere', titolo: 'La squadra in cantiere' },
+        { ruolo: 'cliente',  titolo: 'Il cliente' },
+    ].map(g => ({ ...g, persone: persone.filter(x => x.ruolo === g.ruolo) }));
 
     const dentro = new Set(con.map(Number));
-    box.innerHTML = gruppi.map(g => `
+    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">L'ufficio vede sempre tutto.</p>`
+      + gruppi.map(g => {
+        const tutta = parti.includes(g.ruolo);
+        return `
         <div class="bz-chi-gruppo">
-            <div class="bz-chi-titolo">
-                <span>${escHtml(g.titolo)}</span>
-                <button type="button" class="bz-chi-tutti" data-gruppo="${g.ruolo}">tutti</button>
-            </div>
-            ${g.persone.map(pr => `
+            <label class="bz-chi-titolo" style="cursor:pointer">
+                <span><input type="checkbox" class="bz-chi-parte" data-parte="${g.ruolo}" ${tutta ? 'checked' : ''}>
+                    ${escHtml(g.titolo)} <em style="font-weight:400">— tutti, anche chi entra dopo</em></span>
+            </label>
+            ${g.persone.length ? g.persone.map(pr => `
                 <label class="bz-chi-riga">
-                    <input type="checkbox" value="${pr.id}" data-gruppo="${g.ruolo}" ${dentro.has(pr.id) ? 'checked' : ''}>
+                    <input type="checkbox" value="${pr.id}" data-gruppo="${g.ruolo}"
+                        ${tutta || dentro.has(pr.id) ? 'checked' : ''} ${tutta ? 'disabled' : ''}>
                     <span>${escHtml(pr.nome)}</span>
                     ${pr.azienda ? `<em>${escHtml(pr.azienda)}</em>` : ''}
                 </label>
-            `).join('')}
-        </div>
-    `).join('');
+            `).join('') : `<p class="bz-chi-vuoto" style="text-align:left">Nessuno per ora.</p>`}
+        </div>`;
+      }).join('');
 }
 
 function chiudiChi() {
@@ -864,21 +896,26 @@ function chiudiChi() {
     chiAperto = null;
 }
 
+/* { persone, parti }: le persone spuntate una per una (fuori dalle parti
+   intere, che le comprendono gia') e le parti intere. */
 function chiScelte() {
-    return [...document.querySelectorAll('#bz-chi-corpo input[type=checkbox]:checked')]
+    const parti = [...document.querySelectorAll('#bz-chi-corpo .bz-chi-parte:checked')].map(c => c.dataset.parte);
+    const persone = [...document.querySelectorAll('#bz-chi-corpo input[data-gruppo]:checked')]
+        .filter(c => !parti.includes(c.dataset.gruppo))
         .map(c => parseInt(c.value));
+    return { persone, parti };
 }
 
 async function salvaChi() {
     if (!chiAperto) return;
-    const persone = chiScelte();
+    const { persone, parti } = chiScelte();
     const { tipo, oggetto, onSalva } = chiAperto;
 
-    if (onSalva) { onSalva(persone); chiudiChi(); return; }
+    if (onSalva) { onSalva(persone, parti); chiudiChi(); return; }
 
     const res = await api(`/worksites/${WID}/zone/condivisione`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, oggetto, persone }),
+        body: JSON.stringify({ tipo, oggetto, persone, parti }),
     });
     if (!res.ok) { alert(res.error || res.message || 'Non salvato'); return; }
     chiudiChi();
@@ -1060,7 +1097,7 @@ function cardHtml(t) {
     return `
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
             <div class="bz-card-name">${escHtml(t.name)}</div>
-            ${chiBadge(t.condivisa_con)}
+            ${chiBadge(t)}
             <div class="bz-card-foot">
                 ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
@@ -1106,7 +1143,7 @@ function renderGantt() {
                     const color = STATUS_COLORS[t.status] || STATUS_COLORS.open;
                     return `
                         <tr data-task-id="${t.id}" style="cursor:pointer">
-                            <td><div class="bz-gantt-name" title="${t.name}">${t.name}</div></td>
+                            <td><div class="bz-gantt-name" title="${escHtml(t.name)}">${escHtml(t.name)}</div></td>
                             <td>
                                 <div class="bz-gantt-timeline">
                                     <div class="bz-gantt-bar"
@@ -1160,7 +1197,7 @@ function renderCalendar() {
             <div class="bz-cal-day ${isToday ? 'today' : ''}">
                 <div class="bz-cal-day-num">${d}</div>
                 ${events.map(t => `
-                    <div class="bz-cal-event ${t.status}" data-task-id="${t.id}" title="${t.name}" style="cursor:pointer">${t.name}</div>
+                    <div class="bz-cal-event ${t.status}" data-task-id="${t.id}" title="${escHtml(t.name)}" style="cursor:pointer">${escHtml(t.name)}</div>
                 `).join('')}
                 ${(tasksByDate[key]||[]).length > 3 ? `<div style="font-size:10px;color:#334155">+${(tasksByDate[key]||[]).length - 3} altri</div>` : ''}
             </div>`;
@@ -1194,35 +1231,45 @@ async function openTask(id) {
     inner.innerHTML = `
         <div class="bz-detail-section">
             <input class="bz-detail-title-input" value="${escHtml(task.name)}"
-                   data-task-name-id="${id}">
+                   data-task-name-id="${id}" ${taskModifica(task) ? '' : 'readonly'}>
             ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${escHtml(task.category)}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:10px;">
-                <button class="bz-task-action-btn" data-edit-task="${id}" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                ${taskModifica(task) ? `<button class="bz-task-action-btn" data-edit-task="${id}" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
                     <i class="fas fa-pen" style="font-size:11px"></i> Modifica
-                </button>
-                <button class="bz-task-action-btn" data-delete-task="${id}" style="background:#1e293b;color:#fca5a5;border:1px solid #471515;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                </button>` : ''}
+                ${DA_UFFICIO ? `<button class="bz-task-action-btn" data-delete-task="${id}" style="background:#1e293b;color:#fca5a5;border:1px solid #471515;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
                     <i class="fas fa-trash" style="font-size:11px"></i> Elimina
-                </button>
+                </button>` : ''}
             </div>
         </div>
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Status</div>
             <div class="bz-status-row">
-                ${Object.entries(STATUSES).map(([k,v]) => `
+                ${Object.entries(STATUSES)
+                    // "Verificato" e' l'ultima parola, dell'ufficio: agli
+                    // altri si mostra solo quando c'e' gia'
+                    .filter(([k]) => DA_UFFICIO || k !== 'verified' || task.status === 'verified')
+                    .map(([k,v]) => `
                     <button class="bz-status-opt ${k} ${task.status === k ? 'selected' : ''}"
-                            data-set-status="${k}" data-task-id="${id}">
+                            ${taskAvanza(task) ? `data-set-status="${k}"` : 'disabled'} data-task-id="${id}">
                         ${v}
                     </button>`).join('')}
             </div>
+            ${taskAvanza(task) ? '' : `<div style="font-size:11px;color:#64748b;margin-top:6px">${task.status === 'verified'
+                ? "Verificata dall'ufficio."
+                : "La porta avanti chi l'ha creata o a chi tocca."}</div>`}
         </div>
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Info</div>
-            ${task.assignee_name ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i> ${task.assignee_name}</div>` : ''}
+            <div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i>
+                Tocca a: ${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
+                    ? (task.assignee_name || 'una persona')
+                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</div>
             ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-calendar-alt" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
             ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="fas fa-calendar-check" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
-            ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5">${task.description}</p>` : ''}
+            ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5;white-space:pre-line">${escHtml(task.description)}</p>` : ''}
         </div>
 
         <div class="bz-detail-section">
@@ -1352,7 +1399,7 @@ function openEditModal(taskId) {
     const sel = document.getElementById('edit-task-assignee');
     if (t.assignee_user_id) {
         sel.value = String(t.assignee_user_id);
-    } else if (t.assegnata_a && t.assegnata_a !== 'persona' && t.assegnata_a !== 'squadra') {
+    } else if (t.assegnata_a && !['persona', 'squadra', 'capi', 'cantiere'].includes(t.assegnata_a)) {
         sel.value = '@' + t.assegnata_a;
     } else {
         sel.value = '';
@@ -1360,8 +1407,7 @@ function openEditModal(taskId) {
     const chiEdit = document.getElementById('edit-task-chi');
     chiEdit.dataset.chiTipo    = 'attivita';
     chiEdit.dataset.chiOggetto = t.id;
-    chiEdit.innerHTML = '<i class="fas fa-eye"></i> '
-        + ((t.condivisa_con || []).length ? (t.condivisa_con.length + ' persone') : 'Chi la vede');
+    chiEdit.innerHTML = '<i class="fas fa-eye"></i> ' + escHtml(chiTesto(t));
     document.getElementById('task-edit-modal').classList.remove('hidden');
     document.getElementById('edit-task-name').focus();
 }
@@ -1418,16 +1464,23 @@ function updateTaskName(taskId, name) {
 
 /* ══════════ BOB USERS DROPDOWN ══════════ */
 async function loadBobUsers() {
-    const res = await api(`/worksites/${WID}/zone/users`);
+    // solo chi sta in questo cantiere: un'attivita' data a qualcuno che
+    // qui non c'e' non la puo' aprire nessuno
+    const res = await api(`/worksites/${WID}/zone/users?qui=1`);
     if (!res.ok || !Array.isArray(res.data)) return;
     const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label)}</option>`).join('');
     document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
         // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
         // prima i gruppi: un'attivita' di tutta la squadra non e' di nessuno
         // in particolare. Ufficio e cliente li assegna solo l'ufficio.
-        const gruppi = '<option value="">— tutta la squadra —</option>' +
-            '<option value="@capi">— i capi squadra —</option>' +
-            (DA_UFFICIO ? '<option value="@ufficio">— l\'ufficio —</option><option value="@cliente">— il cliente —</option>' : '');
+        // "i capi squadra" non c'e' piu': erano le stesse persone della
+        // squadra. Il cliente chiede prima di tutto all'ufficio.
+        const squadra = '<option value="">— la squadra in cantiere —</option>';
+        const ufficio = '<option value="@ufficio">— il nostro ufficio —</option>';
+        const cliente = '<option value="@cliente">— il cliente —</option>';
+        const gruppi = RUOLO === 'cliente' ? ufficio + squadra
+                     : DA_UFFICIO ? squadra + ufficio + cliente
+                     : squadra + ufficio;
         sel.innerHTML = gruppi + '<optgroup label="Una persona">' + html + '</optgroup>';
     });
 }
@@ -1447,8 +1500,6 @@ async function loadComments(taskId) {
                     <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
                     ${c.interna == 1 ? '<span class="bz-vis-badge" style="color:#f87171"><i class="fas fa-lock"></i> interna</span>' : ''}
-                    ${c.per_cliente == 1 ? '<span class="bz-vis-badge" style="color:#a78bfa"><i class="fas fa-handshake"></i> cliente</span>' : ''}
-                    ${DA_UFFICIO ? `<button class="bz-x-btn" data-flag-cliente="${c.id}" data-val="${c.per_cliente == 1 ? 0 : 1}" title="${c.per_cliente == 1 ? 'Non mostrare al cliente' : 'Mostra al cliente'}" style="background:transparent;border:0;cursor:pointer;color:${c.per_cliente == 1 ? '#a78bfa' : '#475569'};"><i class="fas fa-handshake"></i></button>` : ''}
                     <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
                             title="Elimina commento"
                             style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
@@ -1530,7 +1581,7 @@ function renderDisegni(items, fwReady) {
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
             <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${DA_UFFICIO
-                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d.condivisa_con)}</div>`
+                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d)}</div>`
                 : ''}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
@@ -1699,7 +1750,7 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) {
         box.innerHTML = DA_UFFICIO && cart
-            ? chiBottone('cartella', cart.id, cart.condivisa_con)
+            ? chiBottone('cartella', cart.id, cart)
             : '';
     }
 }
@@ -1710,7 +1761,7 @@ function renderFolders(folders) {
         <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
         ${folders.map(f => `
             <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
-                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f.condivisa_con)}
+                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 <em>${f.file_count}</em>
                 <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
             </button>`).join('')}
@@ -1854,10 +1905,11 @@ function quickAdd(status) {
 }
 
 function openModal() {
-    // vuoto = come prima: la squadra. Si tocca solo per stringere.
+    // vuoto = di base: la vedono tutti. Si tocca solo per stringere.
     const chiNuovo = document.getElementById('task-chi');
     chiNuovo.dataset.persone = '';
-    chiNuovo.innerHTML = '<i class="fas fa-eye"></i> La squadra';
+    chiNuovo.dataset.parti   = '';
+    chiNuovo.innerHTML = '<i class="fas fa-eye"></i> Tutti';
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
@@ -2307,7 +2359,10 @@ document.addEventListener('click', e => {
 function personeDalBottone(idBottone) {
     const b = document.getElementById(idBottone);
     const v = (b?.dataset.persone || '').trim();
-    return v === '' ? {} : { persone: JSON.parse(v) };
+    const p = (b?.dataset.parti || '').trim();
+    // niente scelto: decide il server (di base tutti)
+    if (v === '' && p === '') return {};
+    return { persone: v === '' ? [] : JSON.parse(v), parti: p === '' ? [] : JSON.parse(p) };
 }
 
 document.addEventListener('click', async e => {
@@ -2323,12 +2378,15 @@ document.addEventListener('click', async e => {
     const nuovo = e.target.closest('#task-chi');
     if (nuovo) {
         e.stopPropagation();
-        const gia = (nuovo.dataset.persone || '').trim();
-        apriChi('attivita', 0, gia === '' ? [] : JSON.parse(gia), persone => {
+        const gia  = (nuovo.dataset.persone || '').trim();
+        const giaP = (nuovo.dataset.parti || '').trim();
+        apriChi('attivita', 0, {
+            persone: gia === '' ? [] : JSON.parse(gia),
+            parti:   giaP === '' && gia === '' ? null : (giaP === '' ? [] : JSON.parse(giaP)),
+        }, (persone, parti) => {
             nuovo.dataset.persone = JSON.stringify(persone);
-            nuovo.innerHTML = '<i class="fas fa-eye"></i> '
-                + (persone.length ? persone.length + (persone.length === 1 ? ' persona' : ' persone')
-                                  : 'Nessuno fuori dall\'ufficio');
+            nuovo.dataset.parti   = JSON.stringify(parti);
+            nuovo.innerHTML = '<i class="fas fa-eye"></i> ' + escHtml(chiTesto({ condivisa_con: persone, condivisa_parti: parti }));
         });
         return;
     }
@@ -2336,14 +2394,12 @@ document.addEventListener('click', async e => {
     if (e.target.closest('#bz-chi-salva'))   { await salvaChi(); return; }
     if (e.target.closest('#bz-chi-annulla')) { chiudiChi();      return; }
 
-    // "tutti" su un gruppo: spunta i nomi di quel gruppo, non salva un
-    // ruolo. Se domani entra qualcuno nel cantiere, non eredita niente.
-    const tutti = e.target.closest('.bz-chi-tutti');
-    if (tutti) {
-        const caselle = [...document.querySelectorAll(
-            `#bz-chi-corpo input[data-gruppo="${tutti.dataset.gruppo}"]`)];
-        const accendi = caselle.some(c => !c.checked);
-        caselle.forEach(c => { c.checked = accendi; });
+    // la parte intera: comprende tutti i nomi di quel gruppo, anche chi
+    // entrera' dopo, quindi i nomi si spuntano e si fermano
+    const parte = e.target.closest('.bz-chi-parte');
+    if (parte) {
+        document.querySelectorAll(`#bz-chi-corpo input[data-gruppo="${parte.dataset.parte}"]`)
+            .forEach(c => { c.disabled = parte.checked; if (parte.checked) c.checked = true; });
         return;
     }
 
@@ -2617,7 +2673,7 @@ if (!SOLO_ACCESSI) {
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js?v=3"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=5"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -2628,8 +2684,8 @@ if (!SOLO_ACCESSI) {
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
 {% if puoGestire %}<script src="/assets/js/views/fieldwire/accessi.js?v=3"></script>{% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=2"></script>
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=3"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
-{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=1"></script>{% endif %}
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
 </body>
 </html>

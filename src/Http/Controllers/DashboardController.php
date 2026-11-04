@@ -16,6 +16,13 @@ final class DashboardController
         $user   = $request->user();
         $userId = $user->id;
 
+        // Un cliente in BOB ha solo i suoi cantieri: la dashboard, costruita
+        // sui moduli che lui non ha, gli mostrava una pagina vuota come
+        // prima cosa dopo il login.
+        if (($user->type ?? '') === 'client') {
+            Response::redirect('/worksites/my');
+        }
+
         $stmt = $this->conn->prepare('SELECT username, role, first_name FROM bb_users WHERE id = ?');
         $stmt->execute([$userId]);
         $userInfo  = $stmt->fetch(\PDO::FETCH_ASSOC);

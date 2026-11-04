@@ -147,16 +147,59 @@ final class ApiV1UfficioController
     public function presenze(Request $request): never
     {
         $this->pretende($request, 'attendance');
-        $repo = new \App\Repository\AttendanceRepository($this->conn);
         $dal  = $this->data($_GET['dal'] ?? '') ?? date('Y-m-01');
         $al   = $this->data($_GET['al'] ?? '') ?? date('Y-m-d');
         $cant = (int)($_GET['cantiere_id'] ?? 0) ?: null;
         $op   = (int)($_GET['worker_id'] ?? 0) ?: null;
+        $q    = trim((string)($_GET['q'] ?? ''));
+        $da   = max(0, (int)($_GET['da'] ?? 0));
+        $quante = 100;
+
+        // Stesse colonne di AttendanceRepository::getFiltered, piu' la
+        // ricerca libera e le pagine: dal telefono si cerca "Hoxha" o una
+        // targa su tutto un anno, non si scorre una tabella.
+        $where = 'p.data BETWEEN :dal AND :al';
+        $par   = [':dal' => $dal, ':al' => $al];
+        if ($cant) { $where .= ' AND p.worksite_id = :c'; $par[':c'] = $cant; }
+        if ($op)   { $where .= ' AND p.worker_id = :w';   $par[':w'] = $op; }
+        if ($q !== '') {
+            $where .= " AND (CONCAT(w.last_name, ' ', w.first_name) LIKE :q1
+                          OR CONCAT(w.first_name, ' ', w.last_name) LIKE :q2
+                          OR c.worksite_code LIKE :q3 OR c.name LIKE :q4
+                          OR p.targa_auto LIKE :q5 OR p.azienda LIKE :q6)";
+            foreach (['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] as $k) {
+                $par[":$k"] = '%' . $q . '%';
+            }
+        }
+        $base = "FROM bb_presenze p
+                 JOIN bb_workers w ON p.worker_id = w.id
+                 JOIN bb_worksites c ON p.worksite_id = c.id
+                 WHERE $where";
+
+        $st = $this->conn->prepare("SELECT COUNT(*) AS righe,
+                   COALESCE(SUM(CASE p.turno WHEN 'Mezzo' THEN 0.5 ELSE 1 END), 0) AS giornate $base");
+        $st->execute($par);
+        $tot = $st->fetch(\PDO::FETCH_ASSOC) ?: ['righe' => 0, 'giornate' => 0];
+
+        $st = $this->conn->prepare("SELECT p.*,
+                   CONCAT(w.first_name, ' ', w.last_name) AS lavoratore,
+                   CONCAT(c.worksite_code, ' - ', c.name) AS cantiere,
+                   c.id AS cantiere_id
+            $base
+            ORDER BY p.data DESC, w.last_name, w.first_name
+            LIMIT $quante OFFSET $da");
+        $st->execute($par);
+        $righe = $st->fetchAll(\PDO::FETCH_ASSOC);
+
         Response::json([
             'success'  => true,
             'dal'      => $dal,
             'al'       => $al,
-            'presenze' => $repo->getFiltered($dal, $al, $cant, $op, 200),
+            'totale'   => (int)$tot['righe'],
+            'giornate' => (float)$tot['giornate'],
+            'da'       => $da,
+            'altre'    => $da + count($righe) < (int)$tot['righe'],
+            'presenze' => $righe,
         ]);
     }
 
@@ -276,7 +319,7 @@ final class ApiV1UfficioController
     public function flotta(Request $request): never
     {
         $u = $request->user();
-        if (!($u && ((int)$u->id === 1 || $u->canAccess('fleet_view') || $u->canAccess('fleet_manage')))) {
+        if (!($u && ($u->canAccess('fleet_view') || $u->canAccess('fleet_manage')))) {
             Response::json(['success' => false, 'message' => 'Non hai questo permesso in questa societa\''], 403);
         }
         $f = new \App\Repository\Fleet\FleetRepository($this->conn);
@@ -300,7 +343,7 @@ final class ApiV1UfficioController
     private function pretende(Request $request, string $modulo): void
     {
         $u = $request->user();
-        if ($u && ((int)$u->id === 1 || $u->canAccess($modulo))) {
+        if ($u && $u->canAccess($modulo)) {
             return;
         }
         Response::json(['success' => false, 'message' => 'Non hai questo permesso in questa societa\''], 403);

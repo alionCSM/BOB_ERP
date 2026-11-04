@@ -98,9 +98,9 @@ final class Permessi
      * La tabella.
      *
      * Ufficio e Cliente si somigliano, ed e' voluto: sui nostri cantieri
-     * il committente dirige. Le due differenze sono l'ultima parola sulle
-     * attivita' (la verifica) e il poter cancellare quello che hanno
-     * scritto altri — due cose che restano a noi.
+     * il committente dirige. Le differenze sono l'ultima parola sulle
+     * attivita' (la verifica), il poter cancellare quello che hanno
+     * scritto altri e il decidere i moduli — cose che restano a noi.
      *
      * Cantiere e' il ruolo stretto: non apre lavoro nuovo (non crea
      * attivita', non carica disegni, non decide i moduli) ma fa tutto
@@ -137,8 +137,12 @@ final class Permessi
         self::DISEGNI => [
             self::UFFICIO => true, self::CANTIERE => false, self::CLIENTE => true,
         ],
+        // Decidere i moduli (modelli e chi li compila) resta all'ufficio:
+        // ne' il sito ne' l'app l'hanno mai offerto al cliente, e lasciarlo
+        // aperto solo dietro le quinte voleva dire che un cliente poteva
+        // togliere il DPI alla nostra squadra. Compilare e' COMPILARE.
         self::MODULI => [
-            self::UFFICIO => true, self::CANTIERE => false, self::CLIENTE => true,
+            self::UFFICIO => true, self::CANTIERE => false, self::CLIENTE => false,
         ],
 
         self::VERIFICARE => [

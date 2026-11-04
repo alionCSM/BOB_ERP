@@ -84,8 +84,27 @@ final class ApiV1Controller
         // lascia passare solo su /api/v1/me/password, e senza token l'app
         // non arriverebbe mai li'.
 
+        // Telefono gia' fidato (ha superato il codice una volta): niente
+        // codice, anche se l'IP e' nuovo. Su un telefono l'IP cambia sempre.
+        if ($this->dispositivoFidato((int)$user->id, (string)($body['dispositivo'] ?? ''))) {
+            AuditLogger::log($this->conn, $user, 'api_login_trusted_device', 'user', (int)$user->id, (string)$user->username, ['ip' => $ip]);
+            Response::json($this->issueToken($user, $row, $device, $ip, $ua));
+        }
+
         // IP gia' fidato: token subito. Altrimenti codice via email (come web)
         if ($user->isKnownLogin($ip)) {
+            Response::json($this->issueToken($user, $row, $device, $ip, $ua));
+        }
+
+        // Gli account per chi esamina l'app negli store (Google, Apple)
+        // entrano senza il codice via email: il revisore non legge la
+        // casella dell'account, e l'app verrebbe rifiutata al primo
+        // accesso. Valgono solo i nomi scritti a mano nel .env del server
+        // (APP_REVIEW_USERS=nome1,nome2) e solo dall'app; ogni accesso resta
+        // nel registro. Da usare per account finti, senza dati veri.
+        $revisori = array_filter(array_map('trim', explode(',', (string)($_ENV['APP_REVIEW_USERS'] ?? ''))));
+        if ($revisori && in_array(strtolower((string)$user->username), array_map('strtolower', $revisori), true)) {
+            AuditLogger::log($this->conn, $user, 'api_login_review_account', 'user', (int)$user->id, (string)$user->username, ['ip' => $ip]);
             Response::json($this->issueToken($user, $row, $device, $ip, $ua));
         }
 
@@ -148,7 +167,52 @@ final class ApiV1Controller
             Response::json(['success' => false, 'message' => 'Utente non piu\' disponibile.'], 403);
         }
 
-        Response::json($this->issueToken($user, $row, $device, $ip, $ua));
+        // e da questo telefono: il segreto torna all'app, che lo conserva
+        // nel portachiavi e lo manda ai login successivi
+        $risposta = $this->issueToken($user, $row, $device, $ip, $ua);
+        $risposta['dispositivo'] = $this->nuovoDispositivo((int)$user->id, $device);
+        Response::json($risposta);
+    }
+
+    /** Il segreto di un telefono fidato, valido e di questo utente? */
+    private function dispositivoFidato(int $userId, string $segreto): bool
+    {
+        if (strlen($segreto) < 40) {
+            return false;
+        }
+        try {
+            $st = $this->conn->prepare("
+                SELECT id FROM bb_api_dispositivi
+                WHERE  segreto_hash = :h AND user_id = :u AND revoked_at IS NULL
+                  AND  COALESCE(last_used_at, created_at) > NOW() - INTERVAL 180 DAY
+                LIMIT  1
+            ");
+            $st->execute([':h' => hash('sha256', $segreto), ':u' => $userId]);
+            $id = $st->fetchColumn();
+            if (!$id) {
+                return false;
+            }
+            $this->conn->prepare('UPDATE bb_api_dispositivi SET last_used_at = NOW() WHERE id = :id')
+                       ->execute([':id' => (int)$id]);
+            return true;
+        } catch (\Throwable $e) {
+            // tabella non ancora creata: si torna al codice via email
+            return false;
+        }
+    }
+
+    /** Registra il telefono come fidato e ne restituisce il segreto (una volta sola). */
+    private function nuovoDispositivo(int $userId, string $nome): ?string
+    {
+        try {
+            $segreto = bin2hex(random_bytes(32));
+            $this->conn->prepare("
+                INSERT INTO bb_api_dispositivi (user_id, segreto_hash, nome) VALUES (:u, :h, :n)
+            ")->execute([':u' => $userId, ':h' => hash('sha256', $segreto), ':n' => mb_substr($nome, 0, 120)]);
+            return $segreto;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     // ── SESSIONE (Bearer) ────────────────────────────────────────────────────
@@ -720,16 +784,16 @@ final class ApiV1Controller
      */
     private function noleggiAccesso(User $user, string $tipo): array
     {
-        $super = (int)$user->id === 1;
-
+        // niente scorciatoia per il superadmin: anche lui vede la giornata solo
+        // nella societa' che ha il modulo (canAccess lo lascia passare li')
         if ($tipo === 'macchina') {
-            if ($super || $user->canAccess('pn_noleggi') || $user->canAccess('pn_noleggi_giornata')) {
+            if ($user->canAccess('pn_noleggi') || $user->canAccess('pn_noleggi_giornata')) {
                 return [true, new \App\Repository\Poti\MacchinaRepository($this->conn), ''];
             }
             return [false, null, "Permesso 'pn_noleggi_giornata' richiesto"];
         }
 
-        if ($super || $user->canAccess('pn_autocarrate') || $user->canAccess('pn_autocarrate_giornata')) {
+        if ($user->canAccess('pn_autocarrate') || $user->canAccess('pn_autocarrate_giornata')) {
             return [true, new \App\Repository\Poti\AutocarrataRepository($this->conn), ''];
         }
         return [false, null, "Permesso 'pn_autocarrate_giornata' richiesto"];
