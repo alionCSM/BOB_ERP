@@ -1,13 +1,17 @@
 /**
  * Chi accede a questo cantiere, e con che ruolo.
  *
- * Un ruolo per persona: capo squadra, operaio, cliente. Cosa vede ciascuno
- * non si decide piu' qui sezione per sezione, ma su ogni cosa (attivita',
- * cartella, disegno, modulo) con "Chi la vede". Sei tendine per persona per
- * cantiere non le teneva aggiornate nessuno.
+ * Tre ruoli: Ufficio (noi), Cantiere (il capo squadra e chi lavora li'),
+ * Cliente (gli account del committente). Cosa vede ciascuno si decide su
+ * ogni cosa con "Chi la vede"; di base, quello che uno mette lo vedono
+ * tutti e tre.
  *
- * Il cliente entra solo se e' acceso "Condividi col cliente": cosi' si puo'
- * preparare tutto, e aprire la porta quando e' pronto.
+ * "Condividi col cliente" non sceglie persone: apre la porta agli account
+ * cliente messi in questo elenco, e solo a quelli del cliente del
+ * cantiere. Il riquadro lo scrive coi nomi, perche' "con chi condivido?"
+ * e' la prima domanda che viene.
+ *
+ * Si aggiungono piu' persone insieme, cercando per nome o per azienda.
  *
  * Niente onclick negli attributi: la CSP di BOB non ha 'unsafe-inline' e
  * quelli non partirebbero. Tutto agganciato da qui.
@@ -19,23 +23,27 @@
     const modale  = document.getElementById('accessi-modal');
     if (!apri || !modale) return;
 
-    const chiudi  = document.getElementById('btn-acc-close');
-    const tendina = document.getElementById('acc-utente');
-    const elenco  = document.getElementById('acc-elenco');
+    const chiudi   = document.getElementById('btn-acc-close');
+    const tendina  = document.getElementById('acc-utente');
+    const aggiungi = document.getElementById('acc-aggiungi');
+    const elenco   = document.getElementById('acc-elenco');
 
     const RUOLI = {
-        ufficio: 'Ufficio',
-        capo:    'Capo squadra',
-        operaio: 'Operaio',
+        ufficio:  'Ufficio',
+        cantiere: 'Cantiere',
     };
     const SPIEGA = {
-        ufficio: 'vede tutto il cantiere, decide chi vede cosa, riceve i suoi avvisi',
-        capo:    'crea e assegna attivita\' alla squadra, carica file e foto, compila i moduli',
-        operaio: 'vede le cose della squadra, lavora sulle sue attivita\', compila i suoi moduli',
-        cliente: 'vede solo quello che l\'ufficio condivide col cliente',
+        ufficio:  'vede tutto il cantiere, decide chi vede cosa e chi entra',
+        cantiere: 'porta avanti le attività della squadra, carica foto e file, compila i suoi moduli',
+        cliente:  'vede ciò che è condiviso col cliente, apre attività per l\'ufficio, scrive e carica',
     };
+    const COLORE = { ufficio: '#1e40af', cantiere: '#0f766e', cliente: '#7c3aed' };
 
     let caricati = false;
+    let scelta = null;      // Tom Select
+    let utenti = [];        // tutti quelli che si possono aggiungere
+    let dentro = [];        // user_id gia' nel cantiere
+    let cliente = '';       // il cliente del cantiere
 
     function post(url, dati) {
         const corpo = new URLSearchParams(dati);
@@ -64,66 +72,85 @@
     }
 
     // ── "Condividi col cliente" ──
-    const barra = document.createElement('label');
-    barra.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:14px;cursor:pointer;';
+    const barra = document.createElement('div');
+    barra.className = 'acc-barra';
     barra.innerHTML =
-        '<input type="checkbox" id="acc-cliente" style="width:18px;height:18px;">' +
-        '<span><strong style="font-size:13px;color:#1e293b;">Condividi col cliente</strong><br>' +
-        '<span style="font-size:11.5px;color:#64748b;">I clienti assegnati vedono quello che e\' segnato "Ufficio e cliente" o "Tutti". Spento, non vedono niente.</span></span>';
-    elenco.parentNode.insertBefore(barra, elenco.previousElementSibling || elenco);
+        '<label class="acc-barra-riga"><input type="checkbox" id="acc-cliente">' +
+        '<span><strong>Condividi col cliente</strong><span class="acc-barra-chi" id="acc-cliente-chi"></span></span></label>';
+    elenco.parentNode.insertBefore(barra, elenco.parentNode.querySelector('.bz-modal-field'));
     const spunta = barra.querySelector('input');
+    const chiCliente = barra.querySelector('#acc-cliente-chi');
     spunta.addEventListener('change', function () {
         postJson('/worksites/' + WID + '/zone/condividi-cliente', { attivo: spunta.checked })
-            .then(function (r) { if (!r.ok) { spunta.checked = !spunta.checked; alert(r.error || 'Non salvato'); } });
+            .then(function (r) {
+                if (!r.ok) { spunta.checked = !spunta.checked; alert(r.error || 'Non salvato'); return; }
+                carica();
+            });
     });
+
+    /** Chi entra davvero col cliente acceso: i nomi, non una regola. */
+    function scriviChiCliente(persone) {
+        const clienti = persone.filter(p => p.ruolo === 'cliente').map(p => p.nome);
+        const di = cliente ? ' di ' + esc(cliente) : '';
+        let t;
+        if (!clienti.length) {
+            t = 'Nessun account cliente in questo cantiere. Aggiungi qui sotto gli account' + di + ' che devono entrare.';
+        } else if (spunta.checked) {
+            t = 'Entrano: <b>' + clienti.map(esc).join(', ') + '</b>. Vedono ciò che è condiviso col cliente e ricevono gli avvisi per email.';
+        } else {
+            t = 'Spento: ' + clienti.map(esc).join(', ') + ' non entrano ancora. Accendilo quando il cantiere è pronto da mostrare.';
+        }
+        if (!cliente) {
+            t = 'Questo cantiere non ha un cliente in anagrafica: nessun account cliente può entrare.';
+        }
+        chiCliente.innerHTML = t;
+    }
 
     function riga(p) {
         const div = document.createElement('div');
-        div.style.cssText = 'display:flex;align-items:center;gap:12px;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;margin-bottom:8px;';
+        div.className = 'acc-riga';
         div.dataset.userId = p.user_id;
 
         const chi = document.createElement('div');
-        chi.style.cssText = 'flex:1;min-width:0;';
+        chi.className = 'acc-chi';
         chi.innerHTML =
-            '<strong style="font-size:13px;color:#1e293b;">' + esc(p.nome) + '</strong>' +
-            '<span style="font-size:11px;color:#94a3b8;margin-left:8px;">' + esc(p.company || '') + '</span>' +
-            '<div class="acc-spiega" style="font-size:11px;color:#64748b;margin-top:2px;">' + esc(SPIEGA[p.ruolo] || '') + '</div>';
+            '<strong>' + esc(p.nome) + '</strong>' +
+            (p.company ? '<span class="acc-azienda">' + esc(p.company) + '</span>' : '') +
+            '<div class="acc-spiega">' + esc(SPIEGA[p.ruolo] || '') + '</div>';
         div.appendChild(chi);
 
         if (p.ruolo === 'cliente') {
-            // un account cliente e' cliente e basta: non diventa capo di nessuno
+            // un account cliente e' cliente e basta
             const t = document.createElement('span');
+            t.className = 'acc-tag';
             t.textContent = 'Cliente';
-            t.style.cssText = 'font-size:12px;font-weight:700;color:#7c3aed;background:#f5f3ff;border-radius:7px;padding:5px 10px;';
             div.appendChild(t);
         } else {
             const sel = document.createElement('select');
-            sel.style.cssText = 'background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:12px;color:#1e293b;';
-            // "Ufficio" si propone solo a chi ha il modulo Zone di BOB: a un
-            // operaio non si puo' dare, e vederlo in tendina fa solo pensare
-            // che si possa.
-            Object.keys(RUOLI).filter(function (r) {
-                return r !== 'ufficio' || p.ha_modulo_zone;
-            }).forEach(function (r) {
-                const o = document.createElement('option');
-                o.value = r;
-                o.textContent = RUOLI[r];
-                if (p.ruolo === r) o.selected = true;
-                sel.appendChild(o);
-            });
+            sel.className = 'acc-ruolo';
+            // "Ufficio" solo a chi ha il modulo Zone di BOB
+            Object.keys(RUOLI).filter(r => r !== 'ufficio' || p.ha_modulo_zone || p.ruolo === 'ufficio')
+                .forEach(function (r) {
+                    const o = document.createElement('option');
+                    o.value = r;
+                    o.textContent = RUOLI[r];
+                    if (p.ruolo === r) o.selected = true;
+                    sel.appendChild(o);
+                });
             sel.addEventListener('change', function () {
                 post(base(), { user_id: p.user_id, ruolo: sel.value }).then(function (r) {
-                    div.style.borderColor = (r && r.ok !== false) ? '#4ade80' : '#f87171';
+                    div.classList.add(r && r.ok !== false ? 'acc-ok' : 'acc-ko');
                     chi.querySelector('.acc-spiega').textContent = SPIEGA[sel.value] || '';
-                    setTimeout(function () { div.style.borderColor = '#e2e8f0'; }, 700);
+                    setTimeout(() => div.classList.remove('acc-ok', 'acc-ko'), 700);
                 });
             });
             div.appendChild(sel);
         }
 
         const togli = document.createElement('button');
+        togli.type = 'button';
+        togli.className = 'acc-togli';
         togli.textContent = 'Togli';
-        togli.style.cssText = 'background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:7px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;';
         togli.addEventListener('click', function () {
             if (!confirm('Togliere ' + p.nome + ' da questo cantiere?')) return;
             post(base() + '/elimina', { user_id: p.user_id }).then(carica);
@@ -138,56 +165,94 @@
             .then(function (r) {
                 const d = r.data || r;
                 spunta.checked = !!d.zone_cliente;
+                cliente = d.cliente || '';
                 elenco.innerHTML = '';
 
                 const persone = d.persone || [];
+                // ufficio, poi cantiere, poi cliente: come si legge una squadra
+                const ordine = { ufficio: 0, cantiere: 1, cliente: 2 };
+                persone.sort((a, b) => (ordine[a.ruolo] ?? 3) - (ordine[b.ruolo] ?? 3));
                 if (!persone.length) {
-                    elenco.innerHTML = '<p style="font-size:12.5px;color:#94a3b8;padding:18px 0;text-align:center;">' +
-                        'Nessuno accede a questo cantiere. Nemmeno l\'ufficio: va aggiunto anche lui.</p>';
+                    elenco.innerHTML = '<p class="acc-vuoto">Nessuno accede a questo cantiere, nemmeno l\'ufficio. '
+                        + 'Aggiungi prima te stesso come Ufficio.</p>';
                 } else {
-                    persone.forEach(function (p) { elenco.appendChild(riga(p)); });
+                    persone.forEach(p => elenco.appendChild(riga(p)));
                 }
-
-                const dentro = persone.map(p => p.user_id);
-                [...tendina.options].forEach(function (o) {
-                    if (o.value) o.hidden = dentro.indexOf(Number(o.value)) !== -1;
-                });
-                tendina.value = '';
+                scriviChiCliente(persone);
+                dentro = persone.map(p => Number(p.user_id));
+                riempiScelta();
             });
+    }
+
+    function etichetta(u) {
+        if (u.tipo === 'client') return 'Cliente';
+        if (u.ha_modulo_zone) return 'Ufficio';
+        if (u.tipo === 'worker') return 'Operaio';
+        return '';
+    }
+
+    function riempiScelta() {
+        const liberi = utenti.filter(u => dentro.indexOf(Number(u.id)) === -1);
+        if (!window.TomSelect) {
+            // senza la libreria: la tendina semplice, una persona alla volta
+            tendina.innerHTML = '<option value="">Scegli…</option>' + liberi.map(u =>
+                '<option value="' + u.id + '">' + esc(u.label + (u.azienda ? ' · ' + u.azienda : '')) + '</option>').join('');
+            return;
+        }
+        if (!scelta) {
+            scelta = new TomSelect(tendina, {
+                valueField: 'id',
+                labelField: 'label',
+                searchField: ['label', 'azienda'],
+                maxOptions: 200,
+                plugins: ['remove_button'],
+                placeholder: 'Cerca per nome o azienda…',
+                render: {
+                    option: (u, e) => '<div class="acc-opz"><span>' + e(u.label) + '</span>'
+                        + '<small>' + e([u.azienda, etichetta(u)].filter(Boolean).join(' · ')) + '</small></div>',
+                    item: (u, e) => '<div>' + e(u.label) + (u.azienda ? ' <small style="opacity:.7">· ' + e(u.azienda) + '</small>' : '') + '</div>',
+                    no_results: () => '<div class="no-results">Nessuno con questo nome o azienda</div>',
+                },
+                onChange: () => { aggiungi.disabled = !scelta.getValue().length; },
+            });
+        }
+        scelta.clear(true);
+        scelta.clearOptions();
+        scelta.addOptions(liberi);
+        scelta.refreshOptions(false);
+        aggiungi.disabled = true;
     }
 
     function caricaUtenti() {
         return fetch('/worksites/' + WID + '/zone/users', { headers: { 'X-CSRF-Token': CSRF } })
             .then(r => r.json())
-            .then(function (r) {
-                (r.data || r || []).forEach(function (u) {
-                    const o = document.createElement('option');
-                    o.value = u.id;
-                    o.textContent = u.label;
-                    if (u.ha_modulo_zone) o.dataset.zone = '1';
-                    tendina.appendChild(o);
-                });
-            });
+            .then(function (r) { utenti = (r.data || r || []).map(u => ({ ...u, id: String(u.id) })); });
     }
 
-    // Si entra come Cantiere, o come Ufficio se si ha il modulo Zone —
-    // chi ha quel modulo quasi sempre lo si aggiunge per quello, e
-    // correggerlo dopo e' un clic in piu' ogni volta. Un
+    // Si entra come Cantiere, o come Ufficio se si ha il modulo Zone. Un
     // account cliente diventa cliente da solo, qualunque cosa si mandi.
-    tendina.addEventListener('change', function () {
-        if (!tendina.value) return;
-        const opz = tendina.options[tendina.selectedIndex];
-        post(base(), {
-            user_id: tendina.value,
-            ruolo:   opz && opz.dataset.zone === '1' ? 'ufficio' : 'cantiere',
-        }).then(carica);
-    });
+    async function aggiungiScelti() {
+        const ids = scelta ? scelta.getValue() : (tendina.value ? [tendina.value] : []);
+        if (!ids.length) return;
+        aggiungi.disabled = true;
+        const errori = [];
+        for (const id of [].concat(ids)) {
+            const u = utenti.find(x => x.id === String(id)) || {};
+            const r = await post(base(), { user_id: id, ruolo: u.ha_modulo_zone ? 'ufficio' : 'cantiere' });
+            if (!r || r.ok === false) errori.push((u.label || id) + ': ' + (r && r.error || 'non aggiunto'));
+        }
+        if (errori.length) alert(errori.join('\n'));
+        carica();
+    }
+    aggiungi.addEventListener('click', aggiungiScelti);
+    // senza Tom Select la tendina aggiunge appena si sceglie
+    tendina.addEventListener('change', function () { if (!window.TomSelect && tendina.value) aggiungiScelti(); });
 
     apri.addEventListener('click', function () {
         modale.classList.remove('hidden');
         if (caricati) { carica(); return; }
         caricati = true;
-        carica().then(caricaUtenti).then(carica);
+        caricaUtenti().then(carica);
     });
 
     chiudi.addEventListener('click', function () { modale.classList.add('hidden'); });

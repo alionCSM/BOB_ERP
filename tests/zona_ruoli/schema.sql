@@ -19,7 +19,8 @@ CREATE TABLE bb_zone_tasks(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, f
 CREATE TABLE bb_zone_task_comments(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, text TEXT NULL, file_url TEXT NULL,
   author_name VARCHAR(80) NULL, author_user_id INT NULL, interna TINYINT DEFAULT 0, per_cliente TINYINT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_file_comments(id INT AUTO_INCREMENT PRIMARY KEY, file_id INT, text TEXT, author_name VARCHAR(80), author_user_id INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, name VARCHAR(200), completed TINYINT DEFAULT 0, position INT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_fw_floorplans(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, fw_id VARCHAR(40), name VARCHAR(100), sheets_count INT DEFAULT 0);
+CREATE TABLE bb_zone_task_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, name VARCHAR(200), completed TINYINT DEFAULT 0, position INT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
   size_bytes BIGINT DEFAULT 0, uploaded_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);

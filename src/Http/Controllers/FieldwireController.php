@@ -409,7 +409,7 @@ final class FieldwireController
             $body       = $this->jsonBody();
 
             if (empty($body['name'])) {
-                throw new \RuntimeException('Il nome del task è obbligatorio');
+                throw new \RuntimeException('Scrivi il nome dell\'attività');
             }
             // creare attivita' e' del capo e dell'ufficio
             $ruolo = (string)$this->ruoloQui($request);
@@ -1413,7 +1413,7 @@ final class FieldwireController
                 : ' AND u.id IN (SELECT user_id FROM bb_zone_accessi WHERE worksite_id = ' . $w . ')';
 
             $stmt = $this->conn->query("
-                SELECT u.id, u.username,
+                SELECT u.id, u.username, u.type, COALESCE(u.company, '') AS company,
                        TRIM(CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,''))) AS full_name,
                        EXISTS (
                            SELECT 1 FROM bb_user_permissions p
@@ -1436,6 +1436,9 @@ final class FieldwireController
             return array_map(fn($r) => [
                 'id'             => (int)$r['id'],
                 'label'          => $r['full_name'] !== '' ? $r['full_name'] : $r['username'],
+                // l'azienda accanto al nome: due Rossi si distinguono cosi'
+                'azienda'        => (string)$r['company'],
+                'tipo'           => (string)$r['type'],
                 'ha_modulo_zone' => (bool)$r['ha_modulo_zone'],
             ], $rows);
         });
@@ -1450,12 +1453,20 @@ final class FieldwireController
 
         $this->jsonResponse(function () use ($request) {
             $w = (int)$request->param('id');
-            $st = $this->conn->prepare('SELECT zone_cliente FROM bb_worksites WHERE id = :w');
+            $st = $this->conn->prepare('
+                SELECT w.zone_cliente, c.name AS cliente
+                FROM bb_worksites w LEFT JOIN bb_clients c ON c.id = w.client_id
+                WHERE w.id = :w
+            ');
             $st->execute([':w' => $w]);
+            $c = $st->fetch(\PDO::FETCH_ASSOC) ?: [];
             return [
                 'persone'      => (new \App\Repository\Zone\AccessoRepository($this->conn))
                                       ->perCantiere($w),
-                'zone_cliente' => (bool)$st->fetchColumn(),
+                'zone_cliente' => !empty($c['zone_cliente']),
+                // "Condividi col cliente" apre la porta agli account di
+                // questo cliente messi qui sotto: il pannello lo scrive
+                'cliente'      => (string)($c['cliente'] ?? ''),
             ];
         });
     }
