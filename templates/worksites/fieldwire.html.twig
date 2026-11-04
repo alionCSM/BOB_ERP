@@ -168,6 +168,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-status-opt.in_progress { background: rgba(96,165,250,.1); color: #60a5fa; border-color: rgba(96,165,250,.2); }
 .bz-status-opt.complete  { background: rgba(74,222,128,.1); color: #4ade80; border-color: rgba(74,222,128,.2); }
 .bz-status-opt.verified  { background: rgba(167,139,250,.1); color: #a78bfa; border-color: rgba(167,139,250,.2); }
+.bz-task-action-btn { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
+.bz-task-action-btn.danger { color:#fca5a5; border-color:#471515; }
+[data-theme="light"] .bz-task-action-btn { background:#f8fafc; color:#334155; border-color:#e2e8f0; }
+[data-theme="light"] .bz-task-action-btn.danger { color:#b91c1c; border-color:#fecaca; }
+[data-theme="light"] .bz-status-opt.open        { background:#fef3c7; color:#b45309; border-color:#fde68a; }
+[data-theme="light"] .bz-status-opt.in_progress { background:#dbeafe; color:#1d4ed8; border-color:#bfdbfe; }
+[data-theme="light"] .bz-status-opt.complete    { background:#dcfce7; color:#15803d; border-color:#bbf7d0; }
+[data-theme="light"] .bz-status-opt.verified    { background:#ede9fe; color:#6d28d9; border-color:#ddd6fe; }
 .bz-status-opt.selected  { opacity: 1; } .bz-status-opt:not(.selected) { opacity: .4; }
 
 .bz-check-list { display: flex; flex-direction: column; gap: 6px; }
@@ -178,6 +186,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-check-add { display: flex; gap: 6px; margin-top: 8px; }
 .bz-check-add input { flex: 1; background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; font-size: 12px; color: #e2e8f0; font-family: inherit; outline: none; }
 .bz-check-add button { background: #1e293b; border: 1px solid #273548; border-radius: 6px; padding: 6px 10px; color: #4ade80; cursor: pointer; font-size: 13px; }
+[data-theme="light"] .bz-check-add button { background:#f0fdf4; border-color:#bbf7d0; color:#15803d; }
 
 .bz-comments { display: flex; flex-direction: column; gap: 12px; }
 .bz-comment { display: flex; gap: 8px; align-items: flex-start; }
@@ -337,7 +346,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </nav>
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
-                {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>{% endif %}
+                {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuova attività</span></button>{% endif %}
                 {# Il rapporto di un periodo: cosa e' stato fatto, cosa resta,
                    segnalazioni, presenze e moduli. Si sceglie il periodo. #}
                 {% if accessi.report   > 0 %}
@@ -360,9 +369,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if worksite.start_date %}<div class="bz-info-row"><i class="fas fa-calendar-day"></i><span>Inizio {{ worksite.start_date|date('d/m/Y') }}</span></div>{% endif %}
                 {% if worksite.order_number %}<div class="bz-info-row"><i class="fas fa-file-signature"></i><span>Ord. {{ worksite.order_number }}</span></div>{% endif %}
                 <div class="bz-info-counts">
-                    <span title="Aperti"><b style="color:#fbbf24">{{ taskCounts.open }}</b> aperti</span>
-                    <span title="In corso"><b style="color:#60a5fa">{{ taskCounts.in_progress }}</b> in corso</span>
-                    <span title="Completati"><b style="color:#4ade80">{{ taskCounts.complete }}</b> fatti</span>
+                    <span title="Aperti"><b class="c-aperto">{{ taskCounts.open }}</b> aperti</span>
+                    <span title="In corso"><b class="c-corso">{{ taskCounts.in_progress }}</b> in corso</span>
+                    <span title="Completati"><b class="c-fatto">{{ taskCounts.complete }}</b> fatti</span>
                 </div>
             </div>
 
@@ -375,8 +384,6 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire collegato</span>
                 {% elseif fieldwire_enabled %}
                     <button class="bz-nav-item bz-nav-fw-btn" id="btn-fw-connect"><i class="fas fa-link"></i><span>Collega Fieldwire</span></button>
-                {% else %}
-                    <span class="bz-fw-off"><i class="fas fa-info-circle"></i> Fieldwire non configurato (manca il token in .env)</span>
                 {% endif %}
             </div>
         </aside>
@@ -415,8 +422,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-subview active" id="view-kanban">
             <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
                 <div class="bz-kanban-filters">
-                    <input type="text" id="bz-filter-search" placeholder="Cerca task...">
-                    <select id="bz-filter-assignee"><option value="">Tutti gli assegnatari</option></select>
+                    <input type="text" id="bz-filter-search" placeholder="Cerca attività…">
+                    <select id="bz-filter-assignee"><option value="">Tutte le persone</option></select>
                     <select id="bz-filter-cat"><option value="">Tutte le categorie</option></select>
                     <button type="button" id="bz-filter-clear" title="Azzera filtri"><i class="fas fa-times"></i></button>
                 </div>
@@ -570,7 +577,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Detail panel #}
         <div class="bz-detail-wrap closed" id="bz-detail-wrap">
             <div class="bz-detail-topbar">
-                <span style="font-size:12px;font-weight:600;color:#475569;">Dettaglio Task</span>
+                <span class="bz-detail-label">Attività</span>
                 <button class="bz-detail-close" id="btn-close-detail"><i class="fas fa-times"></i></button>
             </div>
             <div class="bz-detail-inner" id="bz-detail-inner"></div>
@@ -598,7 +605,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 {# ── New task modal ── #}
 <div class="bz-overlay hidden" id="task-modal">
     <div class="bz-modal">
-        <h3>Nuovo Task</h3>
+        <h3>Nuova attività</h3>
         <div class="bz-modal-field">
             <label>Nome *</label>
             <input type="text" id="task-name" placeholder="Descrivi il task...">
@@ -609,7 +616,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Status</label>
+                <label>Stato</label>
                 <select id="task-status">
                     <option value="open">Aperto</option>
                     <option value="in_progress">In corso</option>
@@ -647,7 +654,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="btn-modal-cancel">Annulla</button>
-            <button class="bz-modal-submit" id="btn-modal-submit">Crea Task</button>
+            <button class="bz-modal-submit" id="btn-modal-submit">Crea attività</button>
         </div>
     </div>
 </div>
@@ -655,7 +662,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <!-- ════════ EDIT TASK MODAL ════════ -->
 <div class="bz-overlay hidden" id="task-edit-modal">
     <div class="bz-modal">
-        <h3>Modifica Task</h3>
+        <h3>Modifica attività</h3>
         <input type="hidden" id="edit-task-id">
         <div class="bz-modal-field">
             <label>Nome *</label>
@@ -667,7 +674,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Status</label>
+                <label>Stato</label>
                 <select id="edit-task-status">
                     <option value="open">Aperto</option>
                     <option value="in_progress">In corso</option>
@@ -730,16 +737,19 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     <div class="bz-modal" style="width: 760px;">
         <h3>Chi accede a questo cantiere</h3>
 
-        <p style="font-size:12px; color:#64748b; margin:-12px 0 18px;">
-            Chi ha il modulo Zone in BOB vede tutto comunque. Qui si danno i
-            cantieri a chi quel modulo non ce l'ha — capi squadra, operai,
-            clienti — con un ruolo. Cosa vede ognuno si decide su ogni cosa,
-            con "Chi la vede".
+        <p class="acc-intro">
+            Entra in questo cantiere solo chi è in questo elenco, anche
+            dall'ufficio. Ognuno ha un ruolo: Ufficio, Cantiere o Cliente.
+            Di base ciò che uno aggiunge lo vedono tutti e tre; si restringe
+            cosa per cosa con "Chi la vede".
         </p>
 
         <div class="bz-modal-field">
-            <label>Aggiungi persona</label>
-            <select id="acc-utente"><option value="">Scegli…</option></select>
+            <label>Aggiungi persone</label>
+            <div class="acc-aggiungi-riga">
+                <select id="acc-utente" multiple></select>
+                <button type="button" class="acc-aggiungi" id="acc-aggiungi" disabled>Aggiungi</button>
+            </div>
         </div>
 
         <div id="acc-elenco" style="max-height:46vh; overflow:auto; margin-top:8px;"></div>
@@ -829,7 +839,7 @@ function chiBadge(riga) {
     const t = chiTesto(riga);
     if (t === 'Tutti') return '';   // il caso normale non ha bisogno di bollino
     const solo = t === 'Solo ufficio';
-    return `<span class="bz-vis-badge" style="color:${solo ? '#f87171' : '#94a3b8'}" title="Chi la vede oltre all'ufficio">`
+    return `<span class="bz-vis-badge ${solo ? 'solo' : 'muto'}" title="Chi la vede oltre all'ufficio">`
          + `<i class="fas ${solo ? 'fa-lock' : 'fa-user-check'}"></i> ${escHtml(t)}</span>`;
 }
 
@@ -1069,7 +1079,7 @@ function refreshKanbanFilterOptions() {
     if (!aSel || !cSel) return;
     const assignees = [...new Set(allTasks.map(t => t.assignee_name).filter(Boolean))].sort();
     const cats      = [...new Set(allTasks.map(t => t.category).filter(Boolean))].sort();
-    aSel.innerHTML = '<option value="">Tutti gli assegnatari</option>' + assignees.map(a=>`<option ${a===kFilter.assignee?'selected':''}>${escHtml(a)}</option>`).join('');
+    aSel.innerHTML = '<option value="">Tutte le persone</option>' + assignees.map(a=>`<option ${a===kFilter.assignee?'selected':''}>${escHtml(a)}</option>`).join('');
     cSel.innerHTML = '<option value="">Tutte le categorie</option>' + cats.map(c=>`<option ${c===kFilter.cat?'selected':''}>${escHtml(c)}</option>`).join('');
 }
 
@@ -1119,7 +1129,7 @@ function renderGantt() {
     const el = document.getElementById('bz-gantt-content');
     const withDates = allTasks.filter(t => t.start_date || t.due_date);
     if (!withDates.length) {
-        el.innerHTML = '<div class="bz-gantt-empty">Nessun task con date impostate.<br>Aggiungi una data di inizio o scadenza per vederli qui.</div>';
+        el.innerHTML = '<div class="bz-gantt-empty">Nessuna attività con date.<br>Aggiungi una data di inizio o scadenza per vederla qui.</div>';
         return;
     }
 
@@ -1139,7 +1149,7 @@ function renderGantt() {
         <table class="bz-gantt-table">
             <thead>
                 <tr>
-                    <th style="width:200px">Task</th>
+                    <th style="width:200px">Attività</th>
                     <th>Timeline</th>
                 </tr>
             </thead>
@@ -1243,17 +1253,17 @@ async function openTask(id) {
                    data-task-name-id="${id}" ${taskModifica(task) ? '' : 'readonly'}>
             ${task.category ? `<div style="font-size:11px;color:#475569;margin-top:4px">${escHtml(task.category)}</div>` : ''}
             <div style="display:flex;gap:8px;margin-top:10px;">
-                ${taskModifica(task) ? `<button class="bz-task-action-btn" data-edit-task="${id}" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                ${taskModifica(task) ? `<button class="bz-task-action-btn" data-edit-task="${id}">
                     <i class="fas fa-pen" style="font-size:11px"></i> Modifica
                 </button>` : ''}
-                ${DA_UFFICIO ? `<button class="bz-task-action-btn" data-delete-task="${id}" style="background:#1e293b;color:#fca5a5;border:1px solid #471515;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;">
+                ${DA_UFFICIO ? `<button class="bz-task-action-btn danger" data-delete-task="${id}">
                     <i class="fas fa-trash" style="font-size:11px"></i> Elimina
                 </button>` : ''}
             </div>
         </div>
 
         <div class="bz-detail-section">
-            <div class="bz-detail-section-title">Status</div>
+            <div class="bz-detail-section-title">Stato</div>
             <div class="bz-status-row">
                 ${Object.entries(STATUSES)
                     // "Verificato" e' l'ultima parola, dell'ufficio: agli
@@ -1271,7 +1281,7 @@ async function openTask(id) {
         </div>
 
         <div class="bz-detail-section">
-            <div class="bz-detail-section-title">Info</div>
+            <div class="bz-detail-section-title">Dettagli</div>
             <div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i>
                 Tocca a: ${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
                     ? (task.assignee_name || 'una persona')
@@ -1333,7 +1343,7 @@ async function loadChecklist(taskId) {
     const el  = document.getElementById(`bz-checklist-${taskId}`);
     if (!el) return;
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun elemento.</div>'; return; }
+    if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun elemento.</div>'; return; }
     el.innerHTML = items.map(c => `
         <div class="bz-check-row" id="crow-${c.id}" style="display:flex;align-items:center;gap:6px;">
             <input type="checkbox" id="chk-${c.id}" ${c.completed ? 'checked' : ''}
@@ -1380,7 +1390,7 @@ async function deleteComment(taskId, commentId) {
 }
 
 async function deleteTask(taskId) {
-    if (!confirm('Eliminare definitivamente questo task? Tutti i commenti e checklist saranno persi.')) return;
+    if (!confirm('Eliminare questa attività? Si perdono anche messaggi, foto e checklist.')) return;
     const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/delete`, { method: 'POST' });
     if (res.ok) {
         allTasks = allTasks.filter(t => t.id != taskId);
@@ -1477,7 +1487,8 @@ async function loadBobUsers() {
     // qui non c'e' non la puo' aprire nessuno
     const res = await api(`/worksites/${WID}/zone/users?qui=1`);
     if (!res.ok || !Array.isArray(res.data)) return;
-    const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label)}</option>`).join('');
+    // il nome con l'azienda: due Rossi si distinguono cosi'
+    const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label + (u.azienda ? ' · ' + u.azienda : ''))}</option>`).join('');
     document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
         // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
         // prima i gruppi: un'attivita' di tutta la squadra non e' di nessuno
@@ -1500,7 +1511,7 @@ async function loadComments(taskId) {
     const el   = document.getElementById(`bz-comments-${taskId}`);
     if (!el) return;
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
-    if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:#334155">Nessun commento ancora.</div>'; return; }
+    if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun messaggio.</div>'; return; }
     el.innerHTML = items.map(c => `
         <div class="bz-comment">
             <div class="bz-comment-avatar">${initials(c.author_name)}</div>
@@ -1508,7 +1519,7 @@ async function loadComments(taskId) {
                 <div class="bz-comment-meta">
                     <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
-                    ${c.interna == 1 ? '<span class="bz-vis-badge" style="color:#f87171"><i class="fas fa-lock"></i> interna</span>' : ''}
+                    ${c.interna == 1 ? '<span class="bz-vis-badge solo"><i class="fas fa-lock"></i> interna</span>' : ''}
                     <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
                             title="Elimina commento"
                             style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
@@ -1687,7 +1698,7 @@ async function loadMedia() {
     const res = await api(`/worksites/${WID}/zone/media`);
     mediaLoaded = true;
     const items = (res.ok && Array.isArray(res.data)) ? res.data : [];
-    if (!items.length) { grid.innerHTML = '<div class="bz-dz-empty">Nessuna foto caricata. Allega foto ai task per vederle qui.</div>'; return; }
+    if (!items.length) { grid.innerHTML = '<div class="bz-dz-empty">Nessuna foto. Le foto si allegano alle attività.</div>'; return; }
     grid.innerHTML = items.map(m => `
         <div class="bz-media-card" data-lb="${escAttr(m.file_url)}"
              data-cap="${escAttr((m.task_name||'') + ' · ' + (m.author_name||'') + ' · ' + fmtDateTime(m.created_at))}"
@@ -1703,7 +1714,7 @@ async function loadMedia() {
 function openLightbox(src, caption, taskId) {
     document.getElementById('bz-lb-img').src = src;
     const cap = document.getElementById('bz-lb-caption');
-    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">apri task →</a>` : '');
+    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">apri attività →</a>` : '');
     document.getElementById('bz-lightbox').classList.add('open');
 }
 function closeLightbox() { document.getElementById('bz-lightbox').classList.remove('open'); }
@@ -1962,7 +1973,7 @@ async function submitTask() {
         body: JSON.stringify(body),
     });
 
-    btn.textContent = 'Crea Task'; btn.disabled = false;
+    btn.textContent = 'Crea attività'; btn.disabled = false;
 
     if (res.ok) {
         allTasks.unshift(res.data);
@@ -1970,7 +1981,7 @@ async function submitTask() {
         renderCurrentView();
         openTask(res.data.id);
     } else {
-        alert('Errore: ' + (res.error || 'impossibile creare il task'));
+        alert('Errore: ' + (res.error || 'Attività non creata'));
     }
 }
 
@@ -2456,6 +2467,7 @@ if (!SOLO_ACCESSI) {
 .bz-pres-g .n { flex:0 0 auto; font-size:11px; color:#64748b; background:#0f172a;
                 border-radius:20px; padding:2px 8px; }
 .bz-pres-g.on .n { color:#cbd5e1; }
+[data-theme="light"] .bz-pres-g .n { background:#f1f5f9; color:#475569; }
 .bz-pres-corpo { flex:1; overflow-y:auto; padding:22px 26px; }
 .bz-pres-testa { display:flex; align-items:baseline; gap:12px; margin-bottom:22px; }
 .bz-pres-testa h3 { margin:0; font-size:16px; font-weight:700; color:#e2e8f0; text-transform:capitalize; }
@@ -2500,6 +2512,76 @@ if (!SOLO_ACCESSI) {
 
 /* Chi vede cosa */
 .bz-vis-badge { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; margin-top:4px; }
+.bz-vis-badge.solo { color:#f87171; } .bz-vis-badge.muto { color:#94a3b8; }
+.c-aperto { color:#fbbf24; } .c-corso { color:#60a5fa; } .c-fatto { color:#4ade80; }
+
+
+/* Tema scuro: i grigi piu' spenti non si leggevano (contrasto 1,4-2,4
+   sul fondo). Un tono piu' chiaro, stesso aspetto. */
+.bz-brand-bob, .bz-wname, .bz-info-title, .bz-card-due, .bz-dz-empty,
+.bz-pres-tab th, .bz-detail-topbar span { color:#94a3b8; }
+.bz-col-count { color:#94a3b8; }
+.bz-col-add-btn { color:#94a3b8; border-color:#334155; }
+.bz-col-add-btn:hover { color:#e2e8f0; border-color:#475569; }
+.bz-back, .bz-detail-label { color:#94a3b8; }
+.bz-detail-label { font-size:12px; font-weight:600; }
+.bz-detail-section-title { color:#64748b; }
+.bz-detail-vuoto { font-size:12px; color:#64748b; }
+html .bz-dz-empty { color:#94a3b8; }
+[data-theme="light"] .bz-detail-label, [data-theme="light"] .bz-detail-section-title,
+[data-theme="light"] .bz-detail-vuoto, html[data-theme="light"] .bz-dz-empty { color:#64748b; }
+[data-theme="light"] .bz-card-due, [data-theme="light"] .bz-dz-empty,
+[data-theme="light"] .bz-pres-tab th, [data-theme="light"] .bz-detail-topbar span { color:#64748b; }
+
+/* ── Tema chiaro: i colori pensati per il fondo scuro, rifatti per il
+   bianco. Trovati con un controllo automatico del contrasto su ogni
+   sezione: grigi chiari e gialli su bianco non si leggevano, e bordi e
+   campi scuri restavano neri. ── */
+[data-theme="light"] .bz-info-title,
+[data-theme="light"] .bz-info-counts,
+[data-theme="light"] .bz-comment-flags,
+[data-theme="light"] .bz-pres-testa .gu,
+[data-theme="light"] .bz-pres-g,
+[data-theme="light"] .bz-pres-tab .az,
+[data-theme="light"] .bz-pres-tab .tu,
+[data-theme="light"] .bz-vis-badge.muto,
+[data-theme="light"] .bz-rapporto a { color:#475569; }
+[data-theme="light"] .bz-rapporto a:hover { color:#0f172a; }
+[data-theme="light"] .bz-info-counts { border-top-color:#e2e8f0; }
+[data-theme="light"] .c-aperto, [data-theme="light"] .bz-pres-tab .tu.mezza { color:#b45309; }
+[data-theme="light"] .c-corso  { color:#1d4ed8; }
+[data-theme="light"] .c-fatto  { color:#15803d; }
+[data-theme="light"] .bz-vis-badge.solo { color:#dc2626; }
+[data-theme="light"] #bz-filter-clear { background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; }
+[data-theme="light"] .bz-col-add-btn { border-color:#cbd5e1; color:#64748b; }
+[data-theme="light"] .bz-col-add-btn:hover { border-color:#94a3b8; color:#334155; }
+[data-theme="light"] .bz-disegni-title { color:#1e293b; }
+[data-theme="light"] .bz-folder-new { border-color:#cbd5e1; color:#475569; }
+[data-theme="light"] .bz-folder-item span, [data-theme="light"] .bz-folders span { color:#334155; }
+[data-theme="light"] .bz-file-act { background:#f8fafc; border-color:#e2e8f0; color:#475569; }
+[data-theme="light"] .bz-file-act:hover { color:#0f172a; }
+[data-theme="light"] .bz-file-act.danger:hover { color:#b91c1c; border-color:#fecaca; }
+[data-theme="light"] .bz-assegna { border-color:#e2e8f0; background:#fff; }
+[data-theme="light"] .bz-assegna h4 { color:#0f172a; }
+[data-theme="light"] .bz-assegna-row { color:#334155; border-top-color:#e2e8f0; }
+[data-theme="light"] .bz-assegna-row .sub { color:#64748b; }
+[data-theme="light"] .bz-assegna-row button { color:#b91c1c; border-color:#fecaca; }
+[data-theme="light"] .bz-assegna-form select, [data-theme="light"] .bz-assegna-form input { background:#f8fafc; color:#1e293b; border-color:#e2e8f0; }
+[data-theme="light"] .bzf-tab { color:#475569; }
+[data-theme="light"] .bzf-btn-ghost { background:#f8fafc; border-color:#e2e8f0; color:#475569; }
+[data-theme="light"] .bzf-btn-ghost:hover { color:#0f172a; }
+[data-theme="light"] .bzf-tag { background:#f1f5f9; color:#475569; }
+[data-theme="light"] .bzf-tag.universal { background:#dbeafe; color:#1d4ed8; }
+[data-theme="light"] .bzd-filtro { background:#f1f5f9; }
+[data-theme="light"] .bzd-filtro button { color:#475569; }
+[data-theme="light"] .bzd-filtro button.on { background:#fff; color:#0f172a; }
+[data-theme="light"] .bzd-pill.aperta  { background:#fef3c7; color:#b45309; }
+[data-theme="light"] .bzd-pill.presa   { background:#dbeafe; color:#1d4ed8; }
+[data-theme="light"] .bzd-pill.risolta { background:#dcfce7; color:#15803d; }
+[data-theme="light"] .bzd-pill.blocca  { background:#fee2e2; color:#b91c1c; }
+[data-theme="light"] .bzd-pill.alta    { background:#ffedd5; color:#c2410c; }
+[data-theme="light"] .bzd-pill.tipo    { background:#f1f5f9; color:#334155; }
+[data-theme="light"] .bzd-fissa { color:#b45309; }
 /* Il bottone "Chi la vede" sta in due posti con due fondi: negli elenchi
    della pagina, che sono scuri, e dentro i moduli, che sono bianchi. Si
    parte dallo scuro e dentro .bz-modal si schiarisce — se no nel modulo
@@ -2520,6 +2602,33 @@ if (!SOLO_ACCESSI) {
 .bz-chi-titolo { display:flex; align-items:center; justify-content:space-between;
                  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
                  color:#94a3b8; padding-bottom:6px; border-bottom:1px solid #e2e8f0; margin-bottom:4px; }
+/* ── Chi accede ── */
+.acc-intro { font-size:12.5px; color:#475569; line-height:1.5; margin:-10px 0 16px; }
+.acc-barra { border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:14px; background:#faf5ff; }
+.acc-barra-riga { display:flex; gap:10px; align-items:flex-start; cursor:pointer; }
+.acc-barra-riga input { width:18px; height:18px; margin-top:1px; accent-color:#7c3aed; flex:none; }
+.acc-barra-riga strong { font-size:13px; color:#1e293b; display:block; }
+.acc-barra-chi { display:block; font-size:12px; color:#475569; margin-top:2px; line-height:1.45; }
+.acc-aggiungi-riga { display:flex; gap:8px; align-items:flex-start; }
+.acc-aggiungi-riga .ts-wrapper { flex:1; min-width:0; }
+.acc-aggiungi-riga .ts-control { border-radius:8px; border-color:#e2e8f0; background:#f8fafc; min-height:40px; font-size:13px; color:#1e293b; }
+.acc-aggiungi-riga .ts-dropdown { font-size:13px; color:#1e293b; }
+.acc-opz { display:flex; flex-direction:column; }
+.acc-opz small { color:#64748b; font-size:11.5px; }
+.acc-aggiungi { background:#1e40af; color:#fff; border:0; border-radius:8px; padding:0 16px; height:40px; font-size:13px; font-weight:700; cursor:pointer; }
+.acc-aggiungi:disabled { background:#e2e8f0; color:#64748b; cursor:default; }
+.acc-riga { display:flex; align-items:center; gap:12px; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; margin-bottom:8px; transition:border-color .2s; }
+.acc-riga.acc-ok { border-color:#4ade80; } .acc-riga.acc-ko { border-color:#f87171; }
+.acc-chi { flex:1; min-width:0; }
+.acc-chi strong { font-size:13px; color:#1e293b; }
+.acc-azienda { font-size:11.5px; color:#64748b; margin-left:8px; }
+.acc-spiega { font-size:11.5px; color:#64748b; margin-top:2px; }
+.acc-tag { font-size:12px; font-weight:700; color:#7c3aed; background:#f5f3ff; border-radius:7px; padding:5px 10px; }
+.acc-ruolo { background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px; padding:6px 8px; font-size:12px; color:#1e293b; }
+.acc-togli { background:none; border:1px solid #fecaca; color:#b91c1c; border-radius:7px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer; }
+.acc-vuoto { font-size:12.5px; color:#64748b; padding:18px 0; text-align:center; }
+@media (max-width:560px) { .acc-riga { flex-wrap:wrap; } .acc-chi { flex-basis:100%; } }
+
 .bz-rapporto summary { list-style:none; cursor:pointer; }
 .bz-rapporto summary::-webkit-details-marker { display:none; }
 .bz-rapporto a { display:block; padding:6px 12px 6px 40px; font-size:12px; color:#94a3b8; text-decoration:none; }
@@ -2540,6 +2649,8 @@ if (!SOLO_ACCESSI) {
 .bz-assegna-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid #1e293b; font-size:12.5px; color:#cbd5e1; }
 .bz-assegna-row:first-of-type { border-top:0; }
 .bz-assegna-row .sub { color:#64748b; font-size:11.5px; }
+.bz-assegna .fatti { color:#22c55e; } .bz-assegna .mancano { color:#f87171; }
+[data-theme="light"] .bz-assegna .fatti { color:#15803d; } [data-theme="light"] .bz-assegna .mancano { color:#b91c1c; }
 .bz-assegna-form { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
 .bz-assegna-form select, .bz-assegna-form input { background:#0f172a; color:#cbd5e1; border:1px solid #334155; border-radius:7px; padding:6px 8px; font-size:12px; }
 .bz-assegna-form button, .bz-assegna-row button { background:#2563eb; color:#fff; border:0; border-radius:7px; padding:6px 12px; font-size:12px; font-weight:700; cursor:pointer; }
@@ -2702,8 +2813,12 @@ if (!SOLO_ACCESSI) {
   }
 </script>
 <script src="/assets/js/views/fieldwire/annotator.js"></script>
-{% if puoGestire %}<script src="/assets/js/views/fieldwire/accessi.js?v=3"></script>{% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=3"></script>
+{% if puoGestire %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+<script src="/assets/js/views/fieldwire/accessi.js?v=4"></script>
+{% endif %}
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=4"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
 {% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
 </body>

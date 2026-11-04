@@ -60,10 +60,10 @@
         if (!st) return '';
         const quando = PERIODO[a.frequenza] ? PERIODO[a.frequenza] + ': ' : '';
         const fatti = st.fatti.length
-            ? `<span style="color:#22c55e"><i class="fas fa-check"></i> ${st.fatti.map(f => esc(f.nome)).join(', ')}</span>`
+            ? `<span class="fatti"><i class="fas fa-check"></i> ${st.fatti.map(f => esc(f.nome)).join(', ')}</span>`
             : '';
         const mancano = st.mancano.length
-            ? `<span style="color:#f87171"><i class="fas fa-hourglass-half"></i> mancano ${st.mancano.map(esc).join(', ')}</span>`
+            ? `<span class="mancano"><i class="fas fa-hourglass-half"></i> mancano ${st.mancano.map(esc).join(', ')}</span>`
             : '';
         if (!fatti && !mancano) {
             return `<div class="sub">${esc(quando)}nessuno l'ha ancora compilato</div>`;
