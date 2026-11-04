@@ -8,46 +8,67 @@ use Dompdf\Options;
 use PDO;
 
 /**
- * Genera un report PDF (punch list) dei task BOB Zone di un cantiere:
- * raggruppati per stato, con assegnatario/scadenza/categoria e le foto
- * allegate (incorporate come data URI, downscalate con GD se disponibile).
+ * Il rapporto di cantiere della Zone, in PDF, per un periodo.
+ *
+ * Prima era una "Punch List": l'elenco delle attivita' per stato, in
+ * inglese, senza date, e nient'altro della Zone. Al cliente non diceva
+ * cosa era successo in settimana, che e' la sola cosa che un rapporto
+ * deve dire.
+ *
+ * Adesso, per il periodo scelto:
+ *   1. in breve: attivita' fatte e aperte, in ritardo, segnalazioni,
+ *      giornate di lavoro, moduli compilati;
+ *   2. cosa e' stato fatto, con le foto;
+ *   3. cosa resta aperto, in ritardo per primo;
+ *   4. le segnalazioni aperte o chiuse nel periodo;
+ *   5. le presenze giorno per giorno;
+ *   6. i moduli compilati.
+ *
+ * Il rapporto lo scaricano anche squadra e cliente: chi chiama passa le
+ * regole della Zone (cosa vede chi scarica), e qui dentro non si guarda
+ * niente che non sia passato da quelle.
  */
 final class ZoneReportService
 {
-    private const STATUS_LABEL = [
-        'open' => 'Aperto', 'in_progress' => 'In corso',
-        'complete' => 'Completato', 'verified' => 'Verificato',
+    private const STATO = [
+        'open' => 'Da fare', 'in_progress' => 'In corso',
+        'complete' => 'Fatta', 'verified' => 'Verificata',
     ];
-    private const STATUS_COLOR = [
+    private const COLORE = [
         'open' => '#d97706', 'in_progress' => '#2563eb',
         'complete' => '#16a34a', 'verified' => '#7c3aed',
     ];
-    private const MAX_PHOTOS_PER_TASK = 6;
-    private const PHOTO_MAX_PX = 600;
+    private const TIPO_SEGN = [
+        'sicurezza' => 'Sicurezza', 'materiale' => 'Materiale', 'danno' => 'Danno',
+        'ritardo' => 'Ritardo', 'qualita' => 'Qualità', 'altro' => 'Altro',
+    ];
+    private const STATO_SEGN = ['aperta' => 'Aperta', 'presa' => 'Presa in carico', 'risolta' => 'Risolta'];
+    private const FOTO_PER_ATTIVITA = 4;
+    private const FOTO_PX = 600;
 
     public function __construct(private PDO $conn) {}
 
     /**
-     * @param callable(array): bool|null           $vedeTask  quali attivita' entrano
-     * @param callable(array): array|null          $filtraFoto quali foto di un'attivita' entrano
-     *
-     * Il report lo scaricano anche capi e clienti: senza filtri ci finirebbero
-     * le attivita' "solo ufficio" e le note interne. Chi chiama passa le
-     * stesse regole della Zone; senza, e' il report dell'ufficio.
+     * @param string                    $dal         Y-m-d
+     * @param string                    $al          Y-m-d
+     * @param callable(array): bool     $vedeTask    quali attivita' entrano
+     * @param callable(array): array    $filtraFoto  quali foto di un'attivita' entrano
+     * @param callable(array): bool     $vedeRisposta quali compilazioni entrano
+     * @param array<int, array>         $segnalazioni quelle che chi scarica vede
+     * @param string                    $perChi      "Ufficio", "Cliente"... per l'intestazione
      */
-    public function generate(int $worksiteId, array $worksite, ?callable $vedeTask = null, ?callable $filtraFoto = null): string
-    {
-        $tasks = $this->loadTasks($worksiteId);
-        if ($vedeTask) {
-            $tasks = array_values(array_filter($tasks, $vedeTask));
-        }
-        if ($filtraFoto) {
-            foreach ($tasks as &$t) {
-                $t['photos'] = $filtraFoto($t['photos']);
-            }
-            unset($t);
-        }
-        $html  = $this->buildHtml($worksite, $tasks);
+    public function generate(
+        int $worksiteId,
+        array $worksite,
+        string $dal,
+        string $al,
+        callable $vedeTask,
+        callable $filtraFoto,
+        callable $vedeRisposta,
+        array $segnalazioni,
+        string $perChi,
+    ): string {
+        $html = $this->html($worksiteId, $worksite, $dal, $al, $vedeTask, $filtraFoto, $vedeRisposta, $segnalazioni, $perChi);
 
         $options = new Options();
         $options->set('isRemoteEnabled', false);
@@ -59,120 +80,290 @@ final class ZoneReportService
         return $dompdf->output();
     }
 
-    private function loadTasks(int $worksiteId): array
-    {
-        $stmt = $this->conn->prepare("
-            SELECT * FROM bb_zone_tasks WHERE worksite_id = :w
-            ORDER BY FIELD(status,'open','in_progress','complete','verified'), priority DESC, created_at ASC
-        ");
-        $stmt->execute([':w' => $worksiteId]);
-        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    /** L'HTML del rapporto: separato dal PDF per poterlo provare senza Dompdf. */
+    public function html(
+        int $worksiteId,
+        array $worksite,
+        string $dal,
+        string $al,
+        callable $vedeTask,
+        callable $filtraFoto,
+        callable $vedeRisposta,
+        array $segnalazioni,
+        string $perChi,
+    ): string {
+        $oggi    = date('Y-m-d');
+        $attivita = array_values(array_filter($this->attivita($worksiteId), $vedeTask));
 
-        // foto per task (commenti con file_url)
-        $cstmt = $this->conn->prepare("
-            SELECT task_id, text, file_url, author_name, created_at,
-                   interna, per_cliente, author_user_id
-            FROM bb_zone_task_comments
-            WHERE task_id = :t AND file_url IS NOT NULL AND file_url <> ''
-            ORDER BY created_at ASC
+        $nelPeriodo = static fn(?string $quando): bool =>
+            $quando !== null && substr($quando, 0, 10) >= $dal && substr($quando, 0, 10) <= $al;
+
+        $fatte  = array_values(array_filter($attivita, fn($t) =>
+            in_array($t['status'], ['complete', 'verified'], true) && $nelPeriodo($t['updated_at'] ?? null)));
+        $aperte = array_values(array_filter($attivita, fn($t) =>
+            !in_array($t['status'], ['complete', 'verified'], true)));
+        $ritardo = array_values(array_filter($aperte, fn($t) =>
+            !empty($t['due_date']) && substr((string)$t['due_date'], 0, 10) < $oggi));
+        // in ritardo per prime, poi per scadenza
+        usort($aperte, function ($a, $b) use ($oggi) {
+            $ra = !empty($a['due_date']) && substr((string)$a['due_date'], 0, 10) < $oggi;
+            $rb = !empty($b['due_date']) && substr((string)$b['due_date'], 0, 10) < $oggi;
+            if ($ra !== $rb) return $ra ? -1 : 1;
+            return strcmp((string)($a['due_date'] ?: '9999'), (string)($b['due_date'] ?: '9999'));
+        });
+
+        $segn = array_values(array_filter($segnalazioni, fn($s) =>
+            $nelPeriodo($s['created_at'] ?? null) || $nelPeriodo($s['risolta_at'] ?? null)
+            || ($s['stato'] ?? '') !== 'risolta'));
+        $segnAperte = count(array_filter($segnalazioni, fn($s) => ($s['stato'] ?? '') !== 'risolta'));
+
+        $presenze = $this->presenze($worksiteId, $dal, $al);
+        $giornate = array_sum(array_column($presenze, 'giornate'));
+
+        $risposte = array_values(array_filter($this->risposte($worksiteId, $dal, $al), $vedeRisposta));
+
+        $e   = static fn($x): string => htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8');
+        $d   = static fn(?string $x): string => $x ? date('d/m/Y', strtotime($x)) : '';
+        $num = static fn(float $x): string => rtrim(rtrim(number_format($x, 1, ',', '.'), '0'), ',');
+
+        $nome    = $e($worksite['name'] ?? ('Cantiere #' . $worksiteId));
+        $codice  = $e($worksite['worksite_code'] ?? '');
+        $cliente = $e($this->cliente((int)($worksite['client_id'] ?? 0)));
+
+        $h  = "<html><head><meta charset='utf-8'><style>" . $this->css() . "</style></head><body>";
+        $h .= "<div class='testa'><div class='marchio'>Consorzio Soluzione Montaggi · BOB</div>"
+            . "<h1>Rapporto di cantiere</h1>"
+            . "<div class='cantiere'>{$nome}" . ($codice ? " · {$codice}" : '') . "</div>"
+            . "<div class='sub'>" . ($cliente ? "Cliente: {$cliente} · " : '')
+            . "Periodo: {$d($dal)} – {$d($al)} · Generato il " . date('d/m/Y H:i') . " · Copia per: {$e($perChi)}</div></div>";
+
+        // 1. in breve
+        $h .= "<table class='breve'><tr>"
+            . $this->riquadro((string)count($fatte), 'attività fatte', '#16a34a')
+            . $this->riquadro((string)count($aperte), 'ancora aperte', '#2563eb')
+            . $this->riquadro((string)count($ritardo), 'in ritardo', count($ritardo) ? '#dc2626' : '#64748b')
+            . $this->riquadro((string)$segnAperte, 'segnalazioni aperte', $segnAperte ? '#d97706' : '#64748b')
+            . $this->riquadro($num((float)$giornate), 'giornate di lavoro', '#0f172a')
+            . $this->riquadro((string)count($risposte), 'moduli compilati', '#0f172a')
+            . "</tr></table>";
+
+        // 2. fatto nel periodo
+        $h .= "<div class='sez'>Fatto nel periodo</div>";
+        if (!$fatte) {
+            $h .= "<p class='vuoto'>Nessuna attività chiusa in questo periodo.</p>";
+        }
+        foreach ($fatte as $t) {
+            $h .= $this->attivitaHtml($t, $filtraFoto, true);
+        }
+
+        // 3. aperte
+        $h .= "<div class='sez'>Da fare</div>";
+        if (!$aperte) {
+            $h .= "<p class='vuoto'>Nessuna attività aperta.</p>";
+        }
+        foreach ($aperte as $t) {
+            $h .= $this->attivitaHtml($t, $filtraFoto, false);
+        }
+
+        // 4. segnalazioni
+        $h .= "<div class='sez'>Segnalazioni</div>";
+        if (!$segn) {
+            $h .= "<p class='vuoto'>Nessuna segnalazione aperta o chiusa nel periodo.</p>";
+        } else {
+            $h .= "<table class='tab'><tr><th>Data</th><th>Tipo</th><th>Problema</th><th>Stato</th></tr>";
+            foreach ($segn as $s) {
+                $stato = self::STATO_SEGN[$s['stato'] ?? ''] ?? $s['stato'];
+                if (($s['stato'] ?? '') === 'risolta' && !empty($s['risolta_at'])) {
+                    $stato .= ' il ' . $d($s['risolta_at']);
+                }
+                $grave = ($s['gravita'] ?? '') === 'blocca' ? " <b class='rosso'>blocca il lavoro</b>" : '';
+                $h .= "<tr><td>{$d($s['created_at'] ?? null)}</td><td>" . $e(self::TIPO_SEGN[$s['tipo'] ?? ''] ?? '') . "</td>"
+                    . "<td>" . $e(mb_substr((string)($s['testo'] ?? ''), 0, 160)) . "{$grave}"
+                    . (!empty($s['esito']) ? "<div class='meta'>Esito: " . $e($s['esito']) . "</div>" : '') . "</td>"
+                    . "<td>" . $e($stato) . "</td></tr>";
+            }
+            $h .= "</table>";
+        }
+
+        // 5. presenze
+        $h .= "<div class='sez'>Presenze</div>";
+        if (!$presenze) {
+            $h .= "<p class='vuoto'>Nessuna presenza registrata nel periodo.</p>";
+        } else {
+            $h .= "<table class='tab'><tr><th>Giorno</th><th>Persone</th><th>Giornate</th></tr>";
+            foreach ($presenze as $p) {
+                $h .= "<tr><td>{$d($p['data'])}</td><td>" . (int)$p['persone'] . "</td><td>" . $num((float)$p['giornate']) . "</td></tr>";
+            }
+            $h .= "<tr class='tot'><td>Totale</td><td></td><td>" . $num((float)$giornate) . "</td></tr></table>";
+        }
+
+        // 6. moduli
+        $h .= "<div class='sez'>Moduli compilati</div>";
+        if (!$risposte) {
+            $h .= "<p class='vuoto'>Nessun modulo compilato nel periodo.</p>";
+        } else {
+            $h .= "<table class='tab'><tr><th>Data</th><th>Modulo</th><th>Compilato da</th></tr>";
+            foreach ($risposte as $r) {
+                $chi = trim((string)($r['user_name'] ?? '')) ?: (string)($r['submitter_name'] ?? '');
+                $h .= "<tr><td>{$d($r['created_at'])}</td><td>" . $e($r['template_name']) . "</td><td>" . $e($chi) . "</td></tr>";
+            }
+            $h .= "</table>";
+        }
+
+        $h .= "<div class='piede'>Rapporto generato da BOB per il cantiere {$nome}. Contiene solo ciò che "
+            . "è condiviso con chi l'ha scaricato.</div>";
+        return $h . "</body></html>";
+    }
+
+    // ── Dati ────────────────────────────────────────────────────────────────
+
+    private function attivita(int $worksiteId): array
+    {
+        $st = $this->conn->prepare("SELECT * FROM bb_zone_tasks WHERE worksite_id = :w ORDER BY priority DESC, updated_at DESC");
+        $st->execute([':w' => $worksiteId]);
+        $tasks = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        $foto = $this->conn->prepare("
+            SELECT id, task_id, text, file_url, author_name, created_at, interna, per_cliente, author_user_id
+            FROM   bb_zone_task_comments
+            WHERE  task_id = :t AND file_url IS NOT NULL AND file_url <> ''
+            ORDER BY created_at DESC
         ");
         foreach ($tasks as &$t) {
-            $cstmt->execute([':t' => $t['id']]);
-            $t['photos'] = $cstmt->fetchAll(PDO::FETCH_ASSOC);
+            $foto->execute([':t' => $t['id']]);
+            $t['photos'] = $foto->fetchAll(PDO::FETCH_ASSOC);
         }
         return $tasks;
     }
 
-    private function buildHtml(array $ws, array $tasks): string
+    /** @return array<int, array{data:string, persone:int, giornate:float}> */
+    private function presenze(int $worksiteId, string $dal, string $al): array
     {
-        $counts = ['open' => 0, 'in_progress' => 0, 'complete' => 0, 'verified' => 0];
-        foreach ($tasks as $t) {
-            $s = $t['status'] ?? 'open';
-            if (isset($counts[$s])) $counts[$s]++;
+        $per = [];
+        $st = $this->conn->prepare("
+            SELECT data, COUNT(*) AS persone,
+                   SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END) AS giornate
+            FROM   bb_presenze WHERE worksite_id = :w AND data BETWEEN :dal AND :al
+            GROUP BY data
+        ");
+        $st->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $per[$r['data']] = ['data' => $r['data'], 'persone' => (int)$r['persone'], 'giornate' => (float)$r['giornate']];
         }
-
-        $wsName = htmlspecialchars($ws['name'] ?? ('Cantiere #' . ($ws['id'] ?? '')));
-        $wsCode = htmlspecialchars($ws['worksite_code'] ?? '');
-        $date   = date('d/m/Y H:i');
-
-        $css = '
-            * { font-family: "DejaVu Sans", sans-serif; }
-            body { color:#1e293b; font-size:11px; }
-            h1 { font-size:18px; margin:0 0 2px; }
-            .sub { color:#64748b; font-size:10px; margin-bottom:12px; }
-            .stats { margin-bottom:14px; }
-            .stat { display:inline-block; padding:4px 10px; border-radius:4px; color:#fff; font-size:10px; margin-right:6px; }
-            .task { border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px; margin-bottom:8px; }
-            .task-name { font-size:12px; font-weight:bold; }
-            .badge { display:inline-block; padding:1px 7px; border-radius:10px; color:#fff; font-size:9px; }
-            .meta { color:#64748b; font-size:10px; margin-top:3px; }
-            .desc { margin-top:4px; font-size:10px; }
-            .photos { margin-top:6px; }
-            .photos img { width:120px; height:auto; border:1px solid #cbd5e1; border-radius:4px; margin:0 4px 4px 0; }
-            .sec { font-size:13px; font-weight:bold; margin:14px 0 6px; padding-bottom:3px; border-bottom:2px solid #e2e8f0; }
-        ';
-
-        $h = "<html><head><meta charset='utf-8'><style>{$css}</style></head><body>";
-        $h .= "<h1>Punch List — {$wsName}</h1>";
-        $h .= "<div class='sub'>" . ($wsCode ? "Codice {$wsCode} · " : '') . "Generato il {$date} · " . count($tasks) . " task</div>";
-
-        $h .= "<div class='stats'>";
-        foreach ($counts as $s => $n) {
-            $h .= "<span class='stat' style='background:" . self::STATUS_COLOR[$s] . "'>" . self::STATUS_LABEL[$s] . ": {$n}</span>";
+        $st = $this->conn->prepare("
+            SELECT data_presenza AS data, SUM(quantita) AS persone
+            FROM   bb_presenze_consorziate WHERE worksite_id = :w AND data_presenza BETWEEN :dal AND :al
+            GROUP BY data_presenza
+        ");
+        $st->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $per[$r['data']] ??= ['data' => $r['data'], 'persone' => 0, 'giornate' => 0.0];
+            $per[$r['data']]['persone']  += (int)$r['persone'];
+            $per[$r['data']]['giornate'] += (float)$r['persone'];
         }
-        $h .= "</div>";
-
-        // raggruppa per stato
-        $byStatus = ['open' => [], 'in_progress' => [], 'complete' => [], 'verified' => []];
-        foreach ($tasks as $t) {
-            $s = $t['status'] ?? 'open';
-            $byStatus[$s][] = $t;
-        }
-
-        foreach ($byStatus as $s => $list) {
-            if (empty($list)) continue;
-            $h .= "<div class='sec'>" . self::STATUS_LABEL[$s] . " (" . count($list) . ")</div>";
-            foreach ($list as $t) {
-                $h .= $this->taskHtml($t, $s);
-            }
-        }
-
-        $h .= "</body></html>";
-        return $h;
+        ksort($per);
+        return array_values($per);
     }
 
-    private function taskHtml(array $t, string $status): string
+    private function risposte(int $worksiteId, string $dal, string $al): array
     {
-        $name = htmlspecialchars($t['name'] ?? '');
-        $color = self::STATUS_COLOR[$status];
-        $label = self::STATUS_LABEL[$status];
+        $st = $this->conn->prepare("
+            SELECT s.id, s.template_name, s.submitter_name, s.submitted_by, s.created_at,
+                   TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS user_name
+            FROM   bb_zone_form_submissions s LEFT JOIN bb_users u ON u.id = s.submitted_by
+            WHERE  s.worksite_id = :w AND DATE(s.created_at) BETWEEN :dal AND :al
+            ORDER BY s.created_at
+        ");
+        $st->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        $meta = [];
-        if (!empty($t['assignee_name'])) $meta[] = '👤 ' . htmlspecialchars($t['assignee_name']);
-        if (!empty($t['category']))      $meta[] = htmlspecialchars($t['category']);
-        if (!empty($t['due_date']))      $meta[] = 'Scad. ' . date('d/m/Y', strtotime($t['due_date']));
+    private function cliente(int $clientId): string
+    {
+        if ($clientId <= 0) return '';
+        $st = $this->conn->prepare('SELECT name FROM bb_clients WHERE id = :id');
+        $st->execute([':id' => $clientId]);
+        return (string)($st->fetchColumn() ?: '');
+    }
 
-        $h = "<div class='task'>";
-        $h .= "<span class='task-name'>{$name}</span> <span class='badge' style='background:{$color}'>{$label}</span>";
+    // ── Pezzi ───────────────────────────────────────────────────────────────
+
+    private function riquadro(string $numero, string $cosa, string $colore): string
+    {
+        return "<td><div class='n' style='color:{$colore}'>{$numero}</div><div class='l'>{$cosa}</div></td>";
+    }
+
+    private function attivitaHtml(array $t, callable $filtraFoto, bool $conFoto): string
+    {
+        $e = static fn($x): string => htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8');
+        $stato  = (string)($t['status'] ?? 'open');
+        $oggi   = date('Y-m-d');
+        $meta   = [];
+        $chi = !empty($t['assignee_name']) ? $t['assignee_name'] : match ((string)($t['assegnata_a'] ?? '')) {
+            'ufficio' => "l'ufficio", 'cliente' => 'il cliente', 'persona' => '', default => 'la squadra',
+        };
+        if ($chi !== '') $meta[] = 'Tocca a ' . $e($chi);
+        if (!empty($t['due_date'])) {
+            $tardi  = !in_array($stato, ['complete', 'verified'], true) && substr((string)$t['due_date'], 0, 10) < $oggi;
+            $meta[] = ($tardi ? "<b class='rosso'>in ritardo, " : '') . 'scadenza ' . date('d/m/Y', strtotime((string)$t['due_date'])) . ($tardi ? '</b>' : '');
+        }
+        if (!empty($t['category'])) $meta[] = $e($t['category']);
+        if (in_array($stato, ['complete', 'verified'], true) && !empty($t['updated_at'])) {
+            $meta[] = 'chiusa il ' . date('d/m/Y', strtotime((string)$t['updated_at']));
+        }
+
+        $h  = "<div class='att'><span class='badge' style='background:" . (self::COLORE[$stato] ?? '#64748b') . "'>"
+            . (self::STATO[$stato] ?? $e($stato)) . "</span> <b>" . $e($t['name'] ?? '') . "</b>";
         if ($meta) $h .= "<div class='meta'>" . implode(' · ', $meta) . "</div>";
-        if (!empty($t['description'])) $h .= "<div class='desc'>" . nl2br(htmlspecialchars($t['description'])) . "</div>";
-
-        // foto incorporate
-        $photos = array_slice($t['photos'] ?? [], 0, self::MAX_PHOTOS_PER_TASK);
-        if ($photos) {
-            $h .= "<div class='photos'>";
-            foreach ($photos as $p) {
-                $data = $this->photoDataUri($p['file_url'] ?? '');
-                if ($data) $h .= "<img src='{$data}'>";
-            }
-            $h .= "</div>";
+        if (!empty($t['description'])) {
+            $h .= "<div class='desc'>" . nl2br($e(mb_substr((string)$t['description'], 0, 600))) . "</div>";
         }
-        $h .= "</div>";
-        return $h;
+        if ($conFoto) {
+            $foto = array_slice($filtraFoto($t['photos'] ?? []), 0, self::FOTO_PER_ATTIVITA);
+            if ($foto) {
+                $h .= "<div class='foto'>";
+                foreach ($foto as $p) {
+                    $dati = $this->fotoDataUri((string)($p['file_url'] ?? ''));
+                    if ($dati) $h .= "<img src='{$dati}'>";
+                }
+                $h .= "</div>";
+            }
+        }
+        return $h . "</div>";
     }
 
-    /** Legge la foto dal disco e la restituisce come data URI (downscalata se GD c'è). */
-    private function photoDataUri(string $fileUrl): ?string
+    private function css(): string
+    {
+        return '
+            * { font-family: "DejaVu Sans", sans-serif; }
+            body { color:#1e293b; font-size:10.5px; }
+            .testa { border-bottom:3px solid #1E40AF; padding-bottom:8px; margin-bottom:12px; }
+            .marchio { color:#1E40AF; font-size:9px; font-weight:bold; letter-spacing:.5px; text-transform:uppercase; }
+            h1 { font-size:19px; margin:2px 0 0; color:#0C1929; }
+            .cantiere { font-size:13px; font-weight:bold; margin-top:2px; }
+            .sub { color:#64748b; font-size:9px; margin-top:3px; }
+            .breve { width:100%; border-collapse:separate; border-spacing:5px; margin:0 -5px 6px; }
+            .breve td { background:#f1f5f9; border-radius:6px; padding:7px 4px; text-align:center; width:16.6%; }
+            .breve .n { font-size:17px; font-weight:bold; }
+            .breve .l { font-size:8.5px; color:#475569; }
+            .sez { font-size:13px; font-weight:bold; color:#0C1929; margin:14px 0 6px; padding-bottom:3px; border-bottom:1.5px solid #e2e8f0; }
+            .att { border:1px solid #e2e8f0; border-radius:6px; padding:6px 9px; margin-bottom:6px; page-break-inside:avoid; }
+            .badge { display:inline-block; padding:1px 7px; border-radius:9px; color:#fff; font-size:8.5px; }
+            .meta { color:#64748b; font-size:9px; margin-top:2px; }
+            .desc { margin-top:3px; font-size:9.5px; }
+            .foto img { width:118px; height:auto; border:1px solid #cbd5e1; border-radius:4px; margin:4px 4px 0 0; }
+            .tab { width:100%; border-collapse:collapse; }
+            .tab th { text-align:left; font-size:9px; color:#475569; border-bottom:1px solid #cbd5e1; padding:3px 4px; }
+            .tab td { font-size:9.5px; border-bottom:1px solid #eef2f7; padding:3px 4px; vertical-align:top; }
+            .tab .tot td { font-weight:bold; border-top:1.5px solid #cbd5e1; }
+            .vuoto { color:#94a3b8; font-size:9.5px; margin:2px 0 6px; }
+            .rosso { color:#dc2626; }
+            .piede { margin-top:18px; color:#94a3b8; font-size:8px; border-top:1px solid #e2e8f0; padding-top:5px; }
+        ';
+    }
+
+    /** Legge la foto dal disco e la restituisce come data URI (rimpicciolita se c'e' GD). */
+    private function fotoDataUri(string $fileUrl): ?string
     {
         // file_url = /worksites/{id}/zone/photo?f=<rel-encoded>
         $q = parse_url($fileUrl, PHP_URL_QUERY);
@@ -188,13 +379,12 @@ final class ZoneReportService
             return null;
         }
 
-        // downscale con GD se disponibile (riduce molto la dimensione del PDF)
         if (function_exists('imagecreatefromstring') && function_exists('imagejpeg')) {
             $raw = @file_get_contents($real);
             $img = $raw ? @imagecreatefromstring($raw) : false;
             if ($img !== false) {
                 $w = imagesx($img); $hh = imagesy($img);
-                $scale = min(1, self::PHOTO_MAX_PX / max($w, $hh));
+                $scale = min(1, self::FOTO_PX / max($w, $hh));
                 if ($scale < 1) {
                     $nw = (int)($w * $scale); $nh = (int)($hh * $scale);
                     $dst = imagecreatetruecolor($nw, $nh);
@@ -206,7 +396,6 @@ final class ZoneReportService
                 return 'data:image/jpeg;base64,' . base64_encode($bin);
             }
         }
-        // fallback: incorpora il file così com'è
         $bin = @file_get_contents($real);
         if ($bin === false) return null;
         $ext = strtolower(pathinfo($real, PATHINFO_EXTENSION));

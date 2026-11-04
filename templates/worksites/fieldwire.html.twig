@@ -338,7 +338,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <div class="bz-nav-sep"></div>
             <div class="bz-nav-actions">
                 {% if accessi.attivita > 1 %}<button class="bz-nav-item" id="btn-new-task"><i class="fas fa-plus"></i><span>Nuovo Task</span></button>{% endif %}
-                {% if accessi.report   > 0 %}<a class="bz-nav-item" href="/worksites/{{ worksite_id }}/zone/report" target="_blank"><i class="fas fa-file-pdf"></i><span>Report PDF</span></a>{% endif %}
+                {# Il rapporto di un periodo: cosa e' stato fatto, cosa resta,
+                   segnalazioni, presenze e moduli. Si sceglie il periodo. #}
+                {% if accessi.report   > 0 %}
+                <details class="bz-rapporto">
+                    <summary class="bz-nav-item"><i class="fas fa-file-pdf"></i><span>Rapporto PDF</span></summary>
+                    <a href="/worksites/{{ worksite_id }}/zone/report?periodo=7" target="_blank">Ultima settimana</a>
+                    <a href="/worksites/{{ worksite_id }}/zone/report?periodo=30" target="_blank">Ultimi 30 giorni</a>
+                    <a href="/worksites/{{ worksite_id }}/zone/report?periodo=tutto" target="_blank">Dall'inizio</a>
+                </details>
+                {% endif %}
                 {% if puoGestire %}<button class="bz-nav-item" id="btn-accessi"><i class="fas fa-user-shield"></i><span>Chi accede</span></button>{% endif %}
             </div>
 
@@ -1938,6 +1947,12 @@ async function submitTask() {
         due_date:        document.getElementById('task-due').value || null,
         start_date:      document.getElementById('task-start').value || null,
     };
+    // "solo ufficio" e "alla squadra" insieme non stanno: a chi tocca la
+    // vede. Se l'ufficio la tiene per se' e non ha scelto nessuno, e' sua.
+    if (Array.isArray(body.parti) && !body.parti.length && !(body.persone || []).length
+        && body.assegnata_a === 'squadra' && !aSel.value) {
+        body.assegnata_a = 'ufficio';
+    }
 
     const btn = document.querySelector('.bz-modal-submit');
     btn.textContent = '...'; btn.disabled = true;
@@ -2505,6 +2520,10 @@ if (!SOLO_ACCESSI) {
 .bz-chi-titolo { display:flex; align-items:center; justify-content:space-between;
                  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
                  color:#94a3b8; padding-bottom:6px; border-bottom:1px solid #e2e8f0; margin-bottom:4px; }
+.bz-rapporto summary { list-style:none; cursor:pointer; }
+.bz-rapporto summary::-webkit-details-marker { display:none; }
+.bz-rapporto a { display:block; padding:6px 12px 6px 40px; font-size:12px; color:#94a3b8; text-decoration:none; }
+.bz-rapporto a:hover { color:#e2e8f0; }
 .bz-chi-tutti { background:none; border:0; color:#2563eb; font-size:11px; font-weight:700;
                 font-family:inherit; cursor:pointer; text-transform:none; letter-spacing:0; padding:2px 4px; }
 .bz-chi-tutti:hover { text-decoration:underline; }

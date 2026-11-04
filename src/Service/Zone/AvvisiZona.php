@@ -76,6 +76,82 @@ final class AvvisiZona
         }
     }
 
+    /**
+     * Un messaggio sul filo di un'attivita'.
+     *
+     * Prima non avvisava nessuno: il cliente scriveva una domanda sotto
+     * un'attivita' e nessuno lo sapeva finche' non ci ripassava. Avvisa chi
+     * ci e' dentro davvero: chi l'ha creata, la persona a cui tocca, e
+     * l'ufficio del cantiere quando scrive qualcuno da fuori. Non tutto il
+     * gruppo: una squadra di dieci con un avviso a ogni "ok" la silenzia.
+     * Una nota interna resta all'ufficio anche qui.
+     */
+    public function commento(int $taskId, int $daChi, string $testo, bool $interna): void
+    {
+        $st = $this->conn->prepare("
+            SELECT t.*, w.name AS cantiere FROM bb_zone_tasks t JOIN bb_worksites w ON w.id = t.worksite_id
+            WHERE t.id = :id
+        ");
+        $st->execute([':id' => $taskId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) {
+            return;
+        }
+        $w = (int)$t['worksite_id'];
+        $acc = new Accesso($this->conn);
+        $ruoloAutore = $this->ruoloDi($w, $daChi);
+
+        $persone = [];
+        foreach ([(int)($t['created_by'] ?? 0), (int)($t['assignee_user_id'] ?? 0)] as $uid) {
+            if ($uid > 0) {
+                foreach ($this->persone($w, [], $uid) as $p) $persone[(int)$p['user_id']] = $p;
+            }
+        }
+        if ($ruoloAutore !== Accesso::UFFICIO) {
+            foreach ($this->persone($w, [Accesso::UFFICIO], null) as $p) $persone[(int)$p['user_id']] = $p;
+        }
+
+        $cond   = new Condivisione($this->conn, $acc);
+        $chi    = $this->nome($daChi);
+        foreach ($persone as $uid => $p) {
+            if ($uid === $daChi) continue;
+            if ($interna && $p['ruolo'] !== Accesso::UFFICIO) continue;
+            // solo chi vede l'attivita'
+            if ($p['ruolo'] !== Accesso::UFFICIO
+                && !$cond->vede($this->utente($uid), $w, 'attivita', $taskId, (int)($t['created_by'] ?? 0))) continue;
+            $p['worksite_id'] = $w;
+            $p['dove'] = 'attivita-' . $taskId;
+            $this->manda($p, 'zona_commento_t', 'zona_commento', [
+                'cantiere' => $t['cantiere'],
+                'nome'     => mb_substr((string)$t['name'], 0, 80),
+                'chi'      => $chi,
+                'testo'    => mb_substr($testo, 0, 140),
+            ], 'normal', $daChi);
+        }
+    }
+
+    private function ruoloDi(int $w, int $userId): ?string
+    {
+        $st = $this->conn->prepare('SELECT ruolo FROM bb_zone_accessi WHERE worksite_id = :w AND user_id = :u');
+        $st->execute([':w' => $w, ':u' => $userId]);
+        return (new Accesso($this->conn))->normalizza((string)$st->fetchColumn());
+    }
+
+    private function nome(int $userId): string
+    {
+        $st = $this->conn->prepare("SELECT TRIM(CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,''))) FROM bb_users WHERE id = :u");
+        $st->execute([':u' => $userId]);
+        return (string)($st->fetchColumn() ?: 'BOB');
+    }
+
+    /** Un utente per le domande di Accesso: basta id e tipo. */
+    private function utente(int $userId): object
+    {
+        $st = $this->conn->prepare('SELECT id, type FROM bb_users WHERE id = :u');
+        $st->execute([':u' => $userId]);
+        return (object)($st->fetch(PDO::FETCH_ASSOC) ?: ['id' => $userId]);
+    }
+
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {

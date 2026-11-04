@@ -98,7 +98,7 @@ final class ZoneFormRepository
     public function submissions(int $worksiteId, ?int $templateId = null): array
     {
         $sql = "
-            SELECT s.id, s.template_id, s.template_name, s.submitter_name, s.created_at, s.source,
+            SELECT s.id, s.template_id, s.template_name, s.submitter_name, s.created_at, s.source, s.submitted_by,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS user_name
             FROM bb_zone_form_submissions s
             LEFT JOIN bb_users u ON u.id = s.submitted_by
