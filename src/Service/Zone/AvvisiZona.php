@@ -152,6 +152,35 @@ final class AvvisiZona
         return (object)($st->fetch(PDO::FETCH_ASSOC) ?: ['id' => $userId]);
     }
 
+    /**
+     * Una versione nuova di un disegno: a chi lo vede (squadra, cliente,
+     * le persone a cui e' condiviso). L'ufficio l'ha caricata lui.
+     */
+    public function disegno(int $worksiteId, int $docId, int $daChi): void
+    {
+        $st = $this->conn->prepare('
+            SELECT d.file_name, d.created_by, w.name AS cantiere
+            FROM bb_worksite_documents d JOIN bb_worksites w ON w.id = d.worksite_id
+            WHERE d.id = :d AND d.worksite_id = :w
+        ');
+        $st->execute([':d' => $docId, ':w' => $worksiteId]);
+        $d = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$d) {
+            return;
+        }
+        $cond = new Condivisione($this->conn, new Accesso($this->conn));
+        foreach ($this->persone($worksiteId, [Accesso::CANTIERE, Accesso::CLIENTE], null) as $p) {
+            if ((int)$p['user_id'] === $daChi) continue;
+            if (!$cond->vede($this->utente((int)$p['user_id']), $worksiteId, 'disegno', $docId, (int)($d['created_by'] ?? 0))) continue;
+            $p['worksite_id'] = $worksiteId;
+            $p['dove'] = '';
+            $this->manda($p, 'zona_disegno_t', 'zona_disegno', [
+                'cantiere' => $d['cantiere'],
+                'nome'     => mb_substr((string)$d['file_name'], 0, 100),
+            ], 'high', $daChi);
+        }
+    }
+
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {

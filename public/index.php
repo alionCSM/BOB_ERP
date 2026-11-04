@@ -569,6 +569,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'salvaAccesso'])
            ->post('/worksites/{id}/zone/accessi/elimina',                                         [FieldwireController::class, 'eliminaAccesso'])
            ->post('/worksites/{id}/zone/condividi-cliente',                                       [FieldwireController::class, 'condividiCliente'])
+           ->post('/worksites/{id}/zone/riferimento',                                             [FieldwireController::class, 'salvaRiferimento'])
            ->get( '/worksites/{id}/zone/condivisione',                                            [FieldwireController::class, 'condivisione'])
            ->post('/worksites/{id}/zone/condivisione',                                            [FieldwireController::class, 'salvaCondivisione'])
            ->post('/worksites/{id}/zone/messaggio-flag',                                          [FieldwireController::class, 'flagMessaggio'])

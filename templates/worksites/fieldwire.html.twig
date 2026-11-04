@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* "hidden" vince sempre: senza, un display:flex di classe lo scavalca */
+[hidden] { display: none !important; }
 html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
 
 /* ── Shell ── */
@@ -170,6 +172,94 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-status-opt.verified  { background: rgba(167,139,250,.1); color: #a78bfa; border-color: rgba(167,139,250,.2); }
 .bz-task-action-btn { background:#1e293b; color:#cbd5e1; border:1px solid #334155; border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
 .bz-task-action-btn.danger { color:#fca5a5; border-color:#471515; }
+.bz-card-luogo { font-size:11.5px; color:#94a3b8; margin-top:4px; }
+.bz-card-user { color:#94a3b8; }
+[data-theme="light"] .bz-card-user { color:#64748b; }
+.bz-card-prio { display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700; margin-top:5px; margin-right:8px; }
+.bz-card-prio.alta { color:#fbbf24; } .bz-card-prio.urgente { color:#f87171; }
+[data-theme="light"] .bz-card-luogo { color:#64748b; }
+[data-theme="light"] .bz-card-prio.alta { color:#b45309; } [data-theme="light"] .bz-card-prio.urgente { color:#b91c1c; }
+.bz-gantt-bar.stimata { opacity:.55; background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.25) 0 6px, transparent 6px 12px) !important; }
+.bz-gantt-scala { position:relative; height:16px; }
+.bz-gantt-scala span { position:absolute; transform:translateX(-50%); font-size:10px; font-weight:600; color:#94a3b8; white-space:nowrap; }
+[data-theme="light"] .bz-gantt-scala span { color:#64748b; }
+.bz-gantt-nd { font-style:normal; font-size:10px; color:#94a3b8; margin-left:4px; }
+.bz-gantt-timeline { position:relative; }
+.bz-gantt-oggi { position:absolute; top:0; bottom:0; width:2px; background:#ef4444; opacity:.6; z-index:1; }
+.bz-cal-event.stimata { outline:1px dashed currentColor; outline-offset:-1px; }
+.bz-cal-event.verified { background: rgba(167,139,250,.15); color: #a78bfa; }
+.bz-cal-day-name { color:#94a3b8; }
+.bz-cal-day-num { color:#94a3b8; }
+.bz-cal-altri { font-size:10px; color:#94a3b8; }
+.bz-gantt-name { color:#cbd5e1; }
+[data-theme="light"] .bz-cal-nav button { background:#fff; border-color:#e2e8f0; color:#334155; }
+[data-theme="light"] .bz-cal-nav button:hover { color:#0f172a; border-color:#cbd5e1; }
+[data-theme="light"] .bz-cal-day-name, [data-theme="light"] .bz-cal-day-num, [data-theme="light"] .bz-cal-altri { color:#64748b; }
+[data-theme="light"] .bz-cal-day.today .bz-cal-day-num { color:#1e40af; }
+[data-theme="light"] .bz-cal-event.open        { background:#fef3c7; color:#92400e; }
+[data-theme="light"] .bz-cal-event.in_progress { background:#dbeafe; color:#1e40af; }
+[data-theme="light"] .bz-cal-event.complete    { background:#dcfce7; color:#166534; }
+[data-theme="light"] .bz-cal-event.verified    { background:#ede9fe; color:#5b21b6; }
+[data-theme="light"] .bz-gantt-name { color:#1e293b; }
+[data-theme="light"] .bz-gantt-nd { color:#64748b; }
+
+/* ── Gantt ── */
+.bz-gantt-wrap { padding: 0 !important; }
+.bzg { display:flex; height:100%; min-height:0; font-size:12px; }
+.bzg-sx { padding-bottom:20px; flex:0 0 250px; border-right:1px solid #1e293b; overflow:hidden; background:#0f172a; z-index:2; }
+.bzg-sx-testa { position:sticky; top:0; z-index:1; background:inherit; height:52px; display:flex; align-items:flex-end; padding:0 14px 8px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#94a3b8; border-bottom:1px solid #1e293b; }
+.bzg-sx-riga { box-sizing:border-box; height:40px; display:grid; grid-template-columns:10px 1fr; grid-template-rows:auto auto; column-gap:8px; align-content:center; padding:0 14px; border-bottom:1px solid #16202f; cursor:pointer; }
+.bzg-sx-riga:hover { background:#16202f; }
+.bzg-pallino { grid-row:1 / span 2; width:8px; height:8px; border-radius:50%; align-self:center; }
+.bzg-nome { color:#e2e8f0; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bzg-chi { color:#94a3b8; font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bzg-dx { flex:1; overflow:auto; position:relative; }
+.bzg-tela { position:relative; }
+.bzg-testa { position:sticky; top:0; z-index:3; height:52px; background:#0f172a; border-bottom:1px solid #1e293b; }
+.bzg-mesi, .bzg-giorni { position:relative; height:26px; }
+.bzg-mesi div { position:absolute; top:0; height:26px; line-height:26px; padding-left:8px; font-size:11px; font-weight:700; color:#cbd5e1; text-transform:capitalize; border-left:1px solid #1e293b; white-space:nowrap; overflow:hidden; }
+.bzg-giorni div { position:absolute; top:0; height:26px; text-align:center; font-size:11px; font-weight:600; color:#94a3b8; line-height:12px; padding-top:1px; }
+.bzg-giorni small { display:block; font-size:8.5px; font-weight:500; opacity:.75; }
+.bzg-giorni div.fest { color:#64748b; }
+.bzg-giorni div.oggi { color:#fff; background:#ef4444; border-radius:6px; }
+.bzg-corpo { position:relative; margin-bottom:20px; }
+.bzg-fest { position:absolute; top:0; bottom:0; background:rgba(148,163,184,.06); }
+.bzg-riga { position:absolute; left:0; right:0; height:40px; border-bottom:1px solid #16202f; }
+.bzg-oggi { position:absolute; top:0; bottom:0; width:2px; margin-left:-1px; background:#ef4444; z-index:1; }
+.bzg-barra { position:absolute; height:24px; border-radius:7px; background:var(--c); color:#0f172a; cursor:pointer; z-index:2;
+             display:flex; align-items:center; padding:0 9px; font-size:11px; font-weight:700; overflow:hidden; white-space:nowrap;
+             box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .1s, box-shadow .1s; }
+.bzg-barra span { overflow:hidden; text-overflow:ellipsis; }
+.bzg-barra:hover { transform:translateY(-1px); box-shadow:0 4px 10px rgba(0,0,0,.3); }
+.bzg-barra.stimata { background:repeating-linear-gradient(135deg, var(--c) 0 8px, color-mix(in srgb, var(--c) 55%, transparent) 8px 16px); }
+.bzg-barra.complete span, .bzg-barra.verified span { text-decoration:none; }
+.bzg-etichetta { position:absolute; font-size:11px; color:#cbd5e1; white-space:nowrap; pointer-events:none; z-index:2; }
+[data-theme="light"] .bzg-sx, [data-theme="light"] .bzg-testa { background:#fff; border-color:#e2e8f0; }
+[data-theme="light"] .bzg-sx-testa { color:#64748b; border-color:#e2e8f0; }
+[data-theme="light"] .bzg-sx-riga, [data-theme="light"] .bzg-riga { border-color:#f1f5f9; }
+[data-theme="light"] .bzg-sx-riga:hover { background:#f8fafc; }
+[data-theme="light"] .bzg-nome { color:#0f172a; }
+[data-theme="light"] .bzg-chi, [data-theme="light"] .bzg-giorni div { color:#64748b; }
+[data-theme="light"] .bzg-giorni div.fest { color:#94a3b8; }
+[data-theme="light"] .bzg-giorni div.oggi { color:#fff; }
+[data-theme="light"] .bzg-mesi div { color:#1e293b; border-color:#e2e8f0; }
+[data-theme="light"] .bzg-fest { background:#f8fafc; }
+[data-theme="light"] .bzg-etichetta { color:#334155; }
+[data-theme="light"] .bzg-barra { box-shadow:0 1px 2px rgba(15,23,42,.12); }
+[data-theme="light"] .bz-gantt { background:#fff; }
+
+.bz-dati { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin:0; font-size:12.5px; }
+.bz-dati dt { color:#94a3b8; white-space:nowrap; } .bz-dati dt i { width:14px; text-align:center; margin-right:4px; }
+.bz-dati dd { margin:0; color:#e2e8f0; } .bz-dati dd.alta { color:#fbbf24; font-weight:600; } .bz-dati dd.urgente { color:#f87171; font-weight:600; }
+.bz-dati-desc { font-size:13px; color:#cbd5e1; margin-top:10px; line-height:1.5; white-space:pre-line; }
+.bz-foto-striscia { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+.bz-foto-striscia a { flex:0 0 auto; width:76px; height:76px; border-radius:8px; overflow:hidden; border:1px solid #334155; }
+.bz-foto-striscia img { width:100%; height:100%; object-fit:cover; display:block; }
+[data-theme="light"] .bz-dati dt { color:#64748b; } [data-theme="light"] .bz-dati dd { color:#1e293b; }
+[data-theme="light"] .bz-dati dd.alta { color:#b45309; } [data-theme="light"] .bz-dati dd.urgente { color:#b91c1c; }
+[data-theme="light"] .bz-dati-desc { color:#334155; } [data-theme="light"] .bz-foto-striscia a { border-color:#e2e8f0; }
+.bz-comment-del { background:transparent; color:#94a3b8; border:0; cursor:pointer; font-size:15px; padding:0 4px; margin-left:auto; line-height:1; }
+.bz-comment-del:hover { color:#f87171; }
 [data-theme="light"] .bz-task-action-btn { background:#f8fafc; color:#334155; border-color:#e2e8f0; }
 [data-theme="light"] .bz-task-action-btn.danger { color:#b91c1c; border-color:#fecaca; }
 [data-theme="light"] .bz-status-opt.open        { background:#fef3c7; color:#b45309; border-color:#fde68a; }
@@ -221,6 +311,25 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-modal-field textarea:focus { border-color: #94a3b8; background: #fff; }
 .bz-modal-field textarea { resize: vertical; min-height: 80px; }
 .bz-modal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width:560px) { .bz-modal-row { grid-template-columns: 1fr; } }
+.bz-task-form { width: 560px; max-height: 92vh; overflow-y: auto; }
+.bz-task-sez { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #1e40af; margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+.bz-task-sez span { text-transform: none; letter-spacing: 0; font-weight: 400; color: #64748b; margin-left: 6px; }
+.bz-task-passi { list-style: none; margin: 0 0 6px; padding: 0; }
+.bz-task-passi li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 5px; font-size: 13px; color: #1e293b; }
+.bz-task-passi li span { flex: 1; }
+.bz-task-passi li i { color: #94a3b8; }
+.bz-task-passi button, .bz-task-foto-mini button { background: none; border: 0; color: #94a3b8; font-size: 16px; cursor: pointer; line-height: 1; }
+.bz-task-passi button:hover, .bz-task-foto-mini button:hover { color: #dc2626; }
+.bz-task-passo-nuovo { display: flex; gap: 6px; }
+.bz-task-passo-nuovo input { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 11px; font-size: 13px; color: #1e293b; font-family: inherit; outline: none; }
+.bz-task-passo-nuovo button { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 8px; padding: 0 12px; cursor: pointer; }
+.bz-task-foto { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.bz-task-foto-mini { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+.bz-task-foto-mini img { width: 100%; height: 100%; object-fit: cover; }
+.bz-task-foto-mini button { position: absolute; top: 2px; right: 2px; background: rgba(255,255,255,.9); border-radius: 50%; width: 20px; height: 20px; font-size: 14px; }
+.bz-task-foto-add { display: inline-flex; align-items: center; gap: 7px; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #334155; cursor: pointer; }
+.bz-task-foto-add:hover { border-color: #1e40af; color: #1e40af; }
 .bz-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .bz-modal-cancel { background: #f1f5f9; border: none; border-radius: 8px; padding: 9px 18px; color: #64748b; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500; }
 .bz-modal-cancel:hover { background: #e2e8f0; }
@@ -305,9 +414,13 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
     {# ── Header (sottile) ── #}
     <header class="bz-header">
-        <a href="/worksites/{{ worksite_id }}" class="bz-back">
-            <i class="fas fa-arrow-left"></i> Cantiere
-        </a>
+        {# la scheda cantiere e' dell'ufficio: cliente e squadra tornano ai
+           loro cantieri (prima il link portava a una pagina vietata) #}
+        {% if daUfficio %}
+        <a href="/worksites/{{ worksite_id }}" class="bz-back"><i class="fas fa-arrow-left"></i> Cantiere</a>
+        {% else %}
+        <a href="/worksites/my" class="bz-back"><i class="fas fa-arrow-left"></i> I miei cantieri</a>
+        {% endif %}
         <div class="bz-sep"></div>
         <div class="bz-brand">
             <span class="bz-brand-bob">BOB</span>
@@ -315,6 +428,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-sep"></div>
         <span class="bz-wname">{{ worksite.worksite_code ? '[' ~ worksite.worksite_code ~ '] ' : '' }}{{ worksite.name }}</span>
+        {# Il cliente da' al cantiere il suo nome e il suo codice commessa #}
+        <button type="button" class="bz-rif" id="bz-rif" hidden title="Il tuo nome e il tuo codice per questo cantiere"></button>
         <div class="bz-header-right">
             <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
                 <i class="fas fa-circle-half-stroke"></i>
@@ -352,6 +467,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.report   > 0 %}
                 <details class="bz-rapporto">
                     <summary class="bz-nav-item"><i class="fas fa-file-pdf"></i><span>Rapporto PDF</span></summary>
+                    <p class="bz-rapporto-spiega">Un riassunto da scaricare o mandare: cosa è stato fatto
+                        (con le foto), cosa resta, segnalazioni, presenze e moduli. Contiene solo ciò che vedi tu.</p>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=7" target="_blank">Ultima settimana</a>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=30" target="_blank">Ultimi 30 giorni</a>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=tutto" target="_blank">Dall'inizio</a>
@@ -364,6 +481,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <div class="bz-info">
                 <div class="bz-info-title">Cantiere</div>
                 {% if clientName %}<div class="bz-info-row"><i class="fas fa-user-tie"></i><span>{{ clientName }}</span></div>{% endif %}
+                <div class="bz-info-row" id="bz-rif-info" hidden><i class="fas fa-tag"></i><span></span></div>
                 {% if worksite.location %}<div class="bz-info-row"><i class="fas fa-location-dot"></i><span>{{ worksite.location }}</span></div>{% endif %}
                 {% if worksite.status %}<div class="bz-info-row"><i class="fas fa-circle-info"></i><span>{{ worksite.status }}</span></div>{% endif %}
                 {% if worksite.start_date %}<div class="bz-info-row"><i class="fas fa-calendar-day"></i><span>Inizio {{ worksite.start_date|date('d/m/Y') }}</span></div>{% endif %}
@@ -379,7 +497,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             {# Collegare un cantiere a Fieldwire e' una cosa da ufficio: a chi
                ci lavora dentro non serve, e il bottone chiede conferma per
                un'operazione che non saprebbe valutare. #}
-            <div class="bz-nav-fw"{{ daUfficio ? '' : ' hidden' }}>
+            <div class="bz-nav-fw"{{ daUfficio and (fieldwire_project_id or fieldwire_enabled) ? '' : ' hidden' }}>
                 {% if fieldwire_project_id %}
                     <span class="bz-fw-pill"><span class="bz-fw-dot"></span>Fieldwire collegato</span>
                 {% elseif fieldwire_enabled %}
@@ -604,54 +722,82 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 {# ── New task modal ── #}
 <div class="bz-overlay hidden" id="task-modal">
-    <div class="bz-modal">
+    {# Tutto in una volta: cosa, dove, chi e quando, i passaggi, le foto.
+       Prima si creava l'attivita' e poi si tornava dentro per la checklist. #}
+    <div class="bz-modal bz-task-form">
         <h3>Nuova attività</h3>
+
         <div class="bz-modal-field">
-            <label>Nome *</label>
-            <input type="text" id="task-name" placeholder="Descrivi il task...">
+            <label>Cosa c'è da fare *</label>
+            <input type="text" id="task-name" maxlength="200" placeholder="Es. Montare i correnti della corsia A">
         </div>
         <div class="bz-modal-field">
-            <label>Descrizione</label>
-            <textarea id="task-desc" placeholder="Dettagli opzionali..."></textarea>
+            <label>Dettagli</label>
+            <textarea id="task-desc" rows="2" placeholder="Misure, materiale, avvertenze…"></textarea>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Stato</label>
-                <select id="task-status">
-                    <option value="open">Aperto</option>
-                    <option value="in_progress">In corso</option>
-                    <option value="complete">Completato</option>
-                </select>
+                <label>Dove in cantiere</label>
+                <input type="text" id="task-luogo" maxlength="160" placeholder="Es. Campata 3, livello 2">
             </div>
             <div class="bz-modal-field">
-                <label>Categoria</label>
-                <input type="text" id="task-cat" placeholder="Es. Elettrico">
+                <label>Tipo</label>
+                <input type="text" id="task-cat" list="task-tipi">
+                <datalist id="task-tipi">
+                    <option value="Montaggio"><option value="Smontaggio"><option value="Modifica">
+                    <option value="Verifica"><option value="Sicurezza"><option value="Materiale"><option value="Documenti">
+                </datalist>
+            </div>
+        </div>
+
+        <div class="bz-task-sez">Chi e quando</div>
+        <div class="bz-modal-row">
+            <div class="bz-modal-field">
+                <label>A chi tocca</label>
+                <select id="task-assignee"><option value="">— la squadra in cantiere —</option></select>
+            </div>
+            <div class="bz-modal-field">
+                <label>Priorità</label>
+                <select id="task-priority">
+                    <option value="0">Normale</option>
+                    <option value="1">Alta</option>
+                    <option value="2">Urgente</option>
+                </select>
             </div>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Assegnato a</label>
-                <select id="task-assignee">
-                    <option value="">— nessuno —</option>
-                </select>
+                <label>Inizio</label>
+                <input type="date" id="task-start">
             </div>
             <div class="bz-modal-field">
                 <label>Scadenza</label>
                 <input type="date" id="task-due">
             </div>
         </div>
-        <div class="bz-modal-row">
-            <div class="bz-modal-field">
-                <label>Data inizio</label>
-                <input type="date" id="task-start">
-            </div>
+
+        <div class="bz-task-sez">Passaggi <span>facoltativi: si spuntano mentre si lavora</span></div>
+        <ul class="bz-task-passi" id="task-passi"></ul>
+        <div class="bz-task-passo-nuovo">
+            <input type="text" id="task-passo" maxlength="200" placeholder="Aggiungi un passaggio e premi Invio">
+            <button type="button" id="task-passo-add"><i class="fas fa-plus"></i></button>
+        </div>
+
+        <div class="bz-task-sez">Foto <span>facoltative</span></div>
+        <div class="bz-task-foto" id="task-foto"></div>
+        <label class="bz-task-foto-add"><i class="fas fa-camera"></i> Aggiungi foto
+            <input type="file" id="task-foto-input" accept="image/*" multiple hidden>
+        </label>
+
+        <div class="bz-modal-row" style="margin-top:14px">
             <div class="bz-modal-field">
                 <label>Chi la vede</label>
                 <button type="button" class="bz-chi-btn" id="task-chi" data-persone="">
-                    <i class="fas fa-eye"></i> La squadra
+                    <i class="fas fa-eye"></i> Tutti
                 </button>
             </div>
         </div>
+
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="btn-modal-cancel">Annulla</button>
             <button class="bz-modal-submit" id="btn-modal-submit">Crea attività</button>
@@ -674,17 +820,12 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Stato</label>
-                <select id="edit-task-status">
-                    <option value="open">Aperto</option>
-                    <option value="in_progress">In corso</option>
-                    <option value="complete">Completato</option>
-                    <option value="verified">Verificato</option>
-                </select>
+                <label>Dove in cantiere</label>
+                <input type="text" id="edit-task-luogo" maxlength="160">
             </div>
             <div class="bz-modal-field">
-                <label>Categoria</label>
-                <input type="text" id="edit-task-cat">
+                <label>Tipo</label>
+                <input type="text" id="edit-task-cat" list="task-tipi">
             </div>
         </div>
         <div class="bz-modal-row">
@@ -761,6 +902,20 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 </div>
 {% endif %}
 
+<div id="bz-rif-modal" class="bz-overlay hidden">
+    <div class="bz-modal" style="width:440px">
+        <h3>Il tuo riferimento</h3>
+        <p class="acc-intro">Come chiamate voi questo cantiere. Lo vedete accanto al nostro nome, nell'elenco
+            dei cantieri e nel rapporto; lo vede anche il nostro ufficio.</p>
+        <div class="bz-modal-field"><label>Nome</label><input id="bz-rif-nome" maxlength="120" placeholder="Es. Hub Nord fase 2"></div>
+        <div class="bz-modal-field"><label>Codice commessa</label><input id="bz-rif-codice" maxlength="60" placeholder="Es. CO-2026-114"></div>
+        <div class="bz-modal-actions">
+            <button class="bz-modal-cancel" id="bz-rif-annulla">Annulla</button>
+            <button class="bz-modal-submit" id="bz-rif-salva">Salva</button>
+        </div>
+    </div>
+</div>
+
 <div id="bz-chi-modal" class="bz-overlay hidden">
     <div class="bz-modal">
         <h3>Chi la vede</h3>
@@ -786,6 +941,47 @@ const DA_UFFICIO = {{ daUfficio ? 'true' : 'false' }};
 // il ruolo su questo cantiere: ufficio, cantiere o cliente
 const RUOLO = {{ ruolo|default('')|json_encode|raw }};
 const IO    = {{ (user.id ?? 0)|json_encode|raw }};
+// come chiama il cliente questo cantiere: {nome, codice} o null
+let RIF     = {{ (riferimento ?? null)|json_encode|raw }};
+
+/* Il riferimento del cliente: lui lo vede (e lo cambia) accanto al nome
+   del cantiere, l'ufficio nel riquadro Cantiere. */
+function rifTesto(r) { return r ? [r.nome, r.codice].filter(Boolean).join(' · ') : ''; }
+function mostraRif() {
+    const b = document.getElementById('bz-rif'), info = document.getElementById('bz-rif-info');
+    if (RUOLO === 'cliente' && b) {
+        b.hidden = false;
+        b.innerHTML = RIF ? '<i class="fas fa-tag"></i> ' + escHtml(rifTesto(RIF)) + ' <i class="fas fa-pen" style="font-size:10px;opacity:.6"></i>'
+                          : '<i class="fas fa-tag"></i> Aggiungi il tuo nome o codice commessa';
+    }
+    if (RUOLO !== 'cliente' && info && RIF) {
+        info.hidden = false;
+        info.querySelector('span').textContent = 'Per il cliente: ' + rifTesto(RIF);
+    }
+}
+document.addEventListener('DOMContentLoaded', mostraRif);
+document.addEventListener('click', async e => {
+    if (e.target.closest('#bz-rif-annulla') || e.target.id === 'bz-rif-modal') {
+        document.getElementById('bz-rif-modal').classList.add('hidden'); return;
+    }
+    if (e.target.closest('#bz-rif-salva')) {
+        const r = await api(`/worksites/${WID}/zone/riferimento`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nome: document.getElementById('bz-rif-nome').value, codice: document.getElementById('bz-rif-codice').value }),
+        });
+        if (!r.ok) { alert(r.error || 'Non salvato'); return; }
+        RIF = (r.data.nome || r.data.codice) ? r.data : null;
+        document.getElementById('bz-rif-modal').classList.add('hidden');
+        mostraRif();
+        return;
+    }
+    if (!e.target.closest('#bz-rif')) return;
+    const m = document.getElementById('bz-rif-modal');
+    document.getElementById('bz-rif-nome').value   = RIF?.nome || '';
+    document.getElementById('bz-rif-codice').value = RIF?.codice || '';
+    m.classList.remove('hidden');
+    document.getElementById('bz-rif-nome').focus();
+});
 
 /* Cosa puo' fare questa persona su un'attivita': le stesse regole del
    server (FieldwireController::pretendeStato), cosi' non si disegnano
@@ -793,13 +989,20 @@ const IO    = {{ (user.id ?? 0)|json_encode|raw }};
 const GRUPPO_TASK = { squadra: 'cantiere', capi: 'cantiere', cantiere: 'cantiere', cliente: 'cliente', ufficio: 'ufficio' };
 const TOCCA_A     = { squadra: 'la squadra in cantiere', capi: 'la squadra in cantiere', cantiere: 'la squadra in cantiere',
                       ufficio: 'il nostro ufficio', cliente: 'il cliente' };
+/* A chi tocca, in parole: la persona per nome, o il gruppo. */
+function chiCe(t) {
+    if (Number(t.assignee_user_id) > 0) return String(t.assignee_name || 'una persona').replace(/ · .*$/, '');
+    return TOCCA_A[t.assegnata_a || 'squadra'] || 'la squadra in cantiere';
+}
 function taskMio(t)      { return Number(t.created_by) === Number(IO); }
 function taskModifica(t) { return DA_UFFICIO || taskMio(t); }
 function taskAvanza(t) {
     if (DA_UFFICIO) return true;
     if (t.status === 'verified') return false;
-    return taskMio(t) || Number(t.assignee_user_id) === Number(IO)
-        || (GRUPPO_TASK[t.assegnata_a || 'squadra'] === RUOLO);
+    // data a una persona: solo lei; a un gruppo: chi ne fa parte
+    return Number(t.assignee_user_id) > 0
+        ? Number(t.assignee_user_id) === Number(IO)
+        : GRUPPO_TASK[t.assegnata_a || 'squadra'] === RUOLO;
 }
 // ha il modulo Zone ma non e' nell'elenco di questo cantiere
 const SOLO_ACCESSI = {{ soloAccessi ? 'true' : 'false' }};
@@ -943,21 +1146,12 @@ async function salvaChi() {
     else loadTasks();
 }
 
-/* "Nota interna" e "per il cliente" su un messaggio: due interruttori, non
-   un elenco di nomi. */
-async function flagMessaggio(quale, id, valore) {
-    const res = await api(`/worksites/${WID}/zone/messaggio-flag`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quale, id, valore }),
-    });
-    if (!res.ok) alert(res.error || res.message || 'Non salvato');
-    return res.ok;
-}
 /* "Assegnato a": una persona, o un gruppo. Nel select i gruppi hanno @. */
 function assegnazioneDaSelect(sel) {
     const v = sel.value || '';
-    if (v.startsWith('@')) return { assegnata_a: v.slice(1), assignee_user_id: null, assignee_name: sel.options[sel.selectedIndex]?.text || null };
-    if (v) return { assegnata_a: 'persona', assignee_user_id: v, assignee_name: sel.options[sel.selectedIndex]?.text || null };
+    // a un gruppo: nessun nome di persona (prima finiva salvato "— il nostro ufficio —")
+    if (v.startsWith('@')) return { assegnata_a: v.slice(1), assignee_user_id: null, assignee_name: null };
+    if (v) return { assegnata_a: 'persona', assignee_user_id: v, assignee_name: (sel.options[sel.selectedIndex]?.text || '').split(' · ')[0] || null };
     return { assegnata_a: 'squadra', assignee_user_id: null, assignee_name: null };
 }
 const STATUS_COLORS = { open: '#fbbf24', in_progress: '#60a5fa', complete: '#4ade80', verified: '#a78bfa' };
@@ -1063,7 +1257,7 @@ let kFilter = { q: '', assignee: '', cat: '' };
 function filteredTasks() {
     const q = kFilter.q.toLowerCase();
     return allTasks.filter(t => {
-        if (kFilter.assignee && (t.assignee_name || '') !== kFilter.assignee) return false;
+        if (kFilter.assignee && chiCe(t) !== kFilter.assignee) return false;
         if (kFilter.cat && (t.category || '') !== kFilter.cat) return false;
         if (q) {
             const blob = `${t.name||''} ${t.assignee_name||''} ${t.category||''} ${t.description||''}`.toLowerCase();
@@ -1077,7 +1271,7 @@ function refreshKanbanFilterOptions() {
     const aSel = document.getElementById('bz-filter-assignee');
     const cSel = document.getElementById('bz-filter-cat');
     if (!aSel || !cSel) return;
-    const assignees = [...new Set(allTasks.map(t => t.assignee_name).filter(Boolean))].sort();
+    const assignees = [...new Set(allTasks.map(chiCe).filter(Boolean))].sort();
     const cats      = [...new Set(allTasks.map(t => t.category).filter(Boolean))].sort();
     aSel.innerHTML = '<option value="">Tutte le persone</option>' + assignees.map(a=>`<option ${a===kFilter.assignee?'selected':''}>${escHtml(a)}</option>`).join('');
     cSel.innerHTML = '<option value="">Tutte le categorie</option>' + cats.map(c=>`<option ${c===kFilter.cat?'selected':''}>${escHtml(c)}</option>`).join('');
@@ -1112,13 +1306,18 @@ function renderKanban() {
 }
 
 function cardHtml(t) {
-    const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete';
+    const overdue = t.due_date && new Date(t.due_date) < new Date() && t.status !== 'complete' && t.status !== 'verified';
+    const prio = Number(t.priority) > 1 ? '<span class="bz-card-prio urgente" title="Urgente"><i class="fas fa-flag"></i> Urgente</span>'
+               : Number(t.priority) === 1 ? '<span class="bz-card-prio alta" title="Priorità alta"><i class="fas fa-flag"></i> Alta</span>' : '';
+    // si trascina solo chi la puo' portare avanti
     return `
-        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="true">
+        <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="${taskAvanza(t) ? 'true' : 'false'}">
             <div class="bz-card-name">${escHtml(t.name)}</div>
-            ${chiBadge(t)}
+            ${t.luogo ? `<div class="bz-card-luogo"><i class="fas fa-location-dot"></i> ${escHtml(t.luogo)}</div>` : ''}
+            ${prio}${chiBadge(t)}
             <div class="bz-card-foot">
-                ${t.assignee_name ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(t.assignee_name)}</span>` : ''}
+                ${Number(t.assignee_user_id) > 0 ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(chiCe(t))}</span>`
+                  : `<span class="bz-card-user"><i class="fas fa-users" style="font-size:11px"></i>${escHtml(TOCCA_A[t.assegnata_a || 'squadra'] || '')}</span>`}
                 ${t.due_date ? `<span class="bz-card-due ${overdue ? 'overdue' : ''}"><i class="fas fa-calendar-alt" style="font-size:11px"></i>${fmtDate(t.due_date)}</span>` : ''}
             </div>
         </div>`;
@@ -1126,55 +1325,90 @@ function cardHtml(t) {
 
 /* ══════════ GANTT ══════════ */
 function renderGantt() {
+    /* Un Gantt vero: una colonna per giorno, il fine settimana in grigio,
+       mese e giorni in testa, i nomi fermi a sinistra mentre si scorre,
+       la linea di oggi. Si apre su oggi. */
     const el = document.getElementById('bz-gantt-content');
-    const withDates = allTasks.filter(t => t.start_date || t.due_date);
-    if (!withDates.length) {
-        el.innerHTML = '<div class="bz-gantt-empty">Nessuna attività con date.<br>Aggiungi una data di inizio o scadenza per vederla qui.</div>';
+    const righe = filteredTasks()
+        .map(t => ({ t, p: periodoTask(t) }))
+        .sort((a, b) => a.p.inizio - b.p.inizio || a.p.fine - b.p.fine);
+    if (!righe.length) {
+        el.innerHTML = '<div class="bz-gantt-empty">Nessuna attività.</div>';
         return;
     }
 
-    const dates = withDates.flatMap(t => [t.start_date, t.due_date].filter(Boolean)).map(d => new Date(d));
-    const minD  = new Date(Math.min(...dates)); minD.setDate(1);
-    const maxD  = new Date(Math.max(...dates)); maxD.setDate(maxD.getDate() + 7);
-    const totalDays = Math.max(1, Math.ceil((maxD - minD) / 86400000));
+    const GIORNO = 86400000, PX = 34;
+    const oggi = new Date(); oggi.setHours(0, 0, 0, 0);
+    const date = righe.flatMap(x => [x.p.inizio, x.p.fine]).concat([oggi]);
+    const da = new Date(Math.min(...date)); da.setDate(da.getDate() - 3);
+    const a  = new Date(Math.max(...date)); a.setDate(a.getDate() + 10);
+    const giorni = [];
+    for (let d = new Date(da); d <= a; d.setDate(d.getDate() + 1)) giorni.push(new Date(d));
+    const largo = giorni.length * PX;
+    const x = d => Math.round((d - da) / GIORNO) * PX;
 
-    const months = [];
-    let cur = new Date(minD);
-    while (cur <= maxD) {
-        months.push({ label: cur.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' }), start: new Date(cur) });
-        cur.setMonth(cur.getMonth() + 1);
-    }
+    // i mesi: un blocco per mese, largo quanto i suoi giorni
+    const mesi = [];
+    giorni.forEach((d, i) => {
+        const k = d.getFullYear() * 12 + d.getMonth();
+        if (!mesi.length || mesi[mesi.length - 1].k !== k) mesi.push({ k, da: i, n: 0, d });
+        mesi[mesi.length - 1].n++;
+    });
+    const nomeMese = d => d.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+    const iniziale = ['D', 'L', 'M', 'M', 'G', 'V', 'S'];
+
+    const sfondoGiorni = giorni.map((d, i) => {
+        const fest = d.getDay() === 0 || d.getDay() === 6;
+        return fest ? `<div class="bzg-fest" style="left:${i * PX}px;width:${PX}px"></div>` : '';
+    }).join('');
 
     el.innerHTML = `
-        <table class="bz-gantt-table">
-            <thead>
-                <tr>
-                    <th style="width:200px">Attività</th>
-                    <th>Timeline</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${withDates.map(t => {
-                    const start = t.start_date ? new Date(t.start_date) : new Date(t.due_date);
-                    const end   = t.due_date   ? new Date(t.due_date)   : new Date(t.start_date);
-                    const left  = Math.max(0, (start - minD) / 86400000 / totalDays * 100);
-                    const width = Math.max(1, (end - start) / 86400000 / totalDays * 100) + (t.start_date && t.due_date ? 0 : 1);
-                    const color = STATUS_COLORS[t.status] || STATUS_COLORS.open;
-                    return `
-                        <tr data-task-id="${t.id}" style="cursor:pointer">
-                            <td><div class="bz-gantt-name" title="${escHtml(t.name)}">${escHtml(t.name)}</div></td>
-                            <td>
-                                <div class="bz-gantt-timeline">
-                                    <div class="bz-gantt-bar"
-                                         style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%;background:${color}">
-                                        ${width > 8 ? t.name : ''}
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>`;
-                }).join('')}
-            </tbody>
-        </table>`;
+      <div class="bzg">
+        <div class="bzg-sx">
+          <div class="bzg-sx-testa">Attività</div>
+          ${righe.map(({ t, p }) => `
+            <div class="bzg-sx-riga" data-task-id="${t.id}" title="${escHtml(t.name)}">
+              <span class="bzg-pallino" style="background:${STATUS_COLORS[t.status] || STATUS_COLORS.open}"></span>
+              <span class="bzg-nome">${escHtml(t.name)}</span>
+              <span class="bzg-chi">${escHtml(chiCe(t))}${p.senzaDate ? ' · senza date' : ''}</span>
+            </div>`).join('')}
+        </div>
+        <div class="bzg-dx" id="bzg-dx">
+          <div class="bzg-tela" style="width:${largo}px">
+            <div class="bzg-testa">
+              <div class="bzg-mesi">${mesi.map(m => `<div style="left:${m.da * PX}px;width:${m.n * PX}px">${m.n >= 4 ? nomeMese(m.d) : ''}</div>`).join('')}</div>
+              <div class="bzg-giorni">${giorni.map((d, i) => `
+                <div class="${d.getDay() === 0 || d.getDay() === 6 ? 'fest' : ''} ${d.getTime() === oggi.getTime() ? 'oggi' : ''}" style="left:${i * PX}px;width:${PX}px">
+                  <small>${iniziale[d.getDay()]}</small>${d.getDate()}</div>`).join('')}</div>
+            </div>
+            <div class="bzg-corpo" style="height:${righe.length * 40}px">
+              ${sfondoGiorni}
+              <div class="bzg-oggi" style="left:${x(oggi) + PX / 2}px"></div>
+              ${righe.map(({ t, p }, r) => {
+                  const sx = x(p.inizio) + 3, w = Math.max(PX - 6, x(p.fine) - x(p.inizio) + PX - 6);
+                  const col = STATUS_COLORS[t.status] || STATUS_COLORS.open;
+                  const tit = `${t.name} · ${fmtDate(chiaveGiorno(p.inizio))} – ${fmtDate(chiaveGiorno(p.fine))}${p.senzaDate ? ' (senza date: dalla creazione a oggi)' : ''}`;
+                  return `
+                    <div class="bzg-riga" style="top:${r * 40}px"></div>
+                    <div class="bzg-barra ${p.senzaDate ? 'stimata' : ''} ${t.status}" data-task-id="${t.id}" title="${escHtml(tit)}"
+                         style="top:${r * 40 + 8}px;left:${sx}px;width:${w}px;--c:${col}">
+                      <span>${w > 90 ? escHtml(t.name) : ''}</span>
+                    </div>
+                    ${w <= 90 ? `<div class="bzg-etichetta" style="top:${r * 40 + 11}px;left:${sx + w + 6}px">${escHtml(t.name)}</div>` : ''}`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    // si apre su oggi, con qualche giorno prima
+    const dx = document.getElementById('bzg-dx');
+    if (dx) {
+        dx.scrollLeft = Math.max(0, x(oggi) - PX * 5);
+        // i nomi a sinistra scorrono in su e in giu' insieme alle barre
+        const sx = el.querySelector('.bzg-sx');
+        dx.addEventListener('scroll', () => { sx.scrollTop = dx.scrollTop; }, { passive: true });
+    }
 }
 
 /* ══════════ CALENDAR ══════════ */
@@ -1194,9 +1428,10 @@ function renderCalendar() {
     startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
 
     const tasksByDate = {};
-    allTasks.forEach(t => {
-        const key = t.due_date ? t.due_date.slice(0,10) : null;
-        if (key) { if (!tasksByDate[key]) tasksByDate[key] = []; tasksByDate[key].push(t); }
+    filteredTasks().forEach(t => {
+        const p = periodoTask(t);
+        const key = chiaveGiorno(p.quando);
+        (tasksByDate[key] ??= []).push(t);
     });
 
     const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -1216,9 +1451,10 @@ function renderCalendar() {
             <div class="bz-cal-day ${isToday ? 'today' : ''}">
                 <div class="bz-cal-day-num">${d}</div>
                 ${events.map(t => `
-                    <div class="bz-cal-event ${t.status}" data-task-id="${t.id}" title="${escHtml(t.name)}" style="cursor:pointer">${escHtml(t.name)}</div>
+                    <div class="bz-cal-event ${t.status} ${!t.start_date && !t.due_date ? 'stimata' : ''}" data-task-id="${t.id}"
+                         title="${escHtml(t.name + (t.due_date ? ' · scadenza' : t.start_date ? ' · inizio' : ' · creata, senza date'))}" style="cursor:pointer">${escHtml(t.name)}</div>
                 `).join('')}
-                ${(tasksByDate[key]||[]).length > 3 ? `<div style="font-size:10px;color:#334155">+${(tasksByDate[key]||[]).length - 3} altri</div>` : ''}
+                ${(tasksByDate[key]||[]).length > 3 ? `<div class="bz-cal-altri">+${(tasksByDate[key]||[]).length - 3} altre</div>` : ''}
             </div>`;
     }
     // Fill next month
@@ -1256,7 +1492,7 @@ async function openTask(id) {
                 ${taskModifica(task) ? `<button class="bz-task-action-btn" data-edit-task="${id}">
                     <i class="fas fa-pen" style="font-size:11px"></i> Modifica
                 </button>` : ''}
-                ${DA_UFFICIO ? `<button class="bz-task-action-btn danger" data-delete-task="${id}">
+                ${DA_UFFICIO || taskMio(task) ? `<button class="bz-task-action-btn danger" data-delete-task="${id}">
                     <i class="fas fa-trash" style="font-size:11px"></i> Elimina
                 </button>` : ''}
             </div>
@@ -1277,18 +1513,28 @@ async function openTask(id) {
             </div>
             ${taskAvanza(task) ? '' : `<div style="font-size:11px;color:#64748b;margin-top:6px">${task.status === 'verified'
                 ? "Verificata dall'ufficio."
-                : "La porta avanti chi l'ha creata o a chi tocca."}</div>`}
+                : "La porta avanti la persona o il gruppo a cui è assegnata."}</div>`}
         </div>
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Dettagli</div>
-            <div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-user" style="font-size:13px;vertical-align:-2px"></i>
-                Tocca a: ${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
+            <dl class="bz-dati">
+                <dt><i class="fas fa-user"></i> Tocca a</dt><dd>${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
                     ? (task.assignee_name || 'una persona')
-                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</div>
-            ${task.start_date ? `<div style="font-size:12px;color:#64748b;margin-bottom:4px"><i class="fas fa-calendar-alt" style="font-size:13px;vertical-align:-2px"></i> Inizio: ${fmtDate(task.start_date)}</div>` : ''}
-            ${task.due_date ? `<div style="font-size:12px;color:#64748b;"><i class="fas fa-calendar-check" style="font-size:13px;vertical-align:-2px"></i> Scadenza: ${fmtDate(task.due_date)}</div>` : ''}
-            ${task.description ? `<p style="font-size:13px;color:#475569;margin-top:8px;line-height:1.5;white-space:pre-line">${escHtml(task.description)}</p>` : ''}
+                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</dd>
+                ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Dove</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
+                ${Number(task.priority) > 0 ? `<dt><i class="fas fa-flag"></i> Priorità</dt><dd class="${Number(task.priority) > 1 ? 'urgente' : 'alta'}">${Number(task.priority) > 1 ? 'Urgente' : 'Alta'}</dd>` : ''}
+                ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
+                ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
+                ${task.category ? `<dt><i class="fas fa-tag"></i> Tipo</dt><dd>${escHtml(task.category)}</dd>` : ''}
+                <dt><i class="fas fa-clock"></i> Creata</dt><dd>${fmtDate(task.created_at)}</dd>
+            </dl>
+            ${task.description ? `<p class="bz-dati-desc">${escHtml(task.description)}</p>` : ''}
+        </div>
+
+        <div class="bz-detail-section" id="bz-foto-sez-${id}" hidden>
+            <div class="bz-detail-section-title">Foto</div>
+            <div class="bz-foto-striscia" id="bz-foto-${id}"></div>
         </div>
 
         <div class="bz-detail-section">
@@ -1408,7 +1654,7 @@ function openEditModal(taskId) {
     document.getElementById('edit-task-id').value       = t.id;
     document.getElementById('edit-task-name').value     = t.name || '';
     document.getElementById('edit-task-desc').value     = t.description || '';
-    document.getElementById('edit-task-status').value   = t.status || 'open';
+    document.getElementById('edit-task-luogo').value    = t.luogo || '';
     document.getElementById('edit-task-cat').value      = t.category || '';
     document.getElementById('edit-task-due').value      = t.due_date   || '';
     document.getElementById('edit-task-start').value    = t.start_date || '';
@@ -1440,7 +1686,7 @@ async function submitEdit() {
     const body = {
         name:            document.getElementById('edit-task-name').value.trim(),
         description:     document.getElementById('edit-task-desc').value,
-        status:          document.getElementById('edit-task-status').value,
+        luogo:           document.getElementById('edit-task-luogo').value,
         category:        document.getElementById('edit-task-cat').value || null,
         ...assegnazioneDaSelect(eSel),
         due_date:        document.getElementById('edit-task-due').value   || null,
@@ -1511,6 +1757,14 @@ async function loadComments(taskId) {
     const el   = document.getElementById(`bz-comments-${taskId}`);
     if (!el) return;
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
+    // le foto dell'attivita' in cima, tutte insieme: prima erano sparse
+    // fra i messaggi e per trovarle si scorreva il filo
+    const foto = items.filter(c => c.file_url);
+    const sez = document.getElementById(`bz-foto-sez-${taskId}`), striscia = document.getElementById(`bz-foto-${taskId}`);
+    if (sez && striscia) {
+        sez.hidden = !foto.length;
+        striscia.innerHTML = foto.map(c => `<a href="${escAttr(c.file_url)}" target="_blank" rel="noopener" title="${escAttr(c.author_name || '')}"><img src="${escAttr(c.file_url)}" alt="" loading="lazy"></a>`).join('');
+    }
     if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun messaggio.</div>'; return; }
     el.innerHTML = items.map(c => `
         <div class="bz-comment">
@@ -1520,9 +1774,7 @@ async function loadComments(taskId) {
                     <span class="bz-comment-author">${escHtml(c.author_name || '?')}</span>
                     <span class="bz-comment-time">${ago(c.created_at)}</span>
                     ${c.interna == 1 ? '<span class="bz-vis-badge solo"><i class="fas fa-lock"></i> interna</span>' : ''}
-                    <button class="bz-x-btn" data-delete-comment="${taskId}:${c.id}"
-                            title="Elimina commento"
-                            style="background:transparent;color:#475569;border:0;cursor:pointer;font-size:14px;padding:0 4px;margin-left:auto;line-height:1;">×</button>
+                    ${DA_UFFICIO || Number(c.author_user_id) === Number(IO) ? `<button class="bz-x-btn bz-comment-del" data-delete-comment="${taskId}:${c.id}" title="Elimina">×</button>` : ''}
                 </div>
                 ${c.text ? `<div class="bz-comment-text">${escHtml(c.text)}</div>` : ''}
                 ${c.file_url ? `<a href="${escAttr(c.file_url)}" target="_blank" rel="noopener"><img class="bz-comment-photo-thumb" src="${escAttr(c.file_url)}" alt="foto" loading="lazy"></a>` : ''}
@@ -1599,9 +1851,17 @@ function renderDisegni(items, fwReady) {
                 <span class="bz-dz-folder">${escHtml(d.folder)}</span>
             </div>
             <div class="bz-dz-name" title="${escAttr(d.file_name)}">${escHtml(d.file_name)}</div>
-            <div class="bz-dz-meta">${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
+            <div class="bz-dz-meta"><span class="bz-dz-ver" title="Versione in uso">v${d.versione || 1}</span> ${escHtml(d.uploader)} · ${fmtDateTime(d.created_at)}</div>
             ${DA_UFFICIO
-                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d)}</div>`
+                ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d)}</div>
+                   <div class="bz-dz-versioni">
+                     <label class="bz-dz-btn" title="Carica una versione aggiornata: quella di adesso resta nello storico">
+                       <i class="fas fa-arrow-up-from-bracket"></i> Nuova versione
+                       <input type="file" hidden accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg" data-nuova-versione="${d.id}">
+                     </label>
+                     ${d.n_versioni ? `<button type="button" class="bz-dz-btn" data-storico="${d.id}"><i class="fas fa-clock-rotate-left"></i> Versioni precedenti (${d.n_versioni})</button>` : ''}
+                   </div>
+                   <div class="bz-dz-storico" id="bz-storico-${d.id}" hidden></div>`
                 : ''}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
@@ -1660,6 +1920,45 @@ async function uploadDisegno(file) {
     disegniLoaded = false;
     loadDisegni();
 }
+
+/* Una versione nuova dello stesso disegno: quella di prima va nello
+   storico e resta apribile; chi vede il disegno riceve un avviso. */
+async function nuovaVersione(docId, file) {
+    if (!file) return;
+    if (!confirm(`Caricare "${file.name}" come nuova versione? Quella di adesso resta nello storico.`)) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('replace_id', docId);
+    fd.append('ajax', '1');
+    const res = await api(`/worksites/${WID}/disegni/upload`, { method: 'POST', body: fd });
+    if (!res.ok) { alert('Versione non caricata: ' + (res.error || 'errore')); return; }
+    disegniLoaded = false;
+    loadDisegni();
+}
+async function mostraStorico(docId) {
+    const box = document.getElementById(`bz-storico-${docId}`);
+    if (!box) return;
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '<i class="fas fa-spinner bz-spin"></i>';
+    const r = await fetch(`/worksites/${WID}/disegni/${docId}/versions`, { headers: { 'X-CSRF-Token': CSRF } });
+    const v = r.ok ? await r.json() : [];
+    box.innerHTML = (Array.isArray(v) && v.length) ? v.map(x => `
+        <a href="/worksites/${WID}/disegni/${docId}/view?version_id=${x.id}" target="_blank" rel="noopener">
+          <b>v${x.version_number}</b> ${escHtml(x.file_name || '')}
+          <span>${fmtDateTime(x.created_at)}${x.first_name ? ' · ' + escHtml((x.first_name + ' ' + (x.last_name || '')).trim()) : ''}</span>
+        </a>`).join('') : '<span class="bz-detail-vuoto">Nessuna versione precedente.</span>';
+}
+document.addEventListener('change', e => {
+    const inp = e.target.closest('[data-nuova-versione]');
+    if (!inp) return;
+    const f = inp.files?.[0]; inp.value = '';
+    nuovaVersione(parseInt(inp.dataset.nuovaVersione), f);
+});
+document.addEventListener('click', e => {
+    const b = e.target.closest('[data-storico]');
+    if (b) mostraStorico(parseInt(b.dataset.storico));
+});
 
 async function deleteDisegno(docId) {
     if (!confirm('Eliminare questo disegno?')) return;
@@ -1783,7 +2082,7 @@ function renderFolders(folders) {
             <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
                 <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 <em>${f.file_count}</em>
-                <i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>
+                ${DA_UFFICIO || Number(f.created_by) === Number(IO) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
             </button>`).join('')}
         <button class="bz-folder-new" id="bz-new-folder"><i class="fas fa-plus"></i> Nuova cartella</button>
     `;
@@ -1808,7 +2107,7 @@ function renderFiles(files) {
             ${viewable?`<button class="bz-file-act" data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}" title="Anteprima"><i class="fas fa-eye"></i></button>`:''}
             <button class="bz-file-act" data-file-comments="${f.id}" data-file-name="${escAttr(f.file_name)}" title="Commenti"><i class="fas fa-comment"></i> ${f.comment_count>0?f.comment_count:''}</button>
             <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
-            <button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>
+            ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `<button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}
         </div>`;
     }).join('');
 }
@@ -1919,10 +2218,41 @@ document.getElementById('bz-file-comment-input')?.addEventListener('keydown', e 
 let quickAddStatus = null;
 
 function quickAdd(status) {
-    quickAddStatus = status;
-    document.getElementById('task-status').value = status;
+    // un'attivita' nuova nasce sempre "da fare"
+    quickAddStatus = null;
     openModal();
 }
+
+/* I passaggi e le foto della nuova attivita', in pagina finche' non si crea. */
+let passiNuovi = [], fotoNuove = [];
+function disegnaPassi() {
+    document.getElementById('task-passi').innerHTML = passiNuovi.map((p, i) =>
+        `<li><i class="far fa-square"></i><span>${escHtml(p)}</span><button type="button" data-passo-via="${i}" title="Togli">×</button></li>`).join('');
+}
+function disegnaFoto() {
+    const box = document.getElementById('task-foto');
+    box.innerHTML = fotoNuove.map((f, i) =>
+        `<div class="bz-task-foto-mini"><img src="${URL.createObjectURL(f)}" alt=""><button type="button" data-foto-via="${i}" title="Togli">×</button></div>`).join('');
+}
+function aggiungiPasso() {
+    const inp = document.getElementById('task-passo');
+    const v = inp.value.trim();
+    if (v) { passiNuovi.push(v); disegnaPassi(); }
+    inp.value = ''; inp.focus();
+}
+document.getElementById('task-passo-add')?.addEventListener('click', aggiungiPasso);
+document.getElementById('task-passo')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); aggiungiPasso(); } });
+document.getElementById('task-foto-input')?.addEventListener('change', e => {
+    fotoNuove.push(...[...e.target.files].filter(f => f.type.startsWith('image/')));
+    e.target.value = '';
+    disegnaFoto();
+});
+document.getElementById('task-modal')?.addEventListener('click', e => {
+    const p = e.target.closest('[data-passo-via]');
+    if (p) { passiNuovi.splice(parseInt(p.dataset.passoVia), 1); disegnaPassi(); return; }
+    const f = e.target.closest('[data-foto-via]');
+    if (f) { fotoNuove.splice(parseInt(f.dataset.fotoVia), 1); disegnaFoto(); }
+});
 
 function openModal() {
     // vuoto = di base: la vedono tutti. Si tocca solo per stringere.
@@ -1936,11 +2266,13 @@ function openModal() {
 function closeModal() {
     document.getElementById('task-modal').classList.add('hidden');
     quickAddStatus = null;
-    ['task-name','task-desc','task-cat','task-assignee','task-due','task-start'].forEach(id => {
+    ['task-name','task-desc','task-cat','task-assignee','task-due','task-start','task-luogo','task-passo'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    document.getElementById('task-status').value = 'open';
+    document.getElementById('task-priority').value = '0';
+    passiNuovi = []; fotoNuove = [];
+    disegnaPassi(); disegnaFoto();
 }
 
 async function submitTask() {
@@ -1951,8 +2283,11 @@ async function submitTask() {
     const body = {
         name,
         description:      document.getElementById('task-desc').value,
-        status:          document.getElementById('task-status').value,
+        luogo:           document.getElementById('task-luogo').value,
         category:        document.getElementById('task-cat').value,
+        priority:        parseInt(document.getElementById('task-priority').value) || 0,
+        // anche un passaggio scritto e non ancora confermato con Invio
+        checklist:       [...passiNuovi, document.getElementById('task-passo').value.trim()].filter(Boolean),
         ...assegnazioneDaSelect(aSel),
         ...personeDalBottone('task-chi'),
         due_date:        document.getElementById('task-due').value || null,
@@ -1973,14 +2308,27 @@ async function submitTask() {
         body: JSON.stringify(body),
     });
 
-    btn.textContent = 'Crea attività'; btn.disabled = false;
-
     if (res.ok) {
+        // le foto, una per una, sull'attivita' appena creata
+        let saltate = 0;
+        for (const f of fotoNuove) {
+            btn.textContent = 'Foto…';
+            const fd = new FormData();
+            fd.append('photo', f);
+            fd.append('text', '');
+            const r = await api(`/worksites/${WID}/zone/tasks/${res.data.id}/photo`, { method: 'POST', body: fd });
+            if (!r.ok) saltate++;
+        }
+        btn.textContent = 'Crea attività'; btn.disabled = false;
+        if (saltate) alert(saltate + (saltate === 1 ? ' foto non caricata' : ' foto non caricate') + ': riprova dall\'attività.');
+        mediaLoaded = false;
         allTasks.unshift(res.data);
         closeModal();
         renderCurrentView();
         openTask(res.data.id);
+        return;
     } else {
+        btn.textContent = 'Crea attività'; btn.disabled = false;
         alert('Errore: ' + (res.error || 'Attività non creata'));
     }
 }
@@ -2257,9 +2605,39 @@ function ago(str) {
     if (s < 86400) return Math.floor(s/3600) + 'h fa';
     return new Date(str).toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
 }
+/* Le date arrivano come "2026-11-04" o "2026-11-04 21:52:53". Si legge
+   solo il giorno, in ora locale: new Date("2026-11-04") e' mezzanotte UTC,
+   che in Italia diventa il giorno prima o sballa i conti del Gantt. */
+function giorno(str) {
+    const m = String(str || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function chiaveGiorno(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 function fmtDate(str) {
-    if (!str) return '';
-    return new Date(str + 'T00:00:00').toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit' });
+    const d = giorno(str);
+    if (!d) return '';
+    const anno = d.getFullYear() !== new Date().getFullYear();
+    return d.toLocaleDateString('it-IT', anno ? { day:'2-digit', month:'2-digit', year:'2-digit' } : { day:'2-digit', month:'2-digit' });
+}
+
+/* Da quando a quando va un'attivita', per Gantt e calendario.
+   Con le date scritte, quelle. Senza: dal giorno in cui e' stata creata a
+   oggi (o al giorno in cui e' stata chiusa), segnata come "senza date".
+   Prima chi non scriveva le date non vedeva niente nel Gantt e nel
+   calendario, cioe' quasi sempre. */
+function periodoTask(t) {
+    const fatta  = t.status === 'complete' || t.status === 'verified';
+    const oggi   = new Date(); oggi.setHours(0, 0, 0, 0);
+    const inizio = giorno(t.start_date) || giorno(t.due_date) || giorno(t.created_at) || oggi;
+    let fine     = giorno(t.due_date) || giorno(t.start_date);
+    const senzaDate = !t.start_date && !t.due_date;
+    if (!fine) fine = fatta ? (giorno(t.updated_at) || inizio) : (oggi > inizio ? oggi : inizio);
+    if (fine < inizio) fine = inizio;
+    // il giorno del calendario: la scadenza, se no l'inizio, se no quando e' nata
+    const quando = giorno(t.due_date) || giorno(t.start_date) || giorno(t.created_at) || oggi;
+    return { inizio, fine, quando, senzaDate };
 }
 
 /* ══════════ REGISTRO PRESENZE ══════════
@@ -2429,12 +2807,6 @@ document.addEventListener('click', async e => {
         return;
     }
 
-    const b = e.target.closest('[data-flag-cliente]');
-    if (!b) return;
-    e.stopPropagation();
-    if (await flagMessaggio('per_cliente', parseInt(b.dataset.flagCliente), parseInt(b.dataset.val))) {
-        loadComments(activeTaskId);
-    }
 });
 
 // fuori dal pannello si chiude, come gli altri
@@ -2629,8 +3001,14 @@ html .bz-dz-empty { color:#94a3b8; }
 .acc-vuoto { font-size:12.5px; color:#64748b; padding:18px 0; text-align:center; }
 @media (max-width:560px) { .acc-riga { flex-wrap:wrap; } .acc-chi { flex-basis:100%; } }
 
+.bz-rif { background:#1e293b; border:1px dashed #475569; color:#cbd5e1; border-radius:999px; padding:4px 11px; font-size:12px; cursor:pointer; font-family:inherit; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40vw; }
+.bz-rif:hover { border-color:#94a3b8; }
+[data-theme="light"] .bz-rif { background:#f5f3ff; border-color:#c4b5fd; color:#5b21b6; }
+
 .bz-rapporto summary { list-style:none; cursor:pointer; }
 .bz-rapporto summary::-webkit-details-marker { display:none; }
+.bz-rapporto-spiega { font-size:11px; line-height:1.45; color:#94a3b8; padding:2px 12px 6px 40px; margin:0; }
+[data-theme="light"] .bz-rapporto-spiega { color:#64748b; }
 .bz-rapporto a { display:block; padding:6px 12px 6px 40px; font-size:12px; color:#94a3b8; text-decoration:none; }
 .bz-rapporto a:hover { color:#e2e8f0; }
 .bz-chi-tutti { background:none; border:0; color:#2563eb; font-size:11px; font-weight:700;
@@ -2673,6 +3051,18 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-dz-card:hover { border-color: #334155; }
 .bz-dz-icon { font-size: 22px; color: #60a5fa; }
 .bz-dz-icon.pdf { color: #f87171; } .bz-dz-icon.dwg { color: #fbbf24; } .bz-dz-icon.img { color: #4ade80; }
+.bz-dz-ver { display:inline-block; font-size:10px; font-weight:700; color:#93c5fd; background:rgba(59,130,246,.15); border-radius:5px; padding:0 5px; margin-right:4px; }
+.bz-dz-versioni { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.bz-dz-versioni label.bz-dz-btn { cursor:pointer; }
+.bz-dz-storico { margin-top:6px; border-top:1px solid #1e293b; padding-top:6px; display:flex; flex-direction:column; gap:4px; }
+.bz-dz-storico a { font-size:11.5px; color:#cbd5e1; text-decoration:none; padding:4px 6px; border-radius:6px; }
+.bz-dz-storico a:hover { background:#1e293b; }
+.bz-dz-storico a span { display:block; font-size:10.5px; color:#94a3b8; }
+[data-theme="light"] .bz-dz-ver { color:#1d4ed8; background:#dbeafe; }
+[data-theme="light"] .bz-dz-storico { border-color:#e2e8f0; }
+[data-theme="light"] .bz-dz-storico a { color:#1e293b; }
+[data-theme="light"] .bz-dz-storico a:hover { background:#f1f5f9; }
+[data-theme="light"] .bz-dz-storico a span { color:#64748b; }
 .bz-dz-name { font-size: 13px; font-weight: 600; color: #e2e8f0; word-break: break-word; line-height: 1.3; }
 .bz-dz-meta { font-size: 11px; color: #64748b; }
 .bz-dz-folder { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; background: #273548; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
@@ -2683,6 +3073,17 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-dz-btn.fw { color: #93c5fd; }
 .bz-dz-fw-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #4ade80; font-weight: 600; }
 .bz-dz-empty { grid-column: 1/-1; text-align: center; color: #475569; font-size: 13px; padding: 40px 0; }
+.bz-dz-meta { color:#94a3b8; }
+[data-theme="light"] .bz-dz-card { background:#fff; border-color:#e2e8f0; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+[data-theme="light"] .bz-dz-card:hover { border-color:#cbd5e1; }
+[data-theme="light"] .bz-dz-name { color:#0f172a; }
+[data-theme="light"] .bz-dz-meta { color:#64748b; }
+[data-theme="light"] .bz-dz-folder { background:#f1f5f9; color:#475569; }
+[data-theme="light"] .bz-dz-btn { background:#f8fafc; border-color:#e2e8f0; color:#334155; }
+[data-theme="light"] .bz-dz-btn:hover { color:#0f172a; border-color:#cbd5e1; }
+[data-theme="light"] .bz-dz-btn.danger:hover { color:#b91c1c; border-color:#fecaca; }
+[data-theme="light"] .bz-dz-btn.fw { color:#1d4ed8; }
+[data-theme="light"] .bz-dz-fw-badge { color:#15803d; }
 
 /* Filtri Kanban */
 .bz-kanban-filters { display:flex; gap:8px; padding:10px 20px; flex-shrink:0; flex-wrap:wrap; align-items:center; border-bottom:1px solid #1e293b; }

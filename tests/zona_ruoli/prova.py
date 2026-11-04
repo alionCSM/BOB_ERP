@@ -82,7 +82,8 @@ verifica(S, 'il capo porta avanti quelle della squadra', puo(chiama(CAPO, 'POST'
 verifica(S, 'il capo non verifica', chiama(CAPO, 'POST', f'/tasks/{t1}/status', {'status': 'verified'})['_http'] == 403)
 verifica(S, 'il cliente non chiude quelle della squadra', chiama(CLI, 'POST', f'/tasks/{t1}/status', {'status': 'open'})['_http'] == 403)
 verifica(S, 'il cliente chiude quelle date a lui', puo(chiama(CLI, 'POST', f'/tasks/{t3}/status', {'status': 'complete'})))
-verifica(S, 'il cliente chiude la sua', puo(chiama(CLI, 'POST', f"/tasks/{tk['id']}/status", {'status': 'in_progress'})))
+verifica(S, "il cliente non porta avanti la sua se l'ha data all'ufficio", chiama(CLI, 'POST', f"/tasks/{tk['id']}/status", {'status': 'in_progress'})['_http'] == 403)
+verifica(S, "l'ufficio la porta avanti", puo(chiama(UFF, 'POST', f"/tasks/{tk['id']}/status", {'status': 'in_progress'})))
 chiama(CLI, 'POST', f"/tasks/{tk['id']}/update", {'name': 'Spostare scaffale 4', 'status': 'verified'})
 verifica(S, '"verificato" non passa dalla modifica', sql(f"SELECT status FROM bb_zone_tasks WHERE id={tk['id']}")[0][0] == 'in_progress')
 verifica(S, 'il cliente non cancella', chiama(CLI, 'POST', f'/tasks/{t1}/delete')['_http'] == 403)
@@ -174,6 +175,40 @@ verifica(S, 'il rapporto del cliente ha le attività condivise', 'Montaggio cors
 verifica(S, '... non quelle "solo ufficio"', 'Costi interni gru' not in rk)
 verifica(S, '... ha le presenze e i moduli compilati', 'giornate di lavoro' in rk and 'Verbale giornaliero' in rk)
 verifica(S, 'la segnalazione stretta alla squadra è nel rapporto del capo, non del cliente', 'campata 3' in rc and 'Manca materiale' not in rk)
+
+S = '10. Assegnata a una persona'
+tp = chiama(UFF, 'POST', '/tasks', {'name': 'Controllare ancoraggi', 'assignee_user_id': CAPO, 'assegnata_a': 'persona',
+                                    'luogo': 'Campata 3, livello 2', 'priority': 2, 'checklist': ['Ancoraggi lato A', 'Ancoraggi lato B']})['data']
+verifica(S, 'il luogo resta scritto', sql(f"SELECT luogo FROM bb_zone_tasks WHERE id={tp['id']}")[0][0] == 'Campata 3, livello 2')
+voci = chiama(CAPO, 'GET', f"/tasks/{tp['id']}/checklist")['data']
+verifica(S, 'i passaggi nascono con l\'attività', [v['name'] for v in voci] == ['Ancoraggi lato A', 'Ancoraggi lato B'], str(voci))
+verifica(S, 'la persona a cui tocca la porta avanti', puo(chiama(CAPO, 'POST', f"/tasks/{tp['id']}/status", {'status': 'in_progress'})))
+verifica(S, '... e spunta i passaggi', puo(chiama(CAPO, 'POST', f"/tasks/{tp['id']}/checklist/{voci[0]['id']}/complete", {'completed': True})))
+verifica(S, 'il cliente non la tocca', chiama(CLI, 'POST', f"/tasks/{tp['id']}/status", {'status': 'complete'})['_http'] == 403)
+verifica(S, '... e non spunta i passaggi', chiama(CLI, 'POST', f"/tasks/{tp['id']}/checklist/{voci[1]['id']}/complete", {'completed': True})['_http'] == 403)
+verifica(S, 'una nuova attività nasce "da fare" anche se si manda altro', chiama(UFF, 'POST', '/tasks', {'name': 'x', 'status': 'complete'})['data']['status'] == 'open')
+
+S = '11. Cancellare le proprie cose'
+mio = sql("SELECT id FROM bb_zone_files WHERE file_name='foto_scaffale.pdf'")[0][0]
+chiama(CAPO, 'POST', '/files', file={'nome': 'del_capo.pdf'})
+suo = sql("SELECT id FROM bb_zone_files WHERE file_name='del_capo.pdf'")[0][0]
+verifica(S, 'il cliente non cancella il file del capo', chiama(CLI, 'POST', f'/files/{suo}/delete')['_http'] == 403)
+verifica(S, 'il cliente cancella il suo file', puo(chiama(CLI, 'POST', f'/files/{mio}/delete')))
+tmia = chiama(CLI, 'POST', '/tasks', {'name': 'Da cancellare'})['data']['id']
+verifica(S, 'il cliente cancella la sua attività', puo(chiama(CLI, 'POST', f'/tasks/{tmia}/delete')))
+verifica(S, '... non quella dell\'ufficio', chiama(CLI, 'POST', f'/tasks/{t1}/delete')['_http'] == 403)
+fm = chiama(CLI, 'POST', '/files/folder', {'name': 'Mie foto'})['data']['id']
+verifica(S, 'il cliente cancella la sua cartella vuota', puo(chiama(CLI, 'POST', f'/files/folder/{fm}/delete')))
+verifica(S, '... non quella dell\'ufficio', chiama(CLI, 'POST', f'/files/folder/{f1}/delete')['_http'] == 403)
+sql("INSERT INTO bb_zone_annotations (id, worksite_id, document_id, page, created_by) VALUES (900, 100, 1, 1, 30), (901, 200, 1, 1, 10)")
+verifica(S, 'il cliente non cancella i segni sul disegno del capo', chiama(CLI, 'POST', '/disegni/1/annotations/900/delete')['_http'] == 403)
+verifica(S, '... né quelli di un altro cantiere', not puo(chiama(CLI, 'POST', '/disegni/1/annotations/901/delete')))
+
+S = '12. Il riferimento del cliente'
+verifica(S, 'il cliente scrive il suo nome e codice', puo(chiama(CLI, 'POST', '/riferimento', {'nome': 'Hub Nord fase 2', 'codice': 'CO-2026-114'})))
+verifica(S, 'vale per tutta la sua azienda', sql("SELECT nome, codice FROM bb_zone_riferimenti_cliente WHERE worksite_id=100 AND client_id=1") == [['Hub Nord fase 2', 'CO-2026-114']])
+verifica(S, 'il capo non lo scrive', chiama(CAPO, 'POST', '/riferimento', {'nome': 'x'})['_http'] == 403)
+verifica(S, 'il rapporto lo riporta', 'CO-2026-114' in chiama(UFF, 'GET', '/report?periodo=30').get('raw', ''))
 
 ultima = None
 for sez, cosa, c, extra in righe:
