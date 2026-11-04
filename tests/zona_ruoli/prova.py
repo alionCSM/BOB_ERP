@@ -210,6 +210,35 @@ verifica(S, 'vale per tutta la sua azienda', sql("SELECT nome, codice FROM bb_zo
 verifica(S, 'il capo non lo scrive', chiama(CAPO, 'POST', '/riferimento', {'nome': 'x'})['_http'] == 403)
 verifica(S, 'il rapporto lo riporta', 'CO-2026-114' in chiama(UFF, 'GET', '/report?periodo=30').get('raw', ''))
 
+S = '13. Passaggi'
+tq = chiama(UFF, 'POST', '/tasks', {'name': 'Verifica parapetti', 'assegnata_a': 'squadra', 'checklist': ['Lato nord']})['data']['id']
+vq = chiama(CAPO, 'GET', f'/tasks/{tq}/checklist')['data']
+verifica(S, 'il cliente non aggiunge passaggi a un\'attività della squadra', chiama(CLI, 'POST', f'/tasks/{tq}/checklist', {'name': 'x'})['_http'] == 403)
+verifica(S, 'il cliente non toglie passaggi', chiama(CLI, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")['_http'] == 403)
+verifica(S, 'il cliente non spunta passaggi', chiama(CLI, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/complete", {'completed': True})['_http'] == 403)
+verifica(S, 'la squadra aggiunge un passaggio', puo(chiama(CAPO, 'POST', f'/tasks/{tq}/checklist', {'name': 'Lato sud'})))
+verifica(S, '... ma non lo toglie (è di chi l\'ha creata)', chiama(CAPO, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")['_http'] == 403)
+verifica(S, "l'ufficio lo toglie", puo(chiama(UFF, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")))
+
+S = '14. Disegni e attività'
+tz = chiama(CLI, 'POST', '/tasks', {'name': 'Spostare rack', 'punto': {'document_id': 1, 'page': 1, 'x': 0.4, 'y': 0.3}})['data']['id']
+pin = sql(f"SELECT document_id, type FROM bb_zone_annotations WHERE task_id={tz}")
+verifica(S, 'il punto scelto sul disegno diventa lo spillo dell\'attività', pin == [['1', 'pin']], str(pin))
+d = [t for t in chiama(CLI, 'GET', '/tasks')['data'] if int(t['id']) == tz][0].get('disegno')
+verifica(S, "l'attività sa su che disegno sta", d and d['document_id'] == 1, str(d))
+r = chiama(CAPO, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': .1, 'y': .1}, 'create_task': True, 'task_name': 'Dal capo'})
+verifica(S, 'dal disegno il capo non apre attività (come nel modulo)', r['_http'] == 403)
+r = chiama(CLI, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': .2, 'y': .2}, 'create_task': True, 'task_name': 'Dal cliente sul disegno'})
+nuova = int(r['data']['task_id']) if puo(r) else 0
+verifica(S, "dal disegno il cliente apre un'attività", nuova > 0, str(r)[:200])
+verifica(S, '... che va all\'ufficio e la vede la squadra', nuova in ids(chiama(CAPO, 'GET', '/tasks')) and sql(f"SELECT assegnata_a FROM bb_zone_tasks WHERE id={nuova}") == [['ufficio']])
+verifica(S, "non si collega un'attività di un altro cantiere", not puo(chiama(UFF, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': .3, 'y': .3}, 'task_id': tb})))
+verifica(S, 'non si cambia il segno di un altro', chiama(CLI, 'POST', '/disegni/1/annotations', {'id': 900, 'type': 'pin', 'geom': {'x': .5, 'y': .5}})['_http'] == 403)
+
+S = '15. Moduli ogni mese'
+r = chiama(UFF, 'POST', '/forms/assegnazioni', {'template_id': 2, 'a_user_id': CAPO, 'frequenza': 'mensile'})
+verifica(S, 'si assegna a una persona, ogni mese', puo(r) and sql(f"SELECT frequenza, a_user_id FROM bb_zone_form_assegnazioni WHERE id={r['data']['id']}") == [['mensile', '30']])
+
 ultima = None
 for sez, cosa, c, extra in righe:
     if sez != ultima:

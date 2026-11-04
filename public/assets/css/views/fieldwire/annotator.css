@@ -69,3 +69,8 @@
 
 .bza-hint { font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.4; }
 .bza-loading { color: #94a3b8; font-size: 14px; padding: 40px; text-align: center; }
+
+/* scegliere un punto per una nuova attivita': niente strumenti, solo il clic */
+.bza-pick .bza-tools, .bza-pick .bza-color-swatches, .bza-pick [data-act="calibrate"] { display: none !important; }
+.bza-pick .bza-title { color: #fbbf24; }
+.bza-pick .bza-svg { cursor: crosshair; }
