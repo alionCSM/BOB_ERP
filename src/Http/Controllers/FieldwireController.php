@@ -575,6 +575,8 @@ final class FieldwireController
 
             $id = $this->zoneRepo->addComment($taskId, $text, $authorName);
             $this->scriviCommento($id, $request, $body);
+            $interna = $this->accesso->daUfficio($user, $worksiteId) && !empty($body['interna']);
+            $this->avvisa(fn($a) => $a->commento($taskId, (int)($user?->id ?? 0), $text, $interna));
 
             // push su Fieldwire
             $task     = $this->zoneRepo->find($taskId);
@@ -841,23 +843,46 @@ final class FieldwireController
         $worksite   = $this->worksiteRepo->findById($worksiteId);
         if (!$worksite) { http_response_code(404); exit('Cantiere non trovato'); }
 
+        // il periodo: ?periodo=7|30|tutto, o ?dal=&al= (di base l'ultima settimana)
+        $al  = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['al'] ?? '')) ? $_GET['al'] : date('Y-m-d');
+        $dal = match (true) {
+            (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['dal'] ?? '')) => $_GET['dal'],
+            ($_GET['periodo'] ?? '') === '30'    => date('Y-m-d', strtotime($al . ' -29 days')),
+            ($_GET['periodo'] ?? '') === 'tutto' => '2000-01-01',
+            default                              => date('Y-m-d', strtotime($al . ' -6 days')),
+        };
+        if ($dal === '2000-01-01') {
+            // "tutto": dal primo giorno in cui nella Zone e' successo qualcosa
+            $st = $this->conn->prepare('SELECT DATE(MIN(created_at)) FROM bb_zone_tasks WHERE worksite_id = :w');
+            $st->execute([':w' => $worksiteId]);
+            $dal = (string)($st->fetchColumn() ?: date('Y-m-d', strtotime($al . ' -6 days')));
+        }
+
         try {
             // le stesse regole della Zone: solo quello che chi scarica vede
             $ruolo = $this->ruoloQui($request);
             $io    = (int)($request->user()->id ?? 0);
+            $segn  = (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
+                         ->elenco($worksiteId, $ruolo, $io);
             $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate(
                 $worksiteId,
                 $worksite,
+                $dal,
+                $al,
                 $this->filtro($request, 'attivita'),
                 fn(array $foto) => $this->filtraCommenti($foto, $ruolo, $io),
+                $this->filtro($request, 'risposta', 'id', 'submitted_by'),
+                $segn,
+                \App\Service\Zone\Permessi::RUOLI[$ruolo] ?? $ruolo,
             );
         } catch (\Throwable $e) {
-            error_log('[FW report] ' . $e->getMessage());
+            error_log('[Zone rapporto] ' . $e->getMessage());
             http_response_code(500);
-            exit('Errore generazione report: ' . $e->getMessage());
+            exit('Il rapporto non si e\' potuto creare. Riprova, o avvisa l\'ufficio.');
         }
 
-        $fname = 'punchlist_' . ($worksite['worksite_code'] ?? $worksiteId) . '_' . date('Ymd') . '.pdf';
+        $fname = 'rapporto_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)($worksite['worksite_code'] ?? $worksiteId))
+               . '_' . str_replace('-', '', $dal) . '-' . str_replace('-', '', $al) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         header('Content-Length: ' . strlen($pdf));
@@ -2536,8 +2561,11 @@ final class FieldwireController
             if (!in_array($a, ['persona', 'squadra', 'ufficio', 'cliente'], true)) {
                 // senza scelta: il cliente chiede all'ufficio, gli altri
                 // danno lavoro alla squadra
+                // e un'attivita' che l'ufficio tiene per se' ("solo ufficio")
+                // non si da' alla squadra: a chi tocca, la vede
+                $soloUfficio = ($body['parti'] ?? null) === [] && empty($body['persone']);
                 $a = !empty($body['assignee_user_id']) ? 'persona'
-                   : ($ruolo === \App\Service\Zone\Accesso::CLIENTE ? 'ufficio' : 'squadra');
+                   : ($ruolo === \App\Service\Zone\Accesso::CLIENTE || $soloUfficio ? 'ufficio' : 'squadra');
             }
             // Al cliente assegna l'ufficio, o il cliente stesso. All'ufficio
             // puo' assegnare chiunque: prima il cliente che apriva
