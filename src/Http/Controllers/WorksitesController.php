@@ -1274,12 +1274,28 @@ final class WorksitesController
         if ($worksiteId <= 0 || empty($_FILES['file'])) {
             Response::error('Dati mancanti', 400);
         }
-        if (in_array($user->type, ['worker', 'client'], true)) {
-            Response::error('Accesso negato', 403);
-        }
-
         $note      = trim($_POST['note'] ?? '');
         $replaceId = (int)($_POST['replace_id'] ?? 0);
+
+        // Il committente carica i suoi disegni dalla Zone, come CSM: deve
+        // averne il permesso su questo cantiere. Una versione nuova solo sui
+        // disegni caricati da lui: quelli di CSM non li sovrascrive.
+        // L'operaio no.
+        if ($user->type === 'worker') {
+            Response::error('Accesso negato', 403);
+        }
+        if ($user->type === 'client') {
+            $zona = new \App\Service\Zone\Accesso($this->conn);
+            if (!$zona->puo($user, $worksiteId, \App\Service\Zone\Permessi::DISEGNI)) {
+                Response::error('Accesso negato', 403);
+            }
+            if ($replaceId > 0) {
+                $suo = $this->documentRepo->getById($replaceId);
+                if (!$suo || (int)($suo['created_by'] ?? 0) !== (int)$user->id) {
+                    Response::error('Puoi caricare una nuova versione solo dei disegni caricati da te.', 403);
+                }
+            }
+        }
         $category  = trim($_POST['folder'] ?? '') ?: 'altri';
 
         $worksite = $this->worksiteRepo->findById($worksiteId);
@@ -1381,6 +1397,17 @@ final class WorksitesController
                 // resta all'ufficio e si sistema dal pannello
                 error_log('[uploadDisegno] condivisione: ' . $e->getMessage());
             }
+
+            // un disegno nuovo: lo sa chi lo vede (anche CSM, se lo carica
+            // il committente)
+            try {
+                (new \App\Service\Zone\AvvisiZona(
+                    $this->conn,
+                    new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+                ))->disegnoNuovo($worksiteId, (int)$savedDocId, (int)$auth['user_id']);
+            } catch (\Throwable $e) {
+                error_log('[uploadDisegno] avviso disegno nuovo: ' . $e->getMessage());
+            }
         }
 
         // Una versione nuova: lo sa chi lavora su quel disegno. In cantiere
@@ -1469,17 +1496,23 @@ final class WorksitesController
             $fileName   = $disegno['file_name'];
         }
 
+        // Operai e clienti: lo decide la Zone — entra nel cantiere e il
+        // disegno e' condiviso con lui o con la sua parte (squadra, cliente),
+        // o l'ha caricato lui. Prima si guardavano solo l'elenco vecchio del
+        // cantiere e le condivisioni per persona: un disegno condiviso "col
+        // cliente" nella Zone rispondeva 403 e il visore scriveva
+        // "Impossibile aprire il PDF".
         if (in_array($user->type, ['worker', 'client'], true)) {
-            $accessStmt = $this->conn->prepare("
-                SELECT 1 FROM bb_worksite_users
-                WHERE worksite_id = :wid AND user_id = :uid LIMIT 1
-            ");
-            $accessStmt->execute([':wid' => $worksiteId, ':uid' => $auth['user_id']]);
-            if (!$accessStmt->fetchColumn()) {
-                Response::error('Accesso non autorizzato', 403);
+            $zona  = new \App\Service\Zone\Accesso($this->conn);
+            $cond  = new \App\Service\Zone\Condivisione($this->conn, $zona);
+            $autore = (int)(($this->documentRepo->getById($docId) ?: [])['created_by'] ?? 0);
+            $vede  = $cond->vede($user, $worksiteId, 'disegno', $docId, $autore);
+            if (!$vede) {
+                // le condivisioni per persona di prima valgono ancora
+                $sharedIds = $this->documentRepo->getSharedDocIdsByUser((int)$auth['user_id'], $worksiteId);
+                $vede = in_array($docId, array_map('intval', $sharedIds), true);
             }
-            $sharedIds = $this->documentRepo->getSharedDocIdsByUser((int)$auth['user_id'], $worksiteId);
-            if (!in_array($docId, $sharedIds, true)) {
+            if (!$vede) {
                 Response::error('Disegno non condiviso con te', 403);
             }
         }

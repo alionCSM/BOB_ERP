@@ -15,6 +15,30 @@
     let META = { wsName: '', wsCode: '', clientName: '' };
     let root = null;
     let view = 'list';          // list | builder | fill | submission | submissions
+
+    // Chi crea modelli: CSM e il committente (i suoi, per un cantiere o per
+    // tutti i suoi cantieri). Il server lo ricontrolla.
+    const PER_CLIENTE = typeof RUOLO !== 'undefined' && RUOLO === 'cliente';
+    const CREA_MODULI = DA_UFFICIO || PER_CLIENTE;
+
+    // Modifiche non salvate: il modello in costruzione (confrontato con com'era
+    // all'apertura) o un modulo che si sta compilando. Uscire senza salvare
+    // chiede conferma, anche chiudendo la pagina o cambiando sezione.
+    let builderIniziale = null;
+    let fillSporco = false;
+    function sporco() {
+        if (view === 'builder') return builderIniziale !== null && JSON.stringify(builder) !== builderIniziale;
+        if (view === 'fill') return fillSporco;
+        return false;
+    }
+    function puoiUscire() {
+        if (!sporco()) return true;
+        if (!confirm('Ci sono modifiche non salvate. Vuoi uscire comunque? Le modifiche andranno perse.')) return false;
+        builderIniziale = null; fillSporco = false;
+        return true;
+    }
+    window.bzfPuoiUscire = puoiUscire;
+    window.addEventListener('beforeunload', e => { if (sporco()) { e.preventDefault(); e.returnValue = ''; } });
     let builder = null;         // stato builder corrente
     let signaturePads = {};     // fid → {canvas, ctx, drawing}
 
@@ -81,7 +105,7 @@
                     <button class="bzf-tab active" data-tab="templates">Moduli</button>
                     <button class="bzf-tab" data-tab="submissions">Compilazioni</button>
                 </div>
-                ${DA_UFFICIO ? '<button class="bzf-btn-primary" id="bzf-new"><i class="fas fa-plus"></i> Nuovo modulo</button>' : ''}
+                ${CREA_MODULI ? '<button class="bzf-btn-primary" id="bzf-new"><i class="fas fa-plus"></i> Nuovo modulo</button>' : ''}
             </div>
             <div id="bzf-content"></div>
         `;
@@ -102,14 +126,14 @@
         // di tutti i modelli mostrava al cliente anche quelli interni della
         // squadra (DPI, verbali), con un "Compila" che non serviva a niente
         // e un numero di compilazioni che lui non poteva vedere.
-        if (!DA_UFFICIO) {
+        if (!CREA_MODULI) {
             c.innerHTML = '<div class="bzf-empty">I moduli da compilare li trovi nel riquadro "Da compilare" qui sopra. '
                 + 'Quelli che hai gia\' compilato sono in "Compilazioni".</div>';
             return;
         }
         if (!tpls.length) {
-            c.innerHTML = DA_UFFICIO
-                ? '<div class="bzf-empty">Nessun modulo. Creane uno con "Nuovo modulo".</div>'
+            c.innerHTML = CREA_MODULI
+                ? '<div class="bzf-empty">Nessun modulo. Per crearne uno, usa "Nuovo modulo".</div>'
                 : '<div class="bzf-empty">Nessun modulo per questo cantiere.</div>';
             return;
         }
@@ -117,14 +141,15 @@
             <div class="bzf-card">
                 <div class="bzf-card-top">
                     <span class="bzf-card-name">${esc(t.name)}</span>
-                    ${t.worksite_id ? '<span class="bzf-tag">cantiere</span>' : '<span class="bzf-tag universal">universale</span>'}
+                    ${t.worksite_id ? '<span class="bzf-tag">Questo cantiere</span>'
+                      : `<span class="bzf-tag universal">${t.client_id ? (PER_CLIENTE ? 'Tutti i miei cantieri' : 'Tutti i cantieri del committente') : 'Tutti i cantieri'}</span>`}
                 </div>
                 ${t.description ? `<div class="bzf-card-desc">${esc(t.description)}</div>` : ''}
-                <div class="bzf-card-meta">${t.sub_count} compilazioni</div>
+                <div class="bzf-card-meta">${t.sub_count} ${Number(t.sub_count) === 1 ? 'compilazione' : 'compilazioni'}</div>
                 <div class="bzf-card-actions">
                     ${PUO_COMPILARE ? `<button class="bzf-btn-primary" data-fill="${t.id}"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
-                    ${DA_UFFICIO ? `<button class="bzf-btn-ghost" data-edit="${t.id}"><i class="fas fa-sliders"></i></button>` : ''}
-                    ${DA_UFFICIO ? `<button class="bzf-btn-ghost danger" data-del="${t.id}"><i class="fas fa-trash"></i></button>` : ''}
+                    ${CREA_MODULI ? `<button class="bzf-btn-ghost" data-edit="${t.id}" title="Modifica"><i class="fas fa-sliders"></i></button>` : ''}
+                    ${CREA_MODULI ? `<button class="bzf-btn-ghost danger" data-del="${t.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}
                 </div>
             </div>`).join('') + '</div>';
         c.querySelectorAll('[data-fill]').forEach(b => b.addEventListener('click', () => openFill(parseInt(b.dataset.fill))));
@@ -165,6 +190,7 @@
         } else {
             builder = { id: null, name: '', description: '', universal: false, fields: [] };
         }
+        builderIniziale = JSON.stringify(builder);
         renderBuilder();
     }
 
@@ -175,7 +201,7 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <select id="bzf-dest" class="bzf-dest">
                         <option value="cantiere" ${!builder.universal ? 'selected' : ''}>Salva per: questo cantiere</option>
-                        ${DA_UFFICIO ? `<option value="all" ${builder.universal ? 'selected' : ''}>Salva per: tutti i cantieri</option>` : ''}
+                        <option value="all" ${builder.universal ? 'selected' : ''}>${PER_CLIENTE ? 'Salva per: tutti i miei cantieri' : 'Salva per: tutti i cantieri'}</option>
                     </select>
                     <button class="bzf-btn-ghost" id="bzf-preview"><i class="fas fa-eye"></i> Anteprima</button>
                     <button class="bzf-btn-primary" id="bzf-save"><i class="fas fa-floppy-disk"></i> Salva</button>
@@ -196,7 +222,7 @@
               </div>
             </div>
         `;
-        root.querySelector('#bzf-back').addEventListener('click', loadTemplates);
+        root.querySelector('#bzf-back').addEventListener('click', () => { if (puoiUscire()) loadTemplates(); });
         root.querySelector('#bzf-save').addEventListener('click', saveBuilder);
         root.querySelector('#bzf-name').addEventListener('input', e => builder.name = e.target.value);
         root.querySelector('#bzf-desc').addEventListener('input', e => builder.description = e.target.value);
@@ -281,7 +307,7 @@
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(builder),
         });
-        if (res.ok) loadTemplates();
+        if (res.ok) { builderIniziale = null; loadTemplates(); }
         else alert('Errore: ' + (res.error || 'salvataggio'));
     }
 
@@ -328,7 +354,10 @@
               </div>
             </div>
         `;
-        root.querySelector('#bzf-back').addEventListener('click', loadTemplates);
+        fillSporco = false;
+        root.querySelector('.bzf-paper').addEventListener('input', () => { fillSporco = true; });
+        root.querySelector('.bzf-paper').addEventListener('change', () => { fillSporco = true; });
+        root.querySelector('#bzf-back').addEventListener('click', () => { if (puoiUscire()) loadTemplates(); });
         root.querySelector('#bzf-submit').addEventListener('click', () => submitFill(tpl));
         // init firma + foto
         tpl.fields.forEach(f => {
@@ -412,7 +441,7 @@
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ values, submitter_name: submitter, assegnazione_id: fillAssegnazione }),
         });
-        if (res.ok) { alert('Modulo inviato.'); loadTemplates(); }
+        if (res.ok) { fillSporco = false; alert('Modulo inviato.'); loadTemplates(); }
         else { alert('Errore: ' + (res.error || 'invio')); btn.disabled = false; btn.textContent = 'Invia'; }
     }
 

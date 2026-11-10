@@ -85,6 +85,9 @@ final class Permessi
     /** Decidere quale modulo si compila, chi lo compila e ogni quanto. */
     public const MODULI = 'moduli';
 
+    /** Creare i propri modelli di modulo: CSM e il committente. */
+    public const CREARE_MODULI = 'creare_moduli';
+
     /** Verificare: chiudere un'attivita' per davvero. L'ultima parola. */
     public const VERIFICARE = 'verificare';
 
@@ -143,6 +146,11 @@ final class Permessi
         // togliere il DPI alla nostra squadra. Compilare e' COMPILARE.
         self::MODULI => [
             self::UFFICIO => true, self::CANTIERE => false, self::CLIENTE => false,
+        ],
+        // Il committente crea i suoi moduli (per un cantiere o per tutti i
+        // suoi cantieri) e cambia quelli della sua azienda; quelli di CSM no.
+        self::CREARE_MODULI => [
+            self::UFFICIO => true, self::CANTIERE => false, self::CLIENTE => true,
         ],
 
         self::VERIFICARE => [

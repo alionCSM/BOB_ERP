@@ -60,14 +60,15 @@ def dwg_to_dxf(dwg_path, out_dir):
         from shutil import which
         if which("xvfb-run"):
             oda_cmd = ["xvfb-run", "-a"] + oda_cmd
-        subprocess.run(oda_cmd, check=True, capture_output=True, timeout=180)
+        r = subprocess.run(oda_cmd, capture_output=True, timeout=180)
         if os.path.isfile(dxf_path):
             return dxf_path
         # ODA a volte nomina diversamente: prendi il primo .dxf nella out_dir
         for f in os.listdir(out_dir):
             if f.lower().endswith(".dxf"):
                 return os.path.join(out_dir, f)
-        fail("ODA: nessun DXF prodotto")
+        err = (r.stderr or r.stdout or b"").decode("utf-8", "ignore").strip()[:300]
+        fail("ODA File Converter non ha prodotto il DXF" + (": " + err if err else ""))
 
     # LibreDWG dwg2dxf. Risolvi il path in modo robusto: l'ambiente del web
     # server (PHP-FPM) spesso NON ha /usr/local/bin nel PATH ne' /usr/local/lib
@@ -88,19 +89,27 @@ def dwg_to_dxf(dwg_path, out_dir):
             ld = (ld + ":" + libdir) if ld else libdir
     env["LD_LIBRARY_PATH"] = ld
 
+    # dwg2dxf esce spesso con un codice d'errore anche quando il DXF l'ha
+    # scritto: basta un oggetto che LibreDWG non conosce. Conta il file,
+    # non il codice d'uscita.
     try:
-        subprocess.run([dwg2dxf, "-o", dxf_path, dwg_path],
-                       check=True, capture_output=True, timeout=120, env=env)
-    except subprocess.CalledProcessError as e:
-        fail("dwg2dxf fallito: " + (e.stderr.decode("utf-8", "ignore")[:300] if e.stderr else "errore"))
-    if not os.path.isfile(dxf_path):
-        fail("Conversione DWG->DXF non ha prodotto output")
+        r = subprocess.run([dwg2dxf, "-o", dxf_path, dwg_path],
+                           capture_output=True, timeout=240, env=env)
+    except subprocess.TimeoutExpired:
+        fail("dwg2dxf: tempo scaduto (disegno troppo grande?)")
+    if not os.path.isfile(dxf_path) or os.path.getsize(dxf_path) == 0:
+        err = (r.stderr or b"").decode("utf-8", "ignore").strip()
+        fail("dwg2dxf non ha prodotto il DXF: " + (err[-300:] if err else "codice " + str(r.returncode)))
     return dxf_path
 
 
 def emit_svg(dxf_path, svg_path):
-    import ezdxf
-    from ezdxf import disassemble, bbox
+    try:
+        import ezdxf
+        from ezdxf import disassemble, bbox
+    except ImportError:
+        fail("Libreria Python ezdxf non installata per l'utente del web server "
+             "(sudo pip3 install ezdxf).")
 
     doc = ezdxf.readfile(dxf_path)
     msp = doc.modelspace()

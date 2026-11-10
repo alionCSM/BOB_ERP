@@ -93,6 +93,12 @@ final class FieldwireController
         'report'                => P::VEDERE,
         'presenze'              => P::VEDERE,
         'presenzeGiorni'        => P::VEDERE,
+        // gli avvisi di questo cantiere, per il campanello della Zone
+        'avvisi'                => P::VEDERE,
+        'avvisiLetti'           => P::VEDERE,
+        // le presenze scritte a mano: solo CSM
+        'aggiungiPresenza'      => P::GESTIRE,
+        'eliminaPresenza'       => P::GESTIRE,
         // il nome e il codice che il cliente da' al cantiere: lo scrive
         // il cliente, il metodo controlla il ruolo
         'salvaRiferimento'      => P::VEDERE,
@@ -127,10 +133,12 @@ final class FieldwireController
         'dwgConvert'            => P::DISEGNI,
         'pushDisegno'           => P::DISEGNI,
         'setCalibration'        => P::DISEGNI,
-        'salvaAssegnazione'     => P::MODULI,
-        'disattivaAssegnazione' => P::MODULI,
-        'saveFormTemplate'      => P::MODULI,
-        'deleteFormTemplate'    => P::MODULI,
+        // assegnare: CSM tutti i modelli, il committente quelli della sua
+        // azienda (controllato nel metodo)
+        'salvaAssegnazione'     => P::CREARE_MODULI,
+        'disattivaAssegnazione' => P::CREARE_MODULI,
+        'saveFormTemplate'      => P::CREARE_MODULI,
+        'deleteFormTemplate'    => P::CREARE_MODULI,
 
         // ── Cancellare ──────────────────────────────────────────────────
         // Le proprie cose le cancella chiunque le abbia messe; quelle degli
@@ -356,6 +364,8 @@ final class FieldwireController
             'accessi'              => self::livelliPagina($this->accesso->ruolo($request->user(), $worksiteId)),
             'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
+            // caricare disegni: CSM e il committente (vedi uploadDisegno)
+            'caricaDisegni'        => $this->accesso->puo($request->user(), $worksiteId, \App\Service\Zone\Permessi::DISEGNI),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
             // "Chi accede", per aggiungersi o aggiungere qualcuno
             'soloAccessi'          => !$this->accesso->qualcosa($request->user(), $worksiteId)
@@ -505,11 +515,11 @@ final class FieldwireController
             $ruolo = (string)$this->ruoloQui($request);
 
             // Cambiare un'attivita' (nome, descrizione, date, a chi tocca):
-            // l'ufficio tutte, gli altri quelle che hanno creato loro. Prima
-            // un cliente riscriveva le attivita' dell'ufficio che vedeva.
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO
+            // CSM e il committente tutte quelle che vedono — sui nostri
+            // cantieri il committente dirige; la squadra quelle create da lei.
+            if (!in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CLIENTE], true)
                 && (int)($existing['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
-                \App\Service\Zone\Accesso::nega('Questa attivita\' la cambia chi l\'ha creata, o l\'ufficio');
+                \App\Service\Zone\Accesso::nega('Questa attivita\' puo\' essere modificata solo da chi l\'ha creata, da CSM o dal committente');
             }
             // Lo stato passa solo da /status, che controlla chi puo' cosa:
             // dentro la modifica arrivava a "verificato" anche chi non puo'.
@@ -710,6 +720,14 @@ final class FieldwireController
 
             $id = $this->zoneRepo->addComment($taskId, $text, $authorName, $fileUrl);
             $this->scriviCommento($id, $request, $_POST);
+            // una foto sull'attivita' e' un messaggio come gli altri: avvisa
+            // chi segue l'attivita' (una nota interna resta a CSM)
+            $this->avvisa(fn($a) => $a->commento(
+                $taskId,
+                (int)($user?->id ?? 0),
+                $text !== '' ? $text : \App\Service\Lingua::testo('zona_foto_allegata', 'it'),
+                !empty($_POST['interna'])
+            ));
 
             echo json_encode(['ok' => true, 'data' => [
                 'id' => $id, 'text' => $text, 'author_name' => $authorName,
@@ -974,7 +992,10 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            return $this->formRepo->templatesFor((int)$request->param('id'));
+            // il committente vede i modelli della sua azienda, non quelli
+            // interni di CSM (DPI, verbali della squadra)
+            $w = (int)$request->param('id');
+            return $this->formRepo->templatesFor($w, $this->clienteDiChi($request));
         });
     }
 
@@ -1000,20 +1021,18 @@ final class FieldwireController
             $fields = $body['fields'] ?? [];
             if (!is_array($fields) || !count($fields)) throw new \RuntimeException('Aggiungi almeno un campo');
 
-            // universale (worksite_id null) o di questo cantiere. Un modulo
-            // universale compare in tutti i cantieri: lo decide solo
-            // l'ufficio, non un cliente o una squadra.
-            $ufficio = $this->accesso->daUfficio($user, $worksiteId);
-            if (!empty($body['universal']) && !$ufficio) {
-                \App\Service\Zone\Accesso::nega('I moduli per tutti i cantieri li crea solo l\'ufficio');
-            }
+            // Di questo cantiere o per tutti i cantieri. Per CSM "tutti" vuol
+            // dire tutti i cantieri di BOB; per il committente tutti i SUOI
+            // cantieri: il modello porta il suo cliente e altrove non compare.
+            $cliente = $this->clienteDiChi($request);
+            $prima   = !empty($body['id']) ? $this->templateDelCantiere($request, (int)$body['id'], true) : null;
+            // un modello del committente resta suo anche se lo ritocca CSM
+            $clientId = $cliente ?? (isset($prima['client_id']) ? (int)$prima['client_id'] : null);
             $wsId = !empty($body['universal']) ? null : $worksiteId;
-            if (!empty($body['id'])) {
-                $this->templateDelCantiere($request, (int)$body['id'], true);
-            }
 
             $data = [
                 'worksite_id' => $wsId,
+                'client_id'   => $clientId,
                 'name'        => mb_substr($name, 0, 200),
                 'description' => trim($body['description'] ?? '') ?: null,
                 'fields'      => $fields,
@@ -1084,9 +1103,13 @@ final class FieldwireController
                     \App\Service\Zone\Accesso::nega('Questo modulo non e\' assegnato a te');
                 }
             } elseif (!$ufficio) {
-                // fuori dall'ufficio si compila quello che ci e' stato
-                // assegnato, come gia' fa l'app
-                \App\Service\Zone\Accesso::nega('Si compilano i moduli assegnati: chiedi all\'ufficio');
+                // fuori da CSM si compila quello che ci e' stato assegnato,
+                // come gia' fa l'app; il committente anche i moduli della sua
+                // azienda, che ha creato lui
+                $cliente = $this->clienteDiChi($request);
+                if ($cliente === null || (int)($tpl['client_id'] ?? 0) !== $cliente) {
+                    \App\Service\Zone\Accesso::nega('Puoi compilare solo i moduli assegnati a te. Per informazioni, contatta CSM.');
+                }
             }
 
             $id = $this->formRepo->createSubmission([
@@ -1328,6 +1351,8 @@ final class FieldwireController
             if ($folderId === null) {
                 $this->condivisioneNuova($request, $worksiteId, 'file', $id, []);
             }
+            // a chi lo vede, dopo che la condivisione e' scritta
+            $this->avvisa(fn($a) => $a->file($worksiteId, $id, (int)($user?->id ?? 0)));
 
             echo json_encode(['ok' => true, 'data' => ['id' => $id]]);
         } catch (\Throwable $e) {
@@ -1482,6 +1507,145 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             return (new \App\Service\Zone\Presenze($this->conn))
                 ->giorni((int)$request->param('id'), 60);
+        });
+    }
+
+    // ─── Il campanello della Zone ─────────────────────────────────────────────
+
+    /**
+     * La sezione della Zone a cui porta un avviso, dal suo link
+     * (/worksites/5/zone#attivita-12 → attivita).
+     */
+    private static function sezioneAvviso(string $link): string
+    {
+        $dove = (string)(parse_url($link, PHP_URL_FRAGMENT) ?? '');
+        return match (true) {
+            str_starts_with($dove, 'attivita-')     => 'attivita',
+            str_starts_with($dove, 'disegno')       => 'disegni',
+            str_starts_with($dove, 'file-')         => 'files',
+            $dove === 'moduli'                      => 'forms',
+            str_starts_with($dove, 'segnalazione-') => 'segnalazioni',
+            str_starts_with($dove, 'chat-')         => 'chat',
+            default                                 => '',
+        };
+    }
+
+    /**
+     * Gli avvisi di chi guarda su questo cantiere: le stesse notifiche di
+     * BOB (campanello in alto, app), filtrate sul cantiere. Con quanti non
+     * letti ci sono in tutto e per sezione, per i numeri sul menu.
+     */
+    public function avvisi(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $st = $this->conn->prepare("
+                SELECT id, title, message, link, is_read, created_at
+                FROM bb_notifications
+                WHERE user_id = :u AND (link = :l1 OR link LIKE :l2)
+                ORDER BY created_at DESC, id DESC
+                LIMIT 200
+            ");
+            $st->execute([':u' => $io, ':l1' => '/worksites/' . $w . '/zone', ':l2' => '/worksites/' . $w . '/zone#%']);
+
+            $elenco = [];
+            $nonLette = 0;
+            $perSezione = ['attivita' => 0, 'disegni' => 0, 'files' => 0, 'forms' => 0, 'segnalazioni' => 0, 'chat' => 0];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $n) {
+                $sez  = self::sezioneAvviso((string)$n['link']);
+                $letta = (int)$n['is_read'] === 1;
+                if (!$letta) {
+                    $nonLette++;
+                    if (isset($perSezione[$sez])) $perSezione[$sez]++;
+                }
+                if (count($elenco) < 40) {
+                    $elenco[] = [
+                        'id'       => (int)$n['id'],
+                        'titolo'   => (string)$n['title'],
+                        'testo'    => (string)$n['message'],
+                        'dove'     => (string)(parse_url((string)$n['link'], PHP_URL_FRAGMENT) ?? ''),
+                        'sezione'  => $sez,
+                        'letta'    => $letta,
+                        'quando'   => (string)$n['created_at'],
+                    ];
+                }
+            }
+            return ['avvisi' => $elenco, 'non_lette' => $nonLette, 'per_sezione' => $perSezione];
+        });
+    }
+
+    /**
+     * Segna come letti gli avvisi di questo cantiere: uno (id), quelli di
+     * una sezione (aprendola), o tutti.
+     */
+    public function avvisiLetti(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $io   = (int)($request->user()->id ?? 0);
+            $body = $this->jsonBody();
+            $st = $this->conn->prepare("
+                SELECT id, link FROM bb_notifications
+                WHERE user_id = :u AND is_read = 0 AND (link = :l1 OR link LIKE :l2)
+            ");
+            $st->execute([':u' => $io, ':l1' => '/worksites/' . $w . '/zone', ':l2' => '/worksites/' . $w . '/zone#%']);
+            $id  = (int)($body['id'] ?? 0);
+            $sez = (string)($body['sezione'] ?? '');
+            $ids = [];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $n) {
+                if ($id > 0 ? (int)$n['id'] === $id
+                    : ($sez === '' || self::sezioneAvviso((string)$n['link']) === $sez)) {
+                    $ids[] = (int)$n['id'];
+                }
+            }
+            if ($ids) {
+                // read_at dove c'e' (lo usa la cronologia del campanello di BOB)
+                try {
+                    $segna = $this->conn->prepare('UPDATE bb_notifications SET is_read = 1, read_at = NOW() WHERE user_id = :u AND id = :id');
+                    $segna->execute([':u' => $io, ':id' => $ids[0]]);
+                } catch (\PDOException $e) {
+                    $segna = $this->conn->prepare('UPDATE bb_notifications SET is_read = 1 WHERE user_id = :u AND id = :id');
+                }
+                foreach ($ids as $x) {
+                    $segna->execute([':u' => $io, ':id' => $x]);
+                }
+            }
+            return ['segnate' => count($ids)];
+        });
+    }
+
+    /** CSM registra a mano una presenza (una persona o un'azienda). */
+    public function aggiungiPresenza(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $id = (new \App\Service\Zone\Presenze($this->conn))->aggiungi(
+                (int)$request->param('id'),
+                $this->jsonBody(),
+                (int)($request->user()->id ?? 0)
+            );
+            return ['id' => $id];
+        });
+    }
+
+    /** CSM toglie una presenza scritta a mano. */
+    public function eliminaPresenza(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $ok = (new \App\Service\Zone\Presenze($this->conn))
+                ->elimina((int)$request->param('id'), (int)$request->param('pId'));
+            if (!$ok) {
+                throw new \RuntimeException('Presenza non trovata');
+            }
+            return ['ok' => true];
         });
     }
 
@@ -1671,7 +1835,7 @@ final class FieldwireController
                        (SELECT COUNT(*) FROM bb_worksite_document_versions v WHERE v.document_id = d.id) AS n_versioni,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
-                       r.status AS dwg_status
+                       r.status AS dwg_status, r.error AS dwg_error
                 FROM bb_worksite_documents d
                 LEFT JOIN bb_users u             ON u.id = d.created_by
                 LEFT JOIN bb_zone_disegno_sync s ON s.document_id = d.id
@@ -1696,6 +1860,8 @@ final class FieldwireController
                     'folder'       => $r['subcategory'] ?: 'altri',
                     'uploader'     => trim($r['uploader']) ?: '—',
                     'created_at'   => $r['created_at'],
+                    // chi l'ha caricato: il committente aggiorna i suoi
+                    'created_by'   => (int)($r['created_by'] ?? 0),
                     // le versioni: quella in uso e quante ce ne sono di prima
                     'versione'     => (int)($r['current_version'] ?? 1) ?: 1,
                     'n_versioni'   => (int)($r['n_versioni'] ?? 0),
@@ -1705,6 +1871,11 @@ final class FieldwireController
                     // DWG: stato della conversione vettoriale
                     'is_dwg'       => $isDwg,
                     'dwg_status'   => $isDwg ? ($r['dwg_status'] ?? 'pending') : null,
+                    // perche' la conversione non e' riuscita: a CSM, che la
+                    // puo' rilanciare o far sistemare sul server
+                    'dwg_error'    => $isDwg && ($r['dwg_status'] ?? '') === 'error'
+                                      && $this->accesso->daUfficio($request->user(), $worksiteId)
+                                      ? (string)($r['dwg_error'] ?? '') : null,
                     // annotabile se immagine/pdf, oppure dwg convertito con successo
                     'annotatable'  => in_array($type, ['pdf','png','jpg','jpeg'], true)
                                       || ($isDwg && ($r['dwg_status'] ?? '') === 'ok'),
@@ -2409,7 +2580,7 @@ final class FieldwireController
             $io    = (int)($request->user()->id ?? 0);
 
             $st = $this->conn->prepare("
-                SELECT a.*, t.name AS modulo,
+                SELECT a.*, t.name AS modulo, t.client_id AS modulo_cliente,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS persona,
                        (SELECT MAX(s.created_at) FROM bb_zone_form_submissions s
                          WHERE s.assegnazione_id = a.id) AS ultima_compilazione
@@ -2438,13 +2609,18 @@ final class FieldwireController
                     }
                 }
                 $fuori = [];
+                $cliente = $this->clienteDiChi($request);
                 foreach ($tutte as $a) {
+                    // il committente vede anche le assegnazioni dei moduli
+                    // della sua azienda, per seguirle e toglierle
+                    $gestita = $cliente !== null && (int)($a['modulo_cliente'] ?? 0) === $cliente;
                     // capo e operaio scritti da prima sono Cantiere
                     $aRuolo = $a['a_ruolo'] !== null ? $acc->normalizza((string)$a['a_ruolo']) : null;
                     $mio = (int)($a['a_user_id'] ?? 0) === $io || ($aRuolo !== null && $aRuolo === $ruolo);
                     $squadra = $cantiere && !$mio && isset($colleghi[(int)($a['a_user_id'] ?? 0)]);
-                    if ($mio || $squadra) {
+                    if ($mio || $squadra || $gestita) {
                         $a['solo_stato'] = !$mio;
+                        $a['gestita']    = $gestita;
                         $fuori[] = $a;
                     }
                 }
@@ -2475,9 +2651,13 @@ final class FieldwireController
             $w    = (int)$request->param('id');
             $body = $this->jsonBody();
 
-            $tpl = $this->formRepo->find((int)($body['template_id'] ?? 0));
-            if (!$tpl || ($tpl['worksite_id'] !== null && (int)$tpl['worksite_id'] !== $w)) {
-                throw new \RuntimeException('Modulo non trovato');
+            $tpl = $this->templateDelCantiere($request, (int)($body['template_id'] ?? 0));
+            // il committente assegna i modelli della sua azienda, non quelli di CSM
+            if (!$this->accesso->daUfficio($request->user(), $w)) {
+                $cliente = $this->clienteDiChi($request);
+                if ($cliente === null || (int)($tpl['client_id'] ?? 0) !== $cliente) {
+                    \App\Service\Zone\Accesso::nega('Puoi assegnare solo i moduli creati dalla tua azienda');
+                }
             }
 
             $aUser  = (int)($body['a_user_id'] ?? 0) ?: null;
@@ -2549,8 +2729,21 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+            $a = (int)$request->param('aId');
+            // il committente toglie solo le assegnazioni dei moduli della sua
+            // azienda: quelle di CSM (DPI della squadra) restano
+            if (!$this->accesso->daUfficio($request->user(), $w)) {
+                $st = $this->conn->prepare('SELECT t.client_id FROM bb_zone_form_assegnazioni a
+                    JOIN bb_zone_form_templates t ON t.id = a.template_id WHERE a.id = :a AND a.worksite_id = :w');
+                $st->execute([':a' => $a, ':w' => $w]);
+                $cliente = $this->clienteDiChi($request);
+                if ($cliente === null || (int)$st->fetchColumn() !== $cliente) {
+                    \App\Service\Zone\Accesso::nega('Puoi rimuovere solo le assegnazioni dei moduli della tua azienda');
+                }
+            }
             $this->conn->prepare('UPDATE bb_zone_form_assegnazioni SET attiva = 0 WHERE id = :a AND worksite_id = :w')
-                ->execute([':a' => (int)$request->param('aId'), ':w' => (int)$request->param('id')]);
+                ->execute([':a' => $a, ':w' => $w]);
             return ['ok' => true];
         });
     }
@@ -2608,17 +2801,41 @@ final class FieldwireController
     {
         $w   = (int)$request->param('id');
         $tpl = $this->formRepo->find($tplId);
-        $suo = $tpl && ($tpl['worksite_id'] === null || (int)$tpl['worksite_id'] === $w);
+        $suo = $tpl && ((int)($tpl['worksite_id'] ?? 0) === $w
+            || ($tpl['worksite_id'] === null
+                && ($tpl['client_id'] === null || (int)$tpl['client_id'] === $this->clienteDelCantiere($w))));
         if (!$suo) {
             throw new \RuntimeException('Modulo non trovato');
         }
         if (!$modifica || $this->accesso->daUfficio($request->user(), $w)) {
             return $tpl;
         }
-        if ($tpl['worksite_id'] === null || (int)($tpl['created_by'] ?? 0) !== (int)($request->user()->id ?? 0)) {
-            \App\Service\Zone\Accesso::nega('Questo modulo lo cambia solo chi l\'ha creato, o l\'ufficio');
+        // il committente cambia i modelli della sua azienda, gli altri quelli
+        // creati da loro; quelli di CSM per tutti i cantieri restano a CSM
+        $cliente = $this->clienteDiChi($request);
+        $mio = (int)($tpl['created_by'] ?? 0) === (int)($request->user()->id ?? 0);
+        $dellaSuaAzienda = $cliente !== null && (int)($tpl['client_id'] ?? 0) === $cliente;
+        if (!$mio && !$dellaSuaAzienda) {
+            \App\Service\Zone\Accesso::nega('Questo modulo puo\' essere modificato solo da chi l\'ha creato o da CSM');
         }
         return $tpl;
+    }
+
+    /** Il committente che sta guardando, o null se non e' un committente qui. */
+    private function clienteDiChi(Request $request): ?int
+    {
+        if ($this->ruoloQui($request) !== \App\Service\Zone\Accesso::CLIENTE) {
+            return null;
+        }
+        $c = (int)($request->user()->client_id ?? 0);
+        return $c > 0 ? $c : null;
+    }
+
+    private function clienteDelCantiere(int $w): int
+    {
+        $st = $this->conn->prepare('SELECT client_id FROM bb_worksites WHERE id = :w');
+        $st->execute([':w' => $w]);
+        return (int)$st->fetchColumn();
     }
 
     /**
@@ -2689,14 +2906,15 @@ final class FieldwireController
      * Porta avanti un'attivita' (stato, checklist) solo chi ce l'ha.
      *
      * Data a una persona: quella persona. Data a un gruppo (la squadra, il
-     * cliente, l'ufficio): chi ne fa parte. E sempre l'ufficio. Chi l'ha
-     * creata no, se l'ha data a un altro: assegnare vuol dire "la fai tu",
-     * e prima chiunque la vedesse la poteva chiudere al posto suo.
+     * cliente, l'ufficio): chi ne fa parte. E sempre CSM e il committente,
+     * che dirige il cantiere: portano avanti qualsiasi attivita' che vedono
+     * (verificare resta a CSM, vedi pretendeStato). Un altro della squadra
+     * no: assegnare vuol dire "la fai tu".
      */
     private function pretendeChiCiLavora(Request $request, array $task): void
     {
         $ruolo = $this->ruoloQui($request);
-        if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
+        if ($ruolo === \App\Service\Zone\Accesso::UFFICIO || $ruolo === \App\Service\Zone\Accesso::CLIENTE) {
             return;
         }
         $io      = (int)($request->user()->id ?? -1);
@@ -2706,7 +2924,7 @@ final class FieldwireController
             : self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra')) === $ruolo;
         if (!$mia) {
             \App\Service\Zone\Accesso::nega(
-                $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' tocca a un altro gruppo"
+                $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' e' assegnata a un altro gruppo"
             );
         }
     }

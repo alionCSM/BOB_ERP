@@ -172,6 +172,9 @@ class RoutePolicyMap
         // il file di un disegno: chi lo apre lo decide il controller, con
         // la condivisione del disegno
         '#^/worksites/\d+/disegni/\d+/view$#',
+        // caricare un disegno: il committente porta le sue tavole. Se puo'
+        // su quel cantiere lo decide il controller, con la Zone
+        '#^/worksites/\d+/disegni/upload$#',
     ];
 
     public function isCompanyScopedRouteAllowed(string $uri): bool

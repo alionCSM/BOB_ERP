@@ -173,7 +173,11 @@
         dom.ov.classList.remove('open');
         dom.page.innerHTML = '';
         dom.svg.innerHTML = '';
+        const dopo = S && S.onClose;
         S = null;
+        // chi ha aperto il disegno si aggiorna: un punto collegato a
+        // un'attivita' deve comparire subito nell'attivita'
+        if (typeof dopo === 'function') { try { dopo(); } catch (_) {} }
     }
 
     // ── Rendering ──────────────────────────────────────────────────────────────

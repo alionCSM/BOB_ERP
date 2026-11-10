@@ -545,7 +545,10 @@
         if (s.ok) badge('bzd-badge-segn', (s.data.segnalazioni || []).filter(x => x.stato === 'aperta').length);
 
         // Il link di una notifica: #segnalazione-12, #chat-squadra
-        const h = location.hash.slice(1);
+        apriDa(location.hash.slice(1));
+    })();
+
+    function apriDa(h) {
         if (h.startsWith('segnalazione-') && typeof switchTop === 'function') {
             switchTop('segnalazioni');
             const id = parseInt(h.slice(13));
@@ -554,5 +557,7 @@
             C.canale = h.slice(5);
             switchTop('chat');
         }
-    })();
+    }
+    // il campanello della Zone apre da qui segnalazioni e chat
+    window.bzdApri = apriDa;
 })();

@@ -24,7 +24,7 @@ CREATE TABLE bb_zone_task_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id I
 CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
   size_bytes BIGINT DEFAULT 0, uploaded_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
+CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, client_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
   created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_form_submissions(id INT AUTO_INCREMENT PRIMARY KEY, template_id INT, worksite_id INT, template_name VARCHAR(200), `values` TEXT,
   submitter_name VARCHAR(80) NULL, submitted_by INT NULL, source VARCHAR(20) DEFAULT 'internal', assegnazione_id INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
@@ -71,3 +71,5 @@ INSERT INTO bb_zone_form_templates(id,worksite_id,name,fields,created_by) VALUES
 INSERT INTO bb_worksite_documents(id,worksite_id,file_name,file_path,file_type,subcategory,created_by,current_version) VALUES (1,100,'Pianta piano terra.pdf','C-118/Disegni/piante/pianta.pdf','pdf','piante',5,2);
 INSERT INTO bb_worksite_document_versions(document_id,version_number,file_name,file_path,file_type,uploaded_by,created_at) VALUES (1,1,'Pianta piano terra v1.pdf','x','pdf',5,NOW() - INTERVAL 10 DAY);
 INSERT INTO bb_zone_condivisioni_ruoli VALUES (100,'disegno',1,'cantiere',NOW()),(100,'disegno',1,'cliente',NOW());
+CREATE TABLE bb_zone_presenze_manuali(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, data DATE, nome VARCHAR(120) NULL, azienda VARCHAR(120) NULL,
+  persone INT DEFAULT 1, mezza TINYINT DEFAULT 0, created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
