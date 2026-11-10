@@ -288,8 +288,8 @@
     function openPreview() {
         root.innerHTML = `
             <div class="bzf-bar">
-                <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Torna al builder</button>
-                <span class="bzf-preview-tag">Anteprima — i campi non si salvano</span>
+                <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Torna all'editor</button>
+                <span class="bzf-preview-tag">Anteprima: i dati inseriti non vengono salvati</span>
             </div>
             <div class="bzf-paper-wrap">
               <div class="bzf-paper">
@@ -412,7 +412,7 @@
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ values, submitter_name: submitter, assegnazione_id: fillAssegnazione }),
         });
-        if (res.ok) { alert('Modulo inviato!'); loadTemplates(); }
+        if (res.ok) { alert('Modulo inviato.'); loadTemplates(); }
         else { alert('Errore: ' + (res.error || 'invio')); btn.disabled = false; btn.textContent = 'Invia'; }
     }
 

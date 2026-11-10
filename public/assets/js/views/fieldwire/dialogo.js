@@ -73,14 +73,14 @@
         tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'CSM, squadra e committente insieme.' },
     };
     const RAPIDI = {
-        materiale_arrivato: 'Materiale arrivato',
-        serve_materiale:    'Serve materiale',
-        finito_oggi:        'Finito per oggi',
-        arrivati:           'Siamo arrivati in cantiere',
-        ritardo:            'Siamo in ritardo',
-        pausa_meteo:        'Fermi per il meteo',
-        serve_aiuto:        'Serve aiuto',
-        ok:                 'Ok, ricevuto',
+        materiale_arrivato: 'Materiale consegnato',
+        serve_materiale:    'Richiesta materiale',
+        finito_oggi:        'Lavori della giornata terminati',
+        arrivati:           'Squadra arrivata in cantiere',
+        ritardo:            'Lavori in ritardo',
+        pausa_meteo:        'Lavori sospesi per maltempo',
+        serve_aiuto:        'Richiesta supporto',
+        ok:                 'Ricevuto',
         sys_presa:          'Presa in carico da {autore}',
         sys_risolta:        'Risolta da {autore}',
         sys_aperta:         'Riaperta da {autore}',
@@ -195,7 +195,7 @@
                     </div>
                     <div class="bzd-lista-body"></div>
                 </div>
-                <div class="bzd-dett"><div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Scegli una segnalazione, o segnala un problema.</div></div>`;
+                <div class="bzd-dett"><div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Seleziona una segnalazione o creane una nuova.</div></div>`;
             lista = root.querySelector('.bzd-lista');
         }
         root.querySelectorAll('[data-bzd-filtro]').forEach(b => b.classList.toggle('on', b.dataset.bzdFiltro === S.filtro));
@@ -416,7 +416,7 @@
         if (t.closest('[data-bzd-annulla]') || t.closest('[data-bzd-indietro]')) {
             S.nuova = false; S.apertaId = null;
             rootS().classList.remove('dett-aperto');
-            rootS().querySelector('.bzd-dett').innerHTML = '<div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Scegli una segnalazione, o segnala un problema.</div>';
+            rootS().querySelector('.bzd-dett').innerHTML = '<div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Seleziona una segnalazione o creane una nuova.</div>';
             disegnaSegnalazioni();
             return;
         }

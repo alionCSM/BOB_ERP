@@ -98,7 +98,7 @@
         } else if (spunta.checked) {
             t = 'Entrano: <b>' + clienti.map(esc).join(', ') + '</b>. Vedono ciò che è condiviso col cliente e ricevono gli avvisi per email.';
         } else {
-            t = 'Spento: ' + clienti.map(esc).join(', ') + ' non entrano ancora. Accendilo quando il cantiere è pronto da mostrare.';
+            t = 'Accesso clienti disattivato: ' + clienti.map(esc).join(', ') + ' non hanno ancora accesso. Attivalo quando il cantiere è pronto per essere condiviso.';
         }
         if (!cliente) {
             t = 'Questo cantiere non ha un cliente in anagrafica: nessun account cliente può entrare.';

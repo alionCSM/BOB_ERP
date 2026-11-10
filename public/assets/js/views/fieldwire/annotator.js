@@ -153,7 +153,7 @@
             drawing: null, // stato disegno in corso
         };
         dom.title.textContent = cfg.onPick
-            ? 'Clicca il punto dell\'attività · ' + (cfg.fileName || 'Disegno')
+            ? 'Seleziona il punto dell\'attività · ' + (cfg.fileName || 'Disegno')
             : (cfg.fileName || 'Disegno');
         dom.ov.classList.toggle('bza-pick', !!cfg.onPick);
         dom.ov.classList.add('open');
@@ -493,22 +493,22 @@
         const tasksRes = await api(`/worksites/${S.worksiteId}/zone/tasks`);
         const tasks = (tasksRes.ok && Array.isArray(tasksRes.data)) ? tasksRes.data : [];
         dom.side.innerHTML = `
-            <h4><i class="fas fa-map-marker-alt"></i> Nuovo pin</h4>
+            <h4><i class="fas fa-map-marker-alt"></i> Nuovo punto</h4>
             <div class="bza-field">
                 <label>Tipo</label>
                 <select data-el="pinmode">
-                    <option value="new">Crea nuovo task qui</option>
+                    <option value="new">Crea attività in questo punto</option>
                     <option value="segn">Segnala un problema qui</option>
-                    <option value="link">Collega task esistente</option>
+                    <option value="link">Collega attività esistente</option>
                     <option value="note">Solo nota (no task)</option>
                 </select>
             </div>
             <div data-el="pin-new">
-                <div class="bza-field"><label>Nome task</label><input data-el="pin-name" placeholder="Es. Montare staffa"></div>
+                <div class="bza-field"><label>Titolo attività</label><input data-el="pin-name" placeholder="Es. Montare staffa"></div>
                 <div class="bza-field"><label>Assegnato a (opzionale)</label><input data-el="pin-assignee" placeholder="Nome"></div>
             </div>
             <div data-el="pin-segn" style="display:none;">
-                <div class="bza-field"><label>Cosa non va</label>
+                <div class="bza-field"><label>Descrizione del problema</label>
                     <textarea data-el="segn-testo" rows="3" placeholder="Es. qui manca un tirante"></textarea>
                 </div>
                 <div class="bza-field"><label>Tipo</label>
@@ -530,7 +530,7 @@
                 </div>
             </div>
             <div data-el="pin-link" style="display:none;">
-                <div class="bza-field"><label>Task esistente</label>
+                <div class="bza-field"><label>Attività esistente</label>
                     <select data-el="pin-task">${tasks.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select>
                 </div>
             </div>
@@ -538,10 +538,10 @@
                 <div class="bza-field"><label>Nota</label><textarea data-el="pin-text" rows="3"></textarea></div>
             </div>
             <div class="bza-row">
-                <button class="bza-btn bza-btn-primary" data-el="pin-save">Salva pin</button>
+                <button class="bza-btn bza-btn-primary" data-el="pin-save">Salva punto</button>
                 <button class="bza-btn bza-btn-ghost" data-el="pin-cancel">Annulla</button>
             </div>
-            <div class="bza-hint">Il pin resta dove hai cliccato. I task finiscono nel Kanban, le segnalazioni nella loro lista — e da lì si torna qui.</div>
+            <div class="bza-hint">Il punto resta nella posizione selezionata. Le attività compaiono nel Kanban, le segnalazioni nel relativo elenco; da entrambi è possibile tornare a questo punto.</div>
         `;
         const mode = dom.side.querySelector('[data-el="pinmode"]');
         const refresh = () => {
@@ -557,13 +557,13 @@
                 payload.create_task = true;
                 payload.task_name = dom.side.querySelector('[data-el="pin-name"]').value.trim();
                 payload.assignee_name = dom.side.querySelector('[data-el="pin-assignee"]').value.trim() || null;
-                if (!payload.task_name) { alert('Inserisci il nome del task'); return; }
+                if (!payload.task_name) { alert("Inserisci il titolo dell'attività"); return; }
             } else if (mode.value === 'segn') {
                 payload.create_segnalazione = true;
                 payload.segnalazione_testo   = dom.side.querySelector('[data-el="segn-testo"]').value.trim();
                 payload.segnalazione_tipo    = dom.side.querySelector('[data-el="segn-tipo"]').value;
                 payload.segnalazione_gravita = dom.side.querySelector('[data-el="segn-gravita"]').value;
-                if (!payload.segnalazione_testo) { alert('Scrivi qual è il problema'); return; }
+                if (!payload.segnalazione_testo) { alert('Descrivi il problema'); return; }
                 // le segnalazioni che bloccano si vedono da lontano
                 payload.color = payload.segnalazione_gravita === 'blocca' ? '#ef4444' : '#f59e0b';
             } else if (mode.value === 'link') {
@@ -594,7 +594,7 @@
                    style="margin-top:8px;display:inline-block;">Apri la segnalazione</a>
             </div>`;
         } else if (a.type === 'pin' && a.task_id) {
-            info = `<div class="bza-field"><label>Task collegato</label>
+            info = `<div class="bza-field"><label>Attività collegata</label>
                 <div style="color:#e2e8f0;font-size:13px;">${escapeHtml(a.task_name||'—')}</div>
                 <div style="color:#64748b;font-size:12px;">Stato: ${escapeHtml(a.task_status||'—')}${a.task_assignee?' · '+escapeHtml(a.task_assignee):''}</div></div>`;
         } else if (a.text) {
@@ -638,7 +638,7 @@
             });
             S.calibration = { m_per_wfrac: scale };
             setTool('select');
-            alert('Scala calibrata: ora le misure mostrano i metri.');
+            alert('Scala calibrata. Le misure sono ora espresse in metri.');
             return;
         }
         payload.page = S.page;

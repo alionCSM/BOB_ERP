@@ -17,7 +17,7 @@
     const root = document.getElementById('bz-assegnazioni-root');
     if (!root || typeof WID === 'undefined') return;
 
-    const A_CHI = { cantiere: 'Chi e\' in cantiere', cliente: 'Il cliente', ufficio: "L'ufficio" };
+    const A_CHI = { cantiere: 'Squadra', cliente: 'Cliente', ufficio: 'CSM' };
     // assegnazioni scritte prima che capo e operaio diventassero Cantiere
     const A_CHI_VECCHI = { capo: A_CHI.cantiere, operaio: A_CHI.cantiere };
     const FREQ  = { una_volta: 'Una volta', giornaliera: 'Ogni giorno', settimanale: 'Ogni settimana', mensile: 'Ogni mese' };
@@ -147,7 +147,7 @@
         if (chi && window.TomSelect) {
             window.__bzaChi = new TomSelect(chi, {
                 plugins: ['remove_button'], maxOptions: 200,
-                placeholder: 'A chi: un gruppo o delle persone',
+                placeholder: 'Assegna a: un gruppo o singole persone',
             });
         }
     }
@@ -155,7 +155,7 @@
     root.addEventListener('click', async function (e) {
         const togli = e.target.closest('[data-togli-assegnazione]');
         if (togli) {
-            if (!confirm('Togliere questo modulo da compilare? Le compilazioni gia\' fatte restano.')) return;
+            if (!confirm('Rimuovere questo modulo dalle assegnazioni? Le compilazioni gia\' inviate restano disponibili.')) return;
             await post(base() + '/' + togli.dataset.togliAssegnazione + '/disattiva');
             carica();
             return;
