@@ -216,6 +216,8 @@ final class ZoneDialogoController
                 'messaggi'     => $msg,
                 'puo_gestire'  => Segnalazioni::puoGestire($ruolo),
                 'da_ufficio'   => $ruolo === Accesso::UFFICIO,
+                // eliminarla: chi l'ha scritta, o CSM
+                'puo_eliminare' => $ruolo === Accesso::UFFICIO || (int)$s['created_by'] === $io,
             ];
         });
     }
@@ -274,6 +276,33 @@ final class ZoneDialogoController
             }
             $this->segnalazioni->cambiaVisibilita((int)$s['id'], (string)($this->corpo()['visibilita'] ?? ''));
             return $this->segnalazioni->trova((int)$s['id']);
+        });
+    }
+
+    /**
+     * Elimina una segnalazione: chi l'ha scritta, o CSM. Se ne vanno anche
+     * le risposte, il punto sul disegno e gli avvisi che ci portavano (un
+     * avviso che apre una cosa che non c'e' piu' sembra un guasto).
+     * L'attivita' nata dalla segnalazione resta.
+     */
+    public function eliminaSegnalazione(Request $request): void
+    {
+        $this->json(function () use ($request) {
+            [$w, $ruolo, $io] = $this->chi($request);
+            $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
+            if ($ruolo !== Accesso::UFFICIO && (int)$s['created_by'] !== $io) {
+                Accesso::nega('Puoi eliminare solo le segnalazioni scritte da te');
+            }
+            $id = (int)$s['id'];
+            $this->conn->prepare('DELETE FROM bb_zone_messaggi WHERE segnalazione_id = :s AND worksite_id = :w')
+                ->execute([':s' => $id, ':w' => $w]);
+            $this->conn->prepare('DELETE FROM bb_zone_annotations WHERE segnalazione_id = :s AND worksite_id = :w')
+                ->execute([':s' => $id, ':w' => $w]);
+            $this->conn->prepare('DELETE FROM bb_notifications WHERE link = :l')
+                ->execute([':l' => Segnalazioni::link($w, 'segnalazione-' . $id)]);
+            $this->conn->prepare('DELETE FROM bb_zone_segnalazioni WHERE id = :s AND worksite_id = :w')
+                ->execute([':s' => $id, ':w' => $w]);
+            return ['eliminata' => true];
         });
     }
 

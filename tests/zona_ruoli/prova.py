@@ -206,6 +206,33 @@ verifica(S, 'CSM legge il motivo', bool(x) and x[0].get('dwg_error') == 'dwg2dxf
 y = [d for d in (dk.get('data') or {}).get('bob', dk.get('data') or []) if isinstance(d, dict) and d.get('id') == 50] if puo(dk) else []
 verifica(S, 'il committente no', bool(y) and not y[0].get('dwg_error'), str(y)[:200])
 
+S = '5g. Cronologia, presenze corrette, segnalazioni eliminate'
+tc = chiama(UFF, 'POST', '/tasks', {'name': 'Fissare parapetti', 'assegnata_a': 'squadra'})['data']['id']
+chiama(CAPO, 'POST', f'/tasks/{tc}/status', {'status': 'in_progress'})
+chiama(CLI, 'POST', f'/tasks/{tc}/status', {'status': 'complete'})
+tt = [t for t in chiama(UFF, 'GET', '/tasks')['data'] if int(t['id']) == tc][0]
+verifica(S, "l'attività dice chi l'ha creata", tt.get('creata_da_nome') == 'Giulia Ufficio', str(tt.get('creata_da_nome')))
+cr = [(e['chi'], e['da'], e['a']) for e in tt.get('cronologia', [])]
+verifica(S, 'e chi l\'ha portata avanti e chiusa', cr == [('Arben Hoxha', 'open', 'in_progress'), ('Paolo Rossi', 'in_progress', 'complete')], str(cr))
+chiama(CLI, 'POST', f'/tasks/{tc}/status', {'status': 'complete'})
+verifica(S, 'rimettere lo stesso stato non scrive niente', len([t for t in chiama(UFF, 'GET', '/tasks')['data'] if int(t['id']) == tc][0]['cronologia']) == 2)
+
+pe = chiama(UFF, 'POST', '/presenze', {'data': oggi, 'nome': 'Marco Neri', 'azienda': 'CSM'})['data']['id']
+verifica(S, 'CSM corregge una presenza', puo(chiama(UFF, 'POST', f'/presenze/{pe}', {'data': oggi, 'nome': 'Marco Neri', 'azienda': 'CSM', 'mezza': True})))
+gp = chiama(UFF, 'GET', f'/presenze?data={oggi}')['data']
+verifica(S, '... e la correzione si legge', any(x.get('id') == pe and x['mezza'] for x in gp['nostri']), str(gp['nostri'])[:300])
+verifica(S, 'il committente non corregge presenze', chiama(CLI, 'POST', f'/presenze/{pe}', {'data': oggi, 'nome': 'x'})['_http'] == 403)
+verifica(S, 'non si corregge la presenza di un altro cantiere', not puo(chiama(UFF, 'POST', f'/presenze/{pe}', {'data': oggi, 'nome': 'x'}, w=200)))
+
+sg = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Cartello mancante', 'tipo': 'sicurezza', 'gravita': 'bassa'})['data']
+sid = sg['id'] if isinstance(sg, dict) and 'id' in sg else sg.get('segnalazione', {}).get('id')
+verifica(S, 'la squadra non elimina la segnalazione del committente', chiama(CAPO, 'POST', f'/segnalazioni/{sid}/elimina', {})['_http'] == 403)
+verifica(S, 'chi l\'ha scritta la elimina', puo(chiama(CLI, 'POST', f'/segnalazioni/{sid}/elimina', {})))
+verifica(S, '... e non c\'è più, né i suoi avvisi', chiama(UFF, 'GET', f'/segnalazioni/{sid}')['_http'] == 404 and all(x['dove'] != f'segnalazione-{sid}' for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi']))
+s2 = chiama(CAPO, 'POST', '/segnalazioni', {'testo': 'Manca tirante', 'tipo': 'materiale', 'gravita': 'bassa'})['data']
+sid2 = s2['id'] if 'id' in s2 else s2.get('segnalazione', {}).get('id')
+verifica(S, 'CSM elimina qualsiasi segnalazione', puo(chiama(UFF, 'POST', f'/segnalazioni/{sid2}/elimina', {})))
+
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
 mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})

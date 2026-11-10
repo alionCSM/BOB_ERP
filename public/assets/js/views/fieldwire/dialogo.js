@@ -272,6 +272,9 @@
             if (s.stato === 'risolta') azioni.push('<button class="bzd-btn" data-bzd-stato="aperta"><i class="fas fa-rotate-left"></i> Riapri</button>');
             if (!s.task_id) azioni.push('<button class="bzd-btn" data-bzd-attivita><i class="fas fa-list-check"></i> Crea attività</button>');
         }
+        if (r.data.puo_eliminare) {
+            azioni.push('<button class="bzd-btn" data-bzd-elimina-segn title="Elimina la segnalazione"><i class="fas fa-trash"></i> Elimina</button>');
+        }
         if (r.data.da_ufficio) {
             azioni.push(`<select data-bzd-vis title="Chi la vede">${Object.keys(VIS).map(k => `<option value="${k}" ${k === visDi(s.visibilita) ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>`);
         }
@@ -288,7 +291,7 @@
                 <div class="sub">
                     ${esc(s.autore)} · ${esc(quando(s.created_at))}
                     ${s.presa_da_nome ? ` · in carico a <b>${esc(s.presa_da_nome)}</b>` : ''}
-                    ${s.task_id ? ` · <a href="#" data-bzd-task="${s.task_id}" style="color:#60a5fa">apri l'attività</a>` : ''}
+                    ${s.task_id ? ` · <a href="#" data-bzd-task="${s.task_id}" style="color:#60a5fa">Apri attività</a>` : ''}
                 </div>
                 ${s.esito ? `<div class="sub" style="margin-top:6px;color:#4ade80"><i class="fas fa-check"></i> ${esc(s.esito)}</div>` : ''}
                 ${azioni.length ? `<div class="bzd-azioni">${azioni.join('')}</div>` : ''}
@@ -440,12 +443,22 @@
             apriSegnalazione(S.apertaId);
             return;
         }
+        if (t.closest('[data-bzd-elimina-segn]')) {
+            if (!confirm('Eliminare questa segnalazione? Verranno eliminate anche le risposte. L\'operazione non può essere annullata.')) return;
+            const r = await post(`${BASE}/segnalazioni/${S.apertaId}/elimina`, {});
+            if (!r.ok) { alert(r.error || 'Impossibile eliminare la segnalazione.'); return; }
+            S.apertaId = null;
+            rootS().classList.remove('dett-aperto');
+            rootS().querySelector('.bzd-dett').innerHTML = '<div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Seleziona una segnalazione o creane una nuova.</div>';
+            await caricaSegnalazioni();
+            return;
+        }
         if (t.closest('[data-bzd-attivita]')) {
             const s = S.elenco.find(x => x.id === S.apertaId);
-            const nome = prompt('Nome dell\'attività per la squadra', s ? s.testo.slice(0, 120) : '');
+            const nome = prompt('Titolo dell\'attività', s ? s.testo.slice(0, 120) : '');
             if (!nome) return;
             const r = await post(`${BASE}/segnalazioni/${S.apertaId}/attivita`, { name: nome });
-            if (!r.ok) { alert(r.error || 'Non creata'); return; }
+            if (!r.ok) { alert(r.error || 'Impossibile creare l\'attività.'); return; }
             if (typeof loadTasks === 'function') loadTasks();
             await caricaSegnalazioni();
             apriSegnalazione(S.apertaId);

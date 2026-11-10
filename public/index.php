@@ -569,6 +569,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get( '/worksites/{id}/zone/avvisi',                                                 [FieldwireController::class, 'avvisi'])
            ->post('/worksites/{id}/zone/avvisi/letti',                                           [FieldwireController::class, 'avvisiLetti'])
            ->post('/worksites/{id}/zone/presenze/{pId}/elimina',                                 [FieldwireController::class, 'eliminaPresenza'])
+           ->post('/worksites/{id}/zone/presenze/{pId}',                                         [FieldwireController::class, 'modificaPresenza'])
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
            ->get( '/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'accessi'])
            ->post('/worksites/{id}/zone/accessi',                                                 [FieldwireController::class, 'salvaAccesso'])
@@ -628,7 +629,8 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
         ->post('/worksites/{id}/zone/segnalazioni/{sid}/foto',              [ZoneDialogoController::class, 'fotoSegnalazione'])
         ->post('/worksites/{id}/zone/segnalazioni/{sid}/stato',             [ZoneDialogoController::class, 'statoSegnalazione'])
         ->post('/worksites/{id}/zone/segnalazioni/{sid}/visibilita',        [ZoneDialogoController::class, 'visibilitaSegnalazione'])
-        ->post('/worksites/{id}/zone/segnalazioni/{sid}/attivita',          [ZoneDialogoController::class, 'attivitaDaSegnalazione']);
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/attivita',          [ZoneDialogoController::class, 'attivitaDaSegnalazione'])
+        ->post('/worksites/{id}/zone/segnalazioni/{sid}/elimina',           [ZoneDialogoController::class, 'eliminaSegnalazione']);
 
     $router->dispatch($request, $container);
 }
@@ -1007,7 +1009,8 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->post('/api/v1/zone/{id}/segnalazioni/{sid}/foto',                 [ZoneDialogoController::class, 'fotoSegnalazione'])
         ->post('/api/v1/zone/{id}/segnalazioni/{sid}/stato',                [ZoneDialogoController::class, 'statoSegnalazione'])
         ->post('/api/v1/zone/{id}/segnalazioni/{sid}/visibilita',           [ZoneDialogoController::class, 'visibilitaSegnalazione'])
-        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/attivita',             [ZoneDialogoController::class, 'attivitaDaSegnalazione']);
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/attivita',             [ZoneDialogoController::class, 'attivitaDaSegnalazione'])
+        ->post('/api/v1/zone/{id}/segnalazioni/{sid}/elimina',              [ZoneDialogoController::class, 'eliminaSegnalazione']);
 
     $router->dispatch($request, $container);
 }

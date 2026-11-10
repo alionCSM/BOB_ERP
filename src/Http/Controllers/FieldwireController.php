@@ -99,6 +99,7 @@ final class FieldwireController
         // le presenze scritte a mano: solo CSM
         'aggiungiPresenza'      => P::GESTIRE,
         'eliminaPresenza'       => P::GESTIRE,
+        'modificaPresenza'      => P::GESTIRE,
         // il nome e il codice che il cliente da' al cantiere: lo scrive
         // il cliente, il metodo controlla il ruolo
         'salvaRiferimento'      => P::VEDERE,
@@ -442,8 +443,56 @@ final class FieldwireController
             } catch (\PDOException $e) {
                 // tabelle dei disegni non pronte: le attivita' si mostrano lo stesso
             }
-            return $righe;
+            return $this->conCronologia($worksiteId, $righe);
         });
+    }
+
+    /**
+     * Chi ha creato ogni attivita' e la sua cronologia (chi l'ha portata
+     * avanti, chiusa, verificata, riaperta), con i nomi.
+     *
+     * @param array<int, array<string, mixed>> $righe
+     * @return array<int, array<string, mixed>>
+     */
+    private function conCronologia(int $worksiteId, array $righe): array
+    {
+        $nomeDi = function (array $ids): array {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+            if (!$ids) return [];
+            $st = $this->conn->prepare('SELECT id, TRIM(CONCAT(COALESCE(first_name,""), " ", COALESCE(last_name,""))) AS nome, username
+                FROM bb_users WHERE id IN (' . implode(',', $ids) . ')');
+            $st->execute();
+            $fuori = [];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $u) {
+                $fuori[(int)$u['id']] = $u['nome'] !== '' ? $u['nome'] : (string)$u['username'];
+            }
+            return $fuori;
+        };
+        $eventi = [];
+        try {
+            $st = $this->conn->prepare('SELECT task_id, user_id, stato_da, stato_a, created_at FROM bb_zone_task_eventi
+                WHERE worksite_id = :w ORDER BY created_at, id');
+            $st->execute([':w' => $worksiteId]);
+            $eventi = $st->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            // tabella non ancora creata
+        }
+        $nomi = $nomeDi(array_merge(array_column($righe, 'created_by'), array_column($eventi, 'user_id')));
+        $per = [];
+        foreach ($eventi as $e) {
+            $per[(int)$e['task_id']][] = [
+                'chi'    => $nomi[(int)$e['user_id']] ?? '—',
+                'da'     => $e['stato_da'],
+                'a'      => $e['stato_a'],
+                'quando' => $e['created_at'],
+            ];
+        }
+        foreach ($righe as &$r) {
+            $r['creata_da_nome'] = $nomi[(int)($r['created_by'] ?? 0)] ?? null;
+            $r['cronologia']     = $per[(int)$r['id']] ?? [];
+        }
+        unset($r);
+        return $righe;
     }
 
     public function createTask(Request $request): void
@@ -566,8 +615,24 @@ final class FieldwireController
             $body       = $this->jsonBody();
             $status     = $body['status'] ?? 'open';
 
-            $this->pretendeStato($request, $this->taskVisibile($request, $taskId), (string)$status);
+            $prima = $this->taskVisibile($request, $taskId);
+            $this->pretendeStato($request, $prima, (string)$status);
             $this->zoneRepo->updateStatus($taskId, $status);
+            // la cronologia: chi l'ha portata avanti, chiusa, verificata o
+            // riaperta, e quando
+            if ((string)($prima['status'] ?? '') !== (string)$status) {
+                try {
+                    $this->conn->prepare('
+                        INSERT INTO bb_zone_task_eventi (task_id, worksite_id, user_id, stato_da, stato_a)
+                        VALUES (:t, :w, :u, :da, :a)
+                    ')->execute([
+                        ':t' => $taskId, ':w' => $worksiteId, ':u' => (int)($request->user()->id ?? 0) ?: null,
+                        ':da' => $prima['status'] ?? null, ':a' => (string)$status,
+                    ]);
+                } catch (\PDOException $e) {
+                    // tabella non ancora creata: lo stato e' cambiato lo stesso
+                }
+            }
 
             // push status su Fieldwire
             $task     = $this->zoneRepo->find($taskId);
@@ -1631,6 +1696,21 @@ final class FieldwireController
                 (int)($request->user()->id ?? 0)
             );
             return ['id' => $id];
+        });
+    }
+
+    /** CSM corregge una presenza scritta a mano. */
+    public function modificaPresenza(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $ok = (new \App\Service\Zone\Presenze($this->conn))
+                ->modifica((int)$request->param('id'), (int)$request->param('pId'), $this->jsonBody());
+            if (!$ok) {
+                throw new \RuntimeException('Presenza non trovata');
+            }
+            return ['ok' => true];
         });
     }
 

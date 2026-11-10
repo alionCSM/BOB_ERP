@@ -73,3 +73,4 @@ INSERT INTO bb_worksite_document_versions(document_id,version_number,file_name,f
 INSERT INTO bb_zone_condivisioni_ruoli VALUES (100,'disegno',1,'cantiere',NOW()),(100,'disegno',1,'cliente',NOW());
 CREATE TABLE bb_zone_presenze_manuali(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, data DATE, nome VARCHAR(120) NULL, azienda VARCHAR(120) NULL,
   persone INT DEFAULT 1, mezza TINYINT DEFAULT 0, created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_task_eventi(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, worksite_id INT, user_id INT NULL, stato_da VARCHAR(20) NULL, stato_a VARCHAR(20), created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
