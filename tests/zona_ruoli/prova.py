@@ -176,6 +176,24 @@ chiama(UFF, 'POST', '/avvisi/letti', {'sezione': 'attivita'})
 verifica(S, 'aprendo Attività si azzera il numero', chiama(UFF, 'GET', '/avvisi')['data']['per_sezione']['attivita'] == 0)
 verifica(S, 'non si segnano gli avvisi degli altri', chiama(CLI, 'POST', '/avvisi/letti', {})['_http'] == 200 and not all(x['letta'] for x in chiama(CAPO, 'GET', '/avvisi')['data']['avvisi']))
 
+S = '5e. Notifiche di file'
+rf = chiama(CLI, 'POST', '/files', file={'nome': 'computo_metrico.pdf'})
+fid = int(rf['data']['id']) if puo(rf) else 0
+verifica(S, 'il file caricato dal committente arriva a CSM', any(x['dove'] == f'file-{fid}' for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi']))
+verifica(S, '... e conta sul menu File', chiama(UFF, 'GET', '/avvisi')['data']['per_sezione']['files'] >= 1)
+verifica(S, 'chi lo carica non avvisa se stesso', all(x['dove'] != f'file-{fid}' for x in chiama(CLI, 'GET', '/avvisi')['data']['avvisi']))
+rq = chiama(CAPO, 'POST', '/files', file={'nome': 'foto_lavori.pdf'})
+qid = int(rq['data']['id']) if puo(rq) else 0
+vede_cli = qid in [int(x['id']) for x in chiama(CLI, 'GET', '/files')['data']['files']]
+avvisato = any(x['dove'] == f'file-{qid}' for x in chiama(CLI, 'GET', '/avvisi')['data']['avvisi'])
+verifica(S, 'il committente è avvisato di un file della squadra solo se lo vede', vede_cli == avvisato, f'vede={vede_cli} avvisato={avvisato}')
+fp = chiama(UFF, 'POST', '/files/folder', {'name': 'Riservata', 'parti': [], 'persone': []})['data']['id']
+rp = chiama(UFF, 'POST', '/files', file={'nome': 'offerta_interna.pdf', 'campi': {'folder_id': fp}})
+pid = int(rp['data']['id']) if puo(rp) else -1
+verifica(S, 'un file in una cartella riservata a CSM non avvisa né committente né squadra',
+         puo(rp) and all(x['dove'] != f'file-{pid}' for u in (CLI, CAPO) for x in chiama(u, 'GET', '/avvisi')['data']['avvisi']))
+verifica(S, 'CSM è avvisato del file della squadra', any(x['dove'] == f'file-{qid}' for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi']))
+
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
 mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})

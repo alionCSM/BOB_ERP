@@ -720,6 +720,14 @@ final class FieldwireController
 
             $id = $this->zoneRepo->addComment($taskId, $text, $authorName, $fileUrl);
             $this->scriviCommento($id, $request, $_POST);
+            // una foto sull'attivita' e' un messaggio come gli altri: avvisa
+            // chi segue l'attivita' (una nota interna resta a CSM)
+            $this->avvisa(fn($a) => $a->commento(
+                $taskId,
+                (int)($user?->id ?? 0),
+                $text !== '' ? $text : \App\Service\Lingua::testo('zona_foto_allegata', 'it'),
+                !empty($_POST['interna'])
+            ));
 
             echo json_encode(['ok' => true, 'data' => [
                 'id' => $id, 'text' => $text, 'author_name' => $authorName,
@@ -1343,6 +1351,8 @@ final class FieldwireController
             if ($folderId === null) {
                 $this->condivisioneNuova($request, $worksiteId, 'file', $id, []);
             }
+            // a chi lo vede, dopo che la condivisione e' scritta
+            $this->avvisa(fn($a) => $a->file($worksiteId, $id, (int)($user?->id ?? 0)));
 
             echo json_encode(['ok' => true, 'data' => ['id' => $id]]);
         } catch (\Throwable $e) {
@@ -1512,6 +1522,7 @@ final class FieldwireController
         return match (true) {
             str_starts_with($dove, 'attivita-')     => 'attivita',
             str_starts_with($dove, 'disegno')       => 'disegni',
+            str_starts_with($dove, 'file-')         => 'files',
             $dove === 'moduli'                      => 'forms',
             str_starts_with($dove, 'segnalazione-') => 'segnalazioni',
             str_starts_with($dove, 'chat-')         => 'chat',
@@ -1542,7 +1553,7 @@ final class FieldwireController
 
             $elenco = [];
             $nonLette = 0;
-            $perSezione = ['attivita' => 0, 'disegni' => 0, 'forms' => 0, 'segnalazioni' => 0, 'chat' => 0];
+            $perSezione = ['attivita' => 0, 'disegni' => 0, 'files' => 0, 'forms' => 0, 'segnalazioni' => 0, 'chat' => 0];
             foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $n) {
                 $sez  = self::sezioneAvviso((string)$n['link']);
                 $letta = (int)$n['is_read'] === 1;
@@ -1824,7 +1835,7 @@ final class FieldwireController
                        (SELECT COUNT(*) FROM bb_worksite_document_versions v WHERE v.document_id = d.id) AS n_versioni,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
-                       r.status AS dwg_status
+                       r.status AS dwg_status, r.error AS dwg_error
                 FROM bb_worksite_documents d
                 LEFT JOIN bb_users u             ON u.id = d.created_by
                 LEFT JOIN bb_zone_disegno_sync s ON s.document_id = d.id
@@ -1860,6 +1871,11 @@ final class FieldwireController
                     // DWG: stato della conversione vettoriale
                     'is_dwg'       => $isDwg,
                     'dwg_status'   => $isDwg ? ($r['dwg_status'] ?? 'pending') : null,
+                    // perche' la conversione non e' riuscita: a CSM, che la
+                    // puo' rilanciare o far sistemare sul server
+                    'dwg_error'    => $isDwg && ($r['dwg_status'] ?? '') === 'error'
+                                      && $this->accesso->daUfficio($request->user(), $worksiteId)
+                                      ? (string)($r['dwg_error'] ?? '') : null,
                     // annotabile se immagine/pdf, oppure dwg convertito con successo
                     'annotatable'  => in_array($type, ['pdf','png','jpg','jpeg'], true)
                                       || ($isDwg && ($r['dwg_status'] ?? '') === 'ok'),

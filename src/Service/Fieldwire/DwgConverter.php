@@ -34,11 +34,32 @@ final class DwgConverter
             return $this->store($documentId, 'error', null, null, 'File DWG non trovato su disco');
         }
 
+        // shell_exec spento nel php.ini: senza, il convertitore non parte e
+        // prima si leggeva solo "Output non valido"
+        $spente = array_map('trim', explode(',', (string)ini_get('disable_functions')));
+        if (!function_exists('shell_exec') || in_array('shell_exec', $spente, true)) {
+            return $this->store($documentId, 'error', null, null,
+                'Il server non consente di avviare il convertitore (shell_exec disattivato in PHP).');
+        }
+
         $outDir  = dirname($dwgAbs);
         $script  = APP_ROOT . '/scripts/dwg/dwg_to_svg.py';
-        $python  = getenv('BOB_PYTHON') ?: 'python3';
+        $python  = self::env('BOB_PYTHON') ?: 'python3';
 
-        $cmd = escapeshellarg($python) . ' ' . escapeshellarg($script) . ' '
+        // Le impostazioni del convertitore stanno nel .env, che PHP legge in
+        // $_ENV ma che i programmi avviati da PHP non vedono: si passano a
+        // mano. HOME scrivibile serve a ODA (Qt) quando gira come www-data.
+        $vars = ['HOME=/tmp'];
+        foreach (['BOB_ODA_CONVERTER', 'BOB_DWG2DXF'] as $k) {
+            $v = self::env($k);
+            if ($v !== '') {
+                $vars[] = $k . '=' . escapeshellarg($v);
+            }
+        }
+
+        @set_time_limit(300);
+        $cmd = 'env ' . implode(' ', $vars) . ' '
+             . escapeshellarg($python) . ' ' . escapeshellarg($script) . ' '
              . escapeshellarg($dwgAbs) . ' ' . escapeshellarg($outDir) . ' 2>&1';
 
         $raw = shell_exec($cmd);
@@ -52,6 +73,12 @@ final class DwgConverter
         $svgRel = \CloudPath::relativeToRoot($json['svg_path']);
 
         return $this->store($documentId, 'ok', $svgRel, $json, null);
+    }
+
+    /** Una variabile del .env (caricata in $_ENV) o dell'ambiente. */
+    private static function env(string $k): string
+    {
+        return trim((string)($_ENV[$k] ?? $_SERVER[$k] ?? getenv($k) ?: ''));
     }
 
     public function status(int $documentId): ?array

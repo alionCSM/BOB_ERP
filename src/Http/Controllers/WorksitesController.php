@@ -1397,6 +1397,17 @@ final class WorksitesController
                 // resta all'ufficio e si sistema dal pannello
                 error_log('[uploadDisegno] condivisione: ' . $e->getMessage());
             }
+
+            // un disegno nuovo: lo sa chi lo vede (anche CSM, se lo carica
+            // il committente)
+            try {
+                (new \App\Service\Zone\AvvisiZona(
+                    $this->conn,
+                    new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+                ))->disegnoNuovo($worksiteId, (int)$savedDocId, (int)$auth['user_id']);
+            } catch (\Throwable $e) {
+                error_log('[uploadDisegno] avviso disegno nuovo: ' . $e->getMessage());
+            }
         }
 
         // Una versione nuova: lo sa chi lavora su quel disegno. In cantiere

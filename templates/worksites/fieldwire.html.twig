@@ -502,7 +502,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span><span class="bzd-badge" id="bz-badge-attivita" hidden></span></button>{% endif %}
                 {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span><span class="bzd-badge" id="bz-badge-disegni" hidden></span></button>{% endif %}
                 {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
-                {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
+                {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span><span class="bzd-badge" id="bz-badge-files" hidden></span></button>{% endif %}
                 {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span><span class="bzd-badge" id="bz-badge-forms" hidden></span></button>{% endif %}
                 {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
                    cosa legge lo decide il server #}
@@ -1962,7 +1962,7 @@ function renderDisegni(items, fwReady) {
                     : '')}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
-            ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG non riuscita</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'error' ? `<div class="bz-dz-meta" style="color:#fca5a5;" title="${escAttr(d.dwg_error || '')}">Conversione DWG non riuscita${d.dwg_error ? ': ' + escHtml(d.dwg_error.slice(0, 160)) : ''}</div>` : ''}
             <div class="bz-dz-actions">
                 ${d.annotatable
                     ? (puoScrivere('disegni')
@@ -2488,7 +2488,7 @@ function quandoAvviso(s) {
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) + ' alle ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
 
-const ICONA_AVVISO = { attivita: 'fa-list-check', disegni: 'fa-drafting-compass', forms: 'fa-clipboard-list',
+const ICONA_AVVISO = { attivita: 'fa-list-check', disegni: 'fa-drafting-compass', files: 'fa-folder-open', forms: 'fa-clipboard-list',
                        segnalazioni: 'fa-triangle-exclamation', chat: 'fa-comments' };
 
 async function caricaAvvisi() {
@@ -2499,7 +2499,7 @@ async function caricaAvvisi() {
     const n = document.getElementById('bz-avvisi-n');
     n.hidden = !avvisiStato.non_lette;
     n.textContent = avvisiStato.non_lette > 99 ? '99+' : avvisiStato.non_lette;
-    ['attivita', 'disegni', 'forms'].forEach(k => {
+    ['attivita', 'disegni', 'files', 'forms'].forEach(k => {
         const b = document.getElementById('bz-badge-' + k);
         if (!b) return;
         const x = avvisiStato.per_sezione[k] || 0;
@@ -2541,6 +2541,8 @@ async function vaiAdAvviso(dove) {
         if (allTasks.some(t => Number(t.id) === id)) openTask(id);
     } else if (dove.startsWith('disegno')) {
         switchTop('disegni');
+    } else if (dove.startsWith('file-')) {
+        switchTop('files');
     } else if (dove === 'moduli') {
         switchTop('forms');
     } else if ((dove.startsWith('segnalazione-') || dove.startsWith('chat-')) && window.bzdApri) {
@@ -2574,7 +2576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(caricaAvvisi, 30000);
     // il link di una notifica aperto da fuori (email, campanello di BOB)
     const h = location.hash.slice(1);
-    if (h.startsWith('attivita-') || h.startsWith('disegno') || h === 'moduli') setTimeout(() => vaiAdAvviso(h), 400);
+    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') setTimeout(() => vaiAdAvviso(h), 400);
 });
 
 /* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */

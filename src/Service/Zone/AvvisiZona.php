@@ -181,6 +181,74 @@ final class AvvisiZona
         }
     }
 
+    /**
+     * Un disegno caricato per la prima volta: a chi lo vede, CSM compreso
+     * (il committente carica le sue tavole). Chi l'ha caricato no.
+     */
+    public function disegnoNuovo(int $worksiteId, int $docId, int $daChi): void
+    {
+        $st = $this->conn->prepare('
+            SELECT d.file_name, d.created_by, w.name AS cantiere
+            FROM bb_worksite_documents d JOIN bb_worksites w ON w.id = d.worksite_id
+            WHERE d.id = :d AND d.worksite_id = :w
+        ');
+        $st->execute([':d' => $docId, ':w' => $worksiteId]);
+        $d = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$d) {
+            return;
+        }
+        $cond = new Condivisione($this->conn, new Accesso($this->conn));
+        foreach ($this->persone($worksiteId, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE], null) as $p) {
+            if ((int)$p['user_id'] === $daChi) continue;
+            if (!$cond->vede($this->utente((int)$p['user_id']), $worksiteId, 'disegno', $docId, (int)($d['created_by'] ?? 0))) continue;
+            $p['worksite_id'] = $worksiteId;
+            $p['dove'] = 'disegno-' . $docId;
+            $this->manda($p, 'zona_disegno_nuovo_t', 'zona_disegno_nuovo', [
+                'cantiere' => $d['cantiere'],
+                'nome'     => mb_substr((string)$d['file_name'], 0, 100),
+            ], 'normal', $daChi);
+        }
+    }
+
+    /**
+     * Un file caricato nella Zone: a chi lo vede — condiviso con lui o con
+     * la sua parte, o dentro una cartella che vede. Chi l'ha caricato no.
+     */
+    public function file(int $worksiteId, int $fileId, int $daChi): void
+    {
+        $st = $this->conn->prepare('
+            SELECT f.file_name, f.folder_id, f.uploaded_by, w.name AS cantiere
+            FROM bb_zone_files f JOIN bb_worksites w ON w.id = f.worksite_id
+            WHERE f.id = :f AND f.worksite_id = :w
+        ');
+        $st->execute([':f' => $fileId, ':w' => $worksiteId]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$f) {
+            return;
+        }
+        $cartella = null;
+        if (!empty($f['folder_id'])) {
+            $c = $this->conn->prepare('SELECT id, created_by FROM bb_zone_folders WHERE id = :c');
+            $c->execute([':c' => (int)$f['folder_id']]);
+            $cartella = $c->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        $acc  = new Accesso($this->conn);
+        $cond = new Condivisione($this->conn, $acc);
+        foreach ($this->persone($worksiteId, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE], null) as $p) {
+            if ((int)$p['user_id'] === $daChi) continue;
+            $u = $this->utente((int)$p['user_id']);
+            $vede = $cond->vede($u, $worksiteId, 'file', $fileId, (int)($f['uploaded_by'] ?? 0))
+                || ($cartella && $cond->vede($u, $worksiteId, 'cartella', (int)$cartella['id'], (int)($cartella['created_by'] ?? 0)));
+            if (!$vede) continue;
+            $p['worksite_id'] = $worksiteId;
+            $p['dove'] = 'file-' . $fileId;
+            $this->manda($p, 'zona_file_t', 'zona_file', [
+                'cantiere' => $f['cantiere'],
+                'nome'     => mb_substr((string)$f['file_name'], 0, 100),
+            ], 'normal', $daChi);
+        }
+    }
+
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {
