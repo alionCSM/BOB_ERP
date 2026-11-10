@@ -1615,9 +1615,16 @@ async function openTask(id) {
                 ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
                 ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
                 ${task.category ? `<dt><i class="fas fa-tag"></i> Categoria</dt><dd>${escHtml(task.category)}</dd>` : ''}
-                <dt><i class="fas fa-clock"></i> Creata</dt><dd>${fmtDate(task.created_at)}</dd>
+                <dt><i class="fas fa-clock"></i> Creata</dt><dd>${task.creata_da_nome ? escHtml(task.creata_da_nome) + ' · ' : ''}${fmtDataOra(task.created_at)}</dd>
             </dl>
             ${task.description ? `<p class="bz-dati-desc">${escHtml(task.description)}</p>` : ''}
+            ${(task.cronologia || []).length ? `
+            <div class="bz-cronologia">
+                <div class="t">Cronologia</div>
+                ${task.cronologia.map(e => `
+                    <div class="r"><span class="q">${fmtDataOra(e.quando)}</span>
+                        <span><b>${escHtml(e.chi)}</b>: ${escHtml(STATUSES[e.da] || e.da || '—')} → ${escHtml(STATUSES[e.a] || e.a)}</span></div>`).join('')}
+            </div>` : ''}
         </div>
 
         <div class="bz-detail-section" id="bz-foto-sez-${id}" hidden>
@@ -1665,6 +1672,9 @@ async function setStatus(taskId, status) {
     const task = allTasks.find(t => t.id == taskId);
     if (task) task.status = status;
     renderCurrentView();
+    // la cronologia nel dettaglio: chi l'ha cambiata e quando
+    await loadTasks();
+    if (Number(activeTaskId) === Number(taskId)) openTask(Number(taskId));
     // update buttons
     document.querySelectorAll('.bz-status-opt').forEach(b => {
         b.classList.toggle('selected', b.classList.contains(status));
@@ -2081,6 +2091,14 @@ async function pushDisegnoFw(docId, btn) {
     }
 }
 
+/* data e ora: per la cronologia, dove conta anche quando nella giornata */
+function fmtDataOra(str) {
+    if (!str) return '';
+    const d = new Date(String(str).replace(' ', 'T'));
+    if (isNaN(d)) return str;
+    return d.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'2-digit' })
+         + ' ' + d.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+}
 function fmtDateTime(str) {
     if (!str) return '';
     const d = new Date(str.replace(' ', 'T'));
@@ -2909,8 +2927,8 @@ function formPresenza(data) {
     if (!DA_UFFICIO) return '';
     const oggi = new Date().toISOString().slice(0, 10);
     return `
-        <form class="bz-pres-form" id="bz-pres-form">
-            <div class="t">Registra presenza</div>
+        <form class="bz-pres-form" id="bz-pres-form" data-id="">
+            <div class="t" id="bz-pres-form-t">Registra presenza</div>
             <div class="r">
                 <label>Data<input type="date" name="data" value="${escAttr(data || oggi)}" max="${oggi}" required></label>
                 <label>Tipo<select name="tipo">
@@ -2924,7 +2942,8 @@ function formPresenza(data) {
                     <option value="0">Giornata intera</option>
                     <option value="1">Mezza giornata</option>
                 </select></label>
-                <button type="submit"><i class="fas fa-plus"></i> Aggiungi</button>
+                <button type="submit" id="bz-pres-salva"><i class="fas fa-plus"></i> Aggiungi</button>
+                <button type="button" class="annulla" id="bz-pres-annulla" hidden>Annulla</button>
             </div>
         </form>`;
 }
@@ -2944,14 +2963,38 @@ document.addEventListener('submit', async e => {
     const persona = v.tipo === 'persona';
     if (persona && !v.nome.trim()) { alert('Inserisci il nome della persona.'); return; }
     if (!persona && !v.azienda.trim()) { alert("Inserisci il nome dell'azienda."); return; }
-    const r = await api(`/worksites/${WID}/zone/presenze`, {
+    // con un id si corregge quella presenza, senza se ne registra una nuova
+    const id = f.dataset.id;
+    const r = await api(`/worksites/${WID}/zone/presenze${id ? '/' + id : ''}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ data: v.data, nome: persona ? v.nome : '', azienda: v.azienda,
                                persone: persona ? 1 : parseInt(v.persone || '1', 10), mezza: v.mezza === '1' }),
     });
-    if (!r.ok) { alert(r.error || 'Impossibile registrare la presenza.'); return; }
+    if (!r.ok) { alert(r.error || (id ? 'Impossibile salvare la presenza.' : 'Impossibile registrare la presenza.')); return; }
     presGiorno = null;               // ricarica anche l'elenco dei giorni
     loadPresenze(v.data);
+});
+// Modifica: il modulo in alto si riempie con la presenza scelta
+document.addEventListener('click', e => {
+    const m = e.target.closest('[data-pres-modifica]');
+    const f = document.getElementById('bz-pres-form');
+    if (e.target.closest('#bz-pres-annulla') && f) { loadPresenze(presGiorno); return; }
+    if (!m || !f) return;
+    const p = JSON.parse(m.dataset.presModifica);
+    const persona = !!p.nome;
+    f.dataset.id = p.id;
+    f.querySelector('[name=data]').value = p.data;
+    f.querySelector('[name=tipo]').value = persona ? 'persona' : 'azienda';
+    f.querySelector('.solo-persona').hidden = !persona;
+    f.querySelector('.solo-azienda').hidden = persona;
+    f.querySelector('[name=nome]').value = p.nome || '';
+    f.querySelector('[name=azienda]').value = p.azienda || '';
+    f.querySelector('[name=persone]').value = p.persone || 1;
+    f.querySelector('[name=mezza]').value = p.mezza ? '1' : '0';
+    document.getElementById('bz-pres-form-t').textContent = 'Modifica presenza';
+    document.getElementById('bz-pres-salva').innerHTML = '<i class="fas fa-check"></i> Salva modifiche';
+    document.getElementById('bz-pres-annulla').hidden = false;
+    f.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 document.addEventListener('click', async e => {
     const b = e.target.closest('[data-pres-elimina]');
@@ -3003,7 +3046,7 @@ async function loadPresenze(data = null) {
             <td>${escHtml(x.nome)}</td>
             <td class="az">${escHtml(x.azienda)}</td>
             <td class="tu${x.mezza ? ' mezza' : ''}">${escHtml(x.turno)}</td>
-            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
+            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-modifica="${escAttr(JSON.stringify({ id: x.id, data: d.data, nome: x.nome || '', azienda: x.azienda || '', persone: x.persone || 1, mezza: !!x.mezza }))}" title="Modifica"><i class="fas fa-pen"></i></button><button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
         </tr>
     `).join('');
 
@@ -3011,7 +3054,7 @@ async function loadPresenze(data = null) {
         <tr>
             <td>${escHtml(x.azienda)}</td>
             <td class="tu${x.mezza ? ' mezza' : ''}">${x.persone} ${x.persone === 1 ? 'persona' : 'persone'}${x.mezza ? ' · mezza giornata' : ''}</td>
-            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
+            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-modifica="${escAttr(JSON.stringify({ id: x.id, data: d.data, nome: x.nome || '', azienda: x.azienda || '', persone: x.persone || 1, mezza: !!x.mezza }))}" title="Modifica"><i class="fas fa-pen"></i></button><button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
         </tr>
     `).join('');
 
@@ -3186,6 +3229,13 @@ if (!SOLO_ACCESSI) {
 .bz-pres-tab .az { color:#94a3b8; }
 .bz-pres-tab .tu { color:#94a3b8; white-space:nowrap; }
 .bz-pres-tab .tu.mezza { color:#fbbf24; }
+.bz-cronologia { margin-top:12px; border-top:1px solid #1e293b; padding-top:10px; }
+.bz-cronologia .t { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin-bottom:6px; }
+.bz-cronologia .r { display:flex; gap:10px; font-size:12.5px; color:#94a3b8; padding:3px 0; }
+.bz-cronologia .r b { color:#cbd5e1; font-weight:600; }
+.bz-cronologia .q { flex:0 0 auto; color:#64748b; min-width:108px; }
+[data-theme="light"] .bz-cronologia { border-top-color:#e2e8f0; }
+[data-theme="light"] .bz-cronologia .r b { color:#1e293b; }
 .bz-pres-del { background:none; border:0; color:#64748b; cursor:pointer; padding:2px 6px; }
 .bz-pres-del:hover { color:#f87171; }
 /* registrare a mano una presenza (CSM) */
@@ -3196,6 +3246,7 @@ if (!SOLO_ACCESSI) {
 .bz-pres-form label[hidden] { display:none; }
 .bz-pres-form input, .bz-pres-form select { background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:7px 9px; font-size:13px; min-width:0; }
 .bz-pres-form input[name=persone] { width:80px; }
+.bz-pres-form button.annulla { background:none; border:1px solid #334155; color:#94a3b8; }
 .bz-pres-form button { background:#1e40af; color:#fff; border:0; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
 [data-theme="light"] .bz-pres-form { border-color:#e2e8f0; }
 [data-theme="light"] .bz-pres-form input, [data-theme="light"] .bz-pres-form select { background:#fff; border-color:#cbd5e1; color:#1e293b; }

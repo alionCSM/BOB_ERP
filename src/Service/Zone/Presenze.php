@@ -287,6 +287,43 @@ final class Presenze
      */
     public function aggiungi(int $worksiteId, array $d, int $daChi): int
     {
+        [$data, $nome, $azienda, $persone, $mezza] = $this->valori($d);
+        $this->conn->prepare('
+            INSERT INTO bb_zone_presenze_manuali (worksite_id, data, nome, azienda, persone, mezza, created_by)
+            VALUES (:w, :d, :n, :a, :p, :m, :by)
+        ')->execute([
+            ':w' => $worksiteId, ':d' => $data, ':n' => $nome, ':a' => $azienda,
+            ':p' => $persone, ':m' => $mezza, ':by' => $daChi ?: null,
+        ]);
+        return (int)$this->conn->lastInsertId();
+    }
+
+    /** Corregge una presenza scritta a mano, di questo cantiere. */
+    public function modifica(int $worksiteId, int $id, array $d): bool
+    {
+        [$data, $nome, $azienda, $persone, $mezza] = $this->valori($d);
+        $c = $this->conn->prepare('SELECT 1 FROM bb_zone_presenze_manuali WHERE id = :id AND worksite_id = :w');
+        $c->execute([':id' => $id, ':w' => $worksiteId]);
+        if (!$c->fetchColumn()) {
+            return false;
+        }
+        $this->conn->prepare('
+            UPDATE bb_zone_presenze_manuali SET data = :d, nome = :n, azienda = :a, persone = :p, mezza = :m
+            WHERE id = :id AND worksite_id = :w
+        ')->execute([
+            ':d' => $data, ':n' => $nome, ':a' => $azienda, ':p' => $persone, ':m' => $mezza,
+            ':id' => $id, ':w' => $worksiteId,
+        ]);
+        return true;
+    }
+
+    /**
+     * I valori di una presenza, controllati.
+     *
+     * @return array{0: string, 1: ?string, 2: ?string, 3: int, 4: int}
+     */
+    private function valori(array $d): array
+    {
         $data = (string)($d['data'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
             throw new \RuntimeException('Data non valida');
@@ -300,15 +337,7 @@ final class Presenze
             throw new \RuntimeException('Inserisci il nome della persona o dell\'azienda');
         }
         $persone = $nome !== '' ? 1 : max(1, min(500, (int)($d['persone'] ?? 1)));
-        $this->conn->prepare('
-            INSERT INTO bb_zone_presenze_manuali (worksite_id, data, nome, azienda, persone, mezza, created_by)
-            VALUES (:w, :d, :n, :a, :p, :m, :by)
-        ')->execute([
-            ':w' => $worksiteId, ':d' => $data, ':n' => $nome !== '' ? $nome : null,
-            ':a' => $azienda !== '' ? $azienda : null, ':p' => $persone,
-            ':m' => !empty($d['mezza']) ? 1 : 0, ':by' => $daChi ?: null,
-        ]);
-        return (int)$this->conn->lastInsertId();
+        return [$data, $nome !== '' ? $nome : null, $azienda !== '' ? $azienda : null, $persone, !empty($d['mezza']) ? 1 : 0];
     }
 
     /** Toglie una presenza scritta a mano, di questo cantiere. */
