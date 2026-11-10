@@ -2956,8 +2956,8 @@ function formPresenza(data, alCliente) {
     const oggi = new Date().toISOString().slice(0, 10);
     return `
         <label class="bz-pres-cliente">
-            <input type="checkbox" id="bz-pres-cliente" ${alCliente !== false ? 'checked' : ''}>
-            <span><b>Visibile al committente</b> — se disattivato, il committente non vede la sezione Presenze né le presenze nel riepilogo lavori.</span>
+            <input type="checkbox" id="bz-pres-cliente" ${alCliente === true ? 'checked' : ''}>
+            <span><b>Visibile al committente</b> — se attivato, il committente vede la sezione Presenze e le presenze nel riepilogo lavori.</span>
         </label>
         <form class="bz-pres-form" id="bz-pres-form" data-id="">
             <div class="t" id="bz-pres-form-t">Registra presenza</div>
@@ -3058,7 +3058,7 @@ async function loadPresenze(data = null) {
         if (!giorni.length) {
             colonna.innerHTML = '';
             const st = DA_UFFICIO ? await api(`/worksites/${WID}/zone/presenze`) : null;
-            corpo.innerHTML = formPresenza(null, st && st.ok ? st.data.al_cliente : true) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
+            corpo.innerHTML = formPresenza(null, st && st.ok ? st.data.al_cliente : false) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `

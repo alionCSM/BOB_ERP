@@ -6,7 +6,7 @@ use Phinx\Migration\AbstractMigration;
 
 /**
  * Le presenze del cantiere: si mostrano al committente o no. Lo decide CSM
- * cantiere per cantiere; di base si', come prima.
+ * cantiere per cantiere; di base no.
  */
 final class ZonePresenzeCliente extends AbstractMigration
 {
@@ -14,7 +14,7 @@ final class ZonePresenzeCliente extends AbstractMigration
     {
         $t = $this->table('bb_worksites');
         if (!$t->hasColumn('zone_presenze_cliente')) {
-            $t->addColumn('zone_presenze_cliente', 'boolean', ['default' => true, 'null' => false])->update();
+            $t->addColumn('zone_presenze_cliente', 'boolean', ['default' => false, 'null' => false])->update();
         }
     }
 
