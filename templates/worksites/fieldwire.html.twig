@@ -1655,11 +1655,13 @@ function closeDetail() {
 }
 
 async function setStatus(taskId, status) {
-    await api(`/worksites/${WID}/zone/tasks/${taskId}/status`, {
+    const r = await api(`/worksites/${WID}/zone/tasks/${taskId}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
     });
+    // un rifiuto del server si dice, invece di far finta che sia cambiato
+    if (!r.ok) { alert(r.error || "Impossibile cambiare lo stato dell'attività."); return; }
     const task = allTasks.find(t => t.id == taskId);
     if (task) task.status = status;
     renderCurrentView();
@@ -1905,7 +1907,7 @@ async function loadDisegni() {
 
     const res = await api(`/worksites/${WID}/zone/disegni`);
     disegniLoaded = true;
-    if (!res.ok) { grid.innerHTML = '<div class="bz-dz-empty">Errore caricamento disegni.</div>'; return; }
+    if (!res.ok) { grid.innerHTML = `<div class="bz-dz-empty">Impossibile caricare i disegni.${res.error ? '<br><small>' + escHtml(res.error) + '</small>' : ''}</div>`; return; }
 
     const { bob = [], fieldwire = [], fieldwire_ready = false } = res.data || {};
     renderDisegni(bob, fieldwire_ready);
@@ -2713,6 +2715,12 @@ document.addEventListener('click', e => {
     const delTask = t.closest('[data-delete-task]');
     if (delTask)  { e.stopPropagation(); deleteTask(parseInt(delTask.dataset.deleteTask)); return; }
 
+    // I bottoni dello stato prima di "apri l'attivita'": hanno anche loro
+    // data-task-id, e controllati dopo ogni clic riapriva l'attivita'
+    // invece di cambiarne lo stato.
+    const stEl = t.closest('[data-set-status]');
+    if (stEl) { setStatus(parseInt(stEl.dataset.taskId), stEl.dataset.setStatus); return; }
+
     // Open task from card / gantt / calendar
     const taskEl = t.closest('[data-task-id]');
     if (taskEl) { openTask(parseInt(taskEl.dataset.taskId)); return; }
@@ -2720,10 +2728,6 @@ document.addEventListener('click', e => {
     // Quick add from kanban column
     const qaEl = t.closest('[data-quick-add]');
     if (qaEl) { quickAdd(qaEl.dataset.quickAdd); return; }
-
-    // Status buttons in detail panel
-    const stEl = t.closest('[data-set-status]');
-    if (stEl) { setStatus(parseInt(stEl.dataset.taskId), stEl.dataset.setStatus); return; }
 
     // Add checklist item button
     const acEl = t.closest('[data-add-check]');

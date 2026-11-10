@@ -194,6 +194,18 @@ verifica(S, 'un file in una cartella riservata a CSM non avvisa né committente 
          puo(rp) and all(x['dove'] != f'file-{pid}' for u in (CLI, CAPO) for x in chiama(u, 'GET', '/avvisi')['data']['avvisi']))
 verifica(S, 'CSM è avvisato del file della squadra', any(x['dove'] == f'file-{qid}' for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi']))
 
+S = '5f. Disegni con DWG non convertito'
+sql("INSERT INTO bb_worksite_documents(id,worksite_id,file_name,file_path,file_type,subcategory,created_by,current_version,category) VALUES (50,100,'Pianta.dwg','C-118/Disegni/piante/Pianta.dwg','dwg','piante',5,1,'disegni')")
+sql("INSERT INTO bb_zone_condivisioni_ruoli(worksite_id,tipo,oggetto_id,ruolo) VALUES (100,'disegno',50,'cliente'),(100,'disegno',50,'cantiere')")
+sql("INSERT INTO bb_zone_dwg_render(document_id,status,error) VALUES (50,'error','dwg2dxf non trovato')")
+du = chiama(UFF, 'GET', '/disegni')
+dk = chiama(CLI, 'GET', '/disegni')
+verifica(S, "l'elenco dei disegni si apre anche con un DWG non convertito", puo(du) and puo(dk), str(du)[:200])
+x = [d for d in (du.get('data') or {}).get('bob', du.get('data') or []) if isinstance(d, dict) and d.get('id') == 50] if puo(du) else []
+verifica(S, 'CSM legge il motivo', bool(x) and x[0].get('dwg_error') == 'dwg2dxf non trovato', str(x)[:200])
+y = [d for d in (dk.get('data') or {}).get('bob', dk.get('data') or []) if isinstance(d, dict) and d.get('id') == 50] if puo(dk) else []
+verifica(S, 'il committente no', bool(y) and not y[0].get('dwg_error'), str(y)[:200])
+
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
 mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})
