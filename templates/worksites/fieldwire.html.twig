@@ -397,6 +397,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 /* Theme toggle button */
 .bz-theme-toggle { background: none; border: 1px solid #273548; color: #94a3b8; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 14px; }
 .bz-theme-toggle:hover { color: #e2e8f0; }
+.bz-esci { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.bz-esci:hover { color: #f87171 !important; border-color: #7f1d1d; }
 /* campanello delle notifiche del cantiere */
 .bz-avvisi { position: relative; }
 .bz-avvisi-btn { position: relative; }
@@ -487,6 +489,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
                 <i class="fas fa-circle-half-stroke"></i>
             </button>
+            {# uscire da BOB senza tornare alla dashboard: il committente ha
+               solo la Zone #}
+            <a class="bz-theme-toggle bz-esci" id="bz-esci" href="/logout" title="Esci da BOB">
+                <i class="fas fa-right-from-bracket"></i>
+            </a>
         </div>
     </header>
 
@@ -2574,6 +2581,11 @@ async function vaiAdAvviso(dove) {
     }
 }
 
+// uscire chiede conferma: un clic sbagliato nell'angolo costa un nuovo accesso
+document.getElementById('bz-esci')?.addEventListener('click', e => {
+    if (window.bzfPuoiUscire && !window.bzfPuoiUscire()) { e.preventDefault(); return; }
+    if (!confirm('Vuoi uscire da BOB?')) e.preventDefault();
+});
 document.getElementById('bz-avvisi-btn')?.addEventListener('click', e => {
     e.stopPropagation();
     const p = document.getElementById('bz-avvisi-panel');

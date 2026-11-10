@@ -187,6 +187,8 @@ $mvcModuleMap = [
     '/documents'      => 'documents',
     '/companies'      => 'companies',
     '/worksites'      => 'worksites',
+    // BOB Zone, l'elenco di tutti i cantieri con qualcosa nella Zone
+    '/zone'           => 'zone',
 ];
 
 foreach ($mvcModuleMap as $prefix => $module) {

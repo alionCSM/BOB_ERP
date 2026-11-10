@@ -612,6 +612,10 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/disegni/{docId}/dwg/convert',                             [FieldwireController::class, 'dwgConvert'])
            ->get( '/worksites/{id}/zone/disegni/{docId}/dwg-svg',                                  [FieldwireController::class, 'dwgSvg']);
 
+    // BOB Zone, tutti i cantieri: chi ha il permesso Zone (middleware: /zone → zone)
+    require_once APP_ROOT . '/src/Http/Controllers/ZoneElencoController.php';
+    $router->get('/zone', [ZoneElencoController::class, 'index']);
+
     // chat del cantiere e segnalazioni: stessi metodi per il sito e per l'app
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
     $router
