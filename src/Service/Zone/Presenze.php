@@ -43,6 +43,34 @@ final class Presenze
     public function __construct(private PDO $conn) {}
 
     /**
+     * Le presenze di questo cantiere si mostrano al committente? Lo decide
+     * CSM (bb_worksites.zone_presenze_cliente); di base si'.
+     */
+    public function alCliente(int $worksiteId): bool
+    {
+        try {
+            $st = $this->conn->prepare('SELECT zone_presenze_cliente FROM bb_worksites WHERE id = :w');
+            $st->execute([':w' => $worksiteId]);
+            $v = $st->fetchColumn();
+            return $v === false || $v === null || (int)$v === 1;
+        } catch (\PDOException $e) {
+            return true;   // colonna non ancora creata: come prima
+        }
+    }
+
+    /** Chi ha questo ruolo vede le presenze di questo cantiere? */
+    public function visibiliA(?string $ruolo, int $worksiteId): bool
+    {
+        return $ruolo !== Accesso::CLIENTE || $this->alCliente($worksiteId);
+    }
+
+    public function mostraAlCliente(int $worksiteId, bool $si): void
+    {
+        $this->conn->prepare('UPDATE bb_worksites SET zone_presenze_cliente = :v WHERE id = :w')
+            ->execute([':v' => $si ? 1 : 0, ':w' => $worksiteId]);
+    }
+
+    /**
      * Chi c'era, in un giorno.
      *
      * @return array{

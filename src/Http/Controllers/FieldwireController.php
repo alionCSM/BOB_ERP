@@ -100,6 +100,7 @@ final class FieldwireController
         'aggiungiPresenza'      => P::GESTIRE,
         'eliminaPresenza'       => P::GESTIRE,
         'modificaPresenza'      => P::GESTIRE,
+        'presenzeAlCliente'     => P::GESTIRE,
         // il nome e il codice che il cliente da' al cantiere: lo scrive
         // il cliente, il metodo controlla il ruolo
         'salvaRiferimento'      => P::VEDERE,
@@ -365,6 +366,9 @@ final class FieldwireController
             'accessi'              => self::livelliPagina($this->accesso->ruolo($request->user(), $worksiteId)),
             'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
+            // le presenze: al committente solo se CSM le condivide
+            'vedePresenze'         => (new \App\Service\Zone\Presenze($this->conn))
+                                          ->visibiliA($this->accesso->ruolo($request->user(), $worksiteId), $worksiteId),
             // caricare disegni: CSM e il committente (vedi uploadDisegno)
             'caricaDisegni'        => $this->accesso->puo($request->user(), $worksiteId, \App\Service\Zone\Permessi::DISEGNI),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
@@ -1024,7 +1028,10 @@ final class FieldwireController
             $segn  = (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
                          ->elenco($worksiteId, $ruolo, $io);
             $worksite['riferimento'] = (new \App\Service\Zone\RiferimentoCliente($this->conn))->delCantiere($worksiteId);
-            $pdf = (new \App\Service\Fieldwire\ZoneReportService($this->conn))->generate(
+            $report = new \App\Service\Fieldwire\ZoneReportService($this->conn);
+            // il committente ha le presenze nel riepilogo solo se le vede nella Zone
+            $report->conPresenze = (new \App\Service\Zone\Presenze($this->conn))->visibiliA($ruolo, $worksiteId);
+            $pdf = $report->generate(
                 $worksiteId,
                 $worksite,
                 $dal,
@@ -1560,7 +1567,12 @@ final class FieldwireController
             }
 
             $presenze = new \App\Service\Zone\Presenze($this->conn);
-            return $presenze->giorno($w, $data) + ['totali' => $presenze->totali($w)];
+            $this->pretendePresenze($request, $presenze, $w);
+            return $presenze->giorno($w, $data) + [
+                'totali' => $presenze->totali($w),
+                // a CSM: se il committente le vede (l'interruttore in alto)
+                'al_cliente' => $presenze->alCliente($w),
+            ];
         });
     }
 
@@ -1570,8 +1582,29 @@ final class FieldwireController
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            return (new \App\Service\Zone\Presenze($this->conn))
-                ->giorni((int)$request->param('id'), 60);
+            $presenze = new \App\Service\Zone\Presenze($this->conn);
+            $this->pretendePresenze($request, $presenze, (int)$request->param('id'));
+            return $presenze->giorni((int)$request->param('id'), 60);
+        });
+    }
+
+    /** Il committente le legge solo se CSM le condivide con lui. */
+    private function pretendePresenze(Request $request, \App\Service\Zone\Presenze $p, int $w): void
+    {
+        if (!$p->visibiliA($this->ruoloQui($request), $w)) {
+            \App\Service\Zone\Accesso::nega('Le presenze di questo cantiere non sono condivise con il committente.');
+        }
+    }
+
+    /** CSM decide se il committente vede le presenze di questo cantiere. */
+    public function presenzeAlCliente(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $si = !empty($this->jsonBody()['visibile']);
+            (new \App\Service\Zone\Presenze($this->conn))->mostraAlCliente((int)$request->param('id'), $si);
+            return ['al_cliente' => $si];
         });
     }
 

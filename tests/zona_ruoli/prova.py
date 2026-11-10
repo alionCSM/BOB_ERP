@@ -234,6 +234,17 @@ s2 = chiama(CAPO, 'POST', '/segnalazioni', {'testo': 'Manca tirante', 'tipo': 'm
 sid2 = s2['id'] if 'id' in s2 else s2.get('segnalazione', {}).get('id')
 verifica(S, 'CSM elimina qualsiasi segnalazione', puo(chiama(UFF, 'POST', f'/segnalazioni/{sid2}/elimina', {})))
 
+S = '5h. Presenze al committente sì o no'
+verifica(S, 'di base il committente vede le presenze', puo(chiama(CLI, 'GET', '/presenze/giorni')))
+verifica(S, 'il committente non spegne la condivisione', chiama(CLI, 'POST', '/presenze/cliente', {'visibile': False})['_http'] == 403)
+verifica(S, 'CSM la spegne', puo(chiama(UFF, 'POST', '/presenze/cliente', {'visibile': False})))
+verifica(S, '... e il committente non le legge più', chiama(CLI, 'GET', '/presenze/giorni')['_http'] == 403 and chiama(CLI, 'GET', '/presenze')['_http'] == 403)
+verifica(S, '... la squadra sì', puo(chiama(CAPO, 'GET', '/presenze/giorni')))
+verifica(S, '... e nel riepilogo del committente non ci sono', 'giornate di lavoro' not in chiama(CLI, 'GET', '/report?periodo=30').get('raw', ''))
+verifica(S, 'CSM legge lo stato dell\'interruttore', chiama(UFF, 'GET', '/presenze')['data'].get('al_cliente') is False)
+chiama(UFF, 'POST', '/presenze/cliente', {'visibile': True})
+verifica(S, 'riaccesa, il committente le rivede', puo(chiama(CLI, 'GET', '/presenze/giorni')))
+
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
 mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})

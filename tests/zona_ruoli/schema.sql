@@ -6,7 +6,7 @@ CREATE TABLE bb_users(id INT PRIMARY KEY, username VARCHAR(40), first_name VARCH
 CREATE TABLE bb_user_permissions(user_id INT, module VARCHAR(40), allowed TINYINT);
 CREATE TABLE bb_user_company_permissions(user_id INT, module VARCHAR(40), allowed TINYINT);
 CREATE TABLE bb_worksites(id INT PRIMARY KEY, name VARCHAR(80), worksite_code VARCHAR(20), location VARCHAR(40), status VARCHAR(20),
-  client_id INT NULL, zone_cliente TINYINT DEFAULT 0, is_draft TINYINT DEFAULT 0, fieldwire_project_id VARCHAR(40) NULL);
+  client_id INT NULL, zone_cliente TINYINT DEFAULT 0, zone_presenze_cliente TINYINT DEFAULT 1, is_draft TINYINT DEFAULT 0, fieldwire_project_id VARCHAR(40) NULL);
 CREATE TABLE bb_zone_accessi(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, user_id INT, ruolo VARCHAR(10), created_by INT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(worksite_id,user_id));
 CREATE TABLE bb_worksite_users(worksite_id INT, user_id INT, PRIMARY KEY(worksite_id,user_id));

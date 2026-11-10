@@ -433,6 +433,8 @@ final class ApiV1OperaioController
             // quel ruolo puo' fare, azione per azione
             $c['ruolo']   = $accesso->ruolo($utente, $c['id']);
             $c['accessi'] = \App\Service\Zone\Permessi::tutte($c['ruolo']);
+            // la sezione Presenze: al committente solo se CSM la condivide
+            $c['presenze'] = (new \App\Service\Zone\Presenze($this->conn))->visibiliA($c['ruolo'], $c['id']);
         }
         unset($c);
 

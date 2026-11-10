@@ -66,7 +66,9 @@ final class Response
     {
         $t = preg_replace('/\\{#.*?#\\}/s', '', $t);
         // gli if, dal piu' interno
-        $re = '/\\{%\\s*if\\s+(.+?)\\s*%\\}((?:(?!\\{%\\s*if\\s).)*?)\\{%\\s*endif\\s*%\\}/s';
+        // la condizione non attraversa un altro %}: con un if dentro un
+        // altro, prendeva per condizione anche l'if interno e lo ignorava
+        $re = '/\\{%\\s*if\\s+([^%]+?)\\s*%\\}((?:(?!\\{%\\s*if\\s).)*?)\\{%\\s*endif\\s*%\\}/s';
         while (preg_match($re, $t)) {
             $t = preg_replace_callback($re, function ($m) use ($v) {
                 $rami = preg_split('/\\{%\\s*(elseif\\s+.+?|else)\\s*%\\}/s', $m[2], -1, PREG_SPLIT_DELIM_CAPTURE);

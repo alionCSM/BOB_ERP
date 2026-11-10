@@ -507,7 +507,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
                    cosa legge lo decide il server #}
                 {% if not soloAccessi %}
+                {% if vedePresenze %}
                 <button class="bz-nav-item" data-view="presenze"><i class="fas fa-user-check"></i><span>Presenze</span></button>
+                {% endif %}
                 <button class="bz-nav-item" data-view="segnalazioni"><i class="fas fa-triangle-exclamation"></i><span>Segnalazioni</span><span class="bzd-badge" id="bzd-badge-segn" hidden></span></button>
                 <button class="bz-nav-item" data-view="chat"><i class="fas fa-comments"></i><span>Chat</span><span class="bzd-badge" id="bzd-badge-chat" hidden></span></button>
                 {% endif %}
@@ -2937,10 +2939,14 @@ let presGiorno = null;
 
 /* Il modulo per registrare a mano una presenza: solo CSM. Una persona
    (nome e azienda) o un'azienda con quante persone ha mandato. */
-function formPresenza(data) {
+function formPresenza(data, alCliente) {
     if (!DA_UFFICIO) return '';
     const oggi = new Date().toISOString().slice(0, 10);
     return `
+        <label class="bz-pres-cliente">
+            <input type="checkbox" id="bz-pres-cliente" ${alCliente !== false ? 'checked' : ''}>
+            <span><b>Visibile al committente</b> — se disattivato, il committente non vede la sezione Presenze né le presenze nel riepilogo lavori.</span>
+        </label>
         <form class="bz-pres-form" id="bz-pres-form" data-id="">
             <div class="t" id="bz-pres-form-t">Registra presenza</div>
             <div class="r">
@@ -2962,6 +2968,15 @@ function formPresenza(data) {
         </form>`;
 }
 
+// CSM decide se il committente vede le presenze di questo cantiere
+document.addEventListener('change', async e => {
+    if (e.target.id !== 'bz-pres-cliente') return;
+    const si = e.target.checked;
+    const r = await api(`/worksites/${WID}/zone/presenze/cliente`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibile: si }),
+    });
+    if (!r.ok) { e.target.checked = !si; alert(r.error || 'Impossibile salvare la scelta.'); }
+});
 document.addEventListener('change', e => {
     const f = e.target.closest('#bz-pres-form');
     if (!f || e.target.name !== 'tipo') return;
@@ -3030,7 +3045,8 @@ async function loadPresenze(data = null) {
         const giorni = (g.data || g || []);
         if (!giorni.length) {
             colonna.innerHTML = '';
-            corpo.innerHTML = formPresenza(null) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
+            const st = DA_UFFICIO ? await api(`/worksites/${WID}/zone/presenze`) : null;
+            corpo.innerHTML = formPresenza(null, st && st.ok ? st.data.al_cliente : true) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `
@@ -3072,7 +3088,7 @@ async function loadPresenze(data = null) {
         </tr>
     `).join('');
 
-    corpo.innerHTML = formPresenza(d.data) + `
+    corpo.innerHTML = formPresenza(d.data, d.al_cliente) + `
         <div class="bz-pres-testa">
             <h3>${fmtDateLunga(d.data)}</h3>
             <span>${d.persone} ${d.persone === 1 ? 'persona' : 'persone'} in cantiere</span>
@@ -3250,6 +3266,10 @@ if (!SOLO_ACCESSI) {
 .bz-cronologia .q { flex:0 0 auto; color:#64748b; min-width:108px; }
 [data-theme="light"] .bz-cronologia { border-top-color:#e2e8f0; }
 [data-theme="light"] .bz-cronologia .r b { color:#1e293b; }
+.bz-pres-cliente { display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:#94a3b8; margin-bottom:12px; cursor:pointer; }
+.bz-pres-cliente input { margin-top:2px; }
+.bz-pres-cliente b { color:#e2e8f0; font-weight:600; }
+[data-theme="light"] .bz-pres-cliente b { color:#1e293b; }
 .bz-pres-del { background:none; border:0; color:#64748b; cursor:pointer; padding:2px 6px; }
 .bz-pres-del:hover { color:#f87171; }
 /* registrare a mano una presenza (CSM) */
