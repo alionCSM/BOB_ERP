@@ -397,6 +397,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 /* Theme toggle button */
 .bz-theme-toggle { background: none; border: 1px solid #273548; color: #94a3b8; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 14px; }
 .bz-theme-toggle:hover { color: #e2e8f0; }
+.bz-esci { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.bz-esci:hover { color: #f87171 !important; border-color: #7f1d1d; }
 /* campanello delle notifiche del cantiere */
 .bz-avvisi { position: relative; }
 .bz-avvisi-btn { position: relative; }
@@ -487,6 +489,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
                 <i class="fas fa-circle-half-stroke"></i>
             </button>
+            {# uscire da BOB senza tornare alla dashboard: il committente ha
+               solo la Zone #}
+            <a class="bz-theme-toggle bz-esci" id="bz-esci" href="/logout" title="Esci da BOB">
+                <i class="fas fa-right-from-bracket"></i>
+            </a>
         </div>
     </header>
 
@@ -507,7 +514,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
                    cosa legge lo decide il server #}
                 {% if not soloAccessi %}
+                {% if vedePresenze %}
                 <button class="bz-nav-item" data-view="presenze"><i class="fas fa-user-check"></i><span>Presenze</span></button>
+                {% endif %}
                 <button class="bz-nav-item" data-view="segnalazioni"><i class="fas fa-triangle-exclamation"></i><span>Segnalazioni</span><span class="bzd-badge" id="bzd-badge-segn" hidden></span></button>
                 <button class="bz-nav-item" data-view="chat"><i class="fas fa-comments"></i><span>Chat</span><span class="bzd-badge" id="bzd-badge-chat" hidden></span></button>
                 {% endif %}
@@ -1281,6 +1290,8 @@ function switchTop(v) {
     // un modulo a meta' (in costruzione o in compilazione) non si perde in silenzio
     if (currentTop === 'forms' && v !== 'forms' && window.bzfPuoiUscire && !window.bzfPuoiUscire()) return;
     currentTop = v;
+    // la sezione aperta resta dopo un "aggiorna pagina"
+    try { sessionStorage.setItem('bz-vista-' + WID, v); } catch (_) {}
     // aprendo una sezione, le sue notifiche sono viste
     if (typeof avvisiSezioneVista === 'function') avvisiSezioneVista(v);
     document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
@@ -2570,6 +2581,11 @@ async function vaiAdAvviso(dove) {
     }
 }
 
+// uscire chiede conferma: un clic sbagliato nell'angolo costa un nuovo accesso
+document.getElementById('bz-esci')?.addEventListener('click', e => {
+    if (window.bzfPuoiUscire && !window.bzfPuoiUscire()) { e.preventDefault(); return; }
+    if (!confirm('Vuoi uscire da BOB?')) e.preventDefault();
+});
 document.getElementById('bz-avvisi-btn')?.addEventListener('click', e => {
     e.stopPropagation();
     const p = document.getElementById('bz-avvisi-panel');
@@ -2596,7 +2612,19 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(caricaAvvisi, 30000);
     // il link di una notifica aperto da fuori (email, campanello di BOB)
     const h = location.hash.slice(1);
-    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') setTimeout(() => vaiAdAvviso(h), 400);
+    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') {
+        setTimeout(() => vaiAdAvviso(h), 400);
+        return;
+    }
+    if (h.startsWith('segnalazione-') || h.startsWith('chat-')) return;   // li apre dialogo.js
+    // dopo "aggiorna pagina" si resta nella sezione in cui si era
+    let vista = null;
+    try { vista = sessionStorage.getItem('bz-vista-' + WID); } catch (_) {}
+    if (vista && vista !== 'attivita' && !SOLO_ACCESSI
+        && document.querySelector(`.bz-nav-item[data-view="${CSS.escape(vista)}"]`)) {
+        // dopo gli altri avvii della pagina (i moduli si preparano al caricamento)
+        setTimeout(() => switchTop(vista), 0);
+    }
 });
 
 /* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
@@ -2923,10 +2951,14 @@ let presGiorno = null;
 
 /* Il modulo per registrare a mano una presenza: solo CSM. Una persona
    (nome e azienda) o un'azienda con quante persone ha mandato. */
-function formPresenza(data) {
+function formPresenza(data, alCliente) {
     if (!DA_UFFICIO) return '';
     const oggi = new Date().toISOString().slice(0, 10);
     return `
+        <label class="bz-pres-cliente">
+            <input type="checkbox" id="bz-pres-cliente" ${alCliente !== false ? 'checked' : ''}>
+            <span><b>Visibile al committente</b> — se disattivato, il committente non vede la sezione Presenze né le presenze nel riepilogo lavori.</span>
+        </label>
         <form class="bz-pres-form" id="bz-pres-form" data-id="">
             <div class="t" id="bz-pres-form-t">Registra presenza</div>
             <div class="r">
@@ -2948,6 +2980,15 @@ function formPresenza(data) {
         </form>`;
 }
 
+// CSM decide se il committente vede le presenze di questo cantiere
+document.addEventListener('change', async e => {
+    if (e.target.id !== 'bz-pres-cliente') return;
+    const si = e.target.checked;
+    const r = await api(`/worksites/${WID}/zone/presenze/cliente`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibile: si }),
+    });
+    if (!r.ok) { e.target.checked = !si; alert(r.error || 'Impossibile salvare la scelta.'); }
+});
 document.addEventListener('change', e => {
     const f = e.target.closest('#bz-pres-form');
     if (!f || e.target.name !== 'tipo') return;
@@ -3016,7 +3057,8 @@ async function loadPresenze(data = null) {
         const giorni = (g.data || g || []);
         if (!giorni.length) {
             colonna.innerHTML = '';
-            corpo.innerHTML = formPresenza(null) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
+            const st = DA_UFFICIO ? await api(`/worksites/${WID}/zone/presenze`) : null;
+            corpo.innerHTML = formPresenza(null, st && st.ok ? st.data.al_cliente : true) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `
@@ -3058,7 +3100,7 @@ async function loadPresenze(data = null) {
         </tr>
     `).join('');
 
-    corpo.innerHTML = formPresenza(d.data) + `
+    corpo.innerHTML = formPresenza(d.data, d.al_cliente) + `
         <div class="bz-pres-testa">
             <h3>${fmtDateLunga(d.data)}</h3>
             <span>${d.persone} ${d.persone === 1 ? 'persona' : 'persone'} in cantiere</span>
@@ -3236,6 +3278,10 @@ if (!SOLO_ACCESSI) {
 .bz-cronologia .q { flex:0 0 auto; color:#64748b; min-width:108px; }
 [data-theme="light"] .bz-cronologia { border-top-color:#e2e8f0; }
 [data-theme="light"] .bz-cronologia .r b { color:#1e293b; }
+.bz-pres-cliente { display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:#94a3b8; margin-bottom:12px; cursor:pointer; }
+.bz-pres-cliente input { margin-top:2px; }
+.bz-pres-cliente b { color:#e2e8f0; font-weight:600; }
+[data-theme="light"] .bz-pres-cliente b { color:#1e293b; }
 .bz-pres-del { background:none; border:0; color:#64748b; cursor:pointer; padding:2px 6px; }
 .bz-pres-del:hover { color:#f87171; }
 /* registrare a mano una presenza (CSM) */
@@ -3603,7 +3649,7 @@ html .bz-dz-empty { color:#94a3b8; }
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js?v=5"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=20261110"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -3612,14 +3658,14 @@ html .bz-dz-empty { color:#94a3b8; }
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-<script src="/assets/js/views/fieldwire/annotator.js"></script>
+<script src="/assets/js/views/fieldwire/annotator.js?v=20261110"></script>
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/fieldwire/accessi.js?v=4"></script>
+<script src="/assets/js/views/fieldwire/accessi.js?v=20261110"></script>
 {% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=5"></script>
-<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
-{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
+<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261110">
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=20261110"></script>{% endif %}
 </body>
 </html>

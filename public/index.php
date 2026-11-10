@@ -568,6 +568,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/presenze',                                               [FieldwireController::class, 'aggiungiPresenza'])
            ->get( '/worksites/{id}/zone/avvisi',                                                 [FieldwireController::class, 'avvisi'])
            ->post('/worksites/{id}/zone/avvisi/letti',                                           [FieldwireController::class, 'avvisiLetti'])
+           ->post('/worksites/{id}/zone/presenze/cliente',                                       [FieldwireController::class, 'presenzeAlCliente'])
            ->post('/worksites/{id}/zone/presenze/{pId}/elimina',                                 [FieldwireController::class, 'eliminaPresenza'])
            ->post('/worksites/{id}/zone/presenze/{pId}',                                         [FieldwireController::class, 'modificaPresenza'])
            ->get( '/worksites/{id}/zone/users',                                                   [FieldwireController::class, 'bobUsers'])
@@ -610,6 +611,10 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->get( '/worksites/{id}/zone/disegni/{docId}/dwg',                                      [FieldwireController::class, 'dwgMeta'])
            ->post('/worksites/{id}/zone/disegni/{docId}/dwg/convert',                             [FieldwireController::class, 'dwgConvert'])
            ->get( '/worksites/{id}/zone/disegni/{docId}/dwg-svg',                                  [FieldwireController::class, 'dwgSvg']);
+
+    // BOB Zone, tutti i cantieri: chi ha il permesso Zone (middleware: /zone → zone)
+    require_once APP_ROOT . '/src/Http/Controllers/ZoneElencoController.php';
+    $router->get('/zone', [ZoneElencoController::class, 'index']);
 
     // chat del cantiere e segnalazioni: stessi metodi per il sito e per l'app
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';

@@ -192,7 +192,7 @@
         {% endif %}
 
         {# ── CANTIERI ── #}
-        {% set worksitesActive = currentPath starts with '/worksites' %}
+        {% set worksitesActive = currentPath starts with '/worksites' or currentPath == '/zone' %}
         {% if user.type == 'worker' %}
             {# Per un operaio il menu e' tutto qui. In cima quello che
                guarda ogni giorno, i cantieri in fondo: li apre quando deve
@@ -247,8 +247,23 @@
                     {% if user.canAccess('worksites_drafts') or user.id == 1 %}
                         <li><a href="/worksites/drafts" class="side-menu {{ currentPath starts with '/worksites/drafts' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="alert-circle"></i></div><div class="side-menu__title">Bozze cantieri</div></a></li>
                     {% endif %}
+                    {% if user.canAccess('zone') or user.id == 1 %}
+                        <li><a href="/zone" class="side-menu {{ currentPath == '/zone' ? 'side-menu--active' : '' }}"><div class="side-menu__icon"><i data-lucide="layout-grid"></i></div><div class="side-menu__title">BOB Zone</div></a></li>
+                    {% endif %}
                 </ul>
             </li>
+        {% endif %}
+        {# BOB Zone: tutti i cantieri con qualcosa nella Zone, per chi ha il
+           permesso Zone (sotto Cantieri; da solo se non ha i cantieri) #}
+        {% if user.type != 'worker' and user.type != 'client' and not user.canAccess('worksites') and user.canAccess('zone') %}
+            <li>
+                <a href="/zone" class="side-menu {{ currentPath == '/zone' ? 'side-menu--active' : '' }}">
+                    <div class="side-menu__icon"><i data-lucide="layout-grid"></i></div>
+                    <div class="side-menu__title">BOB Zone</div>
+                </a>
+            </li>
+        {% endif %}
+        {% if user.type != 'worker' and user.type != 'client' and (user.canAccess('worksites') or user.canAccess('zone') or user.id == 1) %}
             <li class="side-nav__devider my-6"></li>
         {% endif %}
 

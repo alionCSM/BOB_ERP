@@ -151,6 +151,7 @@ verifica(S, 'CSM registra una persona e un\'azienda', puo(p1) and puo(p2), str(p
 gk = chiama(CLI, 'GET', f'/presenze?data={oggi}')['data']
 verifica(S, 'il committente le legge', 'Mario Bianchi' in [x['nome'] for x in gk['nostri']] and any(x['azienda'] == 'Ponteggi Sud' and x['persone'] == 4 for x in gk['consorziate']), str(gk)[:300])
 verifica(S, "l'azienda a mezza giornata conta 2 giornate su 4 persone", any(x['azienda'] == 'Ponteggi Sud' and x.get('mezza') for x in gk['consorziate']))
+verifica(S, 'le presenze vecchie del registro non compaiono, solo quelle scritte a mano', all(x['nome'] != 'Hoxha Arben' for x in gk['nostri']) and all(x.get('manuale') for x in gk['nostri'] + gk['consorziate']), str(gk)[:300])
 verifica(S, 'il giorno compare nel calendario', oggi in [x['data'] for x in chiama(CLI, 'GET', '/presenze/giorni')['data']])
 verifica(S, 'il committente non registra presenze', chiama(CLI, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)
 verifica(S, 'la squadra non registra presenze', chiama(CAPO, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)
@@ -232,6 +233,17 @@ verifica(S, '... e non c\'è più, né i suoi avvisi', chiama(UFF, 'GET', f'/seg
 s2 = chiama(CAPO, 'POST', '/segnalazioni', {'testo': 'Manca tirante', 'tipo': 'materiale', 'gravita': 'bassa'})['data']
 sid2 = s2['id'] if 'id' in s2 else s2.get('segnalazione', {}).get('id')
 verifica(S, 'CSM elimina qualsiasi segnalazione', puo(chiama(UFF, 'POST', f'/segnalazioni/{sid2}/elimina', {})))
+
+S = '5h. Presenze al committente sì o no'
+verifica(S, 'di base il committente vede le presenze', puo(chiama(CLI, 'GET', '/presenze/giorni')))
+verifica(S, 'il committente non spegne la condivisione', chiama(CLI, 'POST', '/presenze/cliente', {'visibile': False})['_http'] == 403)
+verifica(S, 'CSM la spegne', puo(chiama(UFF, 'POST', '/presenze/cliente', {'visibile': False})))
+verifica(S, '... e il committente non le legge più', chiama(CLI, 'GET', '/presenze/giorni')['_http'] == 403 and chiama(CLI, 'GET', '/presenze')['_http'] == 403)
+verifica(S, '... la squadra sì', puo(chiama(CAPO, 'GET', '/presenze/giorni')))
+verifica(S, '... e nel riepilogo del committente non ci sono', 'giornate di lavoro' not in chiama(CLI, 'GET', '/report?periodo=30').get('raw', ''))
+verifica(S, 'CSM legge lo stato dell\'interruttore', chiama(UFF, 'GET', '/presenze')['data'].get('al_cliente') is False)
+chiama(UFF, 'POST', '/presenze/cliente', {'visibile': True})
+verifica(S, 'riaccesa, il committente le rivede', puo(chiama(CLI, 'GET', '/presenze/giorni')))
 
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]

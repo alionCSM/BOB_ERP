@@ -31,7 +31,44 @@ use PDO;
  */
 final class Presenze
 {
+    /**
+     * Le presenze del registro di BOB nella Zone. Per ora no: la Zone mostra
+     * solo quelle che CSM scrive a mano. Il registro e' pieno di giornate
+     * vecchie, segnate prima che il cantiere fosse nella Zone, e al
+     * committente direbbero cose che non c'entrano. Rimettere a true per
+     * leggerle di nuovo insieme a quelle scritte a mano.
+     */
+    public const DAL_REGISTRO = false;
+
     public function __construct(private PDO $conn) {}
+
+    /**
+     * Le presenze di questo cantiere si mostrano al committente? Lo decide
+     * CSM (bb_worksites.zone_presenze_cliente); di base si'.
+     */
+    public function alCliente(int $worksiteId): bool
+    {
+        try {
+            $st = $this->conn->prepare('SELECT zone_presenze_cliente FROM bb_worksites WHERE id = :w');
+            $st->execute([':w' => $worksiteId]);
+            $v = $st->fetchColumn();
+            return $v === false || $v === null || (int)$v === 1;
+        } catch (\PDOException $e) {
+            return true;   // colonna non ancora creata: come prima
+        }
+    }
+
+    /** Chi ha questo ruolo vede le presenze di questo cantiere? */
+    public function visibiliA(?string $ruolo, int $worksiteId): bool
+    {
+        return $ruolo !== Accesso::CLIENTE || $this->alCliente($worksiteId);
+    }
+
+    public function mostraAlCliente(int $worksiteId, bool $si): void
+    {
+        $this->conn->prepare('UPDATE bb_worksites SET zone_presenze_cliente = :v WHERE id = :w')
+            ->execute([':v' => $si ? 1 : 0, ':w' => $worksiteId]);
+    }
 
     /**
      * Chi c'era, in un giorno.
@@ -55,11 +92,11 @@ final class Presenze
             WHERE  p.worksite_id = :ws AND p.data = :d
             ORDER BY azienda, nome
         ");
-        $nostri->execute([':ws' => $worksiteId, ':d' => $data]);
+        if (self::DAL_REGISTRO) $nostri->execute([':ws' => $worksiteId, ':d' => $data]);
 
         $righe    = [];
         $giornate = 0.0;
-        foreach ($nostri->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        foreach ((self::DAL_REGISTRO ? $nostri->fetchAll(PDO::FETCH_ASSOC) : []) as $r) {
             $mezza = ($r['turno'] ?? '') === 'Mezzo';
             $righe[] = [
                 'nome'    => $r['nome'] !== '' ? $r['nome'] : '—',
@@ -85,12 +122,12 @@ final class Presenze
             GROUP BY co.name
             ORDER BY azienda
         ");
-        $cons->execute([':ws' => $worksiteId, ':d' => $data]);
+        if (self::DAL_REGISTRO) $cons->execute([':ws' => $worksiteId, ':d' => $data]);
 
         $consorziate = [];
         $daConsorziate = 0;
         $giornateConsorziate = 0.0;
-        foreach ($cons->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        foreach ((self::DAL_REGISTRO ? $cons->fetchAll(PDO::FETCH_ASSOC) : []) as $r) {
             $n = (int)$r['persone'];
             $consorziate[] = ['azienda' => (string)$r['azienda'], 'persone' => $n];
             $daConsorziate += $n;
@@ -165,8 +202,11 @@ final class Presenze
             FROM   bb_presenze
             WHERE  worksite_id = :ws
         ");
-        $nostri->execute([':ws' => $worksiteId]);
-        $a = $nostri->fetch(PDO::FETCH_ASSOC) ?: [];
+        $a = [];
+        if (self::DAL_REGISTRO) {
+            $nostri->execute([':ws' => $worksiteId]);
+            $a = $nostri->fetch(PDO::FETCH_ASSOC) ?: [];
+        }
 
         $cons = $this->conn->prepare("
             SELECT COALESCE(SUM(quantita), 0) AS giornate,
@@ -174,8 +214,11 @@ final class Presenze
             FROM   bb_presenze_consorziate
             WHERE  worksite_id = :ws
         ");
-        $cons->execute([':ws' => $worksiteId]);
-        $b = $cons->fetch(PDO::FETCH_ASSOC) ?: [];
+        $b = [];
+        if (self::DAL_REGISTRO) {
+            $cons->execute([':ws' => $worksiteId]);
+            $b = $cons->fetch(PDO::FETCH_ASSOC) ?: [];
+        }
 
         // il primo e l'ultimo giorno guardando tutti e due gli elenchi
         $date = array_filter([$a['dal'] ?? null, $b['dal'] ?? null]);
@@ -246,8 +289,11 @@ final class Presenze
             ORDER BY data DESC
             LIMIT $quanti
         ");
-        $stmt->execute([':ws1' => $worksiteId, ':ws2' => $worksiteId]);
-        $righe = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $righe = [];
+        if (self::DAL_REGISTRO) {
+            $stmt->execute([':ws1' => $worksiteId, ':ws2' => $worksiteId]);
+            $righe = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
 
         // i giorni con presenze scritte a mano, sommati agli altri
         try {

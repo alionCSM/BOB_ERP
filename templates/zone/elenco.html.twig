@@ -1,0 +1,150 @@
+{% extends 'layout/base.html.twig' %}
+
+{% block head %}
+<link rel="stylesheet" href="/assets/css/views/worksites/worksite_list.css">
+<link rel="stylesheet" href="/assets/css/views/zone/elenco.css?v=20261110">
+{% endblock %}
+
+{% block content %}
+<div class="wl-page">
+
+<!-- Intestazione -->
+<div class="wl-hero">
+    <div class="wl-hero-content">
+        <div class="wl-hero-left">
+            <div class="wl-hero-icon">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="wl-hero-title">BOB Zone</h1>
+                <p class="wl-hero-sub">I cantieri con contenuti in BOB Zone: attività, segnalazioni, file, disegni e accessi</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Riepilogo -->
+<div class="wl-stats">
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#3b82f6;box-shadow:0 0 6px rgba(59,130,246,.4);"></div>
+        <div><div class="wl-stat-value">{{ totali.cantieri }}</div><div class="wl-stat-label">Cantieri</div></div>
+    </div>
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,.4);"></div>
+        <div><div class="wl-stat-value">{{ totali.aperte }}</div><div class="wl-stat-label">Attività aperte</div></div>
+    </div>
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#ef4444;box-shadow:0 0 6px rgba(239,68,68,.4);"></div>
+        <div><div class="wl-stat-value">{{ totali.segnalazioni }}</div><div class="wl-stat-label">Segnalazioni aperte</div></div>
+    </div>
+    <div class="wl-stat">
+        <div class="wl-stat-dot" style="background:#8b5cf6;box-shadow:0 0 6px rgba(139,92,246,.4);"></div>
+        <div><div class="wl-stat-value">{{ totali.cliente }}</div><div class="wl-stat-label">Condivisi col cliente</div></div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="wl-filters">
+    <div class="wl-filter-group">
+        <span class="wl-filter-label">Stato cantiere</span>
+        <select id="zl-stato">
+            <option value="">Tutti</option>
+            {% for s in stati %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="wl-filter-group">
+        <span class="wl-filter-label">Mostra</span>
+        <select id="zl-mostra">
+            <option value="">Tutti i cantieri</option>
+            <option value="segnalazioni">Con segnalazioni aperte</option>
+            <option value="aperte">Con attività aperte</option>
+            <option value="cliente">Condivisi col cliente</option>
+            <option value="mio">Dove ho accesso</option>
+        </select>
+    </div>
+    <div class="wl-divider"></div>
+    <div class="wl-filter-group wl-search-wrap">
+        <span class="wl-filter-label">Cerca</span>
+        <div style="position:relative;">
+            <svg class="wl-search-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="zl-cerca" placeholder="Nome, codice, cliente, località…" autocomplete="off">
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" class="wl-reset-btn" id="zl-reset">
+            <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Reset
+        </button>
+    </div>
+</div>
+
+<div class="wl-counter">
+    <p class="wl-counter-text"><strong id="zl-conta">{{ cantieri|length }}</strong> cantieri trovati</p>
+</div>
+
+<!-- Elenco -->
+<div class="wl-table-wrap">
+    <table class="wl-table zl-table">
+        <thead>
+        <tr>
+            <th data-ordina="name">Cantiere</th>
+            <th data-ordina="cliente">Cliente</th>
+            <th class="center" data-ordina="status">Stato</th>
+            <th class="center" data-ordina="aperte">Attività aperte</th>
+            <th class="center" data-ordina="segnalazioni">Segnalazioni</th>
+            <th class="center" data-ordina="file">File</th>
+            <th class="center" data-ordina="disegni">Disegni</th>
+            <th class="center" data-ordina="persone">Accessi</th>
+            <th class="center" data-ordina="ultima">Ultimo aggiornamento</th>
+            <th class="center" style="width:110px;"></th>
+        </tr>
+        </thead>
+        <tbody id="zl-righe">
+        {% for c in cantieri %}
+            {% set statusClass = c.status == 'In corso' ? 'wl-status-incorso' : (c.status == 'Sospeso' ? 'wl-status-sospeso' : 'wl-status-completato') %}
+            <tr data-cerca="{{ (c.name ~ ' ' ~ c.worksite_code ~ ' ' ~ c.cliente ~ ' ' ~ c.location)|lower }}"
+                data-status="{{ c.status }}" data-aperte="{{ c.aperte }}" data-segnalazioni="{{ c.segnalazioni }}"
+                data-cliente-on="{{ c.zone_cliente }}" data-mio="{{ c.mio_ruolo ? 1 : 0 }}"
+                data-name="{{ c.name|lower }}" data-cliente="{{ c.cliente|default('')|lower }}"
+                data-file="{{ c.file }}" data-disegni="{{ c.disegni }}" data-persone="{{ c.persone }}"
+                data-ultima="{{ c.ultima|default('') }}">
+                <td>
+                    <a href="/worksites/{{ c.id }}/zone" class="wl-name">{{ c.name }}</a>
+                    <div class="zl-sotto">
+                        {% if c.worksite_code %}<span class="zl-codice">{{ c.worksite_code }}</span>{% endif %}
+                        {% if c.location %}<span>{{ c.location }}</span>{% endif %}
+                    </div>
+                    <div class="wl-badges">
+                        {% if c.zone_cliente %}<span class="wl-badge wl-badge-ok">Condiviso col cliente</span>{% endif %}
+                        {% if c.mio_ruolo %}<span class="wl-badge zl-badge-mio">Hai accesso</span>{% endif %}
+                    </div>
+                </td>
+                <td>{{ c.cliente|default('—') }}</td>
+                <td class="center">{% if c.status %}<span class="wl-status {{ statusClass }}">{{ c.status }}</span>{% endif %}</td>
+                <td class="center"><span class="zl-num {{ c.aperte ? 'zl-num-ambra' : '' }}">{{ c.aperte }}</span><span class="zl-di"> / {{ c.attivita }}</span></td>
+                <td class="center"><span class="zl-num {{ c.segnalazioni ? 'zl-num-rosso' : '' }}">{{ c.segnalazioni }}</span></td>
+                <td class="center"><span class="zl-num">{{ c.file }}</span></td>
+                <td class="center"><span class="zl-num">{{ c.disegni }}</span></td>
+                <td class="center"><span class="zl-num">{{ c.persone }}</span></td>
+                <td class="center zl-quando">{{ c.ultima ? c.ultima|date('d/m/Y H:i') : '—' }}</td>
+                <td class="center"><a href="/worksites/{{ c.id }}/zone" class="zl-apri">Apri Zone</a></td>
+            </tr>
+        {% else %}
+            <tr><td colspan="10" class="zl-vuoto">Nessun cantiere ha ancora contenuti in BOB Zone.</td></tr>
+        {% endfor %}
+        <tr id="zl-nessuno" hidden><td colspan="10" class="zl-vuoto">Nessun cantiere corrisponde ai filtri.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/assets/js/views/zone/elenco.js?v=20261110"></script>
+{% endblock %}

@@ -30,6 +30,9 @@ use PDO;
  */
 final class ZoneReportService
 {
+    /** Le presenze nel riepilogo: no per il committente, se CSM non le condivide. */
+    public bool $conPresenze = true;
+
     private const STATO = [
         'open' => 'Da fare', 'in_progress' => 'In corso',
         'complete' => 'Fatta', 'verified' => 'Verificata',
@@ -117,7 +120,7 @@ final class ZoneReportService
             || ($s['stato'] ?? '') !== 'risolta'));
         $segnAperte = count(array_filter($segnalazioni, fn($s) => ($s['stato'] ?? '') !== 'risolta'));
 
-        $presenze = $this->presenze($worksiteId, $dal, $al);
+        $presenze = $this->conPresenze ? $this->presenze($worksiteId, $dal, $al) : [];
         $giornate = array_sum(array_column($presenze, 'giornate'));
 
         $risposte = array_values(array_filter($this->risposte($worksiteId, $dal, $al), $vedeRisposta));
@@ -146,7 +149,7 @@ final class ZoneReportService
             . $this->riquadro((string)count($aperte), 'ancora aperte', '#2563eb')
             . $this->riquadro((string)count($ritardo), 'in ritardo', count($ritardo) ? '#dc2626' : '#64748b')
             . $this->riquadro((string)$segnAperte, 'segnalazioni aperte', $segnAperte ? '#d97706' : '#64748b')
-            . $this->riquadro($num((float)$giornate), 'giornate di lavoro', '#0f172a')
+            . ($this->conPresenze ? $this->riquadro($num((float)$giornate), 'giornate di lavoro', '#0f172a') : '')
             . $this->riquadro((string)count($risposte), 'moduli compilati', '#0f172a')
             . "</tr></table>";
 
@@ -189,10 +192,13 @@ final class ZoneReportService
         }
 
         // 5. presenze
-        $h .= "<div class='sez'>Presenze</div>";
-        if (!$presenze) {
+        if (!$this->conPresenze) {
+            // non condivise con chi scarica il riepilogo
+        } elseif (!$presenze) {
+            $h .= "<div class='sez'>Presenze</div>";
             $h .= "<p class='vuoto'>Nessuna presenza registrata nel periodo.</p>";
         } else {
+            $h .= "<div class='sez'>Presenze</div>";
             $h .= "<table class='tab'><tr><th>Giorno</th><th>Persone</th><th>Giornate</th></tr>";
             foreach ($presenze as $p) {
                 $h .= "<tr><td>{$d($p['data'])}</td><td>" . (int)$p['persone'] . "</td><td>" . $num((float)$p['giornate']) . "</td></tr>";
@@ -243,6 +249,28 @@ final class ZoneReportService
     private function presenze(int $worksiteId, string $dal, string $al): array
     {
         $per = [];
+        // quelle scritte a mano da CSM nella Zone
+        try {
+            $m = $this->conn->prepare("
+                SELECT data,
+                       SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN 1 ELSE GREATEST(persone, 1) END) AS persone,
+                       SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN 1 ELSE GREATEST(persone, 1) END
+                           * (CASE WHEN mezza THEN 0.5 ELSE 1 END)) AS giornate
+                FROM bb_zone_presenze_manuali WHERE worksite_id = :w AND data BETWEEN :dal AND :al
+                GROUP BY data
+            ");
+            $m->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
+            foreach ($m->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $per[$r['data']] = ['data' => $r['data'], 'persone' => (int)$r['persone'], 'giornate' => (float)$r['giornate']];
+            }
+        } catch (\PDOException $e) {
+            // tabella non ancora creata
+        }
+        // il registro di BOB solo se la Zone lo legge (vedi Presenze::DAL_REGISTRO)
+        if (!\App\Service\Zone\Presenze::DAL_REGISTRO) {
+            ksort($per);
+            return array_values($per);
+        }
         $st = $this->conn->prepare("
             SELECT data, COUNT(*) AS persone,
                    SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END) AS giornate
@@ -251,7 +279,9 @@ final class ZoneReportService
         ");
         $st->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $per[$r['data']] = ['data' => $r['data'], 'persone' => (int)$r['persone'], 'giornate' => (float)$r['giornate']];
+            $per[$r['data']] ??= ['data' => $r['data'], 'persone' => 0, 'giornate' => 0.0];
+            $per[$r['data']]['persone']  += (int)$r['persone'];
+            $per[$r['data']]['giornate'] += (float)$r['giornate'];
         }
         $st = $this->conn->prepare("
             SELECT data_presenza AS data, SUM(quantita) AS persone
