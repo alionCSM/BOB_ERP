@@ -151,6 +151,7 @@ verifica(S, 'CSM registra una persona e un\'azienda', puo(p1) and puo(p2), str(p
 gk = chiama(CLI, 'GET', f'/presenze?data={oggi}')['data']
 verifica(S, 'il committente le legge', 'Mario Bianchi' in [x['nome'] for x in gk['nostri']] and any(x['azienda'] == 'Ponteggi Sud' and x['persone'] == 4 for x in gk['consorziate']), str(gk)[:300])
 verifica(S, "l'azienda a mezza giornata conta 2 giornate su 4 persone", any(x['azienda'] == 'Ponteggi Sud' and x.get('mezza') for x in gk['consorziate']))
+verifica(S, 'le presenze vecchie del registro non compaiono, solo quelle scritte a mano', all(x['nome'] != 'Hoxha Arben' for x in gk['nostri']) and all(x.get('manuale') for x in gk['nostri'] + gk['consorziate']), str(gk)[:300])
 verifica(S, 'il giorno compare nel calendario', oggi in [x['data'] for x in chiama(CLI, 'GET', '/presenze/giorni')['data']])
 verifica(S, 'il committente non registra presenze', chiama(CLI, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)
 verifica(S, 'la squadra non registra presenze', chiama(CAPO, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)

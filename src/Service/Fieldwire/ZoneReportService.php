@@ -243,6 +243,28 @@ final class ZoneReportService
     private function presenze(int $worksiteId, string $dal, string $al): array
     {
         $per = [];
+        // quelle scritte a mano da CSM nella Zone
+        try {
+            $m = $this->conn->prepare("
+                SELECT data,
+                       SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN 1 ELSE GREATEST(persone, 1) END) AS persone,
+                       SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN 1 ELSE GREATEST(persone, 1) END
+                           * (CASE WHEN mezza THEN 0.5 ELSE 1 END)) AS giornate
+                FROM bb_zone_presenze_manuali WHERE worksite_id = :w AND data BETWEEN :dal AND :al
+                GROUP BY data
+            ");
+            $m->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
+            foreach ($m->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $per[$r['data']] = ['data' => $r['data'], 'persone' => (int)$r['persone'], 'giornate' => (float)$r['giornate']];
+            }
+        } catch (\PDOException $e) {
+            // tabella non ancora creata
+        }
+        // il registro di BOB solo se la Zone lo legge (vedi Presenze::DAL_REGISTRO)
+        if (!\App\Service\Zone\Presenze::DAL_REGISTRO) {
+            ksort($per);
+            return array_values($per);
+        }
         $st = $this->conn->prepare("
             SELECT data, COUNT(*) AS persone,
                    SUM(CASE turno WHEN 'Intero' THEN 1 WHEN 'Mezzo' THEN 0.5 ELSE 0 END) AS giornate
@@ -251,7 +273,9 @@ final class ZoneReportService
         ");
         $st->execute([':w' => $worksiteId, ':dal' => $dal, ':al' => $al]);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $per[$r['data']] = ['data' => $r['data'], 'persone' => (int)$r['persone'], 'giornate' => (float)$r['giornate']];
+            $per[$r['data']] ??= ['data' => $r['data'], 'persone' => 0, 'giornate' => 0.0];
+            $per[$r['data']]['persone']  += (int)$r['persone'];
+            $per[$r['data']]['giornate'] += (float)$r['giornate'];
         }
         $st = $this->conn->prepare("
             SELECT data_presenza AS data, SUM(quantita) AS persone
