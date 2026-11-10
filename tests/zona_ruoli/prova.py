@@ -249,6 +249,10 @@ r = chiama(CLI, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': 
 nuova = int(r['data']['task_id']) if puo(r) else 0
 verifica(S, "dal disegno il cliente apre un'attività", nuova > 0, str(r)[:200])
 verifica(S, '... che va all\'ufficio e la vede la squadra', nuova in ids(chiama(CAPO, 'GET', '/tasks')) and sql(f"SELECT assegnata_a FROM bb_zone_tasks WHERE id={nuova}") == [['ufficio']])
+te = chiama(UFF, 'POST', '/tasks', {'name': 'Montaggio staffe'})['data']['id']
+r = chiama(UFF, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': .3, 'y': .4}, 'task_id': te})
+d = [t for t in chiama(UFF, 'GET', '/tasks')['data'] if int(t['id']) == te][0].get('disegno')
+verifica(S, "un'attività esistente collegata dal disegno lo mostra", puo(r) and d and d['document_id'] == 1, str(d))
 verifica(S, "non si collega un'attività di un altro cantiere", not puo(chiama(UFF, 'POST', '/disegni/1/annotations', {'type': 'pin', 'geom': {'x': .3, 'y': .3}, 'task_id': tb})))
 verifica(S, 'non si cambia il segno di un altro', chiama(CLI, 'POST', '/disegni/1/annotations', {'id': 900, 'type': 'pin', 'geom': {'x': .5, 'y': .5}})['_http'] == 403)
 

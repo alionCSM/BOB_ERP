@@ -1350,6 +1350,7 @@ function cardHtml(t) {
         <div class="bz-card ${activeTaskId == t.id ? 'active' : ''}" data-task-id="${t.id}" draggable="${taskAvanza(t) ? 'true' : 'false'}">
             <div class="bz-card-name">${escHtml(t.name)}</div>
             ${t.luogo ? `<div class="bz-card-luogo"><i class="fas fa-location-dot"></i> ${escHtml(t.luogo)}</div>` : ''}
+            ${t.disegno ? `<div class="bz-card-luogo" title="Collegata a un disegno"><i class="fas fa-drafting-compass"></i> ${escHtml(t.disegno.nome)}</div>` : ''}
             ${prio}${chiBadge(t)}
             <div class="bz-card-foot">
                 ${Number(t.assignee_user_id) > 0 ? `<span class="bz-card-user"><i class="fas fa-user" style="font-size:11px"></i>${escHtml(chiCe(t))}</span>`
@@ -2583,6 +2584,12 @@ document.addEventListener('click', e => {
             fileType: annBtn.dataset.annotType,
             fileName: annBtn.dataset.annotName,
             viewUrl: `/worksites/${WID}/disegni/${annBtn.dataset.annot}/view`,
+            // alla chiusura le attivita' si ricaricano: un punto collegato
+            // a un'attivita' compare subito nel Kanban e nel dettaglio
+            onClose: async () => {
+                await loadTasks();
+                if (activeTaskId) openTask(activeTaskId);
+            },
         });
         return;
     }
