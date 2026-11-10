@@ -505,11 +505,11 @@ final class FieldwireController
             $ruolo = (string)$this->ruoloQui($request);
 
             // Cambiare un'attivita' (nome, descrizione, date, a chi tocca):
-            // l'ufficio tutte, gli altri quelle che hanno creato loro. Prima
-            // un cliente riscriveva le attivita' dell'ufficio che vedeva.
-            if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO
+            // CSM e il committente tutte quelle che vedono — sui nostri
+            // cantieri il committente dirige; la squadra quelle create da lei.
+            if (!in_array($ruolo, [\App\Service\Zone\Accesso::UFFICIO, \App\Service\Zone\Accesso::CLIENTE], true)
                 && (int)($existing['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
-                \App\Service\Zone\Accesso::nega('Questa attivita\' puo\' essere modificata solo da chi l\'ha creata o da CSM');
+                \App\Service\Zone\Accesso::nega('Questa attivita\' puo\' essere modificata solo da chi l\'ha creata, da CSM o dal committente');
             }
             // Lo stato passa solo da /status, che controlla chi puo' cosa:
             // dentro la modifica arrivava a "verificato" anche chi non puo'.
@@ -2689,14 +2689,15 @@ final class FieldwireController
      * Porta avanti un'attivita' (stato, checklist) solo chi ce l'ha.
      *
      * Data a una persona: quella persona. Data a un gruppo (la squadra, il
-     * cliente, l'ufficio): chi ne fa parte. E sempre l'ufficio. Chi l'ha
-     * creata no, se l'ha data a un altro: assegnare vuol dire "la fai tu",
-     * e prima chiunque la vedesse la poteva chiudere al posto suo.
+     * cliente, l'ufficio): chi ne fa parte. E sempre CSM e il committente,
+     * che dirige il cantiere: portano avanti qualsiasi attivita' che vedono
+     * (verificare resta a CSM, vedi pretendeStato). Un altro della squadra
+     * no: assegnare vuol dire "la fai tu".
      */
     private function pretendeChiCiLavora(Request $request, array $task): void
     {
         $ruolo = $this->ruoloQui($request);
-        if ($ruolo === \App\Service\Zone\Accesso::UFFICIO) {
+        if ($ruolo === \App\Service\Zone\Accesso::UFFICIO || $ruolo === \App\Service\Zone\Accesso::CLIENTE) {
             return;
         }
         $io      = (int)($request->user()->id ?? -1);

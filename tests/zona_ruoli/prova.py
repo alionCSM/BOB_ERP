@@ -80,9 +80,13 @@ verifica(S, "quella del cliente va all'ufficio e la vede anche la squadra", tk['
 verifica(S, 'il capo non cambia le attività degli altri', chiama(CAPO, 'POST', f'/tasks/{t1}/update', {'name': 'x'})['_http'] == 403)
 verifica(S, 'il capo porta avanti quelle della squadra', puo(chiama(CAPO, 'POST', f'/tasks/{t1}/status', {'status': 'complete'})))
 verifica(S, 'il capo non verifica', chiama(CAPO, 'POST', f'/tasks/{t1}/status', {'status': 'verified'})['_http'] == 403)
-verifica(S, 'il cliente non chiude quelle della squadra', chiama(CLI, 'POST', f'/tasks/{t1}/status', {'status': 'open'})['_http'] == 403)
+verifica(S, 'il committente porta avanti anche quelle della squadra', puo(chiama(CLI, 'POST', f'/tasks/{t1}/status', {'status': 'open'})))
+verifica(S, 'il committente modifica anche quelle di CSM', puo(chiama(CLI, 'POST', f'/tasks/{t1}/update', {'name': 'Montaggio corsia A'})))
+verifica(S, 'il committente non verifica', chiama(CLI, 'POST', f'/tasks/{t1}/status', {'status': 'verified'})['_http'] == 403)
 verifica(S, 'il cliente chiude quelle date a lui', puo(chiama(CLI, 'POST', f'/tasks/{t3}/status', {'status': 'complete'})))
-verifica(S, "il cliente non porta avanti la sua se l'ha data all'ufficio", chiama(CLI, 'POST', f"/tasks/{tk['id']}/status", {'status': 'in_progress'})['_http'] == 403)
+verifica(S, "il committente porta avanti anche quella data a CSM", puo(chiama(CLI, 'POST', f"/tasks/{tk['id']}/status", {'status': 'open'})))
+tu = chiama(UFF, 'POST', '/tasks', {'name': 'Ordine bulloneria', 'assegnata_a': 'persona', 'assignee_user_id': UFF})['data']['id']
+verifica(S, "la squadra non porta avanti quella data a un'altra persona", chiama(CAPO, 'POST', f'/tasks/{tu}/status', {'status': 'complete'})['_http'] == 403)
 verifica(S, "l'ufficio la porta avanti", puo(chiama(UFF, 'POST', f"/tasks/{tk['id']}/status", {'status': 'in_progress'})))
 chiama(CLI, 'POST', f"/tasks/{tk['id']}/update", {'name': 'Spostare scaffale 4', 'status': 'verified'})
 verifica(S, '"verificato" non passa dalla modifica', sql(f"SELECT status FROM bb_zone_tasks WHERE id={tk['id']}")[0][0] == 'in_progress')
@@ -197,8 +201,8 @@ voci = chiama(CAPO, 'GET', f"/tasks/{tp['id']}/checklist")['data']
 verifica(S, 'i passaggi nascono con l\'attività', [v['name'] for v in voci] == ['Ancoraggi lato A', 'Ancoraggi lato B'], str(voci))
 verifica(S, 'la persona a cui tocca la porta avanti', puo(chiama(CAPO, 'POST', f"/tasks/{tp['id']}/status", {'status': 'in_progress'})))
 verifica(S, '... e spunta i passaggi', puo(chiama(CAPO, 'POST', f"/tasks/{tp['id']}/checklist/{voci[0]['id']}/complete", {'completed': True})))
-verifica(S, 'il cliente non la tocca', chiama(CLI, 'POST', f"/tasks/{tp['id']}/status", {'status': 'complete'})['_http'] == 403)
-verifica(S, '... e non spunta i passaggi', chiama(CLI, 'POST', f"/tasks/{tp['id']}/checklist/{voci[1]['id']}/complete", {'completed': True})['_http'] == 403)
+verifica(S, 'il committente la porta avanti come chi ce l\'ha', puo(chiama(CLI, 'POST', f"/tasks/{tp['id']}/status", {'status': 'complete'})))
+verifica(S, '... e spunta i passaggi', puo(chiama(CLI, 'POST', f"/tasks/{tp['id']}/checklist/{voci[1]['id']}/complete", {'completed': True})))
 verifica(S, 'una nuova attività nasce "da fare" anche se si manda altro', chiama(UFF, 'POST', '/tasks', {'name': 'x', 'status': 'complete'})['data']['status'] == 'open')
 
 S = '11. Cancellare le proprie cose'
@@ -226,9 +230,9 @@ verifica(S, 'il rapporto lo riporta', 'CO-2026-114' in chiama(UFF, 'GET', '/repo
 S = '13. Passaggi'
 tq = chiama(UFF, 'POST', '/tasks', {'name': 'Verifica parapetti', 'assegnata_a': 'squadra', 'checklist': ['Lato nord']})['data']['id']
 vq = chiama(CAPO, 'GET', f'/tasks/{tq}/checklist')['data']
-verifica(S, 'il cliente non aggiunge passaggi a un\'attività della squadra', chiama(CLI, 'POST', f'/tasks/{tq}/checklist', {'name': 'x'})['_http'] == 403)
+verifica(S, 'il committente aggiunge passaggi anche a un\'attività della squadra', puo(chiama(CLI, 'POST', f'/tasks/{tq}/checklist', {'name': 'Lato sud'})))
 verifica(S, 'il cliente non toglie passaggi', chiama(CLI, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")['_http'] == 403)
-verifica(S, 'il cliente non spunta passaggi', chiama(CLI, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/complete", {'completed': True})['_http'] == 403)
+verifica(S, 'il committente spunta i passaggi', puo(chiama(CLI, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/complete", {'completed': True})))
 verifica(S, 'la squadra aggiunge un passaggio', puo(chiama(CAPO, 'POST', f'/tasks/{tq}/checklist', {'name': 'Lato sud'})))
 verifica(S, '... ma non lo toglie (è di chi l\'ha creata)', chiama(CAPO, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")['_http'] == 403)
 verifica(S, "l'ufficio lo toglie", puo(chiama(UFF, 'POST', f"/tasks/{tq}/checklist/{vq[0]['id']}/delete")))

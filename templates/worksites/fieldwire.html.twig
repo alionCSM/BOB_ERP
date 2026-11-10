@@ -1028,10 +1028,13 @@ function chiCe(t) {
     return TOCCA_A[t.assegnata_a || 'squadra'] || 'Squadra';
 }
 function taskMio(t)      { return Number(t.created_by) === Number(IO); }
-function taskModifica(t) { return DA_UFFICIO || taskMio(t); }
+// CSM e il committente cambiano e portano avanti qualsiasi attivita' che
+// vedono; verificare resta a CSM
+function taskModifica(t) { return DA_UFFICIO || RUOLO === 'cliente' || taskMio(t); }
 function taskAvanza(t) {
     if (DA_UFFICIO) return true;
     if (t.status === 'verified') return false;
+    if (RUOLO === 'cliente') return true;
     // data a una persona: solo lei; a un gruppo: chi ne fa parte
     return Number(t.assignee_user_id) > 0
         ? Number(t.assignee_user_id) === Number(IO)
@@ -1625,7 +1628,7 @@ async function loadChecklist(taskId) {
     const items = res.ok && Array.isArray(res.data) ? res.data : [];
     // spunta chi ci lavora, toglie chi l'ha creata: le stesse regole del server
     const task = allTasks.find(t => t.id == taskId) || {};
-    const spunta = taskAvanza(task), togli = taskModifica(task);
+    const spunta = taskAvanza(task), togli = DA_UFFICIO || taskMio(task);   // togliere un passaggio: CSM o chi l'ha creata
     if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun passaggio.</div>'; return; }
     el.innerHTML = items.map(c => `
         <div class="bz-check-row" id="crow-${c.id}" style="display:flex;align-items:center;gap:6px;">
