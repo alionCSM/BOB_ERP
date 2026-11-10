@@ -529,7 +529,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 Per consultare attività, disegni, file e chat di <strong>questo</strong>
                 cantiere e riceverne le notifiche, è necessario essere inseriti nel relativo elenco.
             </p>
-            <p class="bz-fuori-come">Aggiungi il tuo utente dalla sezione “Chi accede”, a sinistra.</p>
+            <button type="button" class="bz-fuori-entra" id="bz-fuori-entra">
+                <i class="fas fa-right-to-bracket"></i> Accedi a questo cantiere come CSM
+            </button>
+            <p class="bz-fuori-come">In alternativa, gestisci gli accessi dalla sezione “Chi accede” (icona in alto a sinistra).</p>
         </div>
         {% endif %}
 
@@ -971,6 +974,25 @@ function mostraRif() {
     }
 }
 document.addEventListener('DOMContentLoaded', mostraRif);
+// Chi ha il permesso Zone ma non e' nell'elenco: si aggiunge come CSM con
+// un clic e la pagina si riapre con tutto il cantiere.
+document.getElementById('bz-fuori-entra')?.addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+        const corpo = new URLSearchParams({ user_id: IO, ruolo: 'ufficio', _csrf: CSRF });
+        const r = await fetch('/worksites/' + WID + '/zone/accessi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': CSRF },
+            body: corpo,
+        }).then(x => x.json());
+        if (r && (r.ok || r.success)) { location.reload(); return; }
+        alert((r && (r.error || r.message)) || 'Impossibile completare l\'operazione.');
+    } catch (_) {
+        alert('Impossibile completare l\'operazione.');
+    }
+    b.disabled = false;
+});
 document.addEventListener('click', async e => {
     if (e.target.closest('#bz-rif-annulla') || e.target.id === 'bz-rif-modal') {
         document.getElementById('bz-rif-modal').classList.add('hidden'); return;
@@ -2931,6 +2953,12 @@ if (!SOLO_ACCESSI) {
 .bz-fuori p { font-size:13.5px; line-height:1.65; color:#94a3b8; margin:0 0 10px; }
 .bz-fuori strong { color:#cbd5e1; font-weight:600; }
 .bz-fuori-come { font-size:12.5px; color:#64748b; }
+/* il permesso Zone da solo non fa entrare: un clic per aggiungersi, invece
+   di cercare l'icona di "Chi accede" */
+.bz-fuori .bz-fuori-entra { margin:10px 0 16px; padding:11px 20px; border:0; border-radius:10px; background:#1e40af; color:#fff;
+    font-size:14px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+.bz-fuori .bz-fuori-entra i { font-size:14px; color:#fff; margin:0; display:inline; }
+.bz-fuori .bz-fuori-entra:disabled { opacity:.6; cursor:default; }
 .bz-body.solo-accessi .bz-view { display:none !important; }
 [data-theme="light"] .bz-fuori h2 { color:#1e293b; }
 [data-theme="light"] .bz-fuori strong { color:#334155; }
