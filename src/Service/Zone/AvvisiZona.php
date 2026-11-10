@@ -173,7 +173,7 @@ final class AvvisiZona
             if ((int)$p['user_id'] === $daChi) continue;
             if (!$cond->vede($this->utente((int)$p['user_id']), $worksiteId, 'disegno', $docId, (int)($d['created_by'] ?? 0))) continue;
             $p['worksite_id'] = $worksiteId;
-            $p['dove'] = '';
+            $p['dove'] = 'disegno-' . $docId;
             $this->manda($p, 'zona_disegno_t', 'zona_disegno', [
                 'cantiere' => $d['cantiere'],
                 'nome'     => mb_substr((string)$d['file_name'], 0, 100),
@@ -293,9 +293,11 @@ final class AvvisiZona
             (int)$p['user_id'],
             Lingua::testo($titolo, $p['lingua'] ?? null),
             Lingua::testo($corpo, $p['lingua'] ?? null, $valori),
-            // "/io" e' la pagina degli operai: il cliente e l'ufficio ci
-            // prendevano "Access denied". Loro vanno dritti al cantiere.
-            ($p['ruolo'] ?? '') === Accesso::CANTIERE || empty($p['worksite_id'])
+            // Tutti dritti al cantiere, anche la squadra: il link dice anche
+            // a quale cantiere e a quale sezione appartiene l'avviso, ed e'
+            // cosi' che la Zone mostra il campanello e i numeri sul menu.
+            // "/io" resta per un avviso senza cantiere.
+            empty($p['worksite_id'])
                 ? self::LINK
                 : Segnalazioni::link((int)$p['worksite_id'], (string)($p['dove'] ?? '')),
             'zone',

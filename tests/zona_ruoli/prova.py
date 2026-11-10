@@ -118,7 +118,7 @@ verifica(S, "risposta della squadra sull'attività del cliente → avvisa il cli
 
 S = '4. Notifiche'
 n_capo, n_cli, n_uff = notifiche(CAPO), notifiche(CLI), notifiche(UFF)
-verifica(S, 'attività per la squadra → avviso al capo, link alla sua pagina', any(l == '/io' for _, l in n_capo), str(n_capo))
+verifica(S, "attività per la squadra → avviso al capo, link all'attività nel cantiere", any(l.startswith('/worksites/100/zone#attivita-') for _, l in n_capo), str(n_capo))
 verifica(S, 'attività per il cliente → avviso al cliente, link al cantiere', any(l.startswith('/worksites/100/zone#attivita-') for _, l in n_cli), str(n_cli))
 verifica(S, "attività del cliente per l'ufficio → avviso all'ufficio", len(n_uff) >= 1, str(n_uff))
 verifica(S, "il cliente riceve l'email", len(email('paolo@rossi.it')) == 1, str(email('paolo@rossi.it')))
@@ -159,6 +159,22 @@ verifica(S, 'niente presenze nel futuro', not puo(chiama(UFF, 'POST', '/presenze
 verifica(S, 'il committente non le elimina', chiama(CLI, 'POST', f"/presenze/{p1['data']['id']}/elimina")['_http'] == 403)
 verifica(S, 'CSM le elimina', puo(chiama(UFF, 'POST', f"/presenze/{p1['data']['id']}/elimina")))
 verifica(S, '... non quelle di un altro cantiere', not puo(chiama(UFF, 'POST', f"/presenze/{p2['data']['id']}/elimina", w=200)))
+
+S = '5d. Notifiche nella Zone'
+ta = chiama(CLI, 'POST', '/tasks', {'name': 'Controllo quote solaio'})['data']['id']
+av = chiama(UFF, 'GET', '/avvisi')['data']
+mia = [x for x in av['avvisi'] if x['dove'] == f'attivita-{ta}']
+verifica(S, "l'attività nuova del committente arriva a CSM nel campanello del cantiere", bool(mia) and not mia[0]['letta'], str(av)[:300])
+verifica(S, '... e conta sul menu Attività', av['per_sezione']['attivita'] >= 1)
+verifica(S, 'gli avvisi di un altro cantiere non compaiono', all(x['dove'] != f'attivita-{ta}' for x in chiama(UFF, 'GET', '/avvisi', w=200)['data']['avvisi']))
+tq2 = chiama(UFF, 'POST', '/tasks', {'name': 'Pulizia area carico', 'assegnata_a': 'squadra'})['data']['id']
+avc = chiama(CAPO, 'GET', '/avvisi')['data']
+verifica(S, 'anche la squadra le trova nel cantiere', any(x['dove'] == f'attivita-{tq2}' for x in avc['avvisi']), str(avc)[:300])
+chiama(UFF, 'POST', '/avvisi/letti', {'id': mia[0]['id']} if mia else {})
+verifica(S, 'cliccandola diventa letta', all(x['letta'] for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi'] if x['dove'] == f'attivita-{ta}'))
+chiama(UFF, 'POST', '/avvisi/letti', {'sezione': 'attivita'})
+verifica(S, 'aprendo Attività si azzera il numero', chiama(UFF, 'GET', '/avvisi')['data']['per_sezione']['attivita'] == 0)
+verifica(S, 'non si segnano gli avvisi degli altri', chiama(CLI, 'POST', '/avvisi/letti', {})['_http'] == 200 and not all(x['letta'] for x in chiama(CAPO, 'GET', '/avvisi')['data']['avvisi']))
 
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]

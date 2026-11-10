@@ -397,6 +397,36 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 /* Theme toggle button */
 .bz-theme-toggle { background: none; border: 1px solid #273548; color: #94a3b8; width: 32px; height: 32px; border-radius: 7px; cursor: pointer; font-size: 14px; }
 .bz-theme-toggle:hover { color: #e2e8f0; }
+/* campanello delle notifiche del cantiere */
+.bz-avvisi { position: relative; }
+.bz-avvisi-btn { position: relative; }
+.bz-avvisi-n { position: absolute; top: -6px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+               background: #ef4444; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
+.bz-avvisi-panel { position: absolute; right: 0; top: 40px; width: 360px; max-width: calc(100vw - 24px); max-height: 70vh;
+                   display: flex; flex-direction: column; background: #0f172a; border: 1px solid #273548; border-radius: 12px;
+                   box-shadow: 0 16px 40px rgba(0,0,0,.45); z-index: 300; overflow: hidden; }
+.bz-avvisi-panel[hidden] { display: none; }
+.bz-avvisi-testa { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid #1e293b;
+                   font-size: 13px; font-weight: 700; color: #e2e8f0; }
+.bz-avvisi-testa button { background: none; border: 0; color: #60a5fa; font-size: 12px; cursor: pointer; }
+.bz-avvisi-lista { overflow-y: auto; }
+.bz-avviso { display: flex; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid #16202f;
+             padding: 11px 14px; cursor: pointer; color: #94a3b8; }
+.bz-avviso:hover { background: #111c2e; }
+.bz-avviso > i { margin-top: 2px; width: 16px; color: #64748b; }
+.bz-avviso.nuovo { background: rgba(37, 99, 235, .08); }
+.bz-avviso.nuovo > i { color: #60a5fa; }
+.bz-avviso .c { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bz-avviso .t { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+.bz-avviso .m { font-size: 12.5px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bz-avviso .q { font-size: 11px; color: #64748b; }
+.bz-avvisi-vuoto { padding: 22px 14px; text-align: center; font-size: 13px; color: #64748b; }
+[data-theme="light"] .bz-avvisi-panel { background: #fff; border-color: #e2e8f0; box-shadow: 0 16px 40px rgba(15,23,42,.15); }
+[data-theme="light"] .bz-avvisi-testa { color: #1e293b; border-bottom-color: #e2e8f0; }
+[data-theme="light"] .bz-avviso { border-bottom-color: #f1f5f9; color: #475569; }
+[data-theme="light"] .bz-avviso:hover { background: #f8fafc; }
+[data-theme="light"] .bz-avviso .t { color: #1e293b; }
+[data-theme="light"] .bz-avviso.nuovo { background: #eff6ff; }
 [data-theme="light"] .bz-theme-toggle { border-color: #e2e8f0; color: #64748b; }
 
 /* Info cantiere (sidebar) */
@@ -438,6 +468,22 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {# Il cliente da' al cantiere il suo nome e il suo codice commessa #}
         <button type="button" class="bz-rif" id="bz-rif" hidden title="Il tuo nome e il tuo codice per questo cantiere"></button>
         <div class="bz-header-right">
+            {% if not soloAccessi %}
+            {# Le novita' di questo cantiere: gli stessi avvisi del campanello
+               di BOB e dell'app, filtrati sul cantiere #}
+            <div class="bz-avvisi">
+                <button class="bz-theme-toggle bz-avvisi-btn" id="bz-avvisi-btn" title="Notifiche del cantiere">
+                    <i class="fas fa-bell"></i><span class="bz-avvisi-n" id="bz-avvisi-n" hidden></span>
+                </button>
+                <div class="bz-avvisi-panel" id="bz-avvisi-panel" hidden>
+                    <div class="bz-avvisi-testa">
+                        <span>Notifiche del cantiere</span>
+                        <button type="button" id="bz-avvisi-tutte">Segna tutte come lette</button>
+                    </div>
+                    <div class="bz-avvisi-lista" id="bz-avvisi-lista"></div>
+                </div>
+            </div>
+            {% endif %}
             <button class="bz-theme-toggle" id="bz-theme-toggle" title="Tema">
                 <i class="fas fa-circle-half-stroke"></i>
             </button>
@@ -453,11 +499,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {# Chi non ha accesso a una sezione non se la vede nemmeno:
                    lasciare la voce e farla rispondere 403 sembra un guasto,
                    e chi la trova continua a cliccarci. #}
-                {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span></button>{% endif %}
-                {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span></button>{% endif %}
+                {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span><span class="bzd-badge" id="bz-badge-attivita" hidden></span></button>{% endif %}
+                {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span><span class="bzd-badge" id="bz-badge-disegni" hidden></span></button>{% endif %}
                 {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
                 {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span></button>{% endif %}
-                {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span></button>{% endif %}
+                {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span><span class="bzd-badge" id="bz-badge-forms" hidden></span></button>{% endif %}
                 {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
                    cosa legge lo decide il server #}
                 {% if not soloAccessi %}
@@ -1235,6 +1281,8 @@ function switchTop(v) {
     // un modulo a meta' (in costruzione o in compilazione) non si perde in silenzio
     if (currentTop === 'forms' && v !== 'forms' && window.bzfPuoiUscire && !window.bzfPuoiUscire()) return;
     currentTop = v;
+    // aprendo una sezione, le sue notifiche sono viste
+    if (typeof avvisiSezioneVista === 'function') avvisiSezioneVista(v);
     document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
     document.getElementById('view-' + v)?.classList.add('active');
     document.querySelectorAll('.bz-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === v));
@@ -2421,6 +2469,113 @@ async function submitTask() {
         alert('Errore: ' + (res.error || 'Attività non creata'));
     }
 }
+
+/* ══════════ NOTIFICHE DEL CANTIERE ══════════
+   Gli avvisi di BOB (gli stessi del campanello in alto e dell'app) che
+   riguardano questo cantiere: il campanello nell'intestazione e i numeri
+   sul menu. Aprire una sezione segna come viste le sue; cliccare un avviso
+   porta proprio a quella cosa. Si aggiorna da solo ogni 30 secondi.      */
+let avvisiStato = { avvisi: [], non_lette: 0, per_sezione: {} };
+
+function quandoAvviso(s) {
+    const d = new Date(String(s).replace(' ', 'T'));
+    if (isNaN(d)) return '';
+    const min = Math.round((Date.now() - d) / 60000);
+    if (min < 1)  return 'adesso';
+    if (min < 60) return min + ' min fa';
+    if (min < 60 * 24 && d.toDateString() === new Date().toDateString())
+        return 'oggi alle ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) + ' alle ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+const ICONA_AVVISO = { attivita: 'fa-list-check', disegni: 'fa-drafting-compass', forms: 'fa-clipboard-list',
+                       segnalazioni: 'fa-triangle-exclamation', chat: 'fa-comments' };
+
+async function caricaAvvisi() {
+    if (!document.getElementById('bz-avvisi-btn')) return;
+    const r = await api(`/worksites/${WID}/zone/avvisi`);
+    if (!r.ok) return;
+    avvisiStato = r.data;
+    const n = document.getElementById('bz-avvisi-n');
+    n.hidden = !avvisiStato.non_lette;
+    n.textContent = avvisiStato.non_lette > 99 ? '99+' : avvisiStato.non_lette;
+    ['attivita', 'disegni', 'forms'].forEach(k => {
+        const b = document.getElementById('bz-badge-' + k);
+        if (!b) return;
+        const x = avvisiStato.per_sezione[k] || 0;
+        b.hidden = !x;
+        b.textContent = x;
+    });
+    const lista = document.getElementById('bz-avvisi-lista');
+    lista.innerHTML = avvisiStato.avvisi.length
+        ? avvisiStato.avvisi.map(a => `
+            <button type="button" class="bz-avviso ${a.letta ? '' : 'nuovo'}" data-avviso="${a.id}" data-dove="${escAttr(a.dove)}">
+                <i class="fas ${ICONA_AVVISO[a.sezione] || 'fa-bell'}"></i>
+                <span class="c">
+                    <span class="t">${escHtml(a.titolo)}</span>
+                    <span class="m">${escHtml(a.testo)}</span>
+                    <span class="q">${escHtml(quandoAvviso(a.quando))}</span>
+                </span>
+            </button>`).join('')
+        : '<div class="bz-avvisi-vuoto">Nessuna notifica per questo cantiere.</div>';
+}
+
+async function segnaAvvisi(corpo) {
+    await api(`/worksites/${WID}/zone/avvisi/letti`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    });
+    caricaAvvisi();
+}
+
+function avvisiSezioneVista(v) {
+    if ((avvisiStato.per_sezione || {})[v] > 0) segnaAvvisi({ sezione: v });
+}
+
+/* Porta alla cosa di cui parla l'avviso: #attivita-12, #disegno-3,
+   #moduli, #segnalazione-5, #chat-squadra */
+async function vaiAdAvviso(dove) {
+    if (dove.startsWith('attivita-')) {
+        switchTop('attivita');
+        const id = parseInt(dove.slice(9));
+        if (!allTasks.some(t => Number(t.id) === id)) await loadTasks();
+        if (allTasks.some(t => Number(t.id) === id)) openTask(id);
+    } else if (dove.startsWith('disegno')) {
+        switchTop('disegni');
+    } else if (dove === 'moduli') {
+        switchTop('forms');
+    } else if ((dove.startsWith('segnalazione-') || dove.startsWith('chat-')) && window.bzdApri) {
+        window.bzdApri(dove);
+    }
+}
+
+document.getElementById('bz-avvisi-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    const p = document.getElementById('bz-avvisi-panel');
+    p.hidden = !p.hidden;
+    if (!p.hidden) caricaAvvisi();
+});
+document.getElementById('bz-avvisi-tutte')?.addEventListener('click', e => {
+    e.stopPropagation();
+    segnaAvvisi({});
+});
+document.getElementById('bz-avvisi-lista')?.addEventListener('click', e => {
+    const a = e.target.closest('[data-avviso]');
+    if (!a) return;
+    document.getElementById('bz-avvisi-panel').hidden = true;
+    segnaAvvisi({ id: parseInt(a.dataset.avviso) });
+    vaiAdAvviso(a.dataset.dove);
+});
+document.addEventListener('click', e => {
+    const p = document.getElementById('bz-avvisi-panel');
+    if (p && !p.hidden && !e.target.closest('.bz-avvisi')) p.hidden = true;
+});
+document.addEventListener('DOMContentLoaded', () => {
+    caricaAvvisi();
+    setInterval(caricaAvvisi, 30000);
+    // il link di una notifica aperto da fuori (email, campanello di BOB)
+    const h = location.hash.slice(1);
+    if (h.startsWith('attivita-') || h.startsWith('disegno') || h === 'moduli') setTimeout(() => vaiAdAvviso(h), 400);
+});
 
 /* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
 

@@ -93,6 +93,9 @@ final class FieldwireController
         'report'                => P::VEDERE,
         'presenze'              => P::VEDERE,
         'presenzeGiorni'        => P::VEDERE,
+        // gli avvisi di questo cantiere, per il campanello della Zone
+        'avvisi'                => P::VEDERE,
+        'avvisiLetti'           => P::VEDERE,
         // le presenze scritte a mano: solo CSM
         'aggiungiPresenza'      => P::GESTIRE,
         'eliminaPresenza'       => P::GESTIRE,
@@ -1494,6 +1497,114 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             return (new \App\Service\Zone\Presenze($this->conn))
                 ->giorni((int)$request->param('id'), 60);
+        });
+    }
+
+    // ─── Il campanello della Zone ─────────────────────────────────────────────
+
+    /**
+     * La sezione della Zone a cui porta un avviso, dal suo link
+     * (/worksites/5/zone#attivita-12 → attivita).
+     */
+    private static function sezioneAvviso(string $link): string
+    {
+        $dove = (string)(parse_url($link, PHP_URL_FRAGMENT) ?? '');
+        return match (true) {
+            str_starts_with($dove, 'attivita-')     => 'attivita',
+            str_starts_with($dove, 'disegno')       => 'disegni',
+            $dove === 'moduli'                      => 'forms',
+            str_starts_with($dove, 'segnalazione-') => 'segnalazioni',
+            str_starts_with($dove, 'chat-')         => 'chat',
+            default                                 => '',
+        };
+    }
+
+    /**
+     * Gli avvisi di chi guarda su questo cantiere: le stesse notifiche di
+     * BOB (campanello in alto, app), filtrate sul cantiere. Con quanti non
+     * letti ci sono in tutto e per sezione, per i numeri sul menu.
+     */
+    public function avvisi(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $st = $this->conn->prepare("
+                SELECT id, title, message, link, is_read, created_at
+                FROM bb_notifications
+                WHERE user_id = :u AND (link = :l1 OR link LIKE :l2)
+                ORDER BY created_at DESC, id DESC
+                LIMIT 200
+            ");
+            $st->execute([':u' => $io, ':l1' => '/worksites/' . $w . '/zone', ':l2' => '/worksites/' . $w . '/zone#%']);
+
+            $elenco = [];
+            $nonLette = 0;
+            $perSezione = ['attivita' => 0, 'disegni' => 0, 'forms' => 0, 'segnalazioni' => 0, 'chat' => 0];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $n) {
+                $sez  = self::sezioneAvviso((string)$n['link']);
+                $letta = (int)$n['is_read'] === 1;
+                if (!$letta) {
+                    $nonLette++;
+                    if (isset($perSezione[$sez])) $perSezione[$sez]++;
+                }
+                if (count($elenco) < 40) {
+                    $elenco[] = [
+                        'id'       => (int)$n['id'],
+                        'titolo'   => (string)$n['title'],
+                        'testo'    => (string)$n['message'],
+                        'dove'     => (string)(parse_url((string)$n['link'], PHP_URL_FRAGMENT) ?? ''),
+                        'sezione'  => $sez,
+                        'letta'    => $letta,
+                        'quando'   => (string)$n['created_at'],
+                    ];
+                }
+            }
+            return ['avvisi' => $elenco, 'non_lette' => $nonLette, 'per_sezione' => $perSezione];
+        });
+    }
+
+    /**
+     * Segna come letti gli avvisi di questo cantiere: uno (id), quelli di
+     * una sezione (aprendola), o tutti.
+     */
+    public function avvisiLetti(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $io   = (int)($request->user()->id ?? 0);
+            $body = $this->jsonBody();
+            $st = $this->conn->prepare("
+                SELECT id, link FROM bb_notifications
+                WHERE user_id = :u AND is_read = 0 AND (link = :l1 OR link LIKE :l2)
+            ");
+            $st->execute([':u' => $io, ':l1' => '/worksites/' . $w . '/zone', ':l2' => '/worksites/' . $w . '/zone#%']);
+            $id  = (int)($body['id'] ?? 0);
+            $sez = (string)($body['sezione'] ?? '');
+            $ids = [];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $n) {
+                if ($id > 0 ? (int)$n['id'] === $id
+                    : ($sez === '' || self::sezioneAvviso((string)$n['link']) === $sez)) {
+                    $ids[] = (int)$n['id'];
+                }
+            }
+            if ($ids) {
+                // read_at dove c'e' (lo usa la cronologia del campanello di BOB)
+                try {
+                    $segna = $this->conn->prepare('UPDATE bb_notifications SET is_read = 1, read_at = NOW() WHERE user_id = :u AND id = :id');
+                    $segna->execute([':u' => $io, ':id' => $ids[0]]);
+                } catch (\PDOException $e) {
+                    $segna = $this->conn->prepare('UPDATE bb_notifications SET is_read = 1 WHERE user_id = :u AND id = :id');
+                }
+                foreach ($ids as $x) {
+                    $segna->execute([':u' => $io, ':id' => $x]);
+                }
+            }
+            return ['segnate' => count($ids)];
         });
     }
 
