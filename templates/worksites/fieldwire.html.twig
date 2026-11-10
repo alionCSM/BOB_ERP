@@ -718,7 +718,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             {# Il filo lo legge chi vede l'attivita': noi, il cliente e la
                squadra. Una nota interna la legge solo l'ufficio. #}
             <div class="bz-comment-flags">
-                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo ufficio)</label>
+                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo CSM)</label>
             </div>
             {% endif %}
         </div>
@@ -735,16 +735,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <h3>Nuova attività</h3>
 
         <div class="bz-modal-field">
-            <label>Cosa c'è da fare *</label>
+            <label>Titolo *</label>
             <input type="text" id="task-name" maxlength="200" placeholder="Es. Montare i correnti della corsia A">
         </div>
         <div class="bz-modal-field">
-            <label>Dettagli</label>
+            <label>Descrizione</label>
             <textarea id="task-desc" rows="2" placeholder="Misure, materiale, avvertenze…"></textarea>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Dove in cantiere</label>
+                <label>Posizione</label>
                 <input type="text" id="task-luogo" maxlength="160" placeholder="Es. Campata 3, livello 2">
                 <div class="bz-task-punto" id="task-punto-box" hidden>
                     <select id="task-disegno"></select>
@@ -753,7 +753,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 </div>
             </div>
             <div class="bz-modal-field">
-                <label>Tipo</label>
+                <label>Categoria</label>
                 <input type="text" id="task-cat" list="task-tipi">
                 <datalist id="task-tipi">
                     <option value="Montaggio"><option value="Smontaggio"><option value="Modifica">
@@ -765,7 +765,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-task-sez">Chi e quando</div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>A chi tocca</label>
+                <label>Assegna a</label>
                 <select id="task-assignee"><option value="">— la squadra in cantiere —</option></select>
             </div>
             <div class="bz-modal-field">
@@ -823,7 +823,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <h3>Modifica attività</h3>
         <input type="hidden" id="edit-task-id">
         <div class="bz-modal-field">
-            <label>Nome *</label>
+            <label>Titolo *</label>
             <input type="text" id="edit-task-name">
         </div>
         <div class="bz-modal-field">
@@ -832,17 +832,17 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Dove in cantiere</label>
+                <label>Posizione</label>
                 <input type="text" id="edit-task-luogo" maxlength="160">
             </div>
             <div class="bz-modal-field">
-                <label>Tipo</label>
+                <label>Categoria</label>
                 <input type="text" id="edit-task-cat" list="task-tipi">
             </div>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Assegnato a</label>
+                <label>Assegna a</label>
                 <select id="edit-task-assignee">
                     <option value="">— nessuno —</option>
                 </select>
@@ -854,7 +854,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Data inizio</label>
+                <label>Inizio</label>
                 <input type="date" id="edit-task-start">
             </div>
             <div class="bz-modal-field">
@@ -918,7 +918,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     <div class="bz-modal" style="width:440px">
         <h3>Il tuo riferimento</h3>
         <p class="acc-intro">Come chiamate voi questo cantiere. Lo vedete accanto al nostro nome, nell'elenco
-            dei cantieri e nel rapporto; lo vede anche il nostro ufficio.</p>
+            dei cantieri e nel rapporto; lo vede anche CSM.</p>
         <div class="bz-modal-field"><label>Nome</label><input id="bz-rif-nome" maxlength="120" placeholder="Es. Hub Nord fase 2"></div>
         <div class="bz-modal-field"><label>Codice commessa</label><input id="bz-rif-codice" maxlength="60" placeholder="Es. CO-2026-114"></div>
         <div class="bz-modal-actions">
@@ -931,7 +931,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <div id="bz-chi-modal" class="bz-overlay hidden">
     <div class="bz-modal">
         <h3>Chi la vede</h3>
-        <p class="bz-chi-nota">L'ufficio vede tutto. Qui si spunta chi altro la vede.</p>
+        <p class="bz-chi-nota">CSM vede tutto. Qui si spunta chi altro la vede.</p>
         <div id="bz-chi-corpo"></div>
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="bz-chi-annulla">Annulla</button>
@@ -999,12 +999,12 @@ document.addEventListener('click', async e => {
    server (FieldwireController::pretendeStato), cosi' non si disegnano
    bottoni che poi rispondono di no. */
 const GRUPPO_TASK = { squadra: 'cantiere', capi: 'cantiere', cantiere: 'cantiere', cliente: 'cliente', ufficio: 'ufficio' };
-const TOCCA_A     = { squadra: 'la squadra in cantiere', capi: 'la squadra in cantiere', cantiere: 'la squadra in cantiere',
-                      ufficio: 'il nostro ufficio', cliente: 'il cliente' };
+const TOCCA_A     = { squadra: 'Squadra', capi: 'Squadra', cantiere: 'Squadra',
+                      ufficio: 'CSM', cliente: 'Cliente' };
 /* A chi tocca, in parole: la persona per nome, o il gruppo. */
 function chiCe(t) {
     if (Number(t.assignee_user_id) > 0) return String(t.assignee_name || 'una persona').replace(/ · .*$/, '');
-    return TOCCA_A[t.assegnata_a || 'squadra'] || 'la squadra in cantiere';
+    return TOCCA_A[t.assegnata_a || 'squadra'] || 'Squadra';
 }
 function taskMio(t)      { return Number(t.created_by) === Number(IO); }
 function taskModifica(t) { return DA_UFFICIO || taskMio(t); }
@@ -1045,16 +1045,16 @@ function chiTesto(riga) {
     const con   = Array.isArray(riga) ? riga : ((riga && riga.condivisa_con) || []);
     const parti = Array.isArray(riga) ? [] : ((riga && riga.condivisa_parti) || []);
     const sq = parti.includes('cantiere'), cl = parti.includes('cliente');
-    let t = sq && cl ? 'Tutti' : sq ? 'Ufficio e squadra' : cl ? 'Ufficio e cliente' : '';
+    let t = sq && cl ? 'Tutti' : sq ? 'CSM e squadra' : cl ? 'CSM e cliente' : '';
     if (con.length) t += (t ? ' + ' : '') + con.length + (con.length === 1 ? ' persona' : ' persone');
-    return t || 'Solo ufficio';
+    return t || 'Solo CSM';
 }
 function chiBadge(riga) {
     if (!DA_UFFICIO) return '';
     const t = chiTesto(riga);
     if (t === 'Tutti') return '';   // il caso normale non ha bisogno di bollino
-    const solo = t === 'Solo ufficio';
-    return `<span class="bz-vis-badge ${solo ? 'solo' : 'muto'}" title="Chi la vede oltre all'ufficio">`
+    const solo = t === 'Solo CSM';
+    return `<span class="bz-vis-badge ${solo ? 'solo' : 'muto'}" title="Chi la vede oltre a CSM">`
          + `<i class="fas ${solo ? 'fa-lock' : 'fa-user-check'}"></i> ${escHtml(t)}</span>`;
 }
 
@@ -1104,7 +1104,7 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
     ].map(g => ({ ...g, persone: persone.filter(x => x.ruolo === g.ruolo) }));
 
     const dentro = new Set(con.map(Number));
-    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">L'ufficio vede sempre tutto.</p>`
+    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">CSM vede sempre tutto.</p>`
       + gruppi.map(g => {
         const tutta = parti.includes(g.ruolo);
         return `
@@ -1524,22 +1524,22 @@ async function openTask(id) {
                     </button>`).join('')}
             </div>
             ${taskAvanza(task) ? '' : `<div style="font-size:11px;color:#64748b;margin-top:6px">${task.status === 'verified'
-                ? "Verificata dall'ufficio."
+                ? "Verificata da CSM."
                 : "La porta avanti la persona o il gruppo a cui è assegnata."}</div>`}
         </div>
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Dettagli</div>
             <dl class="bz-dati">
-                <dt><i class="fas fa-user"></i> Tocca a</dt><dd>${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
+                <dt><i class="fas fa-user"></i> Assegnata a</dt><dd>${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
                     ? (task.assignee_name || 'una persona')
-                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</dd>
-                ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Dove</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
-                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Sul disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
+                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'Squadra'))}</dd>
+                ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Posizione</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
+                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
                 ${Number(task.priority) > 0 ? `<dt><i class="fas fa-flag"></i> Priorità</dt><dd class="${Number(task.priority) > 1 ? 'urgente' : 'alta'}">${Number(task.priority) > 1 ? 'Urgente' : 'Alta'}</dd>` : ''}
                 ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
                 ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
-                ${task.category ? `<dt><i class="fas fa-tag"></i> Tipo</dt><dd>${escHtml(task.category)}</dd>` : ''}
+                ${task.category ? `<dt><i class="fas fa-tag"></i> Categoria</dt><dd>${escHtml(task.category)}</dd>` : ''}
                 <dt><i class="fas fa-clock"></i> Creata</dt><dd>${fmtDate(task.created_at)}</dd>
             </dl>
             ${task.description ? `<p class="bz-dati-desc">${escHtml(task.description)}</p>` : ''}
@@ -1755,9 +1755,9 @@ async function loadBobUsers() {
         // in particolare. Ufficio e cliente li assegna solo l'ufficio.
         // "i capi squadra" non c'e' piu': erano le stesse persone della
         // squadra. Il cliente chiede prima di tutto all'ufficio.
-        const squadra = '<option value="">— la squadra in cantiere —</option>';
-        const ufficio = '<option value="@ufficio">— il nostro ufficio —</option>';
-        const cliente = '<option value="@cliente">— il cliente —</option>';
+        const squadra = '<option value="">Squadra</option>';
+        const ufficio = '<option value="@ufficio">CSM</option>';
+        const cliente = '<option value="@cliente">Cliente</option>';
         const gruppi = RUOLO === 'cliente' ? ufficio + squadra
                      : DA_UFFICIO ? squadra + ufficio + cliente
                      : squadra + ufficio;
@@ -2709,7 +2709,7 @@ async function loadPresenze(data = null) {
         const giorni = (g.data || g || []);
         if (!giorni.length) {
             colonna.innerHTML = '';
-            corpo.innerHTML = '<div class="bz-empty">Su questo cantiere non c\'e\' ancora nessuna presenza registrata.</div>';
+            corpo.innerHTML = '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `

@@ -189,7 +189,7 @@
         if (e.target.closest('#bza-assegna')) {
             const sel = document.getElementById('bza-chi');
             const chi = [...sel.selectedOptions].map(o => o.value);
-            if (!chi.length) { alert('Scegli a chi tocca compilarlo'); return; }
+            if (!chi.length) { alert('Seleziona a chi assegnare il modulo'); return; }
             const scelte = (document.getElementById('bza-vis')?.dataset.persone || '').trim();
             const sceltiP = (document.getElementById('bza-vis')?.dataset.parti || '').trim();
             // un'assegnazione per ogni gruppo o persona scelta

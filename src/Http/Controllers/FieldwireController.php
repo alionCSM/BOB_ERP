@@ -955,7 +955,7 @@ final class FieldwireController
         } catch (\Throwable $e) {
             error_log('[Zone rapporto] ' . $e->getMessage());
             http_response_code(500);
-            exit('Il rapporto non si e\' potuto creare. Riprova, o avvisa l\'ufficio.');
+            exit('Il rapporto non si e\' potuto creare. Riprova, o avvisa CSM.');
         }
 
         $fname = 'riepilogo_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)($worksite['worksite_code'] ?? $worksiteId))
@@ -2680,7 +2680,7 @@ final class FieldwireController
             throw new \RuntimeException('Stato non valido');
         }
         if ($stato === 'verified' || ($task['status'] ?? '') === 'verified') {
-            \App\Service\Zone\Accesso::nega("Verificare, o riaprire un'attivita' verificata, lo fa l'ufficio");
+            \App\Service\Zone\Accesso::nega("Verificare, o riaprire un'attivita' verificata, lo fa CSM");
         }
         $this->pretendeChiCiLavora($request, $task);
     }
