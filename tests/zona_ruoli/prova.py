@@ -135,12 +135,37 @@ verifica(S, 'il cliente non vede i moduli della squadra da compilare', not any(i
 verifica(S, 'il capo lo compila', puo(chiama(CAPO, 'POST', '/forms/2/submit', {'values': {'f1': 'ok'}, 'assegnazione_id': aid})))
 verifica(S, 'un altro modulo non vale per quella assegnazione', chiama(CAPO, 'POST', '/forms/1/submit', {'values': {}, 'assegnazione_id': aid})['_http'] == 403)
 verifica(S, 'fuori dall\'ufficio non si compila senza assegnazione', chiama(CLI, 'POST', '/forms/1/submit', {'values': {}})['_http'] == 403)
-verifica(S, 'il cliente non assegna moduli', chiama(CLI, 'POST', '/forms/assegnazioni', {'template_id': 2, 'a_ruolo': 'cantiere'})['_http'] == 403)
-verifica(S, 'il cliente non cancella modelli', chiama(CLI, 'POST', '/forms/1/delete')['_http'] == 403)
+verifica(S, 'il cliente non assegna i moduli di CSM', chiama(CLI, 'POST', '/forms/assegnazioni', {'template_id': 2, 'a_ruolo': 'cantiere'})['_http'] == 403)
+verifica(S, 'il cliente non cancella i modelli di CSM', chiama(CLI, 'POST', '/forms/1/delete')['_http'] == 403)
 verifica(S, "l'ufficio non tocca il modello di un altro cantiere da qui", not puo(chiama(UFF, 'POST', '/forms/3/delete')))
 sk = chiama(CLI, 'GET', '/forms/submissions')['data']
 verifica(S, 'la risposta del capo la legge anche il cliente (di base tutti)', len(sk) == 1)
 verifica(S, 'chi compila rivede la sua risposta', len(chiama(CAPO, 'GET', '/forms/submissions')['data']) == 1)
+
+S = '5b. Moduli del committente'
+campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
+mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})
+verifica(S, 'il committente crea un modulo per il cantiere', puo(mc), str(mc)[:200])
+mc = mc['data']['id'] if puo(mc) else 0
+mu = chiama(CLI, 'POST', '/forms', {'name': 'Sopralluogo committente', 'fields': campo, 'universal': True})
+mu = mu['data']['id'] if puo(mu) else 0
+verifica(S, '... e uno per tutti i suoi cantieri', mu > 0 and sql(f"SELECT worksite_id, client_id FROM bb_zone_form_templates WHERE id={mu}") == [['NULL', '1']])
+nomi = lambda chi, w=100: [t['name'] for t in chiama(chi, 'GET', '/forms', w=w)['data']]
+verifica(S, 'il committente vede i moduli della sua azienda, non quelli interni di CSM', set(nomi(CLI)) == {'Verbale committente', 'Sopralluogo committente'}, str(nomi(CLI)))
+verifica(S, 'CSM li vede nel cantiere', {'Verbale committente', 'Sopralluogo committente'} <= set(nomi(UFF)))
+verifica(S, 'quello "per tutti i suoi cantieri" non compare nei cantieri di un altro committente', 'Sopralluogo committente' not in nomi(UFF, 200))
+verifica(S, 'il committente modifica il suo modulo', puo(chiama(CLI, 'POST', '/forms', {'id': mc, 'name': 'Verbale committente', 'fields': campo + [{'id': 'f2', 'type': 'date', 'label': 'Data'}]})))
+verifica(S, 'non modifica quelli di CSM', chiama(CLI, 'POST', '/forms', {'id': 2, 'name': 'x', 'fields': campo})['_http'] == 403)
+verifica(S, 'compila il suo modulo senza assegnazione', puo(chiama(CLI, 'POST', f'/forms/{mc}/submit', {'values': {'f1': 'ok'}})))
+ac = chiama(CLI, 'POST', '/forms/assegnazioni', {'template_id': mc, 'a_ruolo': 'cantiere', 'frequenza': 'settimanale'})
+verifica(S, 'lo assegna alla squadra', puo(ac), str(ac)[:200])
+verifica(S, '... e il capo lo trova da compilare', mc in [int(x['template_id']) for x in chiama(CAPO, 'GET', '/forms/assegnazioni')['data']])
+verifica(S, 'non assegna i moduli di CSM', chiama(CLI, 'POST', '/forms/assegnazioni', {'template_id': 2, 'a_ruolo': 'cantiere'})['_http'] == 403)
+verifica(S, "non toglie l'assegnazione di CSM", chiama(CLI, 'POST', f'/forms/assegnazioni/{aid}/disattiva')['_http'] == 403)
+mia = [x for x in chiama(CLI, 'GET', '/forms/assegnazioni')['data'] if int(x['template_id']) == mc]
+verifica(S, 'toglie la sua', mia and puo(chiama(CLI, 'POST', f"/forms/assegnazioni/{mia[0]['id']}/disattiva")))
+verifica(S, 'la squadra non crea moduli', chiama(CAPO, 'POST', '/forms', {'name': 'x', 'fields': campo})['_http'] == 403)
+verifica(S, 'il committente cancella il suo modulo', puo(chiama(CLI, 'POST', f'/forms/{mu}/delete')))
 
 S = '6. File'
 f1 = chiama(UFF, 'POST', '/files/folder', {'name': 'Verbali'})['data']['id']

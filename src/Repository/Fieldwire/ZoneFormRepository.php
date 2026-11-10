@@ -15,16 +15,27 @@ final class ZoneFormRepository
     // ─── Template ─────────────────────────────────────────────────────────────
 
     /** Template disponibili per un cantiere: i suoi + gli universali. */
-    public function templatesFor(int $worksiteId): array
+    /**
+     * I modelli di un cantiere: i suoi, quelli di CSM per tutti i cantieri e
+     * quelli del committente per tutti i suoi cantieri.
+     *
+     * @param int|null $soloCliente il committente che guarda: solo i modelli
+     *                              della sua azienda, non quelli interni di CSM
+     */
+    public function templatesFor(int $worksiteId, ?int $soloCliente = null): array
     {
         $stmt = $this->db->prepare("
-            SELECT t.id, t.worksite_id, t.name, t.description, t.active, t.created_at,
+            SELECT t.id, t.worksite_id, t.client_id, t.name, t.description, t.active, t.created_at, t.created_by,
                    (SELECT COUNT(*) FROM bb_zone_form_submissions s WHERE s.template_id = t.id) AS sub_count
             FROM bb_zone_form_templates t
-            WHERE t.active = 1 AND (t.worksite_id = :w OR t.worksite_id IS NULL)
+            WHERE t.active = 1
+              AND (t.worksite_id = :w
+                   OR (t.worksite_id IS NULL AND (t.client_id IS NULL
+                        OR t.client_id = (SELECT w.client_id FROM bb_worksites w WHERE w.id = :w2))))
+              " . ($soloCliente !== null ? 'AND t.client_id = :c' : '') . "
             ORDER BY (t.worksite_id IS NULL) ASC, t.name ASC
         ");
-        $stmt->execute([':w' => $worksiteId]);
+        $stmt->execute([':w' => $worksiteId, ':w2' => $worksiteId] + ($soloCliente !== null ? [':c' => $soloCliente] : []));
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -41,11 +52,12 @@ final class ZoneFormRepository
     public function create(array $d): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_form_templates (worksite_id, name, description, fields, created_by)
-            VALUES (:w, :n, :desc, :f, :u)
+            INSERT INTO bb_zone_form_templates (worksite_id, client_id, name, description, fields, created_by)
+            VALUES (:w, :c, :n, :desc, :f, :u)
         ");
         $stmt->execute([
             ':w'    => $d['worksite_id'],            // null = universale
+            ':c'    => $d['client_id'] ?? null,      // il committente a cui appartiene
             ':n'    => $d['name'],
             ':desc' => $d['description'] ?? null,
             ':f'    => is_string($d['fields']) ? $d['fields'] : json_encode($d['fields']),
@@ -58,9 +70,10 @@ final class ZoneFormRepository
     {
         $this->db->prepare("
             UPDATE bb_zone_form_templates
-            SET name = :n, description = :desc, fields = :f, worksite_id = :w
+            SET name = :n, description = :desc, fields = :f, worksite_id = :w, client_id = :c
             WHERE id = :id
         ")->execute([
+            ':c'    => $d['client_id'] ?? null,
             ':n'    => $d['name'],
             ':desc' => $d['description'] ?? null,
             ':f'    => is_string($d['fields']) ? $d['fields'] : json_encode($d['fields']),

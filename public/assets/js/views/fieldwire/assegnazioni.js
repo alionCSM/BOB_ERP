@@ -17,7 +17,10 @@
     const root = document.getElementById('bz-assegnazioni-root');
     if (!root || typeof WID === 'undefined') return;
 
-    const A_CHI = { cantiere: 'Squadra', cliente: 'Cliente', ufficio: 'CSM' };
+    // il committente assegna i moduli della sua azienda: per lui "cliente" e' "Noi"
+    const PER_CLIENTE = typeof RUOLO !== 'undefined' && RUOLO === 'cliente';
+    const ASSEGNA = DA_UFFICIO || PER_CLIENTE;
+    const A_CHI = { cantiere: 'Squadra', cliente: PER_CLIENTE ? 'Noi' : 'Cliente', ufficio: 'CSM' };
     // assegnazioni scritte prima che capo e operaio diventassero Cantiere
     const A_CHI_VECCHI = { capo: A_CHI.cantiere, operaio: A_CHI.cantiere };
     const FREQ  = { una_volta: 'Una volta', giornaliera: 'Ogni giorno', settimanale: 'Ogni settimana', mensile: 'Ogni mese' };
@@ -95,8 +98,9 @@
                     ${statoRiga(a)}
                 </div>
                 ${DA_UFFICIO
-                    ? `<button data-togli-assegnazione="${a.id}">Togli</button>`
-                    : a.solo_stato ? '<span class="sub">squadra</span>' : `<button data-compila="${a.template_id}" data-assegnazione="${a.id}" style="background:#2563eb;color:#fff;border:0;">Compila</button>`}
+                    ? `<button data-togli-assegnazione="${a.id}">Rimuovi</button>`
+                    : (a.solo_stato ? (a.gestita ? '' : '<span class="sub">Squadra</span>') : `<button data-compila="${a.template_id}" data-assegnazione="${a.id}" style="background:#2563eb;color:#fff;border:0;">Compila</button>`)
+                      + (a.gestita ? ` <button data-togli-assegnazione="${a.id}">Rimuovi</button>` : '')}
             </div>`;
     }
 
@@ -107,10 +111,10 @@
 
         // chi non e' dell'ufficio e non ha niente da compilare non vede il
         // riquadro: un titolo con sotto "niente" non serve
-        if (!DA_UFFICIO && !tutte.length) return;
+        if (!ASSEGNA && !tutte.length) return;
 
         let form = '';
-        if (DA_UFFICIO) {
+        if (ASSEGNA) {
             const [modelli, acc] = await Promise.all([
                 get('/worksites/' + WID + '/zone/forms'),
                 get('/worksites/' + WID + '/zone/accessi'),

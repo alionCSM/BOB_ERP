@@ -24,7 +24,7 @@ CREATE TABLE bb_zone_task_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id I
 CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
   size_bytes BIGINT DEFAULT 0, uploaded_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
+CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, client_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
   created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_form_submissions(id INT AUTO_INCREMENT PRIMARY KEY, template_id INT, worksite_id INT, template_name VARCHAR(200), `values` TEXT,
   submitter_name VARCHAR(80) NULL, submitted_by INT NULL, source VARCHAR(20) DEFAULT 'internal', assegnazione_id INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
