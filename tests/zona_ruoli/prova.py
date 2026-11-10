@@ -87,6 +87,12 @@ verifica(S, "l'ufficio la porta avanti", puo(chiama(UFF, 'POST', f"/tasks/{tk['i
 chiama(CLI, 'POST', f"/tasks/{tk['id']}/update", {'name': 'Spostare scaffale 4', 'status': 'verified'})
 verifica(S, '"verificato" non passa dalla modifica', sql(f"SELECT status FROM bb_zone_tasks WHERE id={tk['id']}")[0][0] == 'in_progress')
 verifica(S, 'il cliente non cancella', chiama(CLI, 'POST', f'/tasks/{t1}/delete')['_http'] == 403)
+# CSM fa tutto quello che fa chi ha l'attivita': anche su una creata dal
+# cliente e data a una persona precisa
+tp = chiama(CLI, 'POST', '/tasks', {'name': 'Controllo ancoraggi', 'assegnata_a': 'persona', 'assignee_user_id': CAPO})['data']['id']
+verifica(S, 'CSM modifica un\'attività creata da un altro', puo(chiama(UFF, 'POST', f'/tasks/{tp}/update', {'name': 'Controllo ancoraggi campata 2'})))
+verifica(S, 'CSM completa un\'attività data a un\'altra persona', puo(chiama(UFF, 'POST', f'/tasks/{tp}/status', {'status': 'complete'})))
+verifica(S, '... e la verifica', puo(chiama(UFF, 'POST', f'/tasks/{tp}/status', {'status': 'verified'})))
 tb = chiama(UFF, 'POST', '/tasks', {'name': 'Attività Bianchi'}, w=200)['data']['id']
 verifica(S, "dall'indirizzo di un cantiere non si cancella l'attività di un altro", not puo(chiama(UFF, 'POST', f'/tasks/{tb}/delete')))
 

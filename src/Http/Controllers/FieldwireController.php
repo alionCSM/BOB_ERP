@@ -509,7 +509,7 @@ final class FieldwireController
             // un cliente riscriveva le attivita' dell'ufficio che vedeva.
             if ($ruolo !== \App\Service\Zone\Accesso::UFFICIO
                 && (int)($existing['created_by'] ?? 0) !== (int)($request->user()->id ?? -1)) {
-                \App\Service\Zone\Accesso::nega('Questa attivita\' la cambia chi l\'ha creata, o l\'ufficio');
+                \App\Service\Zone\Accesso::nega('Questa attivita\' puo\' essere modificata solo da chi l\'ha creata o da CSM');
             }
             // Lo stato passa solo da /status, che controlla chi puo' cosa:
             // dentro la modifica arrivava a "verificato" anche chi non puo'.
@@ -2706,7 +2706,7 @@ final class FieldwireController
             : self::gruppoTask((string)($task['assegnata_a'] ?? 'squadra')) === $ruolo;
         if (!$mia) {
             \App\Service\Zone\Accesso::nega(
-                $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' tocca a un altro gruppo"
+                $persona > 0 ? "Questa attivita' e' assegnata a un'altra persona" : "Questa attivita' e' assegnata a un altro gruppo"
             );
         }
     }
