@@ -595,7 +595,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     {# Caricare ed eliminare disegni passa da /worksites/{id}/disegni,
                        che sta fuori da /zone e dal modulo cantieri: per un
                        operaio e' 403 comunque. Meglio non mostrarlo. #}
-                    {% if daUfficio %}
+                    {% if caricaDisegni %}
                     <label class="bz-upload-btn">
                         <i class="fas fa-upload"></i> Carica disegno
                         <input type="file" id="dz-file-input" accept=".pdf,.dwg,.png,.jpg,.jpeg" hidden>
@@ -1900,7 +1900,15 @@ function renderDisegni(items, fwReady) {
                      ${d.n_versioni ? `<button type="button" class="bz-dz-btn" data-storico="${d.id}"><i class="fas fa-clock-rotate-left"></i> Versioni precedenti (${d.n_versioni})</button>` : ''}
                    </div>
                    <div class="bz-dz-storico" id="bz-storico-${d.id}" hidden></div>`
-                : ''}
+                : (RUOLO === 'cliente' && Number(d.created_by) === Number(IO)
+                    // il committente aggiorna i disegni che ha caricato lui
+                    ? `<div class="bz-dz-versioni">
+                         <label class="bz-dz-btn" title="Carica una versione aggiornata. La versione attuale resta nello storico.">
+                           <i class="fas fa-arrow-up-from-bracket"></i> Nuova versione
+                           <input type="file" hidden accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg" data-nuova-versione="${d.id}">
+                         </label>
+                       </div>`
+                    : '')}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG non riuscita</div>' : ''}

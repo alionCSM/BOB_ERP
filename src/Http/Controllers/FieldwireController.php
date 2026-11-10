@@ -356,6 +356,8 @@ final class FieldwireController
             'accessi'              => self::livelliPagina($this->accesso->ruolo($request->user(), $worksiteId)),
             'ruolo'                => $this->accesso->ruolo($request->user(), $worksiteId),
             'daUfficio'            => $this->accesso->daUfficio($request->user(), $worksiteId),
+            // caricare disegni: CSM e il committente (vedi uploadDisegno)
+            'caricaDisegni'        => $this->accesso->puo($request->user(), $worksiteId, \App\Service\Zone\Permessi::DISEGNI),
             // chi ha il modulo ma non e' dentro: della Zone vede solo
             // "Chi accede", per aggiungersi o aggiungere qualcuno
             'soloAccessi'          => !$this->accesso->qualcosa($request->user(), $worksiteId)
@@ -1696,6 +1698,8 @@ final class FieldwireController
                     'folder'       => $r['subcategory'] ?: 'altri',
                     'uploader'     => trim($r['uploader']) ?: '—',
                     'created_at'   => $r['created_at'],
+                    // chi l'ha caricato: il committente aggiorna i suoi
+                    'created_by'   => (int)($r['created_by'] ?? 0),
                     // le versioni: quella in uso e quante ce ne sono di prima
                     'versione'     => (int)($r['current_version'] ?? 1) ?: 1,
                     'n_versioni'   => (int)($r['n_versioni'] ?? 0),
