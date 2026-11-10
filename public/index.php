@@ -958,6 +958,8 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/photo',                            [FieldwireController::class, 'zonePhoto'])
         ->get( '/api/v1/zone/{id}/media',                            [FieldwireController::class, 'media'])
         ->get( '/api/v1/zone/{id}/report',                           [FieldwireController::class, 'report'])
+        ->get( '/api/v1/zone/{id}/presenze',                         [FieldwireController::class, 'presenze'])
+        ->get( '/api/v1/zone/{id}/presenze/giorni',                  [FieldwireController::class, 'presenzeGiorni'])
         ->get( '/api/v1/zone/{id}/users',                            [FieldwireController::class, 'bobUsers'])
         // file: si consultano e si scaricano, non si riordinano
         ->get( '/api/v1/zone/{id}/files',                            [FieldwireController::class, 'files'])

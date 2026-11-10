@@ -958,7 +958,7 @@ final class FieldwireController
             exit('Il rapporto non si e\' potuto creare. Riprova, o avvisa l\'ufficio.');
         }
 
-        $fname = 'rapporto_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)($worksite['worksite_code'] ?? $worksiteId))
+        $fname = 'riepilogo_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)($worksite['worksite_code'] ?? $worksiteId))
                . '_' . str_replace('-', '', $dal) . '-' . str_replace('-', '', $al) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');

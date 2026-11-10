@@ -605,7 +605,7 @@ final class Lingua
             'zona_attivita_t'      => 'Aktivitet i ri',
             'zona_attivita'        => '{cantiere}: {nome}',
             'zona_commento_t'      => 'Mesazh i ri ne nje aktivitet',
-            'zona_disegno_t'       => 'Version i ri i vizatimit',
+            'zona_disegno_t'       => 'Version i ri i projektit',
             'zona_disegno'         => '{cantiere}: {nome}. Perdor kete, i meparshmi nuk vlen.',
             'zona_commento'        => '{cantiere} · {nome} — {chi}: {testo}',
             'zona_modulo_t'        => 'Formular per te plotesuar',
