@@ -53,6 +53,8 @@ class RoutePolicyMap
         '#^/change-password$#',
         // Notifications
         '#^/notifications/unread$#',
+        // segnare come lette ed eliminare le proprie (il controller guarda user_id)
+        '#^/notifications/(action|history)$#',
         // Analytics: heartbeat only — user-activity exposes staff data and
         // must not be reachable by company-scoped users
         '#^/api/analytics/heartbeat$#',
@@ -107,6 +109,8 @@ class RoutePolicyMap
         '#^/change-password$#',
         // Notifications
         '#^/notifications/unread$#',
+        // segnare come lette ed eliminare le proprie (il controller guarda user_id)
+        '#^/notifications/(action|history)$#',
         '#^/api/analytics/heartbeat$#',
     ];
 

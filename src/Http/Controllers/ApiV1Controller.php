@@ -336,6 +336,26 @@ final class ApiV1Controller
         Response::json(['success' => true, 'marked' => $stmt->rowCount() > 0]);
     }
 
+    /** POST /api/v1/notifications/{id}/delete — butta una notifica (solo le proprie) */
+    public function deleteNotification(Request $request): never
+    {
+        $notifId = $request->intParam('id');
+        if ($notifId <= 0) {
+            Response::json(['success' => false, 'message' => 'Id notifica non valido'], 422);
+        }
+        $st = $this->conn->prepare('DELETE FROM bb_notifications WHERE id = :id AND user_id = :uid');
+        $st->execute([':id' => $notifId, ':uid' => (int)$request->user()->id]);
+        Response::json(['success' => true, 'deleted' => $st->rowCount() > 0]);
+    }
+
+    /** POST /api/v1/notifications/delete-read — butta tutte quelle gia' lette */
+    public function deleteReadNotifications(Request $request): never
+    {
+        $st = $this->conn->prepare('DELETE FROM bb_notifications WHERE user_id = :uid AND is_read = 1');
+        $st->execute([':uid' => (int)$request->user()->id]);
+        Response::json(['success' => true, 'deleted' => $st->rowCount()]);
+    }
+
     // ── DASHBOARD (Bearer) ───────────────────────────────────────────────────
 
     /**
@@ -1407,36 +1427,8 @@ final class ApiV1Controller
     {
         $name   = (string)($row['first_name'] ?? ($row['username'] ?? ''));
         $email  = (string)($row['email'] ?? '');
-        $site   = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
-        $ipHtml = htmlspecialchars($ip, ENT_QUOTES, 'UTF-8');
-        $uaHtml = htmlspecialchars($ua, ENT_QUOTES, 'UTF-8');
 
-        $html = "
-            <div style=\"font-family:Arial,Helvetica,sans-serif; max-width:560px; margin:0 auto; color:#1e293b\">
-                <div style=\"display:flex; align-items:center; gap:12px; padding:24px 0; border-bottom:1px solid #e2e8f0\">
-                    <img src=\"" . $site . "/images/logo.png\" alt=\"BOB\" width=\"72\" height=\"72\"
-                         onerror=\"this.style.display='none'\">
-                    <div>
-                        <div style=\"font-size:22px; font-weight:800; letter-spacing:1px; color:#0f766e\">BOB</div>
-                    </div>
-                </div>
-                <h2 style=\"font-size:18px; margin:28px 0 8px\">Codice di accesso da nuovo dispositivo</h2>
-                <p style=\"font-size:14px; line-height:1.6; margin:0 0 20px\">Ciao <strong>{$name}</strong>,<br>
-                qualcuno ha provato ad accedere al tuo account BOB da un indirizzo IP non riconosciuto.
-                Usa questo codice per completare l'accesso dall'app:</p>
-                <div style=\"background:#f0fdfa; border:2px dashed #0d9488; border-radius:12px; padding:20px; text-align:center; margin-bottom:24px\">
-                    <div style=\"font-size:34px; font-weight:800; letter-spacing:10px; color:#0f766e; font-family:monospace\">{$code}</div>
-                </div>
-                <p style=\"font-size:13px; line-height:1.7; color:#475569; margin:0 0 8px\">
-                    <strong>Dati del tentativo</strong><br>
-                    IP: {$ipHtml}<br>
-                    Dispositivo: {$uaHtml}<br>
-                    Ora: " . date('d/m/Y H:i') . "</p>
-                <p style=\"font-size:12px; color:#94a3b8; margin:24px 0 0\">
-                    Il codice scade tra 15 minuti. Se non hai richiesto tu questo accesso,
-                    ignora questa email o cambia subito la password.
-                </p>
-            </div>";
+        $html = \App\Service\EmailBob::codiceAccesso($name, $code, $ip, $ua, 15, "nell'app");
 
         try {
             $mailer = new Mailer();

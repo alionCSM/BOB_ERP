@@ -152,6 +152,7 @@
                                     <div class="text-slate-500 mt-1 whitespace-normal break-words">{{ notif.message }}</div>
                                     <div class="mt-2 flex gap-3 text-xs">
                                         <button type="button" class="notif-mark-read text-emerald-700 underline">Segna come letta</button>
+                                        <button type="button" class="notif-delete text-rose-600 underline">Elimina</button>
                                         {% if notif.link is not empty %}
                                             <a href="{{ notif.link }}" class="notif-open text-blue-600 underline">Apri</a>
                                         {% endif %}
@@ -205,6 +206,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="font-medium text-base mr-auto">Cronologia notifiche lette</h2>
+                <button type="button" id="history-delete-read" class="btn btn-sm btn-outline-danger mr-2">Elimina tutte le lette</button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-tw-dismiss="modal">Chiudi</button>
             </div>
             <div class="modal-body">

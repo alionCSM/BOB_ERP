@@ -127,7 +127,7 @@ final class NotificationService
                 return;
             }
 
-            $sito  = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
+            $sito  = \App\Service\EmailBob::sito();
             $url   = $sito . ($link !== '' ? $link : '/worksites/my');
             $h     = static fn(string $x): string => htmlspecialchars($x, ENT_QUOTES, 'UTF-8');
             $nome  = trim((string)($u['first_name'] ?? ''));
@@ -137,16 +137,15 @@ final class NotificationService
             $mail = $mailer->getMailer();
             $mail->addAddress((string)$u['email']);
             $mail->Subject = 'BOB – ' . $title;
-            $mail->Body    = '
-                <div style="font-family:Arial,sans-serif;font-size:15px;color:#1E293B;max-width:560px">
-                    <p>' . ($nome !== '' ? 'Buongiorno ' . $h($nome) . ',' : 'Buongiorno,') . '</p>
-                    <p><strong>' . $h($title) . '</strong><br>' . nl2br($h($message)) . '</p>
-                    <p style="margin:24px 0">
-                        <a href="' . $h($url) . '" style="background:#1E40AF;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Apri in BOB</a>
-                    </p>
-                    <p style="color:#64748B;font-size:13px">Consorzio Soluzione Montaggi · BOB<br>
-                    Ricevi questa email perche\' hai accesso a un cantiere in BOB. Altri avvisi arrivano solo dopo che hai letto questo.</p>
-                </div>';
+            $mail->Body    = \App\Service\EmailBob::pagina(
+                $title,
+                '<p style="margin:0 0 12px">' . ($nome !== '' ? 'Buongiorno ' . $h($nome) . ',' : 'Buongiorno,') . '</p>'
+                . '<div style="padding:14px 16px;background:#F8FAFC;border-left:4px solid #1E40AF;border-radius:8px">'
+                . nl2br($h($message)) . '</div>',
+                ['Apri in BOB', $url],
+                'Ricevi questa email perché hai accesso a un cantiere in BOB.<br>'
+                . 'Altri avvisi arrivano solo dopo che hai letto questo.'
+            );
             $mail->AltBody = $title . "\n\n" . $message . "\n\n" . $url;
             $mail->send();
         } catch (\Throwable $e) {

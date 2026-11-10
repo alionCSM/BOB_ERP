@@ -943,10 +943,70 @@ final class UsersController
             if (!empty($target->permissions[$key])) $activeCount++;
         }
 
+        // l'esito di "Reinvia email di benvenuto", una volta sola
+        $benvenuto = $_SESSION['benvenuto'] ?? null;
+        unset($_SESSION['benvenuto']);
+
         Response::view('users/permissions_edit.html.twig', $request, compact(
             'target', 'groups', 'modules', 'activeCount', 'message',
-            'societa', 'societaId', 'moduliSocieta'
+            'societa', 'societaId', 'moduliSocieta', 'benvenuto'
         ));
+    }
+
+    /**
+     * POST /users/permissions/{id}/benvenuto — rimanda l'email di benvenuto.
+     *
+     * Quando il cliente l'ha persa, o e' finita nello spam. La password di
+     * prima non si puo' rimandare (in BOB c'e' solo l'hash): se ne fa una
+     * temporanea nuova e al primo accesso la cambia, come la prima volta.
+     * Se l'email non parte, la password si mostra qui per dettarla.
+     */
+    public function resendWelcome(Request $request): void
+    {
+        $auth = $GLOBALS['authenticated_user'] ?? [];
+        if ((int)($auth['user_id'] ?? 0) !== 1) {
+            Response::error('Accesso negato.', 403);
+        }
+        $id = $request->intParam('id');
+        $st = $this->conn->prepare("
+            SELECT id, username, first_name, last_name, email, access_profile
+            FROM bb_users WHERE id = :id AND removed = 'N'
+        ");
+        $st->execute([':id' => $id]);
+        $u = $st->fetch(\PDO::FETCH_ASSOC);
+        if (!$u || $id === 1) {
+            Response::redirect('/users/permissions');
+        }
+
+        $raw = bin2hex(random_bytes(6));
+        $this->conn->prepare('UPDATE bb_users SET password = :p, must_change_password = 1 WHERE id = :id')
+            ->execute([':p' => password_hash($raw, PASSWORD_DEFAULT), ':id' => $id]);
+
+        $partita = false;
+        $email   = trim((string)($u['email'] ?? ''));
+        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            try {
+                $mailer = new \Mailer();
+                $mailer->setSender('system');
+                $mail = $mailer->getMailer();
+                $mail->addAddress($email);
+                $mail->Subject = 'Il tuo accesso a BOB';
+                $mail->Body    = $this->emailBenvenuto(
+                    (string)$u['first_name'], (string)$u['last_name'], (string)$u['username'],
+                    $raw, (string)($u['access_profile'] ?? '')
+                );
+                $mail->send();
+                $partita = true;
+            } catch (\Exception $e) {
+                error_log('[Benvenuto di nuovo] ' . $e->getMessage());
+            }
+        }
+
+        $_SESSION['benvenuto'] = $partita
+            ? ['ok' => true, 'testo' => "Email di benvenuto rimandata a {$email}, con una password temporanea nuova."]
+            : ['ok' => false, 'testo' => ($email === '' ? 'Questo utente non ha un\'email.' : "L'email a {$email} non è partita.")
+                . ' Password temporanea nuova da comunicargli tu:', 'password' => $raw];
+        Response::redirect("/users/permissions/{$id}");
     }
 
     /**
@@ -1724,9 +1784,7 @@ final class UsersController
         string $nome, string $cognome, string $username, string $password, string $profilo
     ): string {
         $h    = static fn(string $x): string => htmlspecialchars($x, ENT_QUOTES, 'UTF-8');
-        $sito = rtrim((string)($_ENV['APP_URL'] ?? ''), '/');
-        $play = 'https://play.google.com/store/apps/details?id=it.csmontaggi.bob';
-        $ios  = trim((string)($_ENV['APP_STORE_URL'] ?? ''));
+        $sito = \App\Service\EmailBob::sito();
 
         $cosa = match ($profilo) {
             'CLIENT' => 'In BOB trovi i cantieri che seguiamo per te: attività, foto, disegni, '
@@ -1734,29 +1792,23 @@ final class UsersController
             'WORKER' => 'In BOB trovi le tue presenze, i tuoi cantieri, i documenti e le comunicazioni con l\'ufficio.',
             default  => 'BOB è il gestionale del Consorzio Soluzione Montaggi.',
         };
-        $app = '<a href="' . $h($play) . '">Android (Google Play)</a>'
-             . ($ios !== '' ? ' · <a href="' . $h($ios) . '">iPhone (App Store)</a>' : '');
 
-        return '
-            <div style="font-family:Arial,sans-serif;font-size:15px;color:#1E293B;max-width:560px">
-                <p>Buongiorno <strong>' . $h(trim($nome . ' ' . $cognome)) . '</strong>,</p>
-                <p>è stato creato il tuo accesso a <strong>BOB</strong>. ' . $h($cosa) . '</p>
-                <table style="border-collapse:collapse;margin:16px 0">
-                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Indirizzo</td>
-                        <td><a href="' . $h($sito) . '">' . $h($sito) . '</a></td></tr>
-                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Username</td>
-                        <td><strong>' . $h($username) . '</strong></td></tr>
-                    <tr><td style="padding:4px 12px 4px 0;color:#64748B">Password temporanea</td>
-                        <td><strong>' . $h($password) . '</strong></td></tr>
-                </table>
-                <p>Al primo accesso ti chiederemo di scegliere una password tua. Da un dispositivo nuovo
-                potresti ricevere un codice di conferma via email.</p>
-                <p style="margin:24px 0">
-                    <a href="' . $h($sito) . '" style="background:#1E40AF;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Entra in BOB</a>
-                </p>
-                <p>Puoi usare BOB anche dal telefono: ' . $app . '.</p>
-                <p style="color:#64748B;font-size:13px">Per qualsiasi domanda rispondi a questa email o scrivi a
-                <a href="mailto:info@csmontaggi.it">info@csmontaggi.it</a>.<br>Consorzio Soluzione Montaggi · BOB</p>
-            </div>';
+        $corpo = '<p style="margin:0 0 12px">Buongiorno <strong>' . $h(trim($nome . ' ' . $cognome)) . '</strong>,<br>'
+               . 'è stato creato il tuo accesso a BOB. ' . $h($cosa) . '</p>'
+               . \App\Service\EmailBob::dettagli([
+                   'Indirizzo'          => '<a href="' . $h($sito) . '" style="color:#1E40AF">' . $h(preg_replace('~^https?://~', '', $sito)) . '</a>',
+                   'Username'           => '<strong>' . $h($username) . '</strong>',
+                   'Password temporanea' => '<strong style="font-family:Menlo,Consolas,monospace">' . $h($password) . '</strong>',
+               ])
+               . '<p style="margin:0">Al primo accesso ti chiederemo di scegliere una password tua. '
+               . 'Da un dispositivo nuovo potresti ricevere un codice di conferma via email.</p>';
+
+        return \App\Service\EmailBob::pagina(
+            'Il tuo accesso a BOB',
+            $corpo,
+            ['Entra in BOB', $sito],
+            'Per qualsiasi domanda rispondi a questa email.',
+            \App\Service\EmailBob::app()
+        );
     }
 }

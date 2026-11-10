@@ -33,6 +33,37 @@
         }
     }
 
+    async function notificationAction(action, notificationId) {
+        const body = new URLSearchParams({ action: action, notification_id: String(notificationId || 0) });
+        const response = await fetch('/notifications/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Azione notifica fallita');
+        }
+        return data;
+    }
+
+    // Elimina: dalla campanella e dalla cronologia
+    document.addEventListener('click', async function (event) {
+        const delBtn = event.target.closest('.notif-delete');
+        if (!delBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const item = delBtn.closest('[data-id]');
+        if (!item) return;
+        try {
+            await notificationAction('delete', item.getAttribute('data-id'));
+            item.remove();
+            ensureEmptyMessage();
+        } catch (error) {
+            console.error(error);
+        }
+    });
+
     document.addEventListener('click', async function (event) {
         const markBtn = event.target.closest('.notif-mark-read');
         const openLink = event.target.closest('.notif-open');
@@ -212,6 +243,23 @@ async function dismissPriorityModal() {
         const openBtn = document.getElementById('open-history');
         const historyList = document.getElementById('history-list');
 
+        const esc = (v) => {
+            const d = document.createElement('div');
+            d.textContent = v == null ? '' : String(v);
+            return d.innerHTML;
+        };
+        const linkSicuro = (l) => (typeof l === 'string' && l.startsWith('/') && !l.startsWith('//')) ? l : '';
+
+        document.getElementById('history-delete-read')?.addEventListener('click', async function () {
+            if (!confirm('Eliminare tutte le notifiche già lette?')) return;
+            try {
+                await notificationAction('delete_read');
+                loadHistory();
+            } catch (error) {
+                console.error(error);
+            }
+        });
+
         async function loadHistory() {
             historyList.innerHTML = '<div class="text-slate-500">Caricamento...</div>';
 
@@ -230,18 +278,19 @@ async function dismissPriorityModal() {
             historyList.innerHTML = data.notifications.map((n) => {
                 const createdAt = n.created_at ? new Date(n.created_at.replace(' ', 'T')).toLocaleString('it-IT') : '-';
                 const readAt = n.read_at ? new Date(n.read_at.replace(' ', 'T')).toLocaleString('it-IT') : '-';
-                const open = n.link ? `<a href="${n.link}" class="text-blue-600 underline">Apri</a>` : '';
+                const link = linkSicuro(n.link);
+                const open = link ? `<a href="${esc(link)}" class="text-blue-600 underline mr-3">Apri</a>` : '';
                 // la societa' compare solo se la notifica ne porta una
                 const soc = n.societa_codice
-                    ? `<span class="gc-tag" style="background: ${n.societa_colore || '#1e3a5f'}">${n.societa_codice}</span>`
+                    ? `<span class="gc-tag" style="background: ${esc(n.societa_colore || '#1e3a5f')}">${esc(n.societa_codice)}</span>`
                     : '';
                 return `
-                    <div class="border-b py-2">
-                        <div class="font-medium">${n.title || 'Notifica'}${soc}</div>
-                        <div class="text-slate-600">${n.message || ''}</div>
-                        <div class="text-xs text-slate-500 mt-1">Da: ${n.created_by_name || 'Sistema'}</div>
+                    <div class="border-b py-2" data-id="${Number(n.id)}">
+                        <div class="font-medium">${esc(n.title || 'Notifica')}${soc}</div>
+                        <div class="text-slate-600">${esc(n.message || '')}</div>
+                        <div class="text-xs text-slate-500 mt-1">Da: ${esc(n.created_by_name || 'Sistema')}</div>
                         <div class="text-xs text-slate-400 mt-1">Creata: ${createdAt} • Letta: ${readAt}</div>
-                        <div class="mt-1 text-xs">${open}</div>
+                        <div class="mt-1 text-xs">${open}<button type="button" class="notif-delete text-rose-600 underline">Elimina</button></div>
                     </div>
                 `;
             }).join('');

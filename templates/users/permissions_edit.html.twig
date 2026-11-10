@@ -60,6 +60,20 @@
         <button type="submit" class="pe-societa-vai">Cambia</button>
     </form>
 
+    {# Le credenziali: quando l'email di benvenuto si e' persa #}
+    <form method="POST" action="/users/permissions/{{ target.id }}/benvenuto" class="pe-societa" id="pe-benvenuto">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        <label>Accesso</label>
+        <span class="pe-societa-nota">{{ target.email ?: 'nessuna email' }} · rimanda l'email con una password temporanea nuova</span>
+        <button type="submit" class="pe-societa-vai">Reinvia email di benvenuto</button>
+    </form>
+    {% if benvenuto %}
+        <div class="pe-toast" style="{{ benvenuto.ok ? '' : 'background:#fef2f2;border-color:#fecaca;color:#991b1b' }}">
+            {{ benvenuto.testo }}
+            {% if benvenuto.password is defined %}<strong style="font-family:monospace;margin-left:6px">{{ benvenuto.password }}</strong>{% endif %}
+        </div>
+    {% endif %}
+
     {% if message %}
         <div class="pe-toast">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#15803d" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
