@@ -327,9 +327,7 @@ final class AppReleaseController
     /** La pagina di BOB nello store, se non se ne e' scritta un'altra. */
     private static function storeUrl(string $piattaforma): string
     {
-        return $piattaforma === 'ios'
-            ? ''
-            : 'https://play.google.com/store/apps/details?id=it.csmontaggi.bob';
+        return \App\Service\AppStore::per($piattaforma);
     }
 
     /** @return array<int, array<string,mixed>> */

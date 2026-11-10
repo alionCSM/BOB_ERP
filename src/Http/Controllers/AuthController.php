@@ -140,48 +140,10 @@ final class AuthController
 
                             $mail->addAddress($user->email);
                             $mail->Subject = 'Nuovo accesso rilevato - BOB';
-                            $appUrl = rtrim($_ENV['APP_URL'] ?? '', '/');
-
-                            $mail->Body = '
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr><td align="center" style="padding:30px 10px;">
-    <table width="100%" cellpadding="0" cellspacing="0"
-           style="max-width:520px;background:#ffffff;border-radius:10px;box-shadow:0 10px 25px rgba(0,0,0,0.08);">
-        <tr>
-            <td style="padding:20px;text-align:center;border-bottom:1px solid #e5e7eb;">
-                <img src="' . $appUrl . '/includes/template/dist/images/logo.png" alt="BOB" style="height:40px;">
-            </td>
-        </tr>
-        <tr>
-            <td style="padding:30px;color:#1f2937;font-size:14px;line-height:1.6;">
-                <p>Abbiamo rilevato un nuovo tentativo di accesso al tuo account.</p>
-                <p>
-                    <strong>Indirizzo IP:</strong> ' . htmlspecialchars($ip_address) . '<br>
-                    <strong>Dispositivo:</strong> ' . htmlspecialchars($device_info) . '
-                </p>
-                <p>Inserisci questo codice di verifica:</p>
-                <div style="margin:20px 0;padding:15px;background:#f8fafc;border:1px dashed #2563eb;
-                            text-align:center;font-size:28px;font-weight:bold;letter-spacing:6px;
-                            color:#2563eb;border-radius:8px;">
-                    ' . $verifyCode . '
-                </div>
-                <p style="font-size:13px;color:#6b7280;">Codice valido per 10 minuti.</p>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding:15px;text-align:center;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;">
-                BOB
-            </td>
-        </tr>
-    </table>
-</td></tr>
-</table>
-</body>
-</html>';
+                            $mail->Body = \App\Service\EmailBob::codiceAccesso(
+                                (string)($user->first_name ?? ''), $verifyCode, (string)$ip_address,
+                                (string)$device_info, 10, 'nella pagina di accesso'
+                            );
 
                             $mail->send();
                         } catch (\Exception $e) {

@@ -210,13 +210,20 @@ final class Segnalazioni
             $chi[(int)$p['user_id']] = $p;
         }
         if (!isset($chi[(int)$s['created_by']])) {
+            // Chi l'ha aperta la segue anche se non e' fra i ruoli che la
+            // vedono. Ma un cliente tolto dal cantiere, o con la
+            // condivisione spenta, no: prima continuava a ricevere le
+            // risposte, anche per email.
             $st = $this->conn->prepare("
                 SELECT u.id AS user_id, u.lingua, COALESCE(a.ruolo, 'ufficio') AS ruolo,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS nome
-                FROM bb_users u LEFT JOIN bb_zone_accessi a ON a.user_id = u.id AND a.worksite_id = :w
+                FROM bb_users u
+                LEFT JOIN bb_zone_accessi a ON a.user_id = u.id AND a.worksite_id = :w
+                LEFT JOIN bb_worksites w    ON w.id = :w2
                 WHERE u.id = :u
+                  AND (u.type <> 'client' OR (a.user_id IS NOT NULL AND " . Accesso::SQL_CLIENTE_ENTRA . "))
             ");
-            $st->execute([':w' => $w, ':u' => (int)$s['created_by']]);
+            $st->execute([':w' => $w, ':w2' => $w, ':u' => (int)$s['created_by']]);
             if ($p = $st->fetch(PDO::FETCH_ASSOC)) {
                 $chi[(int)$p['user_id']] = ['user_id' => (int)$p['user_id']] + $p;
             }

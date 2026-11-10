@@ -159,6 +159,13 @@ vede_k = lambda: {int(x['id']) for x in chiama(CLI, 'GET', '/segnalazioni')['dat
 verifica(S, 'segnalazione del capo: la vede il cliente (di base tutti)', int(s['id']) in vede_k())
 chiama(UFF, 'POST', f"/segnalazioni/{s['id']}/visibilita", {'visibilita': 'cantiere'})
 verifica(S, "l'ufficio la stringe a ufficio e cantiere: il cliente non la vede più", int(s['id']) not in vede_k())
+sk = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Il cancello resta aperto la sera', 'tipo': 'sicurezza', 'visibilita': 'ufficio'})['data']
+sql("UPDATE bb_worksites SET zone_cliente=0 WHERE id=100"); pulisci_notifiche()
+chiama(UFF, 'POST', f"/segnalazioni/{sk['id']}/messaggi", {'testo': 'Ok, lo chiudiamo noi'})
+verifica(S, 'condivisione spenta: il cliente che aveva aperto la segnalazione non riceve più le risposte', len(notifiche(CLI)) == 0 and len(email('paolo@rossi.it')) == 0, str(notifiche(CLI)))
+sql("UPDATE bb_worksites SET zone_cliente=1 WHERE id=100")
+chiama(UFF, 'POST', f"/segnalazioni/{sk['id']}/messaggi", {'testo': 'Chiuso'})
+verifica(S, '... riaccesa, le riceve di nuovo', len(notifiche(CLI)) == 1, str(notifiche(CLI)))
 
 S = '8. Chi entra dopo'
 pulisci_notifiche()

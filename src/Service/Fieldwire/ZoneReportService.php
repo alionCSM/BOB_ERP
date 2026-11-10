@@ -132,7 +132,7 @@ final class ZoneReportService
 
         $h  = "<html><head><meta charset='utf-8'><style>" . $this->css() . "</style></head><body>";
         $h .= "<div class='testa'><div class='marchio'>Consorzio Soluzione Montaggi · BOB</div>"
-            . "<h1>Rapporto di cantiere</h1>"
+            . "<h1>Riepilogo lavori</h1>"
             . "<div class='cantiere'>{$nome}" . ($codice ? " · {$codice}" : '') . "</div>"
             . (!empty($worksite['riferimento'])
                 ? "<div class='sub'>Riferimento del cliente: " . $e(implode(' · ', array_filter([$worksite['riferimento']['nome'] ?? '', $worksite['riferimento']['codice'] ?? '']))) . "</div>"
@@ -213,7 +213,7 @@ final class ZoneReportService
             $h .= "</table>";
         }
 
-        $h .= "<div class='piede'>Rapporto generato da BOB per il cantiere {$nome}. Contiene solo ciò che "
+        $h .= "<div class='piede'>Riepilogo generato da BOB per il cantiere {$nome}. Contiene solo ciò che "
             . "è condiviso con chi l'ha scaricato.</div>";
         return $h . "</body></html>";
     }

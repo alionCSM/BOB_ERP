@@ -138,6 +138,19 @@ final class NotificationsController
             }
         }
 
+        // Ognuno tiene le notifiche che gli servono e butta le altre: una
+        // alla volta, o tutte quelle gia' lette. Solo le proprie.
+        if ($action === 'delete' && $notificationId > 0) {
+            $this->conn->prepare('DELETE FROM bb_notifications WHERE id = :id AND user_id = :uid')
+                ->execute([':id' => $notificationId, ':uid' => $userId]);
+            Response::json(['success' => true]);
+        }
+        if ($action === 'delete_read') {
+            $st = $this->conn->prepare('DELETE FROM bb_notifications WHERE user_id = :uid AND is_read = 1');
+            $st->execute([':uid' => $userId]);
+            Response::json(['success' => true, 'eliminate' => $st->rowCount()]);
+        }
+
         if ($action !== 'mark_read' || $notificationId <= 0) {
             Response::json(['success' => false, 'message' => 'Parametri non validi'], 422);
         }
