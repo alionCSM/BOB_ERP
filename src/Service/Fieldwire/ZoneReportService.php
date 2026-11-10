@@ -55,7 +55,7 @@ final class ZoneReportService
      * @param callable(array): array    $filtraFoto  quali foto di un'attivita' entrano
      * @param callable(array): bool     $vedeRisposta quali compilazioni entrano
      * @param array<int, array>         $segnalazioni quelle che chi scarica vede
-     * @param string                    $perChi      "Ufficio", "Cliente"... per l'intestazione
+     * @param string                    $perChi      "CSM", "Committente"... per l'intestazione
      */
     public function generate(
         int $worksiteId,
@@ -303,9 +303,9 @@ final class ZoneReportService
         $oggi   = date('Y-m-d');
         $meta   = [];
         $chi = !empty($t['assignee_name']) ? $t['assignee_name'] : match ((string)($t['assegnata_a'] ?? '')) {
-            'ufficio' => "l'ufficio", 'cliente' => 'il cliente', 'persona' => '', default => 'la squadra',
+            'ufficio' => 'CSM', 'cliente' => 'Committente', 'persona' => '', default => 'Squadra',
         };
-        if ($chi !== '') $meta[] = 'Tocca a ' . $e($chi);
+        if ($chi !== '') $meta[] = 'Assegnata a ' . $e($chi);
         if (!empty($t['due_date'])) {
             $tardi  = !in_array($stato, ['complete', 'verified'], true) && substr((string)$t['due_date'], 0, 10) < $oggi;
             $meta[] = ($tardi ? "<b class='rosso'>in ritardo, " : '') . 'scadenza ' . date('d/m/Y', strtotime((string)$t['due_date'])) . ($tardi ? '</b>' : '');

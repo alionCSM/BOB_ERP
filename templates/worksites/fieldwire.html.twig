@@ -474,8 +474,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.report   > 0 %}
                 <details class="bz-rapporto">
                     <summary class="bz-nav-item"><i class="fas fa-file-pdf"></i><span>Riepilogo lavori</span></summary>
-                    <p class="bz-rapporto-spiega">Un riassunto da scaricare o mandare: cosa è stato fatto
-                        (con le foto), cosa resta, segnalazioni, presenze e moduli. Contiene solo ciò che vedi tu.</p>
+                    <p class="bz-rapporto-spiega">Documento riepilogativo da scaricare o inviare: lavori eseguiti
+                        (con foto), lavori da eseguire, segnalazioni, presenze e moduli. Include solo i contenuti visibili al tuo profilo.</p>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=7" target="_blank">Ultima settimana</a>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=30" target="_blank">Ultimi 30 giorni</a>
                     <a href="/worksites/{{ worksite_id }}/zone/report?periodo=tutto" target="_blank">Dall'inizio</a>
@@ -523,14 +523,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         {% if soloAccessi %}
         <div class="bz-fuori">
             <i class="fas fa-user-lock"></i>
-            <h2>Non sei fra chi accede a questo cantiere</h2>
+            <h2>Non risulti tra gli utenti con accesso a questo cantiere</h2>
             <p>
-                Il permesso Zone ti lascia decidere <strong>chi accede</strong> a un
-                cantiere, qui come altrove. Per vedere attività, disegni, file e chat
-                di <strong>questo</strong> cantiere — e per riceverne gli avvisi —
-                devi essere nel suo elenco.
+                Il permesso Zone consente di gestire <strong>chi accede</strong> ai cantieri.
+                Per consultare attività, disegni, file e chat di <strong>questo</strong>
+                cantiere e riceverne le notifiche, è necessario essere inseriti nel relativo elenco.
             </p>
-            <p class="bz-fuori-come">Aggiungiti da “Chi accede”, qui a sinistra.</p>
+            <button type="button" class="bz-fuori-entra" id="bz-fuori-entra">
+                <i class="fas fa-right-to-bracket"></i> Accedi a questo cantiere come CSM
+            </button>
+            <p class="bz-fuori-come">In alternativa, gestisci gli accessi dalla sezione “Chi accede” (icona in alto a sinistra).</p>
         </div>
         {% endif %}
 
@@ -718,7 +720,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             {# Il filo lo legge chi vede l'attivita': noi, il cliente e la
                squadra. Una nota interna la legge solo l'ufficio. #}
             <div class="bz-comment-flags">
-                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo ufficio)</label>
+                <label><input type="checkbox" id="bz-flag-interna"> <i class="fas fa-lock"></i> Nota interna (solo CSM)</label>
             </div>
             {% endif %}
         </div>
@@ -735,16 +737,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <h3>Nuova attività</h3>
 
         <div class="bz-modal-field">
-            <label>Cosa c'è da fare *</label>
+            <label>Titolo *</label>
             <input type="text" id="task-name" maxlength="200" placeholder="Es. Montare i correnti della corsia A">
         </div>
         <div class="bz-modal-field">
-            <label>Dettagli</label>
+            <label>Descrizione</label>
             <textarea id="task-desc" rows="2" placeholder="Misure, materiale, avvertenze…"></textarea>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Dove in cantiere</label>
+                <label>Posizione</label>
                 <input type="text" id="task-luogo" maxlength="160" placeholder="Es. Campata 3, livello 2">
                 <div class="bz-task-punto" id="task-punto-box" hidden>
                     <select id="task-disegno"></select>
@@ -753,7 +755,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 </div>
             </div>
             <div class="bz-modal-field">
-                <label>Tipo</label>
+                <label>Categoria</label>
                 <input type="text" id="task-cat" list="task-tipi">
                 <datalist id="task-tipi">
                     <option value="Montaggio"><option value="Smontaggio"><option value="Modifica">
@@ -765,7 +767,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <div class="bz-task-sez">Chi e quando</div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>A chi tocca</label>
+                <label>Assegna a</label>
                 <select id="task-assignee"><option value="">— la squadra in cantiere —</option></select>
             </div>
             <div class="bz-modal-field">
@@ -788,7 +790,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
 
-        <div class="bz-task-sez">Passaggi <span>facoltativi: si spuntano mentre si lavora</span></div>
+        <div class="bz-task-sez">Passaggi <span>facoltativi, da spuntare durante il lavoro</span></div>
         <ul class="bz-task-passi" id="task-passi"></ul>
         <div class="bz-task-passo-nuovo">
             <input type="text" id="task-passo" maxlength="200" placeholder="Aggiungi un passaggio e premi Invio">
@@ -823,7 +825,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         <h3>Modifica attività</h3>
         <input type="hidden" id="edit-task-id">
         <div class="bz-modal-field">
-            <label>Nome *</label>
+            <label>Titolo *</label>
             <input type="text" id="edit-task-name">
         </div>
         <div class="bz-modal-field">
@@ -832,17 +834,17 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Dove in cantiere</label>
+                <label>Posizione</label>
                 <input type="text" id="edit-task-luogo" maxlength="160">
             </div>
             <div class="bz-modal-field">
-                <label>Tipo</label>
+                <label>Categoria</label>
                 <input type="text" id="edit-task-cat" list="task-tipi">
             </div>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Assegnato a</label>
+                <label>Assegna a</label>
                 <select id="edit-task-assignee">
                     <option value="">— nessuno —</option>
                 </select>
@@ -854,7 +856,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
-                <label>Data inizio</label>
+                <label>Inizio</label>
                 <input type="date" id="edit-task-start">
             </div>
             <div class="bz-modal-field">
@@ -917,8 +919,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <div id="bz-rif-modal" class="bz-overlay hidden">
     <div class="bz-modal" style="width:440px">
         <h3>Il tuo riferimento</h3>
-        <p class="acc-intro">Come chiamate voi questo cantiere. Lo vedete accanto al nostro nome, nell'elenco
-            dei cantieri e nel rapporto; lo vede anche il nostro ufficio.</p>
+        <p class="acc-intro">Il nome o il codice con cui identificate questo cantiere. Viene mostrato accanto al nome del cantiere,
+            nell'elenco dei cantieri e nel riepilogo lavori; è visibile anche a CSM.</p>
         <div class="bz-modal-field"><label>Nome</label><input id="bz-rif-nome" maxlength="120" placeholder="Es. Hub Nord fase 2"></div>
         <div class="bz-modal-field"><label>Codice commessa</label><input id="bz-rif-codice" maxlength="60" placeholder="Es. CO-2026-114"></div>
         <div class="bz-modal-actions">
@@ -931,7 +933,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <div id="bz-chi-modal" class="bz-overlay hidden">
     <div class="bz-modal">
         <h3>Chi la vede</h3>
-        <p class="bz-chi-nota">L'ufficio vede tutto. Qui si spunta chi altro la vede.</p>
+        <p class="bz-chi-nota">CSM ha sempre accesso. Seleziona gli altri utenti autorizzati.</p>
         <div id="bz-chi-corpo"></div>
         <div class="bz-modal-actions">
             <button class="bz-modal-cancel" id="bz-chi-annulla">Annulla</button>
@@ -972,6 +974,25 @@ function mostraRif() {
     }
 }
 document.addEventListener('DOMContentLoaded', mostraRif);
+// Chi ha il permesso Zone ma non e' nell'elenco: si aggiunge come CSM con
+// un clic e la pagina si riapre con tutto il cantiere.
+document.getElementById('bz-fuori-entra')?.addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+        const corpo = new URLSearchParams({ user_id: IO, ruolo: 'ufficio', _csrf: CSRF });
+        const r = await fetch('/worksites/' + WID + '/zone/accessi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': CSRF },
+            body: corpo,
+        }).then(x => x.json());
+        if (r && (r.ok || r.success)) { location.reload(); return; }
+        alert((r && (r.error || r.message)) || 'Impossibile completare l\'operazione.');
+    } catch (_) {
+        alert('Impossibile completare l\'operazione.');
+    }
+    b.disabled = false;
+});
 document.addEventListener('click', async e => {
     if (e.target.closest('#bz-rif-annulla') || e.target.id === 'bz-rif-modal') {
         document.getElementById('bz-rif-modal').classList.add('hidden'); return;
@@ -999,12 +1020,12 @@ document.addEventListener('click', async e => {
    server (FieldwireController::pretendeStato), cosi' non si disegnano
    bottoni che poi rispondono di no. */
 const GRUPPO_TASK = { squadra: 'cantiere', capi: 'cantiere', cantiere: 'cantiere', cliente: 'cliente', ufficio: 'ufficio' };
-const TOCCA_A     = { squadra: 'la squadra in cantiere', capi: 'la squadra in cantiere', cantiere: 'la squadra in cantiere',
-                      ufficio: 'il nostro ufficio', cliente: 'il cliente' };
+const TOCCA_A     = { squadra: 'Squadra', capi: 'Squadra', cantiere: 'Squadra',
+                      ufficio: 'CSM', cliente: RUOLO === 'cliente' ? 'Noi' : 'Cliente' };
 /* A chi tocca, in parole: la persona per nome, o il gruppo. */
 function chiCe(t) {
     if (Number(t.assignee_user_id) > 0) return String(t.assignee_name || 'una persona').replace(/ · .*$/, '');
-    return TOCCA_A[t.assegnata_a || 'squadra'] || 'la squadra in cantiere';
+    return TOCCA_A[t.assegnata_a || 'squadra'] || 'Squadra';
 }
 function taskMio(t)      { return Number(t.created_by) === Number(IO); }
 function taskModifica(t) { return DA_UFFICIO || taskMio(t); }
@@ -1045,16 +1066,17 @@ function chiTesto(riga) {
     const con   = Array.isArray(riga) ? riga : ((riga && riga.condivisa_con) || []);
     const parti = Array.isArray(riga) ? [] : ((riga && riga.condivisa_parti) || []);
     const sq = parti.includes('cantiere'), cl = parti.includes('cliente');
-    let t = sq && cl ? 'Tutti' : sq ? 'Ufficio e squadra' : cl ? 'Ufficio e cliente' : '';
+    // il cliente legge "noi": "CSM e cliente" gli faceva cercare un altro cliente
+    let t = sq && cl ? 'Tutti' : sq ? 'CSM e squadra' : cl ? (RUOLO === 'cliente' ? 'CSM e noi' : 'CSM e cliente') : '';
     if (con.length) t += (t ? ' + ' : '') + con.length + (con.length === 1 ? ' persona' : ' persone');
-    return t || 'Solo ufficio';
+    return t || 'Solo CSM';
 }
 function chiBadge(riga) {
     if (!DA_UFFICIO) return '';
     const t = chiTesto(riga);
     if (t === 'Tutti') return '';   // il caso normale non ha bisogno di bollino
-    const solo = t === 'Solo ufficio';
-    return `<span class="bz-vis-badge ${solo ? 'solo' : 'muto'}" title="Chi la vede oltre all'ufficio">`
+    const solo = t === 'Solo CSM';
+    return `<span class="bz-vis-badge ${solo ? 'solo' : 'muto'}" title="Chi la vede oltre a CSM">`
          + `<i class="fas ${solo ? 'fa-lock' : 'fa-user-check'}"></i> ${escHtml(t)}</span>`;
 }
 
@@ -1075,7 +1097,7 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
     const pan = document.getElementById('bz-chi-modal');
     const box = document.getElementById('bz-chi-corpo');
     chiAperto = { tipo, oggetto, onSalva };
-    box.innerHTML = '<p class="bz-chi-vuoto">Carico…</p>';
+    box.innerHTML = '<p class="bz-chi-vuoto">Caricamento…</p>';
     pan.classList.remove('hidden');
 
     let persone = [];
@@ -1084,7 +1106,7 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
     let parti = scelteParti ?? ['cantiere', 'cliente'];
     if (oggetto) {
         const r = await api(`/worksites/${WID}/zone/condivisione?tipo=${tipo}&oggetto=${oggetto}`);
-        if (!r.ok) { box.innerHTML = `<p class="bz-chi-vuoto">${escHtml(r.error || 'Non riesco a leggere')}</p>`; return; }
+        if (!r.ok) { box.innerHTML = `<p class="bz-chi-vuoto">${escHtml(r.error || 'Impossibile caricare i dati.')}</p>`; return; }
         const d = r.data || r;
         persone = (d.gruppi || []).flatMap(g => g.persone.map(x => ({ ...x, ruolo: g.ruolo })));
         if (!scelte) con = d.con || [];
@@ -1099,19 +1121,18 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
     // con "il cliente" prima che il cliente entri vuol dire che appena
     // entra lo trova.
     const gruppi = [
-        { ruolo: 'cantiere', titolo: 'La squadra in cantiere' },
-        { ruolo: 'cliente',  titolo: 'Il cliente' },
+        { ruolo: 'cantiere', titolo: 'Squadra' },
+        { ruolo: 'cliente',  titolo: RUOLO === 'cliente' ? 'Noi' : 'Cliente' },
     ].map(g => ({ ...g, persone: persone.filter(x => x.ruolo === g.ruolo) }));
 
     const dentro = new Set(con.map(Number));
-    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">L'ufficio vede sempre tutto.</p>`
-      + gruppi.map(g => {
+    box.innerHTML = gruppi.map(g => {
         const tutta = parti.includes(g.ruolo);
         return `
         <div class="bz-chi-gruppo">
             <label class="bz-chi-titolo" style="cursor:pointer">
                 <span><input type="checkbox" class="bz-chi-parte" data-parte="${g.ruolo}" ${tutta ? 'checked' : ''}>
-                    ${escHtml(g.titolo)} <em style="font-weight:400">— tutti, anche chi entra dopo</em></span>
+                    ${escHtml(g.titolo)} <em style="font-weight:400">— tutti, inclusi gli utenti aggiunti in seguito</em></span>
             </label>
             ${g.persone.length ? g.persone.map(pr => `
                 <label class="bz-chi-riga">
@@ -1120,7 +1141,7 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
                     <span>${escHtml(pr.nome)}</span>
                     ${pr.azienda ? `<em>${escHtml(pr.azienda)}</em>` : ''}
                 </label>
-            `).join('') : `<p class="bz-chi-vuoto" style="text-align:left">Nessuno per ora.</p>`}
+            `).join('') : `<p class="bz-chi-vuoto" style="text-align:left">Nessun utente.</p>`}
         </div>`;
       }).join('');
 }
@@ -1524,22 +1545,22 @@ async function openTask(id) {
                     </button>`).join('')}
             </div>
             ${taskAvanza(task) ? '' : `<div style="font-size:11px;color:#64748b;margin-top:6px">${task.status === 'verified'
-                ? "Verificata dall'ufficio."
+                ? "Verificata da CSM."
                 : "La porta avanti la persona o il gruppo a cui è assegnata."}</div>`}
         </div>
 
         <div class="bz-detail-section">
             <div class="bz-detail-section-title">Dettagli</div>
             <dl class="bz-dati">
-                <dt><i class="fas fa-user"></i> Tocca a</dt><dd>${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
+                <dt><i class="fas fa-user"></i> Assegnata a</dt><dd>${escHtml(task.assignee_user_id || task.assegnata_a === 'persona'
                     ? (task.assignee_name || 'una persona')
-                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'la squadra in cantiere'))}</dd>
-                ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Dove</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
-                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Sul disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
+                    : (TOCCA_A[task.assegnata_a || 'squadra'] || 'Squadra'))}</dd>
+                ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Posizione</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
+                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
                 ${Number(task.priority) > 0 ? `<dt><i class="fas fa-flag"></i> Priorità</dt><dd class="${Number(task.priority) > 1 ? 'urgente' : 'alta'}">${Number(task.priority) > 1 ? 'Urgente' : 'Alta'}</dd>` : ''}
                 ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
                 ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
-                ${task.category ? `<dt><i class="fas fa-tag"></i> Tipo</dt><dd>${escHtml(task.category)}</dd>` : ''}
+                ${task.category ? `<dt><i class="fas fa-tag"></i> Categoria</dt><dd>${escHtml(task.category)}</dd>` : ''}
                 <dt><i class="fas fa-clock"></i> Creata</dt><dd>${fmtDate(task.created_at)}</dd>
             </dl>
             ${task.description ? `<p class="bz-dati-desc">${escHtml(task.description)}</p>` : ''}
@@ -1650,7 +1671,7 @@ async function deleteComment(taskId, commentId) {
 }
 
 async function deleteTask(taskId) {
-    if (!confirm('Eliminare questa attività? Si perdono anche messaggi, foto e checklist.')) return;
+    if (!confirm('Eliminare questa attività? Verranno eliminati anche messaggi, foto e checklist.')) return;
     const res = await api(`/worksites/${WID}/zone/tasks/${taskId}/delete`, { method: 'POST' });
     if (res.ok) {
         allTasks = allTasks.filter(t => t.id != taskId);
@@ -1755,9 +1776,9 @@ async function loadBobUsers() {
         // in particolare. Ufficio e cliente li assegna solo l'ufficio.
         // "i capi squadra" non c'e' piu': erano le stesse persone della
         // squadra. Il cliente chiede prima di tutto all'ufficio.
-        const squadra = '<option value="">— la squadra in cantiere —</option>';
-        const ufficio = '<option value="@ufficio">— il nostro ufficio —</option>';
-        const cliente = '<option value="@cliente">— il cliente —</option>';
+        const squadra = '<option value="">Squadra</option>';
+        const ufficio = '<option value="@ufficio">CSM</option>';
+        const cliente = '<option value="@cliente">Cliente</option>';
         const gruppi = RUOLO === 'cliente' ? ufficio + squadra
                      : DA_UFFICIO ? squadra + ufficio + cliente
                      : squadra + ufficio;
@@ -1855,7 +1876,7 @@ function dzIconGlyph(type) {
 function renderDisegni(items, fwReady) {
     const grid = document.getElementById('bz-disegni-grid');
     if (!items.length) {
-        grid.innerHTML = '<div class="bz-dz-empty">Nessun disegno. Carica la prima tavola.</div>';
+        grid.innerHTML = '<div class="bz-dz-empty">Nessun disegno caricato.</div>';
         return;
     }
     grid.innerHTML = items.map(d => `
@@ -1869,7 +1890,7 @@ function renderDisegni(items, fwReady) {
             ${DA_UFFICIO
                 ? `<div class="bz-dz-meta">${chiBottone('disegno', d.id, d)}</div>
                    <div class="bz-dz-versioni">
-                     <label class="bz-dz-btn" title="Carica una versione aggiornata: quella di adesso resta nello storico">
+                     <label class="bz-dz-btn" title="Carica una versione aggiornata. La versione attuale resta nello storico.">
                        <i class="fas fa-arrow-up-from-bracket"></i> Nuova versione
                        <input type="file" hidden accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg" data-nuova-versione="${d.id}">
                      </label>
@@ -1879,7 +1900,7 @@ function renderDisegni(items, fwReady) {
                 : ''}
             ${d.fw_synced ? '<div class="bz-dz-fw-badge"><i class="fas fa-check-circle"></i> Su Fieldwire</div>' : ''}
             ${d.is_dwg && d.dwg_status === 'pending' ? '<div class="bz-dz-meta"><i class="fas fa-spinner bz-spin"></i> Conversione DWG in corso…</div>' : ''}
-            ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG fallita</div>' : ''}
+            ${d.is_dwg && d.dwg_status === 'error' ? '<div class="bz-dz-meta" style="color:#fca5a5;">Conversione DWG non riuscita</div>' : ''}
             <div class="bz-dz-actions">
                 ${d.annotatable
                     ? (puoScrivere('disegni')
@@ -1928,7 +1949,7 @@ async function uploadDisegno(file) {
     const res = await api(`/worksites/${WID}/disegni/upload`, { method: 'POST', body: fd });
     if (!res.ok) {
         document.getElementById('dz-uploading')?.remove();
-        alert('Errore upload: ' + (res.error || 'sconosciuto'));
+        alert('Errore di caricamento: ' + (res.error || 'sconosciuto'));
         return;
     }
     disegniLoaded = false;
@@ -2027,7 +2048,7 @@ async function loadMedia() {
 function openLightbox(src, caption, taskId) {
     document.getElementById('bz-lb-img').src = src;
     const cap = document.getElementById('bz-lb-caption');
-    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">apri attività →</a>` : '');
+    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">Apri attività</a>` : '');
     document.getElementById('bz-lightbox').classList.add('open');
 }
 function closeLightbox() { document.getElementById('bz-lightbox').classList.remove('open'); }
@@ -2106,7 +2127,7 @@ function renderFiles(files) {
     const list = document.getElementById('bz-files-list');
     const title = document.getElementById('bz-files-title');
     title.textContent = 'File' + (curFolder ? '' : ' — tutti');
-    if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file qui. Carica il primo.</div>'; return; }
+    if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file presente.</div>'; return; }
     const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
     list.innerHTML = files.map(f => {
         const viewable = canView(f.file_type);
@@ -2133,7 +2154,7 @@ async function createFolder() {
     loadFiles();
 }
 async function deleteFolder(id) {
-    if (!confirm('Eliminare la cartella? I file dentro tornano in "Tutti i file".')) return;
+    if (!confirm('Eliminare la cartella? I file contenuti verranno spostati in "Tutti i file".')) return;
     await api(`/worksites/${WID}/zone/files/folder/${id}/delete`, { method:'POST' });
     if (curFolder == id) curFolder = null;
     loadFiles();
@@ -2145,7 +2166,7 @@ async function uploadFile(file) {
     if (curFolder) fd.append('folder_id', curFolder);
     const res = await api(`/worksites/${WID}/zone/files`, { method:'POST', body: fd });
     if (res.ok) loadFiles();
-    else alert('Errore upload: ' + (res.error || 'sconosciuto'));
+    else alert('Errore di caricamento: ' + (res.error || 'sconosciuto'));
 }
 async function deleteFile(id) {
     if (!confirm('Eliminare questo file?')) return;
@@ -2564,7 +2585,7 @@ async function convertDwg(docId, btn) {
     if (res.ok && res.data?.status === 'ok') {
         disegniLoaded = false; loadDisegni();
     } else {
-        alert('Conversione DWG fallita: ' + (res.data?.error || res.error || 'errore'));
+        alert('Conversione DWG non riuscita: ' + (res.data?.error || res.error || 'errore'));
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync"></i> Converti'; }
     }
 }
@@ -2709,7 +2730,7 @@ async function loadPresenze(data = null) {
         const giorni = (g.data || g || []);
         if (!giorni.length) {
             colonna.innerHTML = '';
-            corpo.innerHTML = '<div class="bz-empty">Su questo cantiere non c\'e\' ancora nessuna presenza registrata.</div>';
+            corpo.innerHTML = '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `
@@ -2728,7 +2749,7 @@ async function loadPresenze(data = null) {
     corpo.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
     const r = await api(`/worksites/${WID}/zone/presenze?data=${encodeURIComponent(presGiorno)}`);
     if (!r.ok) {
-        corpo.innerHTML = `<div class="bz-empty">${escHtml(r.error || 'Non riesco a leggere le presenze')}</div>`;
+        corpo.innerHTML = `<div class="bz-empty">${escHtml(r.error || 'Impossibile caricare le presenze.')}</div>`;
         return;
     }
     const d = r.data || r;
@@ -2762,7 +2783,7 @@ async function loadPresenze(data = null) {
                 </div>
                 <div class="v">
                     <span class="n">${numIt(d.totali.nostri)}</span>
-                    <span class="l">nostre</span>
+                    <span class="l">CSM</span>
                 </div>
                 <div class="v">
                     <span class="n">${numIt(d.totali.consorziate)}</span>
@@ -2772,7 +2793,7 @@ async function loadPresenze(data = null) {
             </div>` : ''}
         ${nostri ? `
             <div class="bz-pres-sez">
-                <h4>I nostri</h4>
+                <h4>Personale CSM</h4>
                 <table class="bz-pres-tab">
                     <thead><tr><th>Nome</th><th>Azienda</th><th>Turno</th></tr></thead>
                     <tbody>${nostri}</tbody>
@@ -2786,7 +2807,7 @@ async function loadPresenze(data = null) {
                     <tbody>${cons}</tbody>
                 </table>
             </div>` : ''}
-        ${!nostri && !cons ? '<div class="bz-empty">Nessuno in cantiere questo giorno.</div>' : ''}
+        ${!nostri && !cons ? '<div class="bz-empty">Nessuna presenza registrata in questa data.</div>' : ''}
     `;
 }
 
@@ -2932,6 +2953,12 @@ if (!SOLO_ACCESSI) {
 .bz-fuori p { font-size:13.5px; line-height:1.65; color:#94a3b8; margin:0 0 10px; }
 .bz-fuori strong { color:#cbd5e1; font-weight:600; }
 .bz-fuori-come { font-size:12.5px; color:#64748b; }
+/* il permesso Zone da solo non fa entrare: un clic per aggiungersi, invece
+   di cercare l'icona di "Chi accede" */
+.bz-fuori .bz-fuori-entra { margin:10px 0 16px; padding:11px 20px; border:0; border-radius:10px; background:#1e40af; color:#fff;
+    font-size:14px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+.bz-fuori .bz-fuori-entra i { font-size:14px; color:#fff; margin:0; display:inline; }
+.bz-fuori .bz-fuori-entra:disabled { opacity:.6; cursor:default; }
 .bz-body.solo-accessi .bz-view { display:none !important; }
 [data-theme="light"] .bz-fuori h2 { color:#1e293b; }
 [data-theme="light"] .bz-fuori strong { color:#334155; }

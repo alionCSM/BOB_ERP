@@ -42,7 +42,7 @@
     <div class="mc-testa">
         <div>
             <h2>{{ t('menu_cantieri') }}</h2>
-            <p>{{ worksites|length }} {{ worksites|length == 1 ? 'cantiere' : 'cantieri' }} · attività, foto, disegni, documenti e chat con il nostro ufficio</p>
+            <p>{{ worksites|length }} {{ worksites|length == 1 ? 'cantiere' : 'cantieri' }} · attività, foto, disegni, documenti e chat con CSM</p>
         </div>
         {% if worksites|length > 3 %}
             <input type="search" class="mc-cerca" id="mc-cerca" placeholder="Cerca per nome, codice o luogo…">
@@ -56,7 +56,7 @@
     {% if worksites is empty %}
         <div class="mc-vuoto">
             <h3>Nessun cantiere per ora</h3>
-            <p>Quando il nostro ufficio condivide un cantiere con te, lo trovi qui e ricevi un'email.
+            <p>Quando CSM condivide un cantiere con te, lo trovi qui e ricevi un'email.
                Per qualsiasi dubbio scrivi a <a href="mailto:info@csmontaggi.it">info@csmontaggi.it</a>.</p>
         </div>
     {% else %}

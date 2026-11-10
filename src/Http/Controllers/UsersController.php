@@ -1788,7 +1788,7 @@ final class UsersController
 
         $cosa = match ($profilo) {
             'CLIENT' => 'In BOB trovi i cantieri che seguiamo per te: attività, foto, disegni, '
-                      . 'documenti, moduli e la chat con il nostro ufficio e la squadra.',
+                      . 'documenti, moduli e la chat con CSM e la squadra.',
             'WORKER' => 'In BOB trovi le tue presenze, i tuoi cantieri, i documenti e le comunicazioni con l\'ufficio.',
             default  => 'BOB è il gestionale del Consorzio Soluzione Montaggi.',
         };

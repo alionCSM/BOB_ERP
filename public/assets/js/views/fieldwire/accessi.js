@@ -35,7 +35,7 @@
     const SPIEGA = {
         ufficio:  'vede tutto il cantiere, decide chi vede cosa e chi entra',
         cantiere: 'porta avanti le attività della squadra, carica foto e file, compila i suoi moduli',
-        cliente:  'vede ciò che è condiviso col cliente, apre attività per l\'ufficio, scrive e carica',
+        cliente:  'vede ciò che è condiviso col cliente, apre attività per CSM, scrive e carica',
     };
     const COLORE = { ufficio: '#1e40af', cantiere: '#0f766e', cliente: '#7c3aed' };
 
@@ -98,7 +98,7 @@
         } else if (spunta.checked) {
             t = 'Entrano: <b>' + clienti.map(esc).join(', ') + '</b>. Vedono ciò che è condiviso col cliente e ricevono gli avvisi per email.';
         } else {
-            t = 'Spento: ' + clienti.map(esc).join(', ') + ' non entrano ancora. Accendilo quando il cantiere è pronto da mostrare.';
+            t = 'Accesso clienti disattivato: ' + clienti.map(esc).join(', ') + ' non hanno ancora accesso. Attivalo quando il cantiere è pronto per essere condiviso.';
         }
         if (!cliente) {
             t = 'Questo cantiere non ha un cliente in anagrafica: nessun account cliente può entrare.';

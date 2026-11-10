@@ -25,9 +25,10 @@
     // voci con dentro le stesse persone, e cambiare una segnalazione a
     // "squadra" rispondeva "visibilita' non valida".
     const VIS = {
-        ufficio:  { icon: 'fa-lock',      label: 'Solo ufficio',        color: '#f87171' },
-        cantiere: { icon: 'fa-hard-hat',  label: 'Ufficio e cantiere',  color: '#94a3b8' },
-        cliente:  { icon: 'fa-handshake', label: 'Ufficio e cliente',   color: '#a78bfa' },
+        ufficio:  { icon: 'fa-lock',      label: 'Solo CSM',            color: '#f87171' },
+        cantiere: { icon: 'fa-hard-hat',  label: 'CSM e cantiere',      color: '#94a3b8' },
+        // il cliente legge "noi", non "cliente"
+        cliente:  { icon: 'fa-handshake', label: typeof RUOLO !== 'undefined' && RUOLO === 'cliente' ? 'CSM e noi' : 'CSM e cliente', color: '#a78bfa' },
         tutti:    { icon: 'fa-globe',     label: 'Tutti',               color: '#4ade80' },
     };
     // le parole vecchie salvate nel database
@@ -64,22 +65,22 @@
     // non gli diceva con chi stava parlando.
     const PER_CLIENTE = typeof RUOLO !== 'undefined' && RUOLO === 'cliente';
     const CANALI = PER_CLIENTE ? {
-        cliente: { label: 'Ufficio',             icon: 'fa-handshake', desc: 'Tu e il nostro ufficio. La squadra non la legge.' },
-        tutti:   { label: 'Tutto il cantiere',   icon: 'fa-users',     desc: 'Tu, il nostro ufficio e la squadra in cantiere.' },
+        cliente: { label: 'CSM',                 icon: 'fa-handshake', desc: 'Tu e CSM. La squadra non la legge.' },
+        tutti:   { label: 'Tutto il cantiere',   icon: 'fa-users',     desc: 'Tu, CSM e la squadra in cantiere.' },
     } : {
-        squadra: { label: 'Squadra', icon: 'fa-hard-hat',  desc: 'Ufficio e chi lavora in cantiere. Il cliente non la vede.' },
-        cliente: { label: 'Cliente', icon: 'fa-handshake', desc: 'Ufficio e committente. La squadra non la vede.' },
-        tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'Ufficio, squadra e committente insieme.' },
+        squadra: { label: 'Squadra', icon: 'fa-hard-hat',  desc: 'CSM e chi lavora in cantiere. Il cliente non la vede.' },
+        cliente: { label: 'Cliente', icon: 'fa-handshake', desc: 'CSM e committente. La squadra non la vede.' },
+        tutti:   { label: 'Tutti',   icon: 'fa-users',     desc: 'CSM, squadra e committente insieme.' },
     };
     const RAPIDI = {
-        materiale_arrivato: 'Materiale arrivato',
-        serve_materiale:    'Serve materiale',
-        finito_oggi:        'Finito per oggi',
-        arrivati:           'Siamo arrivati in cantiere',
-        ritardo:            'Siamo in ritardo',
-        pausa_meteo:        'Fermi per il meteo',
-        serve_aiuto:        'Serve aiuto',
-        ok:                 'Ok, ricevuto',
+        materiale_arrivato: 'Materiale consegnato',
+        serve_materiale:    'Richiesta materiale',
+        finito_oggi:        'Lavori della giornata terminati',
+        arrivati:           'Squadra arrivata in cantiere',
+        ritardo:            'Lavori in ritardo',
+        pausa_meteo:        'Lavori sospesi per maltempo',
+        serve_aiuto:        'Richiesta supporto',
+        ok:                 'Ricevuto',
         sys_presa:          'Presa in carico da {autore}',
         sys_risolta:        'Risolta da {autore}',
         sys_aperta:         'Riaperta da {autore}',
@@ -127,7 +128,7 @@
         }
         const azioni = [];
         if (!m.eliminato) {
-            azioni.push(`<button class="att" data-bzd-letto="${m.id}" title="Chi l'ha letto"><i class="fas fa-eye"></i></button>`);
+            azioni.push(`<button class="att" data-bzd-letto="${m.id}" title="Letto da"><i class="fas fa-eye"></i></button>`);
             if (puoFissare) {
                 azioni.push(`<button class="att" data-bzd-fissa="${m.id}" data-si="${m.fissato ? 0 : 1}" title="${m.fissato ? 'Togli dagli avvisi' : 'Fissa come avviso'}"><i class="fas fa-thumbtack"></i></button>`);
             }
@@ -135,7 +136,7 @@
                 azioni.push(`<button class="att" data-bzd-elimina="${m.id}" title="Elimina"><i class="fas fa-trash"></i></button>`);
             }
         }
-        const cliente = m.autore_tipo === 'client' ? ' · cliente' : '';
+        const cliente = m.autore_tipo === 'client' && !PER_CLIENTE ? ' · cliente' : '';
         return `
             <div class="bzd-msg ${m.mio ? 'mio' : ''} ${m.fissato ? 'fisso' : ''}" data-mid="${m.id}">
                 ${m.mio ? '' : `<div class="chi">${esc(m.autore || 'BOB')}${cliente}</div>`}
@@ -194,13 +195,13 @@
                     </div>
                     <div class="bzd-lista-body"></div>
                 </div>
-                <div class="bzd-dett"><div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Scegli una segnalazione, o segnala un problema.</div></div>`;
+                <div class="bzd-dett"><div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Seleziona una segnalazione o creane una nuova.</div></div>`;
             lista = root.querySelector('.bzd-lista');
         }
         root.querySelectorAll('[data-bzd-filtro]').forEach(b => b.classList.toggle('on', b.dataset.bzdFiltro === S.filtro));
         lista.querySelector('.bzd-lista-body').innerHTML = vis.length
             ? vis.map(card).join('')
-            : `<div class="bzd-vuoto"><i class="fas fa-circle-check"></i>${S.filtro === 'aperte' ? 'Niente da chiudere.' : 'Nessuna segnalazione.'}</div>`;
+            : `<div class="bzd-vuoto"><i class="fas fa-circle-check"></i>${S.filtro === 'aperte' ? 'Nessuna segnalazione aperta.' : 'Nessuna segnalazione.'}</div>`;
     }
 
     function formNuova() {
@@ -214,9 +215,9 @@
         dett.innerHTML = `
             <div class="bzd-form">
                 <h3><i class="fas fa-triangle-exclamation"></i> Nuova segnalazione</h3>
-                <label>Che problema è</label>${scelte('tipo', TIPI, S.nuova.tipo)}
-                <label>Quanto è grave</label>${scelte('gravita', GRAVITA, S.nuova.gravita)}
-                <label>Cosa succede</label>
+                <label>Categoria</label>${scelte('tipo', TIPI, S.nuova.tipo)}
+                <label>Gravità</label>${scelte('gravita', GRAVITA, S.nuova.gravita)}
+                <label>Descrizione</label>
                 <textarea id="bzd-nuova-testo" placeholder="Es. manca la bulloneria M12 per la campata 4"></textarea>
                 <label>Foto (facoltative)</label>
                 <input type="file" id="bzd-nuova-foto" accept="image/*" multiple>
@@ -266,7 +267,7 @@
         const gest = r.data.puo_gestire;
         const azioni = [];
         if (gest) {
-            if (s.stato === 'aperta') azioni.push('<button class="bzd-btn blu" data-bzd-stato="presa"><i class="fas fa-hand"></i> Prendo in carico</button>');
+            if (s.stato === 'aperta') azioni.push('<button class="bzd-btn blu" data-bzd-stato="presa"><i class="fas fa-hand"></i> Prendi in carico</button>');
             if (s.stato !== 'risolta') azioni.push('<button class="bzd-btn verde" data-bzd-stato="risolta"><i class="fas fa-check"></i> Risolta</button>');
             if (s.stato === 'risolta') azioni.push('<button class="bzd-btn" data-bzd-stato="aperta"><i class="fas fa-rotate-left"></i> Riapri</button>');
             if (!s.task_id) azioni.push('<button class="bzd-btn" data-bzd-attivita><i class="fas fa-list-check"></i> Crea attività</button>');
@@ -360,7 +361,7 @@
                 ${fissati && fissati.length ? `<div class="bzd-fissati">${fissati.map(f => `
                     <div class="bzd-fissato"><i class="fas fa-thumbtack"></i><span class="chi">${esc(f.autore || '')}</span>
                     <span>${f.rapido ? esc(RAPIDI[f.rapido] || f.rapido) : ''} ${esc(f.testo || (f.ha_foto ? 'Foto' : ''))}</span></div>`).join('')}</div>` : ''}
-                <div class="bzd-msgs">${messaggi.map(m => rigaMessaggio(m, C.puoFissare)).join('') || '<div class="bzd-vuoto">Ancora nessun messaggio.</div>'}</div>
+                <div class="bzd-msgs">${messaggi.map(m => rigaMessaggio(m, C.puoFissare)).join('') || '<div class="bzd-vuoto">Nessun messaggio.</div>'}</div>
                 <div class="bzd-rapidi"${PER_CLIENTE ? ' hidden' : ''}>${Object.keys(RAPIDI).filter(k => !k.startsWith('sys_')).map(k => `<button data-bzd-rapido="${k}">${esc(RAPIDI[k])}</button>`).join('')}</div>
                 <div class="bzd-scrivi">
                     <label class="ico" title="Foto"><i class="fas fa-camera"></i><input type="file" accept="image/*" hidden data-bzd-foto-chat></label>
@@ -415,7 +416,7 @@
         if (t.closest('[data-bzd-annulla]') || t.closest('[data-bzd-indietro]')) {
             S.nuova = false; S.apertaId = null;
             rootS().classList.remove('dett-aperto');
-            rootS().querySelector('.bzd-dett').innerHTML = '<div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Scegli una segnalazione, o segnala un problema.</div>';
+            rootS().querySelector('.bzd-dett').innerHTML = '<div class="bzd-vuoto"><i class="fas fa-triangle-exclamation"></i>Seleziona una segnalazione o creane una nuova.</div>';
             disegnaSegnalazioni();
             return;
         }
@@ -430,7 +431,7 @@
         if ((el = t.closest('[data-bzd-stato]'))) {
             let esito = null;
             if (el.dataset.bzdStato === 'risolta') {
-                esito = prompt('Come è stata risolta? (facoltativo)');
+                esito = prompt('Soluzione adottata (facoltativa)');
                 if (esito === null) return;
             }
             const r = await post(`${BASE}/segnalazioni/${S.apertaId}/stato`, { stato: el.dataset.bzdStato, esito });

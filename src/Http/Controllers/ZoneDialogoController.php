@@ -112,7 +112,7 @@ final class ZoneDialogoController
             [$w, $ruolo, $io] = $this->chi($request);
             $m = $this->messaggioMio($request, $w, $ruolo, $io);
             if (!Messaggi::puoFissare($ruolo) || $m['canale'] === null) {
-                Accesso::nega('Solo capo squadra e ufficio fissano gli avvisi');
+                Accesso::nega('Solo capo squadra e CSM fissano gli avvisi');
             }
             $si = !empty($this->corpo()['si']);
             $this->messaggi->fissa((int)$m['id'], $si, $io);
@@ -254,7 +254,7 @@ final class ZoneDialogoController
             [$w, $ruolo, $io] = $this->chi($request);
             $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
             if (!Segnalazioni::puoGestire($ruolo)) {
-                Accesso::nega('La segnalazione la gestiscono capo squadra e ufficio');
+                Accesso::nega('La segnalazione la gestiscono capo squadra e CSM');
             }
             $body = $this->corpo();
             $this->segnalazioni->cambiaStato($s, (string)($body['stato'] ?? ''), $io, $body['esito'] ?? null);
@@ -287,7 +287,7 @@ final class ZoneDialogoController
             [$w, $ruolo, $io] = $this->chi($request);
             $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
             if (!Segnalazioni::puoGestire($ruolo)) {
-                Accesso::nega('Le attivita\' le creano capo squadra e ufficio');
+                Accesso::nega('Le attivita\' le creano capo squadra e CSM');
             }
             if ($s['task_id']) {
                 return $this->segnalazioni->trova((int)$s['id']);
