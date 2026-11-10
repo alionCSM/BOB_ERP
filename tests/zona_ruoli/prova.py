@@ -148,6 +148,9 @@ oggi = datetime.date.today().isoformat()
 p1 = chiama(UFF, 'POST', '/presenze', {'data': oggi, 'nome': 'Mario Bianchi', 'azienda': 'CSM'})
 p2 = chiama(UFF, 'POST', '/presenze', {'data': oggi, 'azienda': 'Ponteggi Sud', 'persone': 4, 'mezza': True})
 verifica(S, 'CSM registra una persona e un\'azienda', puo(p1) and puo(p2), str(p1)[:150])
+verifica(S, 'di base il committente non vede le presenze', chiama(CLI, 'GET', f'/presenze?data={oggi}')['_http'] == 403 and chiama(CLI, 'GET', '/presenze/giorni')['_http'] == 403)
+verifica(S, '... e nel suo riepilogo non ci sono', 'giornate di lavoro' not in chiama(CLI, 'GET', '/report?periodo=30').get('raw', ''))
+chiama(UFF, 'POST', '/presenze/cliente', {'visibile': True})
 gk = chiama(CLI, 'GET', f'/presenze?data={oggi}')['data']
 verifica(S, 'il committente le legge', 'Mario Bianchi' in [x['nome'] for x in gk['nostri']] and any(x['azienda'] == 'Ponteggi Sud' and x['persone'] == 4 for x in gk['consorziate']), str(gk)[:300])
 verifica(S, "l'azienda a mezza giornata conta 2 giornate su 4 persone", any(x['azienda'] == 'Ponteggi Sud' and x.get('mezza') for x in gk['consorziate']))
@@ -235,7 +238,7 @@ sid2 = s2['id'] if 'id' in s2 else s2.get('segnalazione', {}).get('id')
 verifica(S, 'CSM elimina qualsiasi segnalazione', puo(chiama(UFF, 'POST', f'/segnalazioni/{sid2}/elimina', {})))
 
 S = '5h. Presenze al committente sì o no'
-verifica(S, 'di base il committente vede le presenze', puo(chiama(CLI, 'GET', '/presenze/giorni')))
+verifica(S, 'acceso da CSM, il committente vede le presenze', puo(chiama(CLI, 'GET', '/presenze/giorni')))
 verifica(S, 'il committente non spegne la condivisione', chiama(CLI, 'POST', '/presenze/cliente', {'visibile': False})['_http'] == 403)
 verifica(S, 'CSM la spegne', puo(chiama(UFF, 'POST', '/presenze/cliente', {'visibile': False})))
 verifica(S, '... e il committente non le legge più', chiama(CLI, 'GET', '/presenze/giorni')['_http'] == 403 and chiama(CLI, 'GET', '/presenze')['_http'] == 403)

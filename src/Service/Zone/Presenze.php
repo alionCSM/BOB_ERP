@@ -44,17 +44,16 @@ final class Presenze
 
     /**
      * Le presenze di questo cantiere si mostrano al committente? Lo decide
-     * CSM (bb_worksites.zone_presenze_cliente); di base si'.
+     * CSM (bb_worksites.zone_presenze_cliente); di base no.
      */
     public function alCliente(int $worksiteId): bool
     {
         try {
             $st = $this->conn->prepare('SELECT zone_presenze_cliente FROM bb_worksites WHERE id = :w');
             $st->execute([':w' => $worksiteId]);
-            $v = $st->fetchColumn();
-            return $v === false || $v === null || (int)$v === 1;
+            return (int)$st->fetchColumn() === 1;
         } catch (\PDOException $e) {
-            return true;   // colonna non ancora creata: come prima
+            return false;   // colonna non ancora creata: al committente no
         }
     }
 
