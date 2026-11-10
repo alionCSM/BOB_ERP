@@ -1905,7 +1905,7 @@ async function loadDisegni() {
 
     const res = await api(`/worksites/${WID}/zone/disegni`);
     disegniLoaded = true;
-    if (!res.ok) { grid.innerHTML = '<div class="bz-dz-empty">Errore caricamento disegni.</div>'; return; }
+    if (!res.ok) { grid.innerHTML = `<div class="bz-dz-empty">Impossibile caricare i disegni.${res.error ? '<br><small>' + escHtml(res.error) + '</small>' : ''}</div>`; return; }
 
     const { bob = [], fieldwire = [], fieldwire_ready = false } = res.data || {};
     renderDisegni(bob, fieldwire_ready);

@@ -34,7 +34,7 @@ CREATE TABLE bb_worksite_documents(id INT AUTO_INCREMENT PRIMARY KEY, worksite_i
   note TEXT NULL, subcategory VARCHAR(40) NULL, category VARCHAR(40) NULL, is_deleted TINYINT DEFAULT 0, current_version INT DEFAULT 1, created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_worksite_document_versions(id INT AUTO_INCREMENT PRIMARY KEY, document_id INT, version_number INT, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10), uploaded_by INT NULL, note TEXT NULL, created_at DATETIME);
 CREATE TABLE bb_zone_disegno_sync(document_id INT, fw_sheet_upload_id VARCHAR(40) NULL, pushed_at DATETIME NULL);
-CREATE TABLE bb_zone_dwg_render(document_id INT, status VARCHAR(10));
+CREATE TABLE bb_zone_dwg_render(document_id INT, svg_path VARCHAR(500) NULL, status VARCHAR(10), error TEXT NULL);
 CREATE TABLE bb_zone_annotations(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, document_id INT, page INT, segnalazione_id INT NULL, task_id INT NULL, created_by INT NULL, geom TEXT NULL, type VARCHAR(20) NULL, text TEXT NULL, color VARCHAR(20) NULL);
 CREATE TABLE bb_zone_messaggi(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, canale VARCHAR(10) NULL, segnalazione_id INT NULL, user_id INT NULL, testo TEXT NULL,
   rapido VARCHAR(30) NULL, foto VARCHAR(300) NULL, sistema TINYINT DEFAULT 0, fissato TINYINT DEFAULT 0, fissato_da INT NULL, eliminato_at DATETIME NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);

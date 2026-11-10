@@ -1849,7 +1849,9 @@ final class FieldwireController
                 $stmt->fetchAll(\PDO::FETCH_ASSOC),
                 $this->filtro($request, 'disegno')
             );
-            $bob = array_map(function ($r) use ($worksiteId) {
+            // CSM legge perche' una conversione DWG non e' riuscita
+            $ufficio = $this->accesso->daUfficio($request->user(), $worksiteId);
+            $bob = array_map(function ($r) use ($worksiteId, $ufficio) {
                 $type = strtolower($r['file_type'] ?? '');
                 $isDwg = in_array($type, ['dwg', 'dxf'], true); // entrambi passano dal render vettoriale
                 return [
@@ -1874,7 +1876,7 @@ final class FieldwireController
                     // perche' la conversione non e' riuscita: a CSM, che la
                     // puo' rilanciare o far sistemare sul server
                     'dwg_error'    => $isDwg && ($r['dwg_status'] ?? '') === 'error'
-                                      && $this->accesso->daUfficio($request->user(), $worksiteId)
+                                      && $ufficio
                                       ? (string)($r['dwg_error'] ?? '') : null,
                     // annotabile se immagine/pdf, oppure dwg convertito con successo
                     'annotatable'  => in_array($type, ['pdf','png','jpg','jpeg'], true)
