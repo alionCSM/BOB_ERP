@@ -51,9 +51,9 @@ final class Permessi
     public const CLIENTE = 'cliente';
 
     public const RUOLI = [
-        self::UFFICIO  => 'Ufficio',
+        self::UFFICIO  => 'CSM',
         self::CANTIERE => 'Cantiere',
-        self::CLIENTE  => 'Cliente',
+        self::CLIENTE  => 'Committente',
     ];
 
     // ── Le azioni ───────────────────────────────────────────────────────────

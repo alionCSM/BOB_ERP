@@ -27,7 +27,8 @@
     const VIS = {
         ufficio:  { icon: 'fa-lock',      label: 'Solo CSM',            color: '#f87171' },
         cantiere: { icon: 'fa-hard-hat',  label: 'CSM e cantiere',      color: '#94a3b8' },
-        cliente:  { icon: 'fa-handshake', label: 'CSM e cliente',       color: '#a78bfa' },
+        // il cliente legge "noi", non "cliente"
+        cliente:  { icon: 'fa-handshake', label: typeof RUOLO !== 'undefined' && RUOLO === 'cliente' ? 'CSM e noi' : 'CSM e cliente', color: '#a78bfa' },
         tutti:    { icon: 'fa-globe',     label: 'Tutti',               color: '#4ade80' },
     };
     // le parole vecchie salvate nel database
@@ -135,7 +136,7 @@
                 azioni.push(`<button class="att" data-bzd-elimina="${m.id}" title="Elimina"><i class="fas fa-trash"></i></button>`);
             }
         }
-        const cliente = m.autore_tipo === 'client' ? ' · cliente' : '';
+        const cliente = m.autore_tipo === 'client' && !PER_CLIENTE ? ' · cliente' : '';
         return `
             <div class="bzd-msg ${m.mio ? 'mio' : ''} ${m.fissato ? 'fisso' : ''}" data-mid="${m.id}">
                 ${m.mio ? '' : `<div class="chi">${esc(m.autore || 'BOB')}${cliente}</div>`}

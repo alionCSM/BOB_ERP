@@ -1000,7 +1000,7 @@ document.addEventListener('click', async e => {
    bottoni che poi rispondono di no. */
 const GRUPPO_TASK = { squadra: 'cantiere', capi: 'cantiere', cantiere: 'cantiere', cliente: 'cliente', ufficio: 'ufficio' };
 const TOCCA_A     = { squadra: 'Squadra', capi: 'Squadra', cantiere: 'Squadra',
-                      ufficio: 'CSM', cliente: 'Cliente' };
+                      ufficio: 'CSM', cliente: RUOLO === 'cliente' ? 'Noi' : 'Cliente' };
 /* A chi tocca, in parole: la persona per nome, o il gruppo. */
 function chiCe(t) {
     if (Number(t.assignee_user_id) > 0) return String(t.assignee_name || 'una persona').replace(/ · .*$/, '');
@@ -1045,7 +1045,8 @@ function chiTesto(riga) {
     const con   = Array.isArray(riga) ? riga : ((riga && riga.condivisa_con) || []);
     const parti = Array.isArray(riga) ? [] : ((riga && riga.condivisa_parti) || []);
     const sq = parti.includes('cantiere'), cl = parti.includes('cliente');
-    let t = sq && cl ? 'Tutti' : sq ? 'CSM e squadra' : cl ? 'CSM e cliente' : '';
+    // il cliente legge "noi": "CSM e cliente" gli faceva cercare un altro cliente
+    let t = sq && cl ? 'Tutti' : sq ? 'CSM e squadra' : cl ? (RUOLO === 'cliente' ? 'CSM e noi' : 'CSM e cliente') : '';
     if (con.length) t += (t ? ' + ' : '') + con.length + (con.length === 1 ? ' persona' : ' persone');
     return t || 'Solo CSM';
 }
@@ -1099,13 +1100,12 @@ async function apriChi(tipo, oggetto, scelte, onSalva) {
     // con "il cliente" prima che il cliente entri vuol dire che appena
     // entra lo trova.
     const gruppi = [
-        { ruolo: 'cantiere', titolo: 'La squadra in cantiere' },
-        { ruolo: 'cliente',  titolo: 'Il cliente' },
+        { ruolo: 'cantiere', titolo: 'Squadra' },
+        { ruolo: 'cliente',  titolo: RUOLO === 'cliente' ? 'Noi' : 'Cliente' },
     ].map(g => ({ ...g, persone: persone.filter(x => x.ruolo === g.ruolo) }));
 
     const dentro = new Set(con.map(Number));
-    box.innerHTML = `<p class="bz-chi-vuoto" style="text-align:left;margin-bottom:8px">CSM vede sempre tutto.</p>`
-      + gruppi.map(g => {
+    box.innerHTML = gruppi.map(g => {
         const tutta = parti.includes(g.ruolo);
         return `
         <div class="bz-chi-gruppo">
