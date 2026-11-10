@@ -1281,6 +1281,8 @@ function switchTop(v) {
     // un modulo a meta' (in costruzione o in compilazione) non si perde in silenzio
     if (currentTop === 'forms' && v !== 'forms' && window.bzfPuoiUscire && !window.bzfPuoiUscire()) return;
     currentTop = v;
+    // la sezione aperta resta dopo un "aggiorna pagina"
+    try { sessionStorage.setItem('bz-vista-' + WID, v); } catch (_) {}
     // aprendo una sezione, le sue notifiche sono viste
     if (typeof avvisiSezioneVista === 'function') avvisiSezioneVista(v);
     document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
@@ -2596,7 +2598,19 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(caricaAvvisi, 30000);
     // il link di una notifica aperto da fuori (email, campanello di BOB)
     const h = location.hash.slice(1);
-    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') setTimeout(() => vaiAdAvviso(h), 400);
+    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') {
+        setTimeout(() => vaiAdAvviso(h), 400);
+        return;
+    }
+    if (h.startsWith('segnalazione-') || h.startsWith('chat-')) return;   // li apre dialogo.js
+    // dopo "aggiorna pagina" si resta nella sezione in cui si era
+    let vista = null;
+    try { vista = sessionStorage.getItem('bz-vista-' + WID); } catch (_) {}
+    if (vista && vista !== 'attivita' && !SOLO_ACCESSI
+        && document.querySelector(`.bz-nav-item[data-view="${CSS.escape(vista)}"]`)) {
+        // dopo gli altri avvii della pagina (i moduli si preparano al caricamento)
+        setTimeout(() => switchTop(vista), 0);
+    }
 });
 
 /* ══════════ ALL EVENT LISTENERS (no inline onclick) ══════════ */
@@ -3603,7 +3617,7 @@ html .bz-dz-empty { color:#94a3b8; }
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js?v=5"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=20261110"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -3612,14 +3626,14 @@ html .bz-dz-empty { color:#94a3b8; }
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-<script src="/assets/js/views/fieldwire/annotator.js"></script>
+<script src="/assets/js/views/fieldwire/annotator.js?v=20261110"></script>
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/fieldwire/accessi.js?v=4"></script>
+<script src="/assets/js/views/fieldwire/accessi.js?v=20261110"></script>
 {% endif %}
-<script src="/assets/js/views/fieldwire/assegnazioni.js?v=5"></script>
-<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=1">
-{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=3"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
+<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261110">
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=20261110"></script>{% endif %}
 </body>
 </html>

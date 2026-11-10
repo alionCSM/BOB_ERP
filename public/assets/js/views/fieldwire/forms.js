@@ -19,7 +19,8 @@
     // Chi crea modelli: CSM e il committente (i suoi, per un cantiere o per
     // tutti i suoi cantieri). Il server lo ricontrolla.
     const PER_CLIENTE = typeof RUOLO !== 'undefined' && RUOLO === 'cliente';
-    const CREA_MODULI = DA_UFFICIO || PER_CLIENTE;
+    // si ricalcola in init(), quando si sa se chi guarda e' CSM
+    let CREA_MODULI = PER_CLIENTE;
 
     // Modifiche non salvate: il modello in costruzione (confrontato con com'era
     // all'apertura) o un modulo che si sta compilando. Uscire senza salvare
@@ -62,6 +63,7 @@
         WID = cfg.worksiteId; CSRF = cfg.csrf;
         PUO_COMPILARE = !!cfg.puoCompilare;
         DA_UFFICIO    = !!cfg.daUfficio;
+        CREA_MODULI   = DA_UFFICIO || PER_CLIENTE;
         META = { wsName: cfg.wsName || '', wsCode: cfg.wsCode || '', clientName: cfg.clientName || '' };
         root = document.getElementById('bz-forms-root');
     }
