@@ -2736,10 +2736,72 @@ function periodoTask(t) {
 }
 
 /* ══════════ REGISTRO PRESENZE ══════════
-   Le presenze vere di BOB, in sola lettura. I giorni a sinistra, chi c'era
-   a destra. Il server manda solo nome, azienda e turno: pasti, albergo e
-   costi non escono dall'ufficio.                                          */
+   Le presenze di BOB in sola lettura, piu' quelle che CSM scrive a mano
+   (per ora si registrano cosi'). I giorni a sinistra, chi c'era a destra.
+   Il server manda solo nome, azienda e turno: pasti, albergo e costi non
+   escono da CSM.                                                          */
 let presGiorno = null;
+
+/* Il modulo per registrare a mano una presenza: solo CSM. Una persona
+   (nome e azienda) o un'azienda con quante persone ha mandato. */
+function formPresenza(data) {
+    if (!DA_UFFICIO) return '';
+    const oggi = new Date().toISOString().slice(0, 10);
+    return `
+        <form class="bz-pres-form" id="bz-pres-form">
+            <div class="t">Registra presenza</div>
+            <div class="r">
+                <label>Data<input type="date" name="data" value="${escAttr(data || oggi)}" max="${oggi}" required></label>
+                <label>Tipo<select name="tipo">
+                    <option value="persona">Persona</option>
+                    <option value="azienda">Azienda (numero di persone)</option>
+                </select></label>
+                <label class="solo-persona">Nome e cognome<input name="nome" maxlength="120" placeholder="Es. Mario Rossi"></label>
+                <label>Azienda<input name="azienda" maxlength="120" placeholder="Es. CSM"></label>
+                <label class="solo-azienda" hidden>Persone<input type="number" name="persone" min="1" max="500" value="1"></label>
+                <label>Turno<select name="mezza">
+                    <option value="0">Giornata intera</option>
+                    <option value="1">Mezza giornata</option>
+                </select></label>
+                <button type="submit"><i class="fas fa-plus"></i> Aggiungi</button>
+            </div>
+        </form>`;
+}
+
+document.addEventListener('change', e => {
+    const f = e.target.closest('#bz-pres-form');
+    if (!f || e.target.name !== 'tipo') return;
+    const azienda = e.target.value === 'azienda';
+    f.querySelector('.solo-persona').hidden = azienda;
+    f.querySelector('.solo-azienda').hidden = !azienda;
+});
+document.addEventListener('submit', async e => {
+    const f = e.target.closest('#bz-pres-form');
+    if (!f) return;
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(f));
+    const persona = v.tipo === 'persona';
+    if (persona && !v.nome.trim()) { alert('Inserisci il nome della persona.'); return; }
+    if (!persona && !v.azienda.trim()) { alert("Inserisci il nome dell'azienda."); return; }
+    const r = await api(`/worksites/${WID}/zone/presenze`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: v.data, nome: persona ? v.nome : '', azienda: v.azienda,
+                               persone: persona ? 1 : parseInt(v.persone || '1', 10), mezza: v.mezza === '1' }),
+    });
+    if (!r.ok) { alert(r.error || 'Impossibile registrare la presenza.'); return; }
+    presGiorno = null;               // ricarica anche l'elenco dei giorni
+    loadPresenze(v.data);
+});
+document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-pres-elimina]');
+    if (!b) return;
+    if (!confirm('Eliminare questa presenza?')) return;
+    const r = await api(`/worksites/${WID}/zone/presenze/${b.dataset.presElimina}/elimina`, { method: 'POST' });
+    if (!r.ok) { alert(r.error || 'Impossibile eliminare la presenza.'); return; }
+    const giorno = presGiorno;
+    presGiorno = null;
+    loadPresenze(giorno);
+});
 
 async function loadPresenze(data = null) {
     const corpo = document.getElementById('bz-pres-corpo');
@@ -2750,7 +2812,7 @@ async function loadPresenze(data = null) {
         const giorni = (g.data || g || []);
         if (!giorni.length) {
             colonna.innerHTML = '';
-            corpo.innerHTML = '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
+            corpo.innerHTML = formPresenza(null) + '<div class="bz-empty">Nessuna presenza registrata per questo cantiere.</div>';
             return;
         }
         colonna.innerHTML = giorni.map(x => `
@@ -2759,7 +2821,8 @@ async function loadPresenze(data = null) {
                 <span class="n">${x.persone}</span>
             </button>
         `).join('');
-        data = data || giorni[0].data;
+        // il giorno chiesto, se c'e' ancora nell'elenco
+        data = (data && giorni.some(x => x.data === data)) ? data : giorni[0].data;
     }
 
     presGiorno = data;
@@ -2779,17 +2842,19 @@ async function loadPresenze(data = null) {
             <td>${escHtml(x.nome)}</td>
             <td class="az">${escHtml(x.azienda)}</td>
             <td class="tu${x.mezza ? ' mezza' : ''}">${escHtml(x.turno)}</td>
+            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
         </tr>
     `).join('');
 
     const cons = (d.consorziate || []).map(x => `
         <tr>
             <td>${escHtml(x.azienda)}</td>
-            <td class="tu">${x.persone} ${x.persone === 1 ? 'persona' : 'persone'}</td>
+            <td class="tu${x.mezza ? ' mezza' : ''}">${x.persone} ${x.persone === 1 ? 'persona' : 'persone'}${x.mezza ? ' · mezza giornata' : ''}</td>
+            ${DA_UFFICIO ? `<td class="az">${x.manuale ? `<button class="bz-pres-del" data-pres-elimina="${x.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
         </tr>
     `).join('');
 
-    corpo.innerHTML = `
+    corpo.innerHTML = formPresenza(d.data) + `
         <div class="bz-pres-testa">
             <h3>${fmtDateLunga(d.data)}</h3>
             <span>${d.persone} ${d.persone === 1 ? 'persona' : 'persone'} in cantiere</span>
@@ -2803,27 +2868,27 @@ async function loadPresenze(data = null) {
                 </div>
                 <div class="v">
                     <span class="n">${numIt(d.totali.nostri)}</span>
-                    <span class="l">CSM</span>
+                    <span class="l">persone</span>
                 </div>
                 <div class="v">
                     <span class="n">${numIt(d.totali.consorziate)}</span>
-                    <span class="l">consorziate</span>
+                    <span class="l">aziende</span>
                 </div>
                 ${d.totali.dal ? `<div class="p">dal ${fmtDate(d.totali.dal)} al ${fmtDate(d.totali.al)}</div>` : ''}
             </div>` : ''}
         ${nostri ? `
             <div class="bz-pres-sez">
-                <h4>Personale CSM</h4>
+                <h4>Persone</h4>
                 <table class="bz-pres-tab">
-                    <thead><tr><th>Nome</th><th>Azienda</th><th>Turno</th></tr></thead>
+                    <thead><tr><th>Nome</th><th>Azienda</th><th>Turno</th>${DA_UFFICIO ? '<th></th>' : ''}</tr></thead>
                     <tbody>${nostri}</tbody>
                 </table>
             </div>` : ''}
         ${cons ? `
             <div class="bz-pres-sez">
-                <h4>Consorziate</h4>
+                <h4>Aziende</h4>
                 <table class="bz-pres-tab">
-                    <thead><tr><th>Azienda</th><th>Persone</th></tr></thead>
+                    <thead><tr><th>Azienda</th><th>Persone</th>${DA_UFFICIO ? '<th></th>' : ''}</tr></thead>
                     <tbody>${cons}</tbody>
                 </table>
             </div>` : ''}
@@ -2960,6 +3025,19 @@ if (!SOLO_ACCESSI) {
 .bz-pres-tab .az { color:#94a3b8; }
 .bz-pres-tab .tu { color:#94a3b8; white-space:nowrap; }
 .bz-pres-tab .tu.mezza { color:#fbbf24; }
+.bz-pres-del { background:none; border:0; color:#64748b; cursor:pointer; padding:2px 6px; }
+.bz-pres-del:hover { color:#f87171; }
+/* registrare a mano una presenza (CSM) */
+.bz-pres-form { border:1px solid #1e293b; border-radius:10px; padding:12px 14px; margin-bottom:22px; }
+.bz-pres-form .t { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin-bottom:8px; }
+.bz-pres-form .r { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+.bz-pres-form label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:#94a3b8; }
+.bz-pres-form label[hidden] { display:none; }
+.bz-pres-form input, .bz-pres-form select { background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:7px 9px; font-size:13px; min-width:0; }
+.bz-pres-form input[name=persone] { width:80px; }
+.bz-pres-form button { background:#1e40af; color:#fff; border:0; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+[data-theme="light"] .bz-pres-form { border-color:#e2e8f0; }
+[data-theme="light"] .bz-pres-form input, [data-theme="light"] .bz-pres-form select { background:#fff; border-color:#cbd5e1; color:#1e293b; }
 [data-theme="light"] .bz-pres-giorni { border-right-color:#e2e8f0; }
 [data-theme="light"] .bz-pres-g:hover, [data-theme="light"] .bz-pres-g.on { background:#f1f5f9; color:#1e293b; }
 [data-theme="light"] .bz-pres-testa h3 { color:#1e293b; }

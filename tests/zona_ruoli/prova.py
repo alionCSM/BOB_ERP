@@ -142,6 +142,24 @@ sk = chiama(CLI, 'GET', '/forms/submissions')['data']
 verifica(S, 'la risposta del capo la legge anche il cliente (di base tutti)', len(sk) == 1)
 verifica(S, 'chi compila rivede la sua risposta', len(chiama(CAPO, 'GET', '/forms/submissions')['data']) == 1)
 
+S = '5c. Presenze scritte a mano'
+import datetime
+oggi = datetime.date.today().isoformat()
+p1 = chiama(UFF, 'POST', '/presenze', {'data': oggi, 'nome': 'Mario Bianchi', 'azienda': 'CSM'})
+p2 = chiama(UFF, 'POST', '/presenze', {'data': oggi, 'azienda': 'Ponteggi Sud', 'persone': 4, 'mezza': True})
+verifica(S, 'CSM registra una persona e un\'azienda', puo(p1) and puo(p2), str(p1)[:150])
+gk = chiama(CLI, 'GET', f'/presenze?data={oggi}')['data']
+verifica(S, 'il committente le legge', 'Mario Bianchi' in [x['nome'] for x in gk['nostri']] and any(x['azienda'] == 'Ponteggi Sud' and x['persone'] == 4 for x in gk['consorziate']), str(gk)[:300])
+verifica(S, "l'azienda a mezza giornata conta 2 giornate su 4 persone", any(x['azienda'] == 'Ponteggi Sud' and x.get('mezza') for x in gk['consorziate']))
+verifica(S, 'il giorno compare nel calendario', oggi in [x['data'] for x in chiama(CLI, 'GET', '/presenze/giorni')['data']])
+verifica(S, 'il committente non registra presenze', chiama(CLI, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)
+verifica(S, 'la squadra non registra presenze', chiama(CAPO, 'POST', '/presenze', {'data': oggi, 'nome': 'x'})['_http'] == 403)
+domani = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+verifica(S, 'niente presenze nel futuro', not puo(chiama(UFF, 'POST', '/presenze', {'data': domani, 'nome': 'x'})))
+verifica(S, 'il committente non le elimina', chiama(CLI, 'POST', f"/presenze/{p1['data']['id']}/elimina")['_http'] == 403)
+verifica(S, 'CSM le elimina', puo(chiama(UFF, 'POST', f"/presenze/{p1['data']['id']}/elimina")))
+verifica(S, '... non quelle di un altro cantiere', not puo(chiama(UFF, 'POST', f"/presenze/{p2['data']['id']}/elimina", w=200)))
+
 S = '5b. Moduli del committente'
 campo = [{'id': 'f1', 'type': 'text', 'label': 'Note'}]
 mc = chiama(CLI, 'POST', '/forms', {'name': 'Verbale committente', 'fields': campo})

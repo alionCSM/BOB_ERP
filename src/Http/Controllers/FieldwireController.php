@@ -93,6 +93,9 @@ final class FieldwireController
         'report'                => P::VEDERE,
         'presenze'              => P::VEDERE,
         'presenzeGiorni'        => P::VEDERE,
+        // le presenze scritte a mano: solo CSM
+        'aggiungiPresenza'      => P::GESTIRE,
+        'eliminaPresenza'       => P::GESTIRE,
         // il nome e il codice che il cliente da' al cantiere: lo scrive
         // il cliente, il metodo controlla il ruolo
         'salvaRiferimento'      => P::VEDERE,
@@ -1491,6 +1494,36 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             return (new \App\Service\Zone\Presenze($this->conn))
                 ->giorni((int)$request->param('id'), 60);
+        });
+    }
+
+    /** CSM registra a mano una presenza (una persona o un'azienda). */
+    public function aggiungiPresenza(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $id = (new \App\Service\Zone\Presenze($this->conn))->aggiungi(
+                (int)$request->param('id'),
+                $this->jsonBody(),
+                (int)($request->user()->id ?? 0)
+            );
+            return ['id' => $id];
+        });
+    }
+
+    /** CSM toglie una presenza scritta a mano. */
+    public function eliminaPresenza(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $ok = (new \App\Service\Zone\Presenze($this->conn))
+                ->elimina((int)$request->param('id'), (int)$request->param('pId'));
+            if (!$ok) {
+                throw new \RuntimeException('Presenza non trovata');
+            }
+            return ['ok' => true];
         });
     }
 

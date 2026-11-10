@@ -71,3 +71,5 @@ INSERT INTO bb_zone_form_templates(id,worksite_id,name,fields,created_by) VALUES
 INSERT INTO bb_worksite_documents(id,worksite_id,file_name,file_path,file_type,subcategory,created_by,current_version) VALUES (1,100,'Pianta piano terra.pdf','C-118/Disegni/piante/pianta.pdf','pdf','piante',5,2);
 INSERT INTO bb_worksite_document_versions(document_id,version_number,file_name,file_path,file_type,uploaded_by,created_at) VALUES (1,1,'Pianta piano terra v1.pdf','x','pdf',5,NOW() - INTERVAL 10 DAY);
 INSERT INTO bb_zone_condivisioni_ruoli VALUES (100,'disegno',1,'cantiere',NOW()),(100,'disegno',1,'cliente',NOW());
+CREATE TABLE bb_zone_presenze_manuali(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, data DATE, nome VARCHAR(120) NULL, azienda VARCHAR(120) NULL,
+  persone INT DEFAULT 1, mezza TINYINT DEFAULT 0, created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);

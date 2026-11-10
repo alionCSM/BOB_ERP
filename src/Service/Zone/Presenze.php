@@ -9,6 +9,9 @@ use PDO;
 /**
  * Il registro presenze del cantiere, per la Zone.
  *
+ * Per ora CSM le scrive anche a mano (bb_zone_presenze_manuali): si leggono
+ * insieme a quelle del registro, che resta l'unico per i conti.
+ *
  * Non e' una copia: legge le presenze vere, quelle che l'ufficio approva e
  * su cui si fanno i conti. Un secondo registro compilato a mano divergerebbe
  * dal primo nel giro di una settimana, e poi nessuno saprebbe quale guardare.
@@ -86,10 +89,41 @@ final class Presenze
 
         $consorziate = [];
         $daConsorziate = 0;
+        $giornateConsorziate = 0.0;
         foreach ($cons->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $n = (int)$r['persone'];
             $consorziate[] = ['azienda' => (string)$r['azienda'], 'persone' => $n];
             $daConsorziate += $n;
+            $giornateConsorziate += $n;
+        }
+
+        // Le presenze scritte a mano da CSM: una persona con nome va fra le
+        // persone, un'azienda con il numero fra le aziende. Portano il loro
+        // id, per poterle togliere.
+        foreach ($this->manuali($worksiteId, $data) as $m) {
+            $mezza = (bool)$m['mezza'];
+            if (trim((string)$m['nome']) !== '') {
+                $righe[] = [
+                    'id'      => (int)$m['id'],
+                    'manuale' => true,
+                    'nome'    => (string)$m['nome'],
+                    'azienda' => (string)($m['azienda'] ?? ''),
+                    'turno'   => $mezza ? 'Mezza giornata' : 'Giornata intera',
+                    'mezza'   => $mezza,
+                ];
+                $giornate += $mezza ? 0.5 : 1.0;
+            } else {
+                $n = max(1, (int)$m['persone']);
+                $consorziate[] = [
+                    'id'      => (int)$m['id'],
+                    'manuale' => true,
+                    'azienda' => (string)($m['azienda'] ?? '—'),
+                    'persone' => $n,
+                    'mezza'   => $mezza,
+                ];
+                $daConsorziate       += $n;
+                $giornateConsorziate += $mezza ? $n * 0.5 : $n;
+            }
         }
 
         return [
@@ -97,8 +131,20 @@ final class Presenze
             'nostri'      => $righe,
             'consorziate' => $consorziate,
             'persone'     => count($righe) + $daConsorziate,
-            'giornate'    => $giornate + $daConsorziate,
+            'giornate'    => $giornate + $giornateConsorziate,
         ];
+    }
+
+    /** Le righe scritte a mano in un giorno; vuoto se la tabella non c'e' ancora. */
+    private function manuali(int $worksiteId, string $data): array
+    {
+        try {
+            $st = $this->conn->prepare('SELECT * FROM bb_zone_presenze_manuali WHERE worksite_id = :w AND data = :d ORDER BY azienda, nome, id');
+            $st->execute([':w' => $worksiteId, ':d' => $data]);
+            return $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return [];
+        }
     }
 
     /**
@@ -139,6 +185,26 @@ final class Presenze
 
         $nostre = (float)($a['giornate'] ?? 0);
         $loro   = (float)($b['giornate'] ?? 0);
+
+        // e quelle scritte a mano: con il nome fra le persone, senza fra le aziende
+        try {
+            $m = $this->conn->prepare("
+                SELECT COALESCE(SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN (CASE WHEN mezza THEN 0.5 ELSE 1 END) ELSE 0 END), 0) AS persone,
+                       COALESCE(SUM(CASE WHEN TRIM(COALESCE(nome,'')) = '' THEN GREATEST(persone, 1) * (CASE WHEN mezza THEN 0.5 ELSE 1 END) ELSE 0 END), 0) AS aziende,
+                       MIN(data) AS dal, MAX(data) AS al
+                FROM bb_zone_presenze_manuali WHERE worksite_id = :ws
+            ");
+            $m->execute([':ws' => $worksiteId]);
+            $c = $m->fetch(PDO::FETCH_ASSOC) ?: [];
+            $nostre += (float)($c['persone'] ?? 0);
+            $loro   += (float)($c['aziende'] ?? 0);
+            $x = array_filter([$dal, $c['dal'] ?? null]);
+            $dal = $x ? min($x) : null;
+            $x = array_filter([$al, $c['al'] ?? null]);
+            $al = $x ? max($x) : null;
+        } catch (\PDOException $e) {
+            // tabella non ancora creata: solo il registro
+        }
 
         return [
             'nostri'      => $nostre,
@@ -181,13 +247,75 @@ final class Presenze
             LIMIT $quanti
         ");
         $stmt->execute([':ws1' => $worksiteId, ':ws2' => $worksiteId]);
+        $righe = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // i giorni con presenze scritte a mano, sommati agli altri
+        try {
+            $m = $this->conn->prepare("
+                SELECT data, SUM(CASE WHEN TRIM(COALESCE(nome,'')) <> '' THEN 1 ELSE GREATEST(persone, 1) END) AS persone
+                FROM bb_zone_presenze_manuali WHERE worksite_id = :ws GROUP BY data
+            ");
+            $m->execute([':ws' => $worksiteId]);
+            $per = [];
+            foreach ($righe as $r) { $per[(string)$r['data']] = (int)$r['persone']; }
+            foreach ($m->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $per[(string)$r['data']] = ($per[(string)$r['data']] ?? 0) + (int)$r['persone'];
+            }
+            krsort($per);
+            $righe = [];
+            foreach (array_slice($per, 0, $quanti, true) as $d => $n) {
+                $righe[] = ['data' => (string)$d, 'persone' => $n];
+            }
+        } catch (\PDOException $e) {
+            // tabella non ancora creata: solo il registro
+        }
 
         return array_map(
             static fn(array $r): array => [
                 'data'    => (string)$r['data'],
                 'persone' => (int)$r['persone'],
             ],
-            $stmt->fetchAll(PDO::FETCH_ASSOC)
+            $righe
         );
+    }
+
+    /**
+     * Registra a mano una presenza: una persona (nome) o un'azienda con
+     * quante persone ha mandato.
+     *
+     * @param array{data?: string, nome?: string, azienda?: string, persone?: int, mezza?: bool} $d
+     */
+    public function aggiungi(int $worksiteId, array $d, int $daChi): int
+    {
+        $data = (string)($d['data'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
+            throw new \RuntimeException('Data non valida');
+        }
+        if ($data > date('Y-m-d')) {
+            throw new \RuntimeException('Non si possono registrare presenze future');
+        }
+        $nome    = mb_substr(trim((string)($d['nome'] ?? '')), 0, 120);
+        $azienda = mb_substr(trim((string)($d['azienda'] ?? '')), 0, 120);
+        if ($nome === '' && $azienda === '') {
+            throw new \RuntimeException('Inserisci il nome della persona o dell\'azienda');
+        }
+        $persone = $nome !== '' ? 1 : max(1, min(500, (int)($d['persone'] ?? 1)));
+        $this->conn->prepare('
+            INSERT INTO bb_zone_presenze_manuali (worksite_id, data, nome, azienda, persone, mezza, created_by)
+            VALUES (:w, :d, :n, :a, :p, :m, :by)
+        ')->execute([
+            ':w' => $worksiteId, ':d' => $data, ':n' => $nome !== '' ? $nome : null,
+            ':a' => $azienda !== '' ? $azienda : null, ':p' => $persone,
+            ':m' => !empty($d['mezza']) ? 1 : 0, ':by' => $daChi ?: null,
+        ]);
+        return (int)$this->conn->lastInsertId();
+    }
+
+    /** Toglie una presenza scritta a mano, di questo cantiere. */
+    public function elimina(int $worksiteId, int $id): bool
+    {
+        $st = $this->conn->prepare('DELETE FROM bb_zone_presenze_manuali WHERE id = :id AND worksite_id = :w');
+        $st->execute([':id' => $id, ':w' => $worksiteId]);
+        return $st->rowCount() > 0;
     }
 }
