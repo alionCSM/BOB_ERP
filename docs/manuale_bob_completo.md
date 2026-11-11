@@ -1,4 +1,4 @@
-<div style="page-break-after: always; text-align: center; font-family: 'Helvetica', 'Arial', sans-serif; padding: 140px 40px 0 40px;"><img src="logo-bob.png" alt="BOB" style="width: 130px; margin-bottom: 48px;" /><div style="font-size: 72px; font-weight: 800; letter-spacing: -3px; color: #0f172a; line-height: 1; margin-bottom: 14px;">BOB</div><div style="font-size: 14px; font-weight: 500; letter-spacing: 5px; color: #64748b; text-transform: uppercase;">Manuale di Sistema</div><div style="width: 56px; height: 2px; background: #1e3a5f; margin: 50px auto 50px auto;"></div><img src="logo-consorzio.jpg" alt="Consorzio Soluzione Montaggi" style="width: 280px; max-width: 90%;" /><div style="font-size: 12px; color: #64748b; margin-top: 100px; line-height: 1.9;"><span style="color: #94a3b8;">Versione</span> &nbsp;1.0 &nbsp;&middot;&nbsp; <span style="color: #94a3b8;">Data</span> &nbsp;7 maggio 2026<br /><span style="color: #94a3b8;">Sviluppato da</span> &nbsp;<strong style="color: #0f172a;">Alion</strong></div></div>
+<div style="page-break-after: always; text-align: center; font-family: 'Helvetica', 'Arial', sans-serif; padding: 140px 40px 0 40px;"><img src="logo-bob.png" alt="BOB" style="width: 130px; margin-bottom: 48px;" /><div style="font-size: 72px; font-weight: 800; letter-spacing: -3px; color: #0f172a; line-height: 1; margin-bottom: 14px;">BOB</div><div style="font-size: 14px; font-weight: 500; letter-spacing: 5px; color: #64748b; text-transform: uppercase;">Manuale di Sistema</div><div style="width: 56px; height: 2px; background: #1e3a5f; margin: 50px auto 50px auto;"></div><img src="logo-consorzio.jpg" alt="Consorzio Soluzione Montaggi" style="width: 280px; max-width: 90%;" /><div style="font-size: 12px; color: #64748b; margin-top: 100px; line-height: 1.9;"><span style="color: #94a3b8;">Versione</span> &nbsp;1.1 &nbsp;&middot;&nbsp; <span style="color: #94a3b8;">Data</span> &nbsp;11 novembre 2026<br /><span style="color: #94a3b8;">Sviluppato da</span> &nbsp;<strong style="color: #0f172a;">Alion</strong></div></div>
 
 # BOB — Manuale di Sistema
 
@@ -8,8 +8,8 @@
 
 ---
 
-**Versione documento:** 1.0
-**Data:** 7 maggio 2026
+**Versione documento:** 1.1
+**Data:** 11 novembre 2026
 **Riferimento applicativo:** BOB v2.x
 **Sviluppato da:** Alion
 
@@ -40,12 +40,15 @@
    - 5.16 Buoni pasto
    - 5.17 Doc condivisi
    - 5.18 BOB AI
+   - 5.19 BOB Zone
+   - 5.20 App mobile BOB
 6. [Sicurezza e protezione dei dati](#6-sicurezza-e-protezione-dei-dati)
 7. [Integrazioni esterne](#7-integrazioni-esterne)
 8. [Operazioni di sistema](#8-operazioni-di-sistema)
 9. [Audit, monitoraggio e notifiche](#9-audit-monitoraggio-e-notifiche)
 10. [Glossario](#10-glossario)
 11. [Allegati](#11-allegati)
+12. [Domande frequenti](#12-domande-frequenti)
 
 ---
 
@@ -262,14 +265,15 @@ Ordine mensile (bb_ordini_aziende) — uno per (azienda, mese)
 
 ### 4.1 Tipologie di utente
 
-BOB distingue quattro profili di accesso:
+BOB distingue cinque profili di accesso:
 
 | Profilo | Descrizione | Accesso |
 |---|---|---|
 | **Superadmin** | Account fondatore (ID=1) | Accesso totale, bypassa permessi |
 | **Internal staff** | Personale CS Montaggi | Accesso modulato dai permessi assegnati |
 | **company_viewer** | Referente di una consorziata | Vede solo le proprie aziende e operai |
-| **worker** | Operaio con accesso limitato | Solo dashboard personale e cambio password |
+| **worker** | Operaio con accesso limitato | Dashboard personale, presenze, ferie, documenti, cambio password; BOB Zone dei cantieri a cui è stato abilitato |
+| **Cliente (committente)** | Referente di un cliente (`type = 'client'` o `client_id` valorizzato) | Solo la BOB Zone dei cantieri condivisi con lui (vedi §4.5 e §5.19) |
 
 ### 4.2 Sistema di permessi modulo per modulo
 
@@ -280,7 +284,8 @@ I permessi sono gestiti in modo granulare attraverso la tabella `bb_user_permiss
 | **Generale** | dashboard, users, chat |
 | **Visibilità Dati** | view_prices (vede prezzi e costi) |
 | **Contabilità e Clienti** | billing, companies, clients, offers, ordini, ordini_aziende, tickets |
-| **Cantieri e Operai** | worksites, attendance, pianificazione, bookings |
+| **Cantieri e Operai** | worksites, attendance, pianificazione, bookings, zone (BOB Zone: gestione degli accessi e ingresso come CSM) |
+| **BOB AI** | ai_chat (accesso alla chat di BOB AI) |
 | **Documenti e Files** | documents, document_alerts, files, share |
 | **Mezzi e Attrezzature** | equipment |
 | **Programmazione** | programmazione, notif_mezzi_*, notif_trasferta_*, notif_beppe_* |
@@ -300,6 +305,14 @@ I consorziati che accedono a BOB hanno un'esperienza dedicata:
 - I nuovi utenti partono **senza alcun permesso** (deny-by-default).
 - Al primo accesso è obbligatorio impostare una nuova password (flag `must_change_password=1`).
 - L'amministratore deve assegnare esplicitamente ogni permesso.
+
+### 4.5 Clienti (committenti)
+
+I referenti dei clienti accedono a BOB con un profilo dedicato, pensato per la collaborazione sui cantieri:
+- Possono aprire **esclusivamente** la BOB Zone dei cantieri che sono stati condivisi con loro, oltre a dashboard, profilo, notifiche e cambio password. Ogni altro indirizzo restituisce 403.
+- Un cliente vede un cantiere solo se sono vere **entrambe** le condizioni: sul cantiere è attiva l'opzione **"Condividi col cliente"** e il suo account è stato aggiunto in **"Chi accede"** con ruolo Committente. Il cantiere deve inoltre appartenere al suo cliente.
+- La scheda cantiere interna (offerte, fatture, ordini, margini, costi) non è mai accessibile al cliente.
+- Nell'interfaccia il cliente vede la nostra azienda come **"CSM"** e sé stesso come **"Noi"**; nei PDF compare come **"Committente"**.
 
 ---
 
@@ -341,6 +354,7 @@ Modulo centrale del sistema. Ogni cantiere rappresenta una commessa accettata da
 - **Documenti** — disegni e allegati cantiere.
 - **Statistiche** — margine, costi, ricavi (dettagliato in §5.2.1).
 - **Versioning** — storico modifiche.
+- **BOB Zone** — spazio di collaborazione del cantiere con squadra e committente (vedi §5.19), raggiungibile da `/worksites/{id}/zone`.
 
 **Attivazione cantiere:** dalla bozza si emette un'email all'amministrazione con link di attivazione che, cliccato, sposta lo stato a "In corso" e crea il record nel flusso Yard.
 
@@ -712,6 +726,111 @@ Le chat sono persistite in `bb_ai_conversazioni` e `bb_ai_messaggi` e si riapron
 
 Tutte le interazioni vengono registrate in `bb_ai_sql_logs` per finalita' di audit.
 
+### 5.19 BOB Zone
+
+**Path:** `/worksites/{id}/zone` (Zone del singolo cantiere) · `/zone` (elenco dei cantieri con contenuti in BOB Zone)
+**Permesso:** `zone` per gestire gli accessi; per entrare in un cantiere occorre essere inseriti in **"Chi accede"**.
+
+BOB Zone è lo spazio di collaborazione di ciascun cantiere, condiviso fra CSM, la squadra in cantiere e il committente. È disponibile dal sito e dall'app mobile.
+
+#### 5.19.1 Ruoli
+
+Su ogni cantiere una persona ha uno dei tre ruoli seguenti, assegnato da **"Chi accede"**:
+
+| Ruolo | Chi è | In sintesi |
+|---|---|---|
+| **CSM** | Personale CS Montaggi | Vede tutto il cantiere, gestisce gli accessi, verifica le attività, elimina contenuti di altri, decide i moduli |
+| **Cantiere** | Capo squadra o personale in cantiere | Porta avanti il lavoro: scrive, compila, completa, carica file e foto, annota i disegni. Non crea attività, non carica disegni, non decide i moduli |
+| **Committente** | Referente del cliente | Collabora quasi come CSM: crea attività, carica disegni, crea i propri moduli. Non verifica, non elimina contenuti di altri, non gestisce gli accessi |
+
+Chi ha il permesso `zone` ma non è ancora inserito in un cantiere può entrarvi come CSM con un clic dalla pagina del cantiere.
+
+#### 5.19.2 Cosa può fare ciascun ruolo
+
+| Azione | CSM | Cantiere | Committente |
+|---|:-:|:-:|:-:|
+| Vedere ciò che è condiviso | Sì | Sì | Sì |
+| Scrivere commenti, messaggi, segnalazioni | Sì | Sì | Sì |
+| Compilare i moduli assegnati | Sì | Sì | Sì |
+| Completare attività e risolvere segnalazioni | Sì | Sì | Sì |
+| Caricare file e foto | Sì | Sì | Sì |
+| Annotare i disegni | Sì | Sì | Sì |
+| Creare attività e assegnarle | Sì | No | Sì |
+| Caricare disegni (e nuove versioni) | Sì | No | Sì |
+| Creare modelli di modulo | Sì | No | Sì (propri) |
+| Decidere quali moduli si compilano, da chi e con che frequenza | Sì | No | No |
+| Verificare un'attività (chiusura definitiva) | Sì | No | No |
+| Eliminare contenuti scritti da altri | Sì | No | No |
+| Gestire gli accessi ("Chi accede") | Sì | No | No |
+
+I propri contenuti si possono sempre eliminare.
+
+#### 5.19.3 Chi vede cosa
+
+Le regole di visibilità sono separate dai permessi:
+- **CSM vede tutto.**
+- **Chi crea un contenuto lo vede sempre.**
+- Gli altri contenuti (file, cartelle, disegni, attività) si condividono **per nome**, persona per persona. Un file senza impostazioni proprie segue quelle della sua cartella.
+- I messaggi di un'attività possono essere contrassegnati come **nota interna** (non visibile al committente) o **per il committente**.
+- Il committente vede qualcosa solo se sul cantiere è attiva l'opzione **"Condividi col cliente"**.
+
+#### 5.19.4 Sezioni
+
+| Sezione | Contenuto |
+|---|---|
+| **Attività** | Elenco, Kanban e Gantt delle attività. Stati: **Aperto → In corso → Completato → Verificato**. Ogni attività riporta chi l'ha creata e la **cronologia** (chi l'ha presa in carico, completata, verificata o riaperta, e quando). Si possono allegare foto e commenti. |
+| **Disegni** | Tavole del cantiere in PDF, DWG, DXF o immagine, con versioni successive. Sul disegno si appongono annotazioni puntuali: una nota, un'attività o una segnalazione collegata al punto esatto. Un'attività creata dal disegno mostra il collegamento al disegno. I file DWG vengono convertiti automaticamente per la visualizzazione; in caso di errore il motivo compare sulla scheda del disegno (visibile a CSM). |
+| **Foto** | Foto del cantiere e delle attività. |
+| **File** | Cartelle e documenti del cantiere, con condivisione per cartella o per singolo file. |
+| **Moduli** | Moduli da compilare (es. verifiche DPI, check list). Frequenza: **giornaliera**, **settimanale**, **mensile** o **una tantum**. CSM vede chi ha compilato e chi manca nel periodo. Il committente può creare propri modelli, per un singolo cantiere o per **tutti i suoi cantieri**. Uscendo da un modulo non salvato viene richiesta conferma. |
+| **Presenze** | Presenze giornaliere del cantiere, inserite manualmente da CSM: persona o azienda (con numero di persone), giornata intera o mezza giornata. Solo CSM può inserirle, modificarle ed eliminarle. Pasti, alloggi e costi non sono mai mostrati. |
+| **Segnalazioni** | Problemi o comunicazioni rapide, eventualmente fissate su un punto del disegno. Stati: **Aperta → Presa in carico → Risolta**. Può eliminarle chi le ha scritte oppure CSM. |
+| **Chat** | Messaggi del cantiere, con destinatario "Tutti" o singole persone. |
+
+Azioni disponibili nel menu laterale: **Nuova attività**, **Riepilogo lavori** (PDF con attività, segnalazioni e, se abilitato, presenze), **Chi accede** (solo CSM) e **Esci da BOB** (uscita dall'account).
+
+#### 5.19.5 Presenze visibili al committente
+
+Per impostazione predefinita il committente **non vede** le presenze. CSM può attivarle cantiere per cantiere con la spunta **"Visibile al committente"** nella sezione Presenze: la sezione Presenze e i dati delle presenze nel Riepilogo lavori diventano visibili al committente.
+
+#### 5.19.6 Notifiche della Zone
+
+- Il **campanello** del cantiere elenca le novità; un clic porta direttamente al contenuto. I numeri accanto alle voci del menu (Attività, Disegni, File, Moduli, Segnalazioni, Chat) indicano gli elementi nuovi.
+- La pagina si aggiorna automaticamente **ogni 30 secondi**.
+- Le notifiche vengono generate **al momento** dell'evento (attività assegnata, modulo da compilare, nuovo file, nuovo disegno, nuova foto, messaggio, segnalazione) e inviate anche come notifica push sull'app.
+- Ricevono la notifica solo le persone che possono vedere il contenuto; chi ha compiuto l'azione non riceve notifica.
+- Promemoria moduli: ogni giorno alle **16:00** a chi deve ancora compilare un modulo (per i moduli giornalieri, solo a chi è pianificato quel giorno sul cantiere).
+- Aggiornando la pagina si rimane nella sezione aperta.
+
+#### 5.19.7 Elenco Zone (`/zone`)
+
+Raggiungibile dal menu **Cantieri → BOB Zone** per chi ha il permesso `zone`. Elenca i cantieri con contenuti nella Zone, con: attività aperte, segnalazioni aperte, file, disegni, numero di accessi, data dell'ultimo aggiornamento. Filtri per stato del cantiere, per "con segnalazioni aperte", "con attività aperte", "condivisi col cliente", "dove ho accesso"; ricerca per nome, codice, cliente o località; ordinamento per colonna.
+
+#### 5.19.8 Procedure frequenti
+
+**Dare accesso al committente a un cantiere:**
+1. Verificare che il referente abbia un account BOB di tipo cliente, associato al cliente del cantiere.
+2. Aprire la Zone del cantiere e attivare **"Condividi col cliente"** in "Chi accede".
+3. Aggiungere il referente in "Chi accede" con ruolo **Committente**.
+4. Facoltativo: nella sezione Presenze attivare **"Visibile al committente"**.
+
+**Dare accesso alla squadra:** in "Chi accede" aggiungere le persone con ruolo **Cantiere**. Ricevono la notifica del nuovo cantiere.
+
+**Chiudere un'attività:** chi la segue la porta a **In corso** e poi a **Completato**; CSM la porta a **Verificato**. Un'attività può essere riaperta.
+
+### 5.20 App mobile BOB
+
+App per iOS e Android (bundle `it.csmontaggi.bobapp`), disponibile in italiano, inglese, albanese e rumeno. Il contenuto dipende dal profilo:
+
+- **Operai:** presenze giornaliere (con promemoria serale alle 20:00 e alle 21:00 a chi era pianificato e non ha ancora registrato la presenza), ferie, documenti personali, notifiche, profilo, BOB Zone dei cantieri abilitati.
+- **Personale CSM e superadmin:** home dedicata, elementi **Da approvare**, cantieri (scheda con statistiche, presenze, mezzi di sollevamento, fatturazione, extra, ordini, attività e note, in sola lettura), pianificazione, programmazione, registro presenze, scadenze, flotta e noleggi del giorno, offerte, clienti, aziende, prenotazioni, fatturato, rubrica, **BOB AI**, BOB Zone. Menu e moduli seguono la società selezionata.
+- **Consorziate:** home dedicata con i propri dati.
+- **Committenti:** BOB Zone dei cantieri condivisi.
+
+**Accesso:** al primo accesso da un nuovo telefono viene richiesto il codice inviato via email; il telefono diventa poi **fidato** e il codice non viene più richiesto, anche cambiando rete. Il cambio password richiede di nuovo il codice. Nel campo password è disponibile l'icona per mostrare la password digitata.
+
+**Versione minima:** se l'app installata è inferiore alla versione minima configurata sul server, viene richiesto l'aggiornamento dallo store.
+
 ---
 
 ## 6. Sicurezza e protezione dei dati
@@ -732,6 +851,7 @@ Tutte le interazioni vengono registrate in `bb_ai_sql_logs` per finalita' di aud
 - Al primo accesso da un nuovo IP, l'utente riceve via email un codice numerico di 6 cifre.
 - Il codice scade in 10 minuti.
 - Massimo 5 tentativi per IP per 15 minuti.
+- App mobile: dopo il primo codice corretto il telefono resta **fidato** e il codice non viene più richiesto, anche cambiando rete; al cambio password i telefoni fidati devono inserire di nuovo il codice.
 
 **Sessioni:**
 - Cookie sessione `BOB_SESSID` (host-only, HttpOnly, Secure, SameSite=Strict).
@@ -887,7 +1007,7 @@ sudo systemctl reload php8-fpm
 
 ### 8.3 Cron jobs
 
-Tutti i job schedulati di BOB partono **alle ore 06:00** della mattina, in modo che le email di sintesi siano già nella casella dei destinatari all'inizio della giornata lavorativa.
+I job di sintesi partono **alle ore 06:00** della mattina (fanno eccezione i promemoria indicati in tabella), in modo che le email di sintesi siano già nella casella dei destinatari all'inizio della giornata lavorativa.
 
 | Script | Funzione |
 |---|---|
@@ -896,6 +1016,8 @@ Tutti i job schedulati di BOB partono **alle ore 06:00** della mattina, in modo 
 | `includes/cron/yard_worksite_status_check.php` | Sincronizza stato cantieri da Yard |
 | `includes/cron/document_expiry_alerts.php` | Allerta documenti scaduti o in scadenza |
 | `includes/cron/programmazione_deadline_check.php` | Allerta scadenze programmazione |
+| `includes/cron/zone_promemoria_moduli.php` | **Ore 16:00.** Promemoria BOB Zone a chi deve ancora compilare un modulo |
+| `includes/cron/presenze_promemoria.php` | **Ore 20:00 e 21:00.** Promemoria agli operai pianificati che non hanno registrato la presenza |
 
 I cron utilizzano l'utente di sistema `www-data` (o equivalente in base alla configurazione del server) con percorso PHP CLI assoluto.
 
@@ -952,6 +1074,9 @@ Le anomalie sono visualizzate anche in dashboard come notifiche, con possibilit�
 - Marcatura come letta.
 - Filtro per modulo.
 - Storico paginato.
+- Eliminazione della singola notifica o di tutte quelle già lette.
+
+Il campanello e lo storico mostrano solo le notifiche della **società attiva**. Le notifiche vengono create nel momento in cui avviene l'evento e, per chi usa l'app, inviate anche come notifica push. Per le notifiche della BOB Zone vedi §5.19.6.
 
 ---
 
@@ -1121,6 +1246,10 @@ Contabilità e Clienti
 Cantieri e Operai
   - worksites, attendance, presenze (legacy)
   - pianificazione, bookings
+  - zone
+
+BOB AI
+  - ai_chat
 
 Documenti e Files
   - documents, document_alerts, files, share
@@ -1151,6 +1280,64 @@ BOB AI - Anomalie
 | Numero ordine azienda | `OA_YYYY_NNNN` (sequenza per anno, zero-padded) | `OA_2026_0008` |
 | Numero fattura cliente | Assegnato lato Yard / Business (contabilità) | — |
 | Codice cantiere | `C{YY}-{NNN}` generato automaticamente alla creazione (sequenza per anno) | `C26-042` |
+
+---
+
+## 12. Domande frequenti
+
+**Come do accesso a un committente alla BOB Zone di un cantiere?**
+Attivare "Condividi col cliente" in "Chi accede" e aggiungere il referente con ruolo Committente. Il referente deve avere un account di tipo cliente associato al cliente del cantiere (§5.19.8).
+
+**Perché il committente non vede il cantiere?**
+Verificare che sul cantiere sia attivo "Condividi col cliente", che il referente sia in "Chi accede" con ruolo Committente e che il cantiere appartenga al suo cliente.
+
+**Perché il committente non vede le presenze?**
+Per impostazione predefinita le presenze non sono visibili al committente. Attivare "Visibile al committente" nella sezione Presenze del cantiere.
+
+**Perché nella Zone non compaiono le presenze del registro?**
+La sezione Presenze della Zone mostra solo le presenze inserite manualmente da CSM. Il registro presenze interno resta consultabile dal modulo Presenze di BOB.
+
+**Chi può inserire, modificare o eliminare le presenze nella Zone?**
+Solo CSM.
+
+**Chi può chiudere un'attività?**
+Chiunque la veda può portarla a In corso e a Completato. Solo CSM può portarla a Verificato.
+
+**Perché un capo squadra non può creare attività o caricare disegni?**
+Il ruolo Cantiere è dedicato all'esecuzione: completa, commenta, carica file e foto, annota i disegni. Creare attività e caricare disegni spetta a CSM e al committente.
+
+**Come creo un modulo valido per tutti i miei cantieri?** (committente)
+Nella sezione Moduli selezionare "Nuovo modulo" e scegliere l'opzione "Tutti i miei cantieri".
+
+**Chi decide quali moduli si compilano e ogni quanto?**
+CSM, scegliendo frequenza giornaliera, settimanale, mensile o una tantum e le persone assegnate.
+
+**Quando arriva il promemoria dei moduli?**
+Ogni giorno alle 16:00, solo a chi deve ancora compilare.
+
+**Dopo quanto tempo arrivano le notifiche?**
+Immediatamente, quando l'evento avviene. La pagina della Zone si aggiorna da sola ogni 30 secondi.
+
+**Perché non ho ricevuto una notifica per un'azione che ho fatto io?**
+Chi compie l'azione non riceve notifica.
+
+**Chi può eliminare una segnalazione?**
+Chi l'ha scritta oppure CSM.
+
+**Perché un disegno DWG non si apre?**
+Il file DWG viene convertito automaticamente; se la conversione non riesce, il motivo è indicato sulla scheda del disegno (visibile a CSM). In alternativa caricare il disegno in PDF.
+
+**Perché l'app chiede di nuovo il codice email?**
+Il codice viene richiesto al primo accesso da un nuovo telefono e dopo un cambio password.
+
+**Perché l'app chiede di aggiornarsi?**
+La versione installata è inferiore alla versione minima richiesta dal server. Aggiornare l'app dallo store.
+
+**Perché non vedo un modulo o una voce di menu?**
+I moduli visibili dipendono dai permessi assegnati in Utenti → Permessi e dalla società selezionata.
+
+**Come esco dall'account dalla BOB Zone?**
+Con la voce "Esci da BOB" nel menu laterale della Zone.
 
 ---
 
