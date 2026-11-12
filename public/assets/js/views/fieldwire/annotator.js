@@ -71,6 +71,7 @@
                     <div class="bza-loading" data-el="loading">Caricamento disegno...</div>
                     <div class="bza-stage" data-el="stage" style="display:none;">
                         <div data-el="page"></div>
+                        <div class="bza-dettaglio" data-el="det"></div>
                         <svg class="bza-svg tool-select" data-el="svg" xmlns="http://www.w3.org/2000/svg"></svg>
                     </div>
                 </div>
@@ -94,6 +95,7 @@
             zoomval:   ov.querySelector('[data-el="zoomval"]'),
             banner:    ov.querySelector('[data-el="banner"]'),
             toggleann: ov.querySelector('[data-el="toggleann"]'),
+            det:       ov.querySelector('[data-el="det"]'),
         };
         wireDom();
         return dom;
@@ -134,15 +136,30 @@
         dom.svg.addEventListener('pointermove', onPointerMove);
         dom.svg.addEventListener('pointerup', onPointerUp);
         dom.svg.addEventListener('pointercancel', onPointerUp);
-        // zoom con rotella (o pinch del trackpad), ancorato al cursore
+        // zoom con rotella o pinch del trackpad, ancorato al cursore: la
+        // rotella fa scatti, il trackpad (ctrlKey) piccoli passi continui
         dom.stagewrap.addEventListener('wheel', e => {
             if (!S || !dom.ov.classList.contains('open')) return;
             e.preventDefault();
-            zoomVerso(S.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
+            const d = Math.max(-120, Math.min(120, e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY));
+            zoomVerso(S.zoom * Math.exp(-d * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY);
         }, { passive: false });
-        // ESC chiude
+        // doppio clic: ingrandisce (con Maiusc riduce) nel punto cliccato
+        dom.svg.addEventListener('dblclick', e => {
+            if (!S || !(['select', 'pan'].includes(S.tool) || (!S.mostra && !S.onPick))) return;
+            e.preventDefault();
+            zoomVerso(S.zoom * (e.shiftKey ? 0.5 : 2), e.clientX, e.clientY);
+        });
+        // il dettaglio nitido segue lo scorrimento
+        dom.stagewrap.addEventListener('scroll', () => programmaDettaglio(), { passive: true });
+        // tastiera: Esc chiude, + e - ingrandiscono e riducono, 0 adatta
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape' && S && dom.ov.classList.contains('open')) close();
+            if (!S || !dom.ov.classList.contains('open')) return;
+            if (e.target.matches && e.target.matches('input, textarea, select')) return;
+            if (e.key === 'Escape') close();
+            else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomCentro(S.zoom * 1.5); }
+            else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomCentro(S.zoom / 1.5); }
+            else if (e.key === '0') { e.preventDefault(); setZoom(1); dom.stagewrap.scrollTo(0, 0); }
         });
     }
 
@@ -202,6 +219,7 @@
 
     function close() {
         dom.ov.classList.remove('open');
+        nascondiDettaglio();
         dom.page.innerHTML = '';
         dom.svg.innerHTML = '';
         dom.banner.hidden = true;
@@ -284,11 +302,16 @@
     }
 
     async function renderPdfPage(num) {
+        nascondiDettaglio();
         const pg = await S.pdf.getPage(num);
+        S.pagina = pg;
         const vp1 = pg.getViewport({ scale: 1 });
         S.natW = vp1.width; S.natH = vp1.height;
-        // render ad alta risoluzione: si legge anche zoomando
-        const renderScale = 3;
+        // l'immagine di base, entro 4096 px per lato (il limite sicuro dei
+        // browser, Safari compreso); oltre, il dettaglio nitido lo disegna
+        // renderDettaglio() solo per la parte visibile
+        const renderScale = Math.min(3, 4096 / Math.max(S.natW, S.natH));
+        S.scalaBase = renderScale;
         const vp = pg.getViewport({ scale: renderScale });
         const canvas = document.createElement('canvas');
         canvas.width = vp.width; canvas.height = vp.height;
@@ -310,6 +333,7 @@
         dom.pagenav.style.display = S.pageCount > 1 ? 'flex' : 'none';
         dom.pagelabel.textContent = `${S.page}/${S.pageCount}`;
         redraw();
+        programmaDettaglio();
     }
 
     function applyStageSize() {
@@ -321,10 +345,60 @@
         dom.zoomval.textContent = Math.round(S.zoom * 100) + '%';
     }
 
+    // fino a 6400%: sulle tavole di cantiere si legge la quota di un singolo
+    // bullone. I PDF restano nitidi (vedi renderDettaglio), i DWG sono vettoriali.
+    const ZOOM_MAX = 64;
     function setZoom(z) {
-        // i disegni CAD richiedono molto zoom per leggere i dettagli
-        S.zoom = Math.max(0.25, Math.min(40, z));
+        const prima = S.zoom;
+        S.zoom = Math.max(0.25, Math.min(ZOOM_MAX, z));
         applyStageSize();
+        if (S.zoom !== prima) { nascondiDettaglio(); programmaDettaglio(); }
+    }
+
+    // ── Dettaglio nitido (PDF) ──────────────────────────────────────────────
+    // L'immagine di base ha una risoluzione fissa: ingrandendo molto si
+    // sgranerebbe. Quando serve, la parte di disegno visibile si ridisegna
+    // alla risoluzione dello schermo e si appoggia sopra la base.
+    let timerDettaglio = null;
+    function programmaDettaglio() {
+        clearTimeout(timerDettaglio);
+        timerDettaglio = setTimeout(renderDettaglio, 140);
+    }
+    function nascondiDettaglio() {
+        if (!dom) return;
+        if (S && S.lavoroDettaglio) { try { S.lavoroDettaglio.cancel(); } catch (_) {} S.lavoroDettaglio = null; }
+        dom.det.innerHTML = '';
+        dom.det.style.display = 'none';
+    }
+    async function renderDettaglio() {
+        if (!S || !S.pdf || !S.pagina || dom.stage.style.display === 'none') return;
+        const st = dom.stage.getBoundingClientRect();
+        const wr = dom.stagewrap.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        const cssScala = st.width / S.natW;              // px CSS per unita' PDF
+        if (cssScala * dpr <= S.scalaBase * 1.1) { nascondiDettaglio(); return; } // la base basta
+        // la parte visibile, in px CSS dentro il disegno (con un margine)
+        const m = 80;
+        const x0 = Math.max(0, wr.left - st.left - m), y0 = Math.max(0, wr.top - st.top - m);
+        const x1 = Math.min(st.width, wr.right - st.left + m), y1 = Math.min(st.height, wr.bottom - st.top + m);
+        if (x1 <= x0 || y1 <= y0) return;
+        // non oltre ~16 milioni di pixel per tela
+        let k = dpr;
+        const area = (x1 - x0) * (y1 - y0);
+        if (area * k * k > 16e6) k = Math.sqrt(16e6 / area);
+        const tela = document.createElement('canvas');
+        tela.width = Math.floor((x1 - x0) * k);
+        tela.height = Math.floor((y1 - y0) * k);
+        const vp = S.pagina.getViewport({ scale: cssScala * k, offsetX: -x0 * k, offsetY: -y0 * k });
+        if (S.lavoroDettaglio) { try { S.lavoroDettaglio.cancel(); } catch (_) {} }
+        const lavoro = S.pagina.render({ canvasContext: tela.getContext('2d'), viewport: vp });
+        S.lavoroDettaglio = lavoro;
+        try { await lavoro.promise; } catch (_) { return; }       // annullato: c'e' uno piu' nuovo
+        if (!S || S.lavoroDettaglio !== lavoro) return;
+        S.lavoroDettaglio = null;
+        Object.assign(dom.det.style, { display: 'block', left: x0 + 'px', top: y0 + 'px', width: (x1 - x0) + 'px', height: (y1 - y0) + 'px' });
+        tela.style.width = '100%'; tela.style.height = '100%';
+        dom.det.replaceChildren(tela);
     }
 
     /** Zoom tenendo fermo il punto dello schermo (x, y). */
@@ -917,7 +991,7 @@
     function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function escapeXml(s) { return escapeHtml(s); }
 
-    window.addEventListener('resize', () => { if (S && dom?.ov.classList.contains('open')) applyStageSize(); });
+    window.addEventListener('resize', () => { if (S && dom?.ov.classList.contains('open')) { applyStageSize(); nascondiDettaglio(); programmaDettaglio(); } });
 
     window.BZAnnotator = { open };
 })();
