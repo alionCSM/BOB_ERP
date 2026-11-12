@@ -249,6 +249,89 @@ final class AvvisiZona
         }
     }
 
+    /**
+     * Chi del cantiere, con uno di questi ruoli, vede un documento.
+     *
+     * @param string[] $ruoli
+     * @return array{0: array<int, array<string, mixed>>, 1: ?array} persone, riga del file
+     */
+    private function vedonoFile(int $worksiteId, int $fileId, array $ruoli): array
+    {
+        $st = $this->conn->prepare('
+            SELECT f.file_name, f.folder_id, f.uploaded_by, w.name AS cantiere
+            FROM bb_zone_files f JOIN bb_worksites w ON w.id = f.worksite_id
+            WHERE f.id = :f AND f.worksite_id = :w
+        ');
+        $st->execute([':f' => $fileId, ':w' => $worksiteId]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$f) {
+            return [[], null];
+        }
+        $cartella = null;
+        if (!empty($f['folder_id'])) {
+            $c = $this->conn->prepare('SELECT id, created_by FROM bb_zone_folders WHERE id = :c');
+            $c->execute([':c' => (int)$f['folder_id']]);
+            $cartella = $c->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        $cond = new Condivisione($this->conn, new Accesso($this->conn));
+        $chi = [];
+        foreach ($this->persone($worksiteId, $ruoli, null) as $p) {
+            $u = $this->utente((int)$p['user_id']);
+            if ($cond->vede($u, $worksiteId, 'file', $fileId, (int)($f['uploaded_by'] ?? 0))
+                || ($cartella && $cond->vede($u, $worksiteId, 'cartella', (int)$cartella['id'], (int)($cartella['created_by'] ?? 0)))) {
+                $chi[] = $p;
+            }
+        }
+        return [$chi, $f];
+    }
+
+    /** Un PDF da compilare: a chi lo deve compilare (e lo vede). */
+    public function daCompilare(int $richiestaId, int $daChi): void
+    {
+        $st = $this->conn->prepare('SELECT * FROM bb_zone_file_compilazioni WHERE id = :id');
+        $st->execute([':id' => $richiestaId]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r) {
+            return;
+        }
+        $w = (int)$r['worksite_id'];
+        [$persone, $f] = $this->vedonoFile($w, (int)$r['file_id'], [(string)$r['per_ruolo']]);
+        $chi = $this->nome($daChi);
+        foreach ($persone as $p) {
+            if ((int)$p['user_id'] === $daChi) continue;
+            $p['worksite_id'] = $w;
+            $p['dove'] = 'moduli';
+            $this->manda($p, 'zona_da_compilare_t', 'zona_da_compilare', [
+                'cantiere' => $f['cantiere'],
+                'nome'     => mb_substr((string)$f['file_name'], 0, 100),
+                'chi'      => $chi,
+            ], 'high', $daChi);
+        }
+    }
+
+    /** Un PDF compilato e salvato: a chi l'aveva chiesto (se lo vede ancora). */
+    public function compilato(int $richiestaId, int $daChi): void
+    {
+        $st = $this->conn->prepare('SELECT * FROM bb_zone_file_compilazioni WHERE id = :id');
+        $st->execute([':id' => $richiestaId]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r || empty($r['richiesto_da']) || (int)$r['richiesto_da'] === $daChi) {
+            return;
+        }
+        $w = (int)$r['worksite_id'];
+        [$persone, $f] = $this->vedonoFile($w, (int)$r['file_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
+        foreach ($persone as $p) {
+            if ((int)$p['user_id'] !== (int)$r['richiesto_da']) continue;
+            $p['worksite_id'] = $w;
+            $p['dove'] = 'file-' . (int)$r['file_id'];
+            $this->manda($p, 'zona_compilato_t', 'zona_compilato', [
+                'cantiere' => $f['cantiere'],
+                'nome'     => mb_substr((string)$f['file_name'], 0, 100),
+                'chi'      => $this->nome($daChi),
+            ], 'high', $daChi);
+        }
+    }
+
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {

@@ -295,6 +295,41 @@ fc = [x['file_name'] for x in chiama(CAPO, 'GET', '/files')['data']['files']]
 verifica(S, 'la squadra vede il file del cliente', 'foto_scaffale.pdf' in fc)
 verifica(S, 'il cliente non carica in "Contratti"', not puo(chiama(CLI, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'folder_id': f2}})))
 
+S = '6b. PDF da compilare'
+pdf = chiama(CLI, 'POST', '/files', file={'nome': 'modulo_collaudo.pdf', 'campi': {'folder_id': f1}})['data']['id']
+pulisci_notifiche()
+rq = chiama(CLI, 'POST', f'/files/{pdf}/compilazione', {'nota': 'Da compilare entro venerdì', 'per_ruolo': 'cliente'})
+verifica(S, 'il committente chiede la compilazione di un PDF', puo(rq), rq.get('error', ''))
+verifica(S, '... sempre a CSM, anche se indica un altro ruolo', sql(f"SELECT per_ruolo FROM bb_zone_file_compilazioni WHERE file_id={pdf}") == [['ufficio']])
+nu = [n for n in notifiche(UFF) if n[0] == 'Documento da compilare']
+verifica(S, 'CSM riceve la notifica, che porta ai Moduli', len(nu) == 1 and nu[0][1].endswith('#moduli'), str(notifiche(UFF)))
+verifica(S, 'una sola richiesta aperta per documento', not puo(chiama(CLI, 'POST', f'/files/{pdf}/compilazione', {})))
+dc_u = {x['file_id']: x for x in chiama(UFF, 'GET', '/da-compilare')['data']}
+dc_k = {x['file_id']: x for x in chiama(CLI, 'GET', '/da-compilare')['data']}
+verifica(S, 'nei Moduli di CSM: da compilare, e la può compilare', dc_u.get(pdf, {}).get('puo_compilare') is True)
+verifica(S, '... il committente la vede ma non la compila lui', pdf in dc_k and dc_k[pdf]['puo_compilare'] is False)
+verifica(S, 'il committente non salva la compilazione chiesta a CSM', not puo(chiama(CLI, 'POST', f'/files/{pdf}/compila', file={'nome': 'compilato.pdf'})))
+verifica(S, 'la squadra non annulla la richiesta del committente', not puo(chiama(CAPO, 'POST', f'/files/{pdf}/compilazione/annulla', {})))
+pulisci_notifiche()
+rc = chiama(UFF, 'POST', f'/files/{pdf}/compila', file={'nome': 'compilato.pdf'})
+verifica(S, 'CSM compila e salva', puo(rc) and rc['data']['richiesta_chiusa'] is True, rc.get('error', ''))
+nk = [n for n in notifiche(CLI) if n[0] == 'Documento compilato']
+verifica(S, 'il committente riceve "Documento compilato", che porta al documento', len(nk) == 1 and nk[0][1].endswith(f'#file-{pdf}'), str(notifiche(CLI)))
+fk = {int(x['id']): x for x in chiama(CLI, 'GET', f'/files?folder={f1}')['data']['files']}
+verifica(S, "nell'elenco: stato compilato, con chi e la versione compilata", fk[pdf]['compilazione']['stato'] == 'compilato'
+         and fk[pdf]['compilazione']['compilato_da'] == 'Giulia Ufficio' and len(fk[pdf]['versioni']) == 1, str(fk.get(pdf))[:300])
+vurl = fk[pdf]['versioni'][0]['url'].split('/zone', 1)[1]
+vreq = urllib.request.Request(BASE + '100/zone' + vurl, headers={'X-Test-User': str(CLI)})
+with urllib.request.urlopen(vreq) as rr:
+    corpo_v = rr.read()
+verifica(S, 'la versione compilata si apre (e l\'originale resta)', corpo_v.startswith(b'%PDF') and fk[pdf]['download_url'].endswith(f'/files/{pdf}/download'))
+rq2 = chiama(UFF, 'POST', f'/files/{pdf}/compilazione', {'per_ruolo': 'cliente', 'nota': 'Firmare in fondo'})
+verifica(S, 'CSM chiede al committente di compilare', puo(rq2))
+verifica(S, '... e il committente compila e salva', puo(chiama(CLI, 'POST', f'/files/{pdf}/compila', file={'nome': 'firmato.pdf'})))
+verifica(S, 'ora il documento ha due versioni compilate', len(sql(f"SELECT id FROM bb_zone_file_versioni WHERE file_id={pdf}")) == 2)
+txt = chiama(CLI, 'POST', '/files', file={'nome': 'note.txt', 'campi': {'folder_id': f1}})['data']['id']
+verifica(S, 'un file che non è PDF non si chiede di compilarlo', not puo(chiama(CLI, 'POST', f'/files/{txt}/compilazione', {})))
+
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
 verifica(S, 'cliente: Ufficio e Tutto il cantiere', canali(CLI) == ['cliente', 'tutti'], str(canali(CLI)))

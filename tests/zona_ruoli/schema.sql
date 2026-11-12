@@ -36,6 +36,8 @@ CREATE TABLE bb_worksite_document_versions(id INT AUTO_INCREMENT PRIMARY KEY, do
 CREATE TABLE bb_zone_disegno_sync(document_id INT, fw_sheet_upload_id VARCHAR(40) NULL, pushed_at DATETIME NULL);
 CREATE TABLE bb_zone_dwg_render(document_id INT, svg_path VARCHAR(500) NULL, status VARCHAR(10), error TEXT NULL);
 CREATE TABLE bb_zone_doc_calibration(id INT AUTO_INCREMENT PRIMARY KEY, document_id INT, page INT DEFAULT 1, m_per_wfrac DECIMAL(14,6), created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY(document_id, page));
+CREATE TABLE bb_zone_file_compilazioni(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, file_id INT, richiesto_da INT NULL, per_ruolo VARCHAR(16), nota TEXT NULL, stato VARCHAR(16) DEFAULT 'da_compilare', compilato_da INT NULL, compilato_at DATETIME NULL, versione_id INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_file_versioni(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, file_id INT, file_path VARCHAR(500), size_bytes INT NULL, compilazione_id INT NULL, creato_da INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_annotations(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, document_id INT, page INT, segnalazione_id INT NULL, task_id INT NULL, created_by INT NULL, geom TEXT NULL, type VARCHAR(20) NULL, text TEXT NULL, color VARCHAR(20) NULL);
 CREATE TABLE bb_zone_messaggi(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, canale VARCHAR(10) NULL, segnalazione_id INT NULL, user_id INT NULL, testo TEXT NULL,
   rapido VARCHAR(30) NULL, foto VARCHAR(300) NULL, sistema TINYINT DEFAULT 0, fissato TINYINT DEFAULT 0, fissato_da INT NULL, eliminato_at DATETIME NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);

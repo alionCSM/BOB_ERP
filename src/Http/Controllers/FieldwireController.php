@@ -76,6 +76,11 @@ final class FieldwireController
         'files'                 => P::VEDERE,
         'downloadFile'          => P::VEDERE,
         'fileComments'          => P::VEDERE,
+        'versioneFile'          => P::VEDERE,
+        'daCompilare'           => P::VEDERE,
+        'richiediCompilazione'  => P::SCRIVERE,
+        'annullaCompilazione'   => P::SCRIVERE,
+        'compilaFile'           => P::COMPILARE,
         'disegni'               => P::VEDERE,
         'fileDisegno'           => P::VEDERE,
         'floorplans'            => P::VEDERE,
@@ -1356,11 +1361,16 @@ final class FieldwireController
                 $this->fileRepo->files($worksiteId, $folderId),
                 fn(array $f) => $this->vedeFile($request, $f, $cartelle)
             ));
-            // arricchisci con url download/preview
+            // arricchisci con url download/preview, e con lo stato della
+            // compilazione per i PDF da compilare
+            $ruolo = $this->ruoloQui($request);
+            $comp  = (new \App\Service\Zone\Compilazioni($this->conn))->perFile(array_column($files, 'id'));
             foreach ($files as &$f) {
                 $f['download_url'] = "/worksites/{$worksiteId}/zone/files/{$f['id']}/download";
                 $f['is_image'] = in_array(strtolower($f['file_type'] ?? ''), ['jpg','jpeg','png','webp','gif'], true);
+                $this->conCompilazione($f, $worksiteId, $ruolo, $comp, (int)($request->user()->id ?? 0));
             }
+            unset($f);
             return [
                 'folders'        => $this->conChiSuRighe($request, 'cartella', array_values($cartelle)),
                 'files'          => $this->conChiSuRighe($request, 'file', $files),
@@ -1552,6 +1562,190 @@ final class FieldwireController
             $author = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? 'Utente');
             $id = $this->fileRepo->addComment($fileId, $text, $author, (int)($user?->id ?? 0));
             return ['id' => $id, 'text' => $text, 'author_name' => $author, 'created_at' => date('Y-m-d H:i:s')];
+        });
+    }
+
+    // ─── PDF da compilare ─────────────────────────────────────────────────────
+
+    /** Stato della compilazione e versioni compilate di un documento, per l'elenco. */
+    private function conCompilazione(array &$f, int $w, ?string $ruolo, array $comp, int $io): void
+    {
+        $id = (int)$f['id'];
+        $r  = $comp['richieste'][$id] ?? null;
+        $f['compilabile'] = \App\Service\Zone\Compilazioni::compilabile($f);
+        $f['compilazione'] = $r ? [
+            'id'             => (int)$r['id'],
+            'stato'          => $r['stato'],
+            'per_ruolo'      => $r['per_ruolo'],
+            'nota'           => $r['nota'],
+            'richiesto_da'   => $r['richiesto_da_nome'] ?? null,
+            'richiesto_mio'  => (int)($r['richiesto_da'] ?? 0) === $io,
+            'created_at'     => $r['created_at'],
+            'compilato_da'   => $r['compilato_da_nome'] ?? null,
+            'compilato_at'   => $r['compilato_at'],
+        ] : null;
+        $aperta = $r && $r['stato'] === 'da_compilare' ? $r : null;
+        $f['puo_compilare']  = $f['compilabile'] && \App\Service\Zone\Compilazioni::puoCompilare($ruolo, $aperta);
+        $f['puo_richiedere'] = $f['compilabile'] && !$aperta && $ruolo !== null;
+        $f['destinatari']    = $ruolo ? \App\Service\Zone\Compilazioni::destinatari($ruolo) : [];
+        $f['puo_annullare']  = $aperta && ($ruolo === \App\Service\Zone\Accesso::UFFICIO
+                                || (int)$aperta['richiesto_da'] === $io);
+        $f['versioni'] = array_map(fn($v) => [
+            'id'         => (int)$v['id'],
+            'creato_da'  => $v['creato_da_nome'] ?? null,
+            'created_at' => $v['created_at'],
+            'url'        => "/worksites/{$w}/zone/files/{$id}/versioni/{$v['id']}/download",
+        ], $comp['versioni'][$id] ?? []);
+    }
+
+    /** Chiede che un PDF venga compilato: committente e squadra a CSM, CSM al committente o alla squadra. */
+    public function richiediCompilazione(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $file = $this->fileRepo->find((int)$request->param('fileId'));
+            $this->fileVisibile($request, $file);
+            $body = $this->jsonBody();
+            $io   = (int)($request->user()->id ?? 0);
+            $id = (new \App\Service\Zone\Compilazioni($this->conn))->richiedi(
+                $w, $file, $io, (string)$this->ruoloQui($request),
+                isset($body['per_ruolo']) ? (string)$body['per_ruolo'] : null,
+                (string)($body['nota'] ?? '')
+            );
+            $this->avvisa(fn($a) => $a->daCompilare($id, $io));
+            return ['id' => $id];
+        });
+    }
+
+    /** Annulla la richiesta aperta: chi l'ha fatta, o CSM. */
+    public function annullaCompilazione(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $file = $this->fileRepo->find((int)$request->param('fileId'));
+            $this->fileVisibile($request, $file);
+            $c = new \App\Service\Zone\Compilazioni($this->conn);
+            $r = $c->aperta((int)$file['id']);
+            if (!$r) {
+                throw new \RuntimeException('Non ci sono richieste di compilazione aperte per questo documento.');
+            }
+            if ($this->ruoloQui($request) !== \App\Service\Zone\Accesso::UFFICIO
+                && (int)$r['richiesto_da'] !== (int)($request->user()->id ?? 0)) {
+                \App\Service\Zone\Accesso::nega('La richiesta può essere annullata solo da chi l\'ha fatta o da CSM.');
+            }
+            $c->annulla((int)$r['id']);
+            return ['annullata' => true];
+        });
+    }
+
+    /**
+     * Salva il PDF compilato nel browser come nuova versione del documento.
+     * L'originale non si tocca. Multipart: campo "file".
+     */
+    public function compilaFile(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $file = $this->fileRepo->find((int)$request->param('fileId'));
+            $this->fileVisibile($request, $file);
+            $c = new \App\Service\Zone\Compilazioni($this->conn);
+            if (!\App\Service\Zone\Compilazioni::compilabile($file)) {
+                throw new \RuntimeException('Solo i documenti PDF possono essere compilati in BOB Zone.');
+            }
+            if (!\App\Service\Zone\Compilazioni::puoCompilare($this->ruoloQui($request), $c->aperta((int)$file['id']))) {
+                \App\Service\Zone\Accesso::nega('La compilazione di questo documento è stata richiesta a un altro ruolo.');
+            }
+            $up = $_FILES['file'] ?? null;
+            if (!$up || ($up['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new \RuntimeException('Il documento compilato non è stato ricevuto.');
+            }
+            if (($up['size'] ?? 0) > 50 * 1024 * 1024) {
+                throw new \RuntimeException('Il documento supera la dimensione massima di 50 MB.');
+            }
+            $testa = (string)file_get_contents((string)$up['tmp_name'], false, null, 0, 5);
+            if ($testa !== '%PDF-') {
+                throw new \RuntimeException('Il documento compilato non è un PDF valido.');
+            }
+            $dir  = \CloudPath::ensureZoneFilesDir($w);
+            $base = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo((string)$file['file_name'], PATHINFO_FILENAME));
+            $dest = $dir . DIRECTORY_SEPARATOR . $base . '_compilato_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.pdf';
+            if (!move_uploaded_file((string)$up['tmp_name'], $dest)) {
+                throw new \RuntimeException('Salvataggio del documento non riuscito.');
+            }
+            $io = (int)($request->user()->id ?? 0);
+            $esito = $c->salvaCompilato($w, $file, $io, \CloudPath::relativeToRoot($dest), (int)($up['size'] ?? 0));
+            if ($esito['richiesta']) {
+                $rid = (int)$esito['richiesta']['id'];
+                $this->avvisa(fn($a) => $a->compilato($rid, $io));
+            }
+            return ['versione_id' => $esito['versione_id'], 'richiesta_chiusa' => (bool)$esito['richiesta']];
+        });
+    }
+
+    /** Una versione compilata, a chi vede il documento. */
+    public function versioneFile(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+        $this->assertZone();
+
+        $file = $this->fileRepo->find((int)$request->param('fileId'));
+        $this->fileVisibile($request, $file);
+        $v = (new \App\Service\Zone\Compilazioni($this->conn))->versione((int)$request->param('vid'));
+        $root = realpath(\CloudPath::getRoot());
+        $real = $v ? realpath(\CloudPath::getRoot() . DIRECTORY_SEPARATOR . $v['file_path']) : false;
+        if (!$v || (int)$v['file_id'] !== (int)$file['id'] || $real === false || $root === false
+            || strpos($real, $root) !== 0 || !is_file($real)) {
+            http_response_code(404);
+            exit('Versione non trovata');
+        }
+        $nome = pathinfo((string)$file['file_name'], PATHINFO_FILENAME) . ' (compilato ' . date('d-m-Y', strtotime((string)$v['created_at'])) . ').pdf';
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . str_replace('"', '', $nome) . '"');
+        header('Content-Length: ' . filesize($real));
+        header('X-Frame-Options: SAMEORIGIN');
+        readfile($real);
+        exit;
+    }
+
+    /** I PDF da compilare del cantiere che chi chiede vede: per la sezione Moduli. */
+    public function daCompilare(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+            $cartelle = $this->cartelleVisibili($request, $w);
+            $ruolo = $this->ruoloQui($request);
+            $io = (int)($request->user()->id ?? 0);
+            $fuori = [];
+            foreach ((new \App\Service\Zone\Compilazioni($this->conn))->delCantiere($w) as $r) {
+                $f = ['id' => (int)$r['file_id'], 'folder_id' => $r['folder_id'], 'uploaded_by' => $r['uploaded_by'], 'file_type' => $r['file_type']];
+                if (!$this->vedeFile($request, $f, $cartelle)) continue;
+                $aperta = $r['stato'] === 'da_compilare';
+                $fuori[] = [
+                    'id'            => (int)$r['id'],
+                    'file_id'       => (int)$r['file_id'],
+                    'file_name'     => $r['file_name'],
+                    'stato'         => $r['stato'],
+                    'per_ruolo'     => $r['per_ruolo'],
+                    'nota'          => $r['nota'],
+                    'richiesto_da'  => $r['richiesto_da_nome'],
+                    'richiesto_mio' => (int)$r['richiesto_da'] === $io,
+                    'created_at'    => $r['created_at'],
+                    'compilato_da'  => $r['compilato_da_nome'] ?: null,
+                    'compilato_at'  => $r['compilato_at'],
+                    'versione_url'  => $r['versione_id'] ? "/worksites/{$w}/zone/files/{$r['file_id']}/versioni/{$r['versione_id']}/download" : null,
+                    'download_url'  => "/worksites/{$w}/zone/files/{$r['file_id']}/download",
+                    'puo_compilare' => \App\Service\Zone\Compilazioni::puoCompilare($ruolo, $aperta ? $r : null),
+                ];
+            }
+            return $fuori;
         });
     }
 
