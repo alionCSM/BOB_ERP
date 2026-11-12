@@ -345,6 +345,16 @@ verifica(S, 'gli allegati si scaricano dalla cartella', dk['messaggi'][0]['alleg
 verifica(S, 'la squadra che vede la cartella legge la richiesta', puo(chiama(CAPO, 'GET', f'/richieste/{rid}')))
 verifica(S, '... ma non la elimina (non è sua)', not puo(chiama(CAPO, 'POST', f'/richieste/{rid}/elimina', {})))
 verifica(S, 'si riapre', puo(chiama(CLI, 'POST', f'/richieste/{rid}/stato', {'stato': 'aperta'})) and chiama(CLI, 'GET', f'/richieste/{rid}')['data']['richiesta']['stato'] == 'aperta')
+orig_id = [x for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files'] if x['file_name'] == 'modulo_collaudo.pdf'][0]['id']
+comp = [x for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files'] if x['file_name'] == 'modulo_collaudo (compilato).pdf']
+verifica(S, "i documenti arrivati con una richiesta ne portano l'oggetto", comp and comp[0]['richiesta_titolo'] == 'Modulo di collaudo', str(comp)[:200])
+vr = chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', file={'nome': 'modulo_collaudo (compilato).pdf', 'campi': {'testo': 'Versione corretta', 'da_file_id': orig_id}})
+cv = sql(f"SELECT origine_file_id, richiesta_id FROM bb_zone_files WHERE richiesta_id={rid} ORDER BY id DESC LIMIT 1")
+verifica(S, "la copia compilata da una richiesta è una versione dell'originale", puo(vr) and cv == [[str(orig_id), str(rid)]], str(cv))
+sub_v = chiama(UFF, 'POST', '/files', file={'nome': 'collaudo (compilato).pdf', 'campi': {'da_file_id': orig_id}})
+sv = sql(f"SELECT origine_file_id, folder_id FROM bb_zone_files WHERE id={sub_v['data']['id']}") if puo(sub_v) else []
+verifica(S, "compilando un PDF della cartella la copia va nella stessa cartella, come versione", sv == [[str(orig_id), str(f1)]], str(sv))
+verifica(S, 'non si compila da un documento che non si vede', not puo(chiama(CLI, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'da_file_id': 999999}})))
 f3 = chiama(UFF, 'POST', '/files/folder', {'name': 'Documenti impresa'})['data']['id']
 r3 = chiama(CLI, 'POST', '/richieste', form={'folder_id': f3, 'titolo': 'DURC aggiornato', 'testo': 'Ci serve il DURC aggiornato.'})['data']['id']
 sql(f"DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo='cartella' AND oggetto_id={f3}; DELETE FROM bb_zone_condivisioni WHERE tipo='cartella' AND oggetto_id={f3}")

@@ -2340,22 +2340,37 @@ function renderFiles(files, moduli, richieste = []) {
             <button class="bz-file-act" data-modulo-modifica="${t.id}" title="Modifica il modulo"><i class="fas fa-sliders"></i></button>
             <button class="bz-file-act danger" data-modulo-elimina="${t.id}" title="Elimina il modulo"><i class="fas fa-trash"></i></button>
         </div>`).join('');
-    const righeFile = files.map(f => {
+    // le copie compilate stanno sotto il loro originale, come versioni
+    const copie = {};
+    files.forEach(f => { if (f.origine_file_id && files.some(o => Number(o.id) === Number(f.origine_file_id))) (copie[f.origine_file_id] ||= []).push(f); });
+    const rigaFile = (f, versione) => {
         const viewable = canView(f.file_type);
+        const nCopie = (copie[f.id] || []).length;
+        const tag = [
+            versione ? '' : (nCopie ? `<span class="bz-tag-versioni">${nCopie === 1 ? '1 versione compilata' : nCopie + ' versioni compilate'}</span>` : ''),
+            f.origine_file_id && !versione ? '<span class="bz-tag-versioni">Versione compilata</span>' : '',
+            f.richiesta_id ? `<button type="button" class="bz-tag-richiesta" data-richiesta="${f.richiesta_id}" title="Apri la richiesta"><i class="fas fa-inbox"></i> ${escHtml(f.richiesta_titolo || 'Richiesta')}</button>` : '',
+        ].join('');
         return `
-        <div class="bz-file-row">
+        <div class="bz-file-row ${versione ? 'bz-file-versione' : ''}">
+            ${versione ? '<i class="fas fa-turn-up bz-versione-freccia"></i>' : ''}
             <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
             <div class="bz-file-info ${viewable?'bz-file-clickable':''}"
                  ${viewable?`data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}"`:''}>
                 <div class="bz-file-name">${escHtml(f.file_name)}</div>
-                <div class="bz-file-sub">${escHtml(f.uploader||'—')} · ${fmtDateTime(f.created_at)} · ${humanSize(f.size_bytes)}</div>
+                <div class="bz-file-sub bz-file-sub-tag">${versione ? '<span class="bz-tag-versioni">Versione compilata</span> ' : ''}${tag}<span>${versione ? 'Compilata da ' : ''}${escHtml(f.uploader||'—')} · ${fmtDateTime(f.created_at)} · ${humanSize(f.size_bytes)}</span></div>
             </div>
+            ${(f.file_type || '').toLowerCase() === 'pdf' && window.BZCompila ? `<button class="bz-file-act" data-compila-file="${f.id}" data-cf-name="${escAttr(f.file_name)}" data-cf-url="${f.download_url}" title="Compilare il PDF in BOB: la copia compilata viene salvata qui, come versione"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
             ${viewable?`<button class="bz-file-act" data-view-file="${f.id}" data-vf-name="${escAttr(f.file_name)}" data-vf-type="${escAttr(f.file_type)}" data-vf-url="${f.download_url}" title="Anteprima"><i class="fas fa-eye"></i></button>`:''}
             <button class="bz-file-act" data-file-comments="${f.id}" data-file-name="${escAttr(f.file_name)}" title="Commenti"><i class="fas fa-comment"></i> ${f.comment_count>0?f.comment_count:''}</button>
             <a class="bz-file-act" href="${f.download_url}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
             ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `<button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}
         </div>`;
-    }).join('');
+    };
+    const sottoUnOriginale = f => f.origine_file_id && files.some(o => Number(o.id) === Number(f.origine_file_id));
+    const righeFile = files.filter(f => !sottoUnOriginale(f))
+        .map(f => rigaFile(f, false) + (copie[f.id] || []).map(c => rigaFile(c, true)).join(''))
+        .join('');
     const righeRichieste = richieste.map(q => `
         <div class="bz-file-row bz-file-clickable" data-richiesta="${q.id}">
             <i class="fas fa-inbox bz-file-icon bz-icona-richiesta"></i>
@@ -2385,6 +2400,24 @@ function chiudiModuloPanel(ricarica = true) {
     pan.hidden = true;
     document.getElementById('bz-files-browser').hidden = false;
     if (ricarica) { loadFiles(); openForms(); }
+}
+
+/* Compilare un PDF della cartella: la copia compilata si salva nella stessa
+   cartella e compare sotto l'originale, come versione. L'originale resta. */
+function compilaDocumento(btn) {
+    const nome = btn.dataset.cfName || 'documento.pdf';
+    window.BZCompila.apri({
+        url: btn.dataset.cfUrl,
+        nome,
+        salva: async blob => {
+            const fd = new FormData();
+            fd.append('file', new File([blob], nome.replace(/\.pdf$/i, '') + ' (compilato).pdf', { type: 'application/pdf' }));
+            fd.append('da_file_id', btn.dataset.compilaFile);
+            const r = await api(`/worksites/${WID}/zone/files`, { method: 'POST', body: fd });
+            if (!r.ok) throw new Error(r.error || 'Salvataggio non riuscito.');
+            loadFiles();
+        },
+    });
 }
 
 async function createFolder() {
@@ -2484,6 +2517,7 @@ document.addEventListener('click', e => {
     if (e.target.closest('#bz-new-modulo')) { window.BZForms?.openBuilder(null, { folder_id: curFolder }); return; }
     if (e.target.closest('#bz-new-richiesta')) { window.BZRichieste?.nuova(curFolder, percorsoDi(curFolder).pop()?.name || ''); return; }
     if ((m = e.target.closest('[data-richiesta]'))) { window.BZRichieste?.apri(parseInt(m.dataset.richiesta)); return; }
+    if ((m = e.target.closest('[data-compila-file]'))) { compilaDocumento(m); return; }
     if ((m = e.target.closest('[data-modulo-compila]')))      { window.BZForms?.openFill(parseInt(m.dataset.moduloCompila)); return; }
     if ((m = e.target.closest('[data-modulo-modifica]')))     { window.BZForms?.openBuilder(parseInt(m.dataset.moduloModifica)); return; }
     if ((m = e.target.closest('[data-modulo-compilazioni]'))) { window.BZForms?.openSubmissions(parseInt(m.dataset.moduloCompilazioni), m.dataset.moduloNome); return; }
@@ -3805,6 +3839,15 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-file-freccia { color:#475569; font-size:12px; }
 .bz-tag-modulo { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:rgba(167,139,250,.15); color:#c4b5fd; font-size:10.5px; font-weight:600; vertical-align:middle; }
 .bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
+.bz-file-versione { margin-left:28px; border-style:dashed; }
+.bz-versione-freccia { transform:rotate(90deg); color:#475569; font-size:12px; }
+.bz-file-sub-tag { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; white-space:normal; }
+.bz-file-sub-tag .bz-tag-versioni, .bz-file-sub-tag .bz-tag-richiesta { margin-left:0; }
+.bz-tag-versioni { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:rgba(34,197,94,.14); color:#4ade80; font-size:10.5px; font-weight:600; vertical-align:middle; }
+.bz-tag-richiesta { display:inline-flex; align-items:center; gap:4px; margin-left:6px; padding:1px 7px; border-radius:999px; border:0; background:rgba(245,158,11,.15); color:#fbbf24; font-size:10.5px; font-weight:600; cursor:pointer; vertical-align:middle; font-family:inherit; }
+[data-theme="light"] .bz-tag-versioni { background:#dcfce7; color:#15803d; }
+[data-theme="light"] .bz-tag-richiesta { background:#fef3c7; color:#b45309; }
+@media (max-width: 760px) { .bz-file-versione { margin-left:12px; } }
 .bz-file-act.primario:hover { background:#1d4ed8; color:#fff; }
 #bz-assegnazioni-root:not(:empty) { padding:14px 20px 0; }
 #bz-assegnazioni-root[hidden] { display:none; }
@@ -3906,10 +3949,10 @@ html .bz-dz-empty { color:#94a3b8; }
 {% endif %}
 <script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261112">
-<link rel="stylesheet" href="/assets/css/views/fieldwire/richieste.css?v=20261112">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/richieste.css?v=20261112b">
 {% if not soloAccessi %}<script src="/assets/js/views/fieldwire/menzioni.js?v=20261112"></script>
-<script src="/assets/js/views/fieldwire/compila.js?v=20261112"></script>
-<script src="/assets/js/views/fieldwire/richieste.js?v=20261112"></script>
+<script src="/assets/js/views/fieldwire/compila.js?v=20261112b"></script>
+<script src="/assets/js/views/fieldwire/richieste.js?v=20261112b"></script>
 <script nonce="{{ cspNonce }}">
 // le richieste si aprono nel pannello dei Documenti
 window.BZRichieste && BZRichieste.init({ apri: () => apriModuloPanel('richiesta'), chiudi: r => chiudiModuloPanel(r) });

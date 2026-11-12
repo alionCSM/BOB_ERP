@@ -160,6 +160,7 @@
             <div class="bzr-allegato">
                 <i class="fas ${icona(a.file_type)}"></i>
                 <a href="${esc(a.download_url)}" target="_blank" rel="noopener">${esc(a.file_name)}</a>
+                ${a.origine ? '<span class="bzr-compilato">Versione compilata</span>' : ''}
                 <span class="bzr-peso">${peso(a.size_bytes)}</span>
                 ${a.file_type === 'pdf' ? `<button type="button" class="bzr-btn piccolo" data-bzr-compila="${a.id}" data-url="${esc(a.download_url)}" data-nome="${esc(a.file_name)}" title="Compilare il PDF in BOB e inviarlo come risposta"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
             </div>` : '<div class="bzr-allegato via"><i class="fas fa-file-circle-xmark"></i> Documento eliminato dalla cartella</div>').join('');
@@ -185,6 +186,7 @@
                 const fd = new FormData();
                 fd.append('testo', 'Documento compilato: ' + nome);
                 fd.append('file[]', new File([blob], base + ' (compilato).pdf', { type: 'application/pdf' }));
+                fd.append('da_file_id', btn.dataset.bzrCompila);   // la copia compilata e' una versione dell'originale
                 if (completa) fd.append('completa', '1');
                 const x = await chiama(`${BASE}/richieste/${id}/messaggi`, { method: 'POST', body: fd });
                 if (!x.ok) throw new Error(x.error || 'Salvataggio non riuscito.');

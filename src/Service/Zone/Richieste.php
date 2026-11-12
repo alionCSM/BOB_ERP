@@ -120,7 +120,7 @@ final class Richieste
         $file = [];
         if ($tutti) {
             $in = implode(',', array_keys($tutti));
-            foreach ($this->conn->query("SELECT id, file_name, file_type, size_bytes, worksite_id FROM bb_zone_files WHERE id IN ($in)")
+            foreach ($this->conn->query("SELECT id, file_name, file_type, size_bytes, worksite_id, origine_file_id FROM bb_zone_files WHERE id IN ($in)")
                          ->fetchAll(PDO::FETCH_ASSOC) as $f) {
                 $file[(int)$f['id']] = $f;
             }
@@ -131,7 +131,8 @@ final class Richieste
                 // un allegato eliminato dalla cartella resta citato, senza link
                 $m['allegati'][] = isset($file[$f])
                     ? ['id' => $f, 'file_name' => $file[$f]['file_name'], 'file_type' => strtolower((string)$file[$f]['file_type']),
-                       'size_bytes' => (int)$file[$f]['size_bytes'], 'esiste' => true]
+                       'size_bytes' => (int)$file[$f]['size_bytes'], 'esiste' => true,
+                       'origine' => !empty($file[$f]['origine_file_id']) ? (int)$file[$f]['origine_file_id'] : null]
                     : ['id' => $f, 'file_name' => null, 'esiste' => false];
             }
             unset($m['file_ids']);

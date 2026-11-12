@@ -62,9 +62,11 @@ final class ZoneFileRepository
         $sql = "
             SELECT f.*,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
-                   (SELECT COUNT(*) FROM bb_zone_file_comments c WHERE c.file_id = f.id) AS comment_count
+                   (SELECT COUNT(*) FROM bb_zone_file_comments c WHERE c.file_id = f.id) AS comment_count,
+                   r.titolo AS richiesta_titolo
             FROM bb_zone_files f
             LEFT JOIN bb_users u ON u.id = f.uploaded_by
+            LEFT JOIN bb_zone_richieste r ON r.id = f.richiesta_id
             WHERE f.worksite_id = :w AND " . ($folderId === null ? "f.folder_id IS NULL" : "f.folder_id = :f") . "
             ORDER BY f.created_at DESC
         ";
@@ -85,10 +87,12 @@ final class ZoneFileRepository
     public function create(array $d): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_files (worksite_id, folder_id, file_name, file_path, file_type, size_bytes, uploaded_by)
-            VALUES (:w, :folder, :name, :path, :type, :size, :uid)
+            INSERT INTO bb_zone_files (worksite_id, folder_id, file_name, file_path, file_type, size_bytes, uploaded_by, origine_file_id, richiesta_id)
+            VALUES (:w, :folder, :name, :path, :type, :size, :uid, :orig, :rich)
         ");
         $stmt->execute([
+            ':orig'   => $d['origine_file_id'] ?? null,   // compilato da questo documento
+            ':rich'   => $d['richiesta_id'] ?? null,      // arrivato con questa richiesta
             ':w'      => $d['worksite_id'],
             ':folder' => $d['folder_id'] ?? null,
             ':name'   => $d['file_name'],

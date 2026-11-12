@@ -1465,7 +1465,13 @@ final class FieldwireController
             if (!$caricati) {
                 throw new \RuntimeException('Nessun file ricevuto');
             }
-            $id = $this->salvaFileZona($worksiteId, $folderId, $caricati[0], (int)($user?->id ?? 0));
+            // una copia compilata in BOB va nella cartella dell'originale, come sua versione
+            $orig = $this->origineCompilata($request);
+            if ($orig) {
+                $folderId = $orig['folder_id'] !== null ? (int)$orig['folder_id'] : null;
+            }
+            $id = $this->salvaFileZona($worksiteId, $folderId, $caricati[0], (int)($user?->id ?? 0),
+                ['origine_file_id' => $orig ? (int)$orig['id'] : null]);
 
             // Nella radice non c'e' una cartella da cui ereditare: un file
             // caricato li' nasce condiviso come prima faceva l'etichetta —
@@ -1511,8 +1517,12 @@ final class FieldwireController
         return $fuori;
     }
 
-    /** Salva un file caricato fra i documenti della Zone, in una cartella. */
-    private function salvaFileZona(int $worksiteId, ?int $folderId, array $f, int $userId): int
+    /**
+     * Salva un file caricato fra i documenti della Zone, in una cartella.
+     *
+     * @param array{origine_file_id?:?int, richiesta_id?:?int} $legami
+     */
+    private function salvaFileZona(int $worksiteId, ?int $folderId, array $f, int $userId, array $legami = []): int
     {
         if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
             throw new \RuntimeException('Caricamento del documento non riuscito.');
@@ -1540,7 +1550,31 @@ final class FieldwireController
             'file_type'   => $ext,
             'size_bytes'  => (int)($f['size'] ?? 0),
             'uploaded_by' => $userId ?: null,
+            'origine_file_id' => $legami['origine_file_id'] ?? null,
+            'richiesta_id'    => $legami['richiesta_id'] ?? null,
         ]);
+    }
+
+    /**
+     * Il documento da cui si e' compilata una copia (campo "da_file_id"):
+     * deve essere di questo cantiere e visibile a chi carica. Una copia di
+     * una copia punta all'originale.
+     */
+    private function origineCompilata(Request $request): ?array
+    {
+        $da = (int)($_POST['da_file_id'] ?? 0);
+        if ($da <= 0) {
+            return null;
+        }
+        $orig = $this->fileRepo->find($da);
+        $this->fileVisibile($request, $orig);
+        if (!empty($orig['origine_file_id'])) {
+            $prima = $this->fileRepo->find((int)$orig['origine_file_id']);
+            if ($prima && (int)$prima['worksite_id'] === (int)$orig['worksite_id']) {
+                $orig = $prima;
+            }
+        }
+        return $orig;
     }
 
     public function deleteFile(Request $request): void
@@ -1662,11 +1696,15 @@ final class FieldwireController
     }
 
     /** Gli allegati del multipart salvati nella cartella della richiesta. @return int[] */
-    private function allegatiRichiesta(Request $request, int $w, int $folderId): array
+    private function allegatiRichiesta(Request $request, int $w, int $folderId, ?int $richiestaId = null): array
     {
+        $orig = $this->origineCompilata($request);
         $ids = [];
         foreach (array_slice($this->fileRicevuti('file'), 0, 10) as $f) {
-            $ids[] = $this->salvaFileZona($w, $folderId, $f, (int)($request->user()->id ?? 0));
+            $ids[] = $this->salvaFileZona($w, $folderId, $f, (int)($request->user()->id ?? 0), [
+                'origine_file_id' => $orig ? (int)$orig['id'] : null,
+                'richiesta_id'    => $richiestaId,
+            ]);
         }
         return $ids;
     }
@@ -1689,6 +1727,10 @@ final class FieldwireController
             }
             $allegati = $this->allegatiRichiesta($request, $w, $cartella);
             $id = (new \App\Service\Zone\Richieste($this->conn))->crea($w, $cartella, $titolo, $io, (string)($_POST['testo'] ?? ''), $allegati);
+            if ($allegati) {
+                $this->conn->prepare('UPDATE bb_zone_files SET richiesta_id = ? WHERE id IN (' . implode(',', array_map('intval', $allegati)) . ')')
+                    ->execute([$id]);
+            }
             $this->avvisa(fn($a) => $a->richiestaNuova($id, $io));
             return ['id' => $id];
         });
@@ -1735,7 +1777,7 @@ final class FieldwireController
             if (trim($testo) === '' && !$this->fileRicevuti('file')) {
                 throw new \RuntimeException('Scrivere un messaggio o allegare un documento.');
             }
-            $allegati = $this->allegatiRichiesta($request, $w, (int)$r['folder_id']);
+            $allegati = $this->allegatiRichiesta($request, $w, (int)$r['folder_id'], (int)$r['id']);
             $svc->scrivi((int)$r['id'], $io, $testo, $allegati);
             $anteprima = trim($testo) !== '' ? $testo : \App\Service\Lingua::testo('zona_documento_allegato', 'it');
             $this->avvisa(fn($a) => $a->richiestaRisposta((int)$r['id'], $io, $anteprima));
