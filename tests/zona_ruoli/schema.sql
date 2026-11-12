@@ -6,7 +6,7 @@ CREATE TABLE bb_users(id INT PRIMARY KEY, username VARCHAR(40), first_name VARCH
 CREATE TABLE bb_user_permissions(user_id INT, module VARCHAR(40), allowed TINYINT);
 CREATE TABLE bb_user_company_permissions(user_id INT, module VARCHAR(40), allowed TINYINT);
 CREATE TABLE bb_worksites(id INT PRIMARY KEY, name VARCHAR(80), worksite_code VARCHAR(20), location VARCHAR(40), status VARCHAR(20),
-  client_id INT NULL, zone_cliente TINYINT DEFAULT 0, zone_presenze_cliente TINYINT DEFAULT 0, is_draft TINYINT DEFAULT 0, fieldwire_project_id VARCHAR(40) NULL);
+  client_id INT NULL, zone_cliente TINYINT DEFAULT 0, zone_presenze_cliente TINYINT DEFAULT 0, is_draft TINYINT DEFAULT 0, fieldwire_project_id VARCHAR(40) NULL, zone_share_link_id INT NULL);
 CREATE TABLE bb_zone_accessi(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, user_id INT, ruolo VARCHAR(10), created_by INT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(worksite_id,user_id));
 CREATE TABLE bb_worksite_users(worksite_id INT, user_id INT, PRIMARY KEY(worksite_id,user_id));
@@ -18,10 +18,10 @@ CREATE TABLE bb_zone_tasks(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, f
   created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_task_comments(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, text TEXT NULL, file_url TEXT NULL,
   author_name VARCHAR(80) NULL, author_user_id INT NULL, interna TINYINT DEFAULT 0, per_cliente TINYINT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_file_comments(id INT AUTO_INCREMENT PRIMARY KEY, file_id INT, text TEXT, author_name VARCHAR(80), author_user_id INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_file_comments(id INT AUTO_INCREMENT PRIMARY KEY, file_id INT, text TEXT, author_name VARCHAR(80), created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_fw_floorplans(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, fw_id VARCHAR(40), name VARCHAR(100), sheets_count INT DEFAULT 0);
 CREATE TABLE bb_zone_task_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, name VARCHAR(200), completed TINYINT DEFAULT 0, position INT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, parent_id INT NULL, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, parent_id INT NULL, sorgente VARCHAR(20) NULL, sorgente_id INT NULL, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, origine_file_id INT NULL, richiesta_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
   size_bytes BIGINT DEFAULT 0, uploaded_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, client_id INT NULL, folder_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
@@ -65,6 +65,17 @@ INSERT INTO bb_users(id,username,first_name,last_name,email,type,client_id,worke
  (11,'rossi2','Anna','Rossi','anna@rossi.it','client',1,NULL),
  (20,'bianchi','Luca','Bianchi','luca@bianchi.it','client',2,NULL);
 INSERT INTO bb_workers VALUES (300,'Arben','Hoxha','CSM'),(301,'Ion','Popescu','Edilnord');
+CREATE TABLE bb_shared_links(id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, link_token VARCHAR(64), password VARCHAR(255) NULL, title VARCHAR(200), expires_at DATETIME NULL, is_active TINYINT DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_shared_link_workers(shared_link_id INT, worker_id INT);
+CREATE TABLE bb_shared_link_companies(shared_link_id INT, company_id INT);
+CREATE TABLE bb_company_documents(id INT AUTO_INCREMENT PRIMARY KEY, company_id INT, tipo_documento VARCHAR(100), data_emissione DATE NULL, scadenza DATE NULL, file_path VARCHAR(300));
+CREATE TABLE bb_worker_documents(id INT AUTO_INCREMENT PRIMARY KEY, worker_id INT, tipo_documento VARCHAR(100), data_emissione DATE NULL, scadenza DATE NULL, path VARCHAR(300));
+INSERT INTO bb_companies VALUES (900,'Edilnord Srl'),(901,'Montaggi Sud Srl');
+INSERT INTO bb_shared_links(id,user_id,link_token,title) VALUES (1,5,'tok1','Documenti Magazzino Nord');
+INSERT INTO bb_shared_link_companies VALUES (1,900),(1,901);
+INSERT INTO bb_shared_link_workers VALUES (1,300),(1,301);
+INSERT INTO bb_company_documents(company_id,tipo_documento,scadenza,file_path) VALUES (900,'DURC','2020-01-31','az/durc.pdf'),(900,'Visura camerale',NULL,'az/visura.pdf'),(901,'DURC','2099-01-01','az/durc2.pdf');
+INSERT INTO bb_worker_documents(worker_id,tipo_documento,scadenza,path) VALUES (300,'Idoneità sanitaria','2099-12-31','op/ido.pdf'),(301,'Formazione lavori in quota',NULL,'op/quota.pdf');
 INSERT INTO bb_worksites(id,name,worksite_code,client_id,zone_cliente) VALUES (100,'Magazzino Nord','C-118',1,1),(200,'Bianchi Torino','C-200',2,1);
 INSERT INTO bb_zone_accessi(worksite_id,user_id,ruolo) VALUES (100,5,'ufficio'),(100,30,'cantiere'),(100,10,'cliente'),(200,5,'ufficio'),(200,20,'cliente');
 INSERT INTO bb_worksite_users VALUES (100,5),(100,30),(100,10),(200,5),(200,20);

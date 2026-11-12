@@ -98,6 +98,9 @@ final class LeMie
      */
     public function daCompilare(int $userId): array
     {
+        if (!ScadenzeModuli::ATTIVI) {
+            return [];   // moduli sospesi per ora
+        }
         $stmt = $this->conn->prepare("
             SELECT fa.id, fa.worksite_id, fa.template_id, fa.frequenza, fa.scadenza, fa.visibilita,
                    t.name AS modulo, w.name AS cantiere_nome, w.worksite_code, a.ruolo,

@@ -256,8 +256,16 @@ final class AvvisiZona
      * @param string[] $ruoli
      * @return array<int, array<string, mixed>> per user_id
      */
-    private function vedonoCartella(int $worksiteId, int $folderId, array $ruoli): array
+    private function vedonoCartella(int $worksiteId, ?int $folderId, array $ruoli): array
     {
+        // in cima ai Documenti: CSM e il committente
+        if ($folderId === null) {
+            $chi = [];
+            foreach ($this->persone($worksiteId, array_values(array_intersect($ruoli, [Accesso::UFFICIO, Accesso::CLIENTE])), null) as $p) {
+                $chi[(int)$p['user_id']] = $p;
+            }
+            return $chi;
+        }
         $catena = [];
         $st = $this->conn->prepare('SELECT id, parent_id, created_by FROM bb_zone_folders WHERE id = :c AND worksite_id = :w');
         $id = $folderId;
@@ -279,6 +287,19 @@ final class AvvisiZona
                 if (!$cond->vede($u, $worksiteId, 'cartella', (int)$c['id'], (int)($c['created_by'] ?? 0))) continue 2;
             }
             $chi[(int)$p['user_id']] = $p;
+        }
+        return $chi;
+    }
+
+    /** Chi vede una richiesta: chi vede la sua cartella (o, in cima, CSM e committente) e chi l'ha aperta. */
+    private function vedonoRichiesta(array $r, array $ruoli): array
+    {
+        $w = (int)$r['worksite_id'];
+        $chi = $this->vedonoCartella($w, $r['folder_id'] !== null ? (int)$r['folder_id'] : null, $ruoli);
+        if ($r['folder_id'] === null && !empty($r['created_by'])) {
+            foreach ($this->persone($w, [], (int)$r['created_by']) as $p) {
+                if (in_array($p['ruolo'], $ruoli, true)) $chi[(int)$p['user_id']] = $p;
+            }
         }
         return $chi;
     }
@@ -305,7 +326,7 @@ final class AvvisiZona
         $w = (int)$r['worksite_id'];
         $ruoli = $this->ruoloDi($w, $daChi) === Accesso::UFFICIO ? [Accesso::CLIENTE, Accesso::CANTIERE] : [Accesso::UFFICIO];
         $chi = $this->nome($daChi);
-        foreach ($this->vedonoCartella($w, (int)$r['folder_id'], $ruoli) as $uid => $p) {
+        foreach ($this->vedonoRichiesta($r, $ruoli) as $uid => $p) {
             if ($uid === $daChi) continue;
             $p['worksite_id'] = $w;
             $p['dove'] = 'richiesta-' . $id;
@@ -325,7 +346,7 @@ final class AvvisiZona
         $r = $this->richiesta($id);
         if (!$r) return;
         $w = (int)$r['worksite_id'];
-        $vedono = $this->vedonoCartella($w, (int)$r['folder_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
+        $vedono = $this->vedonoRichiesta($r, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
         $a = array_fill_keys((new Richieste($this->conn))->partecipanti($id), true);
         if ($this->ruoloDi($w, $daChi) !== Accesso::UFFICIO) {
             foreach ($vedono as $uid => $p) {
@@ -351,7 +372,7 @@ final class AvvisiZona
         $r = $this->richiesta($id);
         if (!$r || empty($r['created_by']) || (int)$r['created_by'] === $daChi) return;
         $w = (int)$r['worksite_id'];
-        $vedono = $this->vedonoCartella($w, (int)$r['folder_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
+        $vedono = $this->vedonoRichiesta($r, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
         $p = $vedono[(int)$r['created_by']] ?? null;
         if (!$p) return;
         $p['worksite_id'] = $w;
@@ -364,6 +385,10 @@ final class AvvisiZona
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {
+        // moduli sospesi per ora: nessun avviso per qualcosa che non si vede
+        if (!\App\Service\Zone\ScadenzeModuli::ATTIVI) {
+            return;
+        }
         $st = $this->conn->prepare("
             SELECT fa.*, t.name AS modulo, w.name AS cantiere, w.zone_cliente
             FROM bb_zone_form_assegnazioni fa

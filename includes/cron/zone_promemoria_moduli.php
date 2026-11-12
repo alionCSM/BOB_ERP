@@ -22,6 +22,11 @@ if (php_sapi_name() !== 'cli') {
 define('APP_ROOT', dirname(__DIR__, 2));
 require_once APP_ROOT . '/includes/bootstrap.php';
 
+// moduli della Zone sospesi per ora: niente promemoria
+if (!\App\Service\Zone\ScadenzeModuli::ATTIVI) {
+    exit(0);
+}
+
 $giorno = $argv[1] ?? date('Y-m-d');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $giorno)) {
     $giorno = date('Y-m-d');

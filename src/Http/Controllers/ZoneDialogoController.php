@@ -195,9 +195,11 @@ final class ZoneDialogoController
     {
         $this->json(function () use ($request) {
             [$w, $ruolo, $io] = $this->chi($request);
-            $id = $this->segnalazioni->crea($w, $ruolo, $io, $this->corpo());
+            $body = $this->corpo();
+            $id = $this->segnalazioni->crea($w, $ruolo, $io, $body);
             // l'avviso parte subito; le foto arrivano dopo nel filo
             $this->avvisa(fn(NotificationService $n) => $this->segnalazioni->avvisaNuova($n, $id));
+            $this->avvisaMenzioni($w, 'segnalazione', ['id' => $id], 'segnalazione-' . $id, $body, $io);
             return $this->segnalazioni->trova($id);
         });
     }
@@ -388,6 +390,15 @@ final class ZoneDialogoController
                 }
                 // la nota interna la scrive solo CSM
                 $dove['interna'] = $ruolo === Accesso::UFFICIO && !empty($_GET['interna']);
+            } elseif ($contesto === 'segnalazione_nuova') {
+                // la visibilita' la sceglie solo CSM; per gli altri e' "tutti"
+                $dove['vis'] = $ruolo === Accesso::UFFICIO ? (string)($_GET['vis'] ?? 'tutti') : 'tutti';
+            } elseif (in_array($contesto, ['cartella', 'richiesta', 'file'], true)) {
+                // chi chiede deve essere fra chi legge (CSM sempre)
+                $tutti = (new Menzioni($this->conn))->lettori($w, $contesto, $dove, 0);
+                if ($ruolo !== Accesso::UFFICIO && !in_array($io, array_column($tutti, 'id'), true)) {
+                    Accesso::nega('Non hai accesso a questo contenuto');
+                }
             } else {
                 throw new \RuntimeException('Conversazione non valida');
             }

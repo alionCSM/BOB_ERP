@@ -218,7 +218,7 @@
                 <label>Categoria</label>${scelte('tipo', TIPI, S.nuova.tipo)}
                 <label>Gravità</label>${scelte('gravita', GRAVITA, S.nuova.gravita)}
                 <label>Descrizione</label>
-                <textarea id="bzd-nuova-testo" placeholder="Es. manca la bulloneria M12 per la campata 4"></textarea>
+                <textarea id="bzd-nuova-testo" placeholder="Es. manca la bulloneria M12 per la campata 4 (@ per menzionare)"></textarea>
                 <label>Foto (facoltative)</label>
                 <input type="file" id="bzd-nuova-foto" accept="image/*" multiple>
                 ${DA_UFFICIO ? `<label>Chi la vede</label><select id="bzd-nuova-vis">${Object.keys(VIS).map(k => `<option value="${k}" ${k === 'tutti' ? 'selected' : ''}>${VIS[k].label}</option>`).join('')}</select>` : ''}
@@ -236,6 +236,7 @@
         const r = await post(BASE + '/segnalazioni', {
             tipo: S.nuova.tipo, gravita: S.nuova.gravita, testo,
             visibilita: document.getElementById('bzd-nuova-vis')?.value,
+            menzioni: window.BZMenzioni ? BZMenzioni.ids(document.getElementById('bzd-nuova-testo')) : [],
         });
         if (!r.ok) { btn.disabled = false; alert(r.error || 'Non inviata'); return; }
         for (const f of document.getElementById('bzd-nuova-foto').files) {
@@ -553,6 +554,7 @@
     if (window.BZMenzioni) {
         BZMenzioni.collega('[data-bzd-testo-chat]', () => C.canale ? 'contesto=chat&canale=' + encodeURIComponent(C.canale) : '');
         BZMenzioni.collega('[data-bzd-testo-segn]', () => S.apertaId ? 'contesto=segnalazione&id=' + S.apertaId : '');
+        BZMenzioni.collega('#bzd-nuova-testo', () => 'contesto=segnalazione_nuova&vis=' + encodeURIComponent(document.getElementById('bzd-nuova-vis')?.value || 'tutti'));
     }
 
     window.BZDialogo = {

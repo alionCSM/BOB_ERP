@@ -19,6 +19,8 @@
     const BASE = '/worksites/' + WID + '/zone';
     let cb = { apri: () => {}, chiudi: () => {} };
     let aperta = null;     // id della richiesta aperta
+    let cartellaNuova = null; // la cartella della richiesta che si sta scrivendo (0 = in cima)
+    const menzioni = el => (window.BZMenzioni && el ? BZMenzioni.ids(el) : []);
     const root = () => document.getElementById('bz-richiesta-root');
 
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -53,8 +55,9 @@
 
     // ── Nuova richiesta ─────────────────────────────────────────────────────
     function nuova(folderId, nomeCartella) {
-        if (!folderId) { alert('Aprire una cartella per creare la richiesta.'); return; }
         aperta = null;
+        cartellaNuova = folderId || 0;
+        nomeCartella = folderId ? nomeCartella : 'Documenti';
         cb.apri();
         root().innerHTML = `
             <div class="bzr">
@@ -67,13 +70,15 @@
                     <label for="bzr-titolo">Oggetto</label>
                     <input type="text" id="bzr-titolo" maxlength="200" placeholder="Es. Modulo di collaudo da compilare">
                     <label for="bzr-testo">Messaggio</label>
-                    <textarea id="bzr-testo" rows="5" placeholder="Es. Vi inviamo il modulo di collaudo da compilare e restituire entro venerdì."></textarea>
+                    <textarea id="bzr-testo" rows="5" placeholder="Es. Vi inviamo il modulo di collaudo da compilare e restituire entro venerdì. (@ per menzionare)"></textarea>
                     <label>Documenti allegati (facoltativi)</label>
                     <div class="bzr-allega">
                         <label class="bzr-btn"><i class="fas fa-paperclip"></i> Allega documento<input type="file" id="bzr-file" multiple hidden></label>
                         <div class="bzr-chips" id="bzr-file-lista"></div>
                     </div>
-                    <p class="bzr-nota">La richiesta e i documenti allegati restano nella cartella «${esc(nomeCartella || '')}» e sono visibili a chi vede la cartella.</p>
+                    <p class="bzr-nota">${folderId
+                        ? `La richiesta e i documenti allegati restano nella cartella «${esc(nomeCartella || '')}» e sono visibili a chi vede la cartella.`
+                        : 'La richiesta resta in cima ai Documenti ed è visibile a CSM e al committente.'}</p>
                     <div class="bzr-azioni">
                         <button type="button" class="bzr-btn" data-bzr-indietro>Annulla</button>
                         <button type="button" class="bzr-btn primario" id="bzr-crea"><i class="fas fa-paper-plane"></i> Invia richiesta</button>
@@ -87,9 +92,10 @@
             const testo = document.getElementById('bzr-testo').value.trim();
             if (!titolo) { alert('Inserire l\'oggetto della richiesta.'); return; }
             const fd = new FormData();
-            fd.append('folder_id', folderId);
+            if (folderId) fd.append('folder_id', folderId);
             fd.append('titolo', titolo);
             fd.append('testo', testo);
+            menzioni(document.getElementById('bzr-testo')).forEach(id => fd.append('menzioni[]', id));
             allegati().forEach(f => fd.append('file[]', f));
             e.currentTarget.disabled = true;
             const r = await chiama(BASE + '/richieste', { method: 'POST', body: fd });
@@ -124,7 +130,7 @@
                 </div>
                 <div class="bzr-filo">${messaggi.map(riga).join('')}</div>
                 <div class="bzr-scrivi">
-                    <textarea id="bzr-risposta" rows="3" placeholder="Scrivere una risposta..."></textarea>
+                    <textarea id="bzr-risposta" rows="3" placeholder="Scrivere una risposta... (@ per menzionare)"></textarea>
                     <div class="bzr-chips" id="bzr-risposta-lista"></div>
                     <div class="bzr-azioni">
                         <label class="bzr-btn"><i class="fas fa-paperclip"></i> Allega documento<input type="file" id="bzr-risposta-file" multiple hidden></label>
@@ -141,6 +147,7 @@
             if (!testo && !files.length) { alert('Scrivere un messaggio o allegare un documento.'); return; }
             const fd = new FormData();
             fd.append('testo', testo);
+            menzioni(document.getElementById('bzr-risposta')).forEach(m => fd.append('menzioni[]', m));
             files.forEach(f => fd.append('file[]', f));
             if (document.getElementById('bzr-completa')?.checked) fd.append('completa', '1');
             e.currentTarget.disabled = true;
@@ -214,6 +221,12 @@
             cb.chiudi(true);
         }
     });
+
+    // @ nei messaggi: chi vede la cartella (o la richiesta)
+    if (window.BZMenzioni) {
+        BZMenzioni.collega('#bzr-testo', () => 'contesto=cartella&id=' + (cartellaNuova || 0));
+        BZMenzioni.collega('#bzr-risposta', () => aperta ? 'contesto=richiesta&id=' + aperta : '');
+    }
 
     window.BZRichieste = {
         init(c) { cb = { ...cb, ...c }; },
