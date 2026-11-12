@@ -613,6 +613,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/files/folder/{folderId}/delete',                          [FieldwireController::class, 'deleteFolder'])
            ->get( '/worksites/{id}/zone/files/{fileId}/download',                                 [FieldwireController::class, 'downloadFile'])
            ->post('/worksites/{id}/zone/files/{fileId}/delete',                                   [FieldwireController::class, 'deleteFile'])
+           ->post('/worksites/{id}/zone/files/{fileId}/sposta',                                   [FieldwireController::class, 'spostaFile'])
            ->get( '/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'fileComments'])
            ->post('/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'postFileComment'])
            ->get( '/worksites/{id}/zone/link-condivisi',                                          [FieldwireController::class, 'linkCondivisi'])

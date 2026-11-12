@@ -50,6 +50,13 @@
                 </div>
                 <div class="bza-color-swatches" data-el="swatches"></div>
                 <div class="bza-top-right">
+                    <div class="bza-scarica">
+                        <button class="bza-btn bza-btn-ghost" data-act="scarica-menu" title="Scarica il disegno"><i class="fas fa-download"></i> <span>Scarica</span></button>
+                        <div class="bza-scarica-menu" data-el="scaricamenu" hidden>
+                            <button type="button" data-act="scarica-orig"><i class="far fa-file"></i> Originale</button>
+                            <button type="button" data-act="scarica-ann"><i class="fas fa-map-marker-alt"></i> Con annotazioni</button>
+                        </div>
+                    </div>
                     <button class="bza-btn bza-btn-ghost" data-act="toggleann" data-el="toggleann"><i class="fas fa-eye-slash"></i> <span>Nascondi annotazioni</span></button>
                     <button class="bza-btn bza-btn-ghost" data-act="calibrate"><i class="fas fa-ruler-combined"></i> Calibra</button>
                     <div class="bza-page-nav" data-el="pagenav" style="display:none;">
@@ -96,6 +103,7 @@
             banner:    ov.querySelector('[data-el="banner"]'),
             toggleann: ov.querySelector('[data-el="toggleann"]'),
             det:       ov.querySelector('[data-el="det"]'),
+            scaricamenu: ov.querySelector('[data-el="scaricamenu"]'),
         };
         wireDom();
         return dom;
@@ -115,6 +123,9 @@
             if (act === 'toggleann') mostraAnnotazioni(!S.mostra);
             if (act === 'evid-off')  { S.evid = null; dom.banner.hidden = true; redraw(); }
             if (act === 'apri')      apriCollegato(el.dataset.dove);
+            if (act === 'scarica-menu') { dom.scaricamenu.hidden = !dom.scaricamenu.hidden; return; }
+            if (act === 'scarica-orig') { dom.scaricamenu.hidden = true; scaricaOriginale(S); }
+            if (act === 'scarica-ann')  { dom.scaricamenu.hidden = true; scaricaConAnnotazioni(S); }
             const tool = e.target.closest('[data-tool]')?.dataset.tool;
             if (tool) setTool(tool);
         });
@@ -993,5 +1004,123 @@
 
     window.addEventListener('resize', () => { if (S && dom?.ov.classList.contains('open')) { applyStageSize(); nascondiDettaglio(); programmaDettaglio(); } });
 
-    window.BZAnnotator = { open };
+    // ── Download ────────────────────────────────────────────────────────────
+    function salvaFile(blob, nome) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = nome;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
+
+    function scaricaOriginale(cfg) {
+        const a = document.createElement('a');
+        a.href = cfg.viewUrl;
+        a.download = cfg.fileName || 'disegno';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    function caricaPdfLib() {
+        if (window.PDFLib) return Promise.resolve();
+        return new Promise((ok, ko) => {
+            const sc = document.createElement('script');
+            sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+            sc.onload = ok;
+            sc.onerror = () => ko(new Error('Impossibile caricare il componente per creare il PDF.'));
+            document.head.appendChild(sc);
+        });
+    }
+
+    /**
+     * Il disegno con le annotazioni disegnate sopra, in PDF. Le annotazioni
+     * sono in coordinate normalizzate sulla larghezza della pagina (viewBox
+     * largo 1000): con drawSvgPath si disegnano uguali a come si vedono.
+     */
+    async function scaricaConAnnotazioni(cfg) {
+        const ft = (cfg.fileType || '').toLowerCase();
+        if (!['pdf', 'png', 'jpg', 'jpeg'].includes(ft)) { alert('Il download con annotazioni è disponibile per PDF e immagini.'); return; }
+        try {
+            await caricaPdfLib();
+            const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+            const r = await fetch(cfg.viewUrl, { credentials: 'same-origin' });
+            if (!r.ok) throw new Error('Impossibile scaricare il disegno.');
+            const bytes = new Uint8Array(await r.arrayBuffer());
+            let doc;
+            if (ft === 'pdf') {
+                doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+            } else {
+                doc = await PDFDocument.create();
+                const img = ft === 'png' ? await doc.embedPng(bytes) : await doc.embedJpg(bytes);
+                doc.addPage([img.width, img.height]).drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+            }
+            const font = await doc.embedFont(StandardFonts.HelveticaBold);
+            const colore = h => {
+                const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || '') || [0, 'ef', '44', '44'];
+                return rgb(parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255);
+            };
+            const testo = t => Array.from(String(t || '')).map(ch => { try { font.encodeText(ch); return ch; } catch { return ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '') || '?'; } }).join('');
+            const pagine = doc.getPages();
+            for (let i = 0; i < pagine.length; i++) {
+                const res = await fetch(`/worksites/${cfg.worksiteId}/zone/disegni/${cfg.docId}/annotations?page=${i + 1}`,
+                    { credentials: 'same-origin', headers: { 'X-CSRF-Token': cfg.csrf } }).then(x => x.json()).catch(() => null);
+                const anns = res && res.ok ? (res.data.annotations || []) : [];
+                if (!anns.length) continue;
+                const pg = pagine[i];
+                const cb = pg.getCropBox();
+                const k = cb.width / SCALE;                         // unita' viewBox -> punti PDF
+                const o = { x: cb.x, y: cb.y + cb.height, scale: k };
+                const P = (gx, gy) => ({ x: cb.x + gx * cb.width, y: cb.y + cb.height - gy * cb.width });
+                let n = 0;
+                for (const a of anns) {
+                    const g = a.geom || {}, col = colore(a.color);
+                    const linea = { ...o, borderColor: col, borderWidth: 3 };
+                    if (a.type === 'pin') {
+                        n++;
+                        const x = g.x * SCALE, y = g.y * SCALE;
+                        pg.drawSvgPath(`M${x},${y} c-9,-20 -16,-26 -16,-40 a16,16 0 1,1 32,0 c0,14 -7,20 -16,40 z`, { ...o, color: col, borderColor: rgb(1, 1, 1), borderWidth: 2 });
+                        const c = P(g.x, g.y - 40 / SCALE);
+                        pg.drawCircle({ x: c.x, y: c.y, size: 11 * k, color: rgb(1, 1, 1) });
+                        const t = String(n), sz = 13 * k;
+                        pg.drawText(t, { x: c.x - font.widthOfTextAtSize(t, sz) / 2, y: c.y - sz * 0.35, size: sz, font, color: col });
+                    } else if ((a.type === 'arrow' || a.type === 'measure') && g.a && g.b) {
+                        const x1 = g.a.x * SCALE, y1 = g.a.y * SCALE, x2 = g.b.x * SCALE, y2 = g.b.y * SCALE;
+                        let d = `M${x1},${y1} L${x2},${y2}`;
+                        if (a.type === 'arrow') {
+                            const ang = Math.atan2(y2 - y1, x2 - x1), L = 16;
+                            d += ` M${x2},${y2} L${x2 - L * Math.cos(ang - 0.45)},${y2 - L * Math.sin(ang - 0.45)} M${x2},${y2} L${x2 - L * Math.cos(ang + 0.45)},${y2 - L * Math.sin(ang + 0.45)}`;
+                        }
+                        pg.drawSvgPath(d, { ...linea, borderWidth: a.type === 'arrow' ? 4 : 3 });
+                        if (a.type === 'measure') {
+                            const lbl = testo(measureLabel(g)), sz = 14 * k;
+                            const m = P((g.a.x + g.b.x) / 2, (g.a.y + g.b.y) / 2);
+                            const w = font.widthOfTextAtSize(lbl, sz);
+                            pg.drawRectangle({ x: m.x - w / 2 - 3 * k, y: m.y + 6 * k, width: w + 6 * k, height: sz + 4 * k, color: rgb(0.06, 0.09, 0.16) });
+                            pg.drawText(lbl, { x: m.x - w / 2, y: m.y + 8 * k, size: sz, font, color: rgb(1, 1, 1) });
+                        }
+                    } else if ((a.type === 'rectangle' || a.type === 'cloud') && g.w != null) {
+                        const x = g.x * SCALE, y = g.y * SCALE, w = g.w * SCALE, h = g.h * SCALE;
+                        pg.drawSvgPath(`M${x},${y} h${w} v${h} h${-w} Z`, { ...linea, ...(a.type === 'cloud' ? { borderDashArray: [14, 6] } : {}) });
+                    } else if (a.type === 'ellipse' && g.w != null) {
+                        const rx = Math.abs(g.w / 2) * SCALE, ry = Math.abs(g.h / 2) * SCALE, cx = (g.x + g.w / 2) * SCALE, cy = (g.y + g.h / 2) * SCALE;
+                        pg.drawSvgPath(`M${cx - rx},${cy} a${rx},${ry} 0 1,0 ${2 * rx},0 a${rx},${ry} 0 1,0 ${-2 * rx},0`, linea);
+                    } else if (a.type === 'drawing' && Array.isArray(g.pts) && g.pts.length > 1) {
+                        pg.drawSvgPath(g.pts.map((p, j) => `${j ? 'L' : 'M'}${p[0] * SCALE},${p[1] * SCALE}`).join(' '), linea);
+                    } else if (a.type === 'text' && a.text) {
+                        const p = P(g.x, g.y);
+                        pg.drawText(testo(a.text), { x: p.x, y: p.y, size: 20 * k, font, color: col });
+                    }
+                }
+            }
+            const out = await doc.save();
+            const base = (cfg.fileName || 'disegno').replace(/\.[^.]+$/, '');
+            salvaFile(new Blob([out], { type: 'application/pdf' }), base + ' (con annotazioni).pdf');
+        } catch (e) {
+            alert(e && e.message ? e.message : 'Impossibile creare il PDF con le annotazioni.');
+        }
+    }
+
+    window.BZAnnotator = { open, scaricaConAnnotazioni, scaricaOriginale };
 })();

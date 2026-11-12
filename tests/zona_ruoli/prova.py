@@ -330,7 +330,11 @@ fu = chiama(UFF, 'GET', f'/files?folder={f1}')['data']
 verifica(S, "l'allegato è un documento della cartella", 'modulo_collaudo.pdf' in [x['file_name'] for x in fu['files']])
 verifica(S, 'la cartella elenca la richiesta e conta quelle aperte', [x['id'] for x in fu['richieste']] == [rid] and fu['richieste_aperte'].get(str(f1), fu['richieste_aperte'].get(f1)) == 1, str(fu['richieste_aperte']))
 verifica(S, 'non si crea una richiesta in una cartella che non si vede', not puo(chiama(CLI, 'POST', '/richieste', form={'folder_id': f2, 'titolo': 'x', 'testo': 'y'})))
-verifica(S, 'né fuori da una cartella', not puo(chiama(CLI, 'POST', '/richieste', form={'titolo': 'x', 'testo': 'y'})))
+rc = chiama(CLI, 'POST', '/richieste', form={'titolo': 'Programma lavori', 'testo': 'Ci inviate il programma della prossima settimana?'})
+verifica(S, 'si crea una richiesta anche fuori dalle cartelle, in cima ai Documenti', puo(rc), rc.get('error', ''))
+rcid = rc['data']['id'] if puo(rc) else 0
+verifica(S, '... la vede CSM, non la squadra', rcid in [x['id'] for x in chiama(UFF, 'GET', '/files')['data']['richieste']]
+         and rcid not in [x['id'] for x in chiama(CAPO, 'GET', '/files')['data']['richieste']] and chiama(CAPO, 'GET', f'/richieste/{rcid}')['_http'] == 404)
 verifica(S, 'una risposta vuota non si invia', not puo(chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', form={'testo': ' '})))
 pulisci_notifiche()
 rr = chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', file={'nome': 'modulo_collaudo (compilato).pdf', 'campi': {'testo': 'Ecco il modulo compilato.', 'completa': '1'}})
@@ -387,6 +391,27 @@ verifica(S, "togliendo un'azienda dal link sparisce la sua cartella (vuota)", 'M
 chiama(UFF, 'POST', '/link-condivisi', {'link_id': 0})
 cu3 = {c['name'] for c in chiama(UFF, 'GET', '/files')['data']['folders']}
 verifica(S, 'scollegando il link restano solo le cartelle con dentro una richiesta', 'Edilnord Srl' in cu3 and 'Ion Popescu · Edilnord' not in cu3, str(cu3))
+
+S = '6d. Spostare documenti e menzioni nei Documenti'
+fm = chiama(CLI, 'POST', '/files', file={'nome': 'da_spostare.pdf', 'campi': {'folder_id': f1}})['data']['id']
+fdest = chiama(UFF, 'POST', '/files/folder', {'name': 'Archivio'})['data']['id']
+verifica(S, 'chi ha caricato un documento lo sposta in un\'altra cartella', puo(chiama(CLI, 'POST', f'/files/{fm}/sposta', {'folder_id': fdest}))
+         and sql(f"SELECT folder_id FROM bb_zone_files WHERE id={fm}") == [[str(fdest)]])
+verifica(S, 'la squadra non sposta i documenti degli altri', not puo(chiama(CAPO, 'POST', f'/files/{fm}/sposta', {'folder_id': f1})))
+verifica(S, 'non si sposta in una cartella che non si vede', not puo(chiama(CLI, 'POST', f'/files/{fm}/sposta', {'folder_id': f2})))
+mzf = {x['nome'] for x in chiama(CLI, 'GET', f'/menzionabili?contesto=file&id={fm}')['data']}
+verifica(S, 'nei commenti a un documento si menziona chi lo vede', 'Giulia Ufficio' in mzf, str(mzf))
+pulisci_notifiche()
+chiama(CLI, 'POST', f'/files/{fm}/comments', {'text': '@Giulia Ufficio lo potete controllare?', 'menzioni': [UFF]})
+verifica(S, '... e la persona menzionata riceve la notifica', any('menzionato' in n[0] and n[1].endswith(f'#file-{fm}') for n in notifiche(UFF)), str(notifiche(UFF)))
+mzc = {x['nome'] for x in chiama(UFF, 'GET', f'/menzionabili?contesto=cartella&id={f2}')['data']}
+verifica(S, 'in una cartella di sola CSM il committente non si menziona', 'Paolo Rossi' not in mzc, str(mzc))
+verifica(S, 'il committente non chiede chi legge una cartella che non vede', chiama(CLI, 'GET', f'/menzionabili?contesto=cartella&id={f2}')['_http'] == 403)
+mzs = {x['nome'] for x in chiama(CAPO, 'GET', '/menzionabili?contesto=segnalazione_nuova')['data']}
+verifica(S, 'scrivendo una segnalazione si menziona chi la leggerà', 'Giulia Ufficio' in mzs and 'Paolo Rossi' in mzs, str(mzs))
+pulisci_notifiche()
+chiama(CAPO, 'POST', '/segnalazioni', {'testo': '@Paolo Rossi serve il vostro via libera per la gru', 'tipo': 'altro', 'menzioni': [CLI]})
+verifica(S, 'menzione in una segnalazione nuova: notifica al committente', any('menzionato' in n[0] for n in notifiche(CLI)), str(notifiche(CLI)))
 
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]

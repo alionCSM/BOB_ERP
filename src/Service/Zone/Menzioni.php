@@ -23,7 +23,7 @@ use PDO;
  */
 final class Menzioni
 {
-    public const CONTESTI = ['chat', 'segnalazione', 'attivita'];
+    public const CONTESTI = ['chat', 'segnalazione', 'segnalazione_nuova', 'attivita', 'cartella', 'richiesta', 'file'];
 
     public function __construct(private PDO $conn) {}
 
@@ -47,6 +47,24 @@ final class Menzioni
             }
         } elseif ($contesto === 'attivita') {
             $persone = $this->lettoriAttivita($worksiteId, (int)($dove['id'] ?? 0), !empty($dove['interna']), $messaggi);
+        } elseif ($contesto === 'segnalazione_nuova') {
+            // una segnalazione che si sta scrivendo: chi la vedra' con quella visibilita'
+            $s = ['worksite_id' => $worksiteId, 'visibilita' => (string)($dove['vis'] ?? 'tutti'), 'created_by' => $io];
+            $persone = (new Segnalazioni($this->conn, $messaggi))->persone($s);
+        } elseif ($contesto === 'cartella') {
+            $persone = $this->lettoriCartella($worksiteId, (int)($dove['id'] ?? 0) ?: null, $messaggi);
+        } elseif ($contesto === 'richiesta') {
+            $st = $this->conn->prepare('SELECT folder_id, created_by FROM bb_zone_richieste WHERE id = :r AND worksite_id = :w');
+            $st->execute([':r' => (int)($dove['id'] ?? 0), ':w' => $worksiteId]);
+            if ($r = $st->fetch(PDO::FETCH_ASSOC)) {
+                $persone = $this->lettoriCartella($worksiteId, $r['folder_id'] !== null ? (int)$r['folder_id'] : null, $messaggi);
+                // chi l'ha aperta la segue sempre
+                foreach ($messaggi->personeRuoli($worksiteId, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]) as $p) {
+                    if ((int)$p['user_id'] === (int)$r['created_by']) $persone[] = $p;
+                }
+            }
+        } elseif ($contesto === 'file') {
+            $persone = $this->lettoriFile($worksiteId, (int)($dove['id'] ?? 0), $messaggi);
         }
 
         $fuori = [];
@@ -148,6 +166,78 @@ final class Menzioni
             $utenti->execute([':u' => (int)$p['user_id']]);
             $u = (object)($utenti->fetch(PDO::FETCH_ASSOC) ?: ['id' => (int)$p['user_id']]);
             if ($cond->vede($u, $w, 'attivita', $taskId, (int)$creatoDa)) {
+                $chi[] = $p;
+            }
+        }
+        return $chi;
+    }
+
+    /** Un utente per le domande di Condivisione: basta id e tipo. */
+    private function utente(int $id): object
+    {
+        static $cache = [];
+        if (!isset($cache[$id])) {
+            $st = $this->conn->prepare('SELECT id, type FROM bb_users WHERE id = :u');
+            $st->execute([':u' => $id]);
+            $cache[$id] = (object)($st->fetch(PDO::FETCH_ASSOC) ?: ['id' => $id]);
+        }
+        return $cache[$id];
+    }
+
+    /** La cartella e tutte quelle che la contengono. @return array<int, array> */
+    private function catena(int $w, int $folderId): array
+    {
+        $st = $this->conn->prepare('SELECT id, parent_id, created_by FROM bb_zone_folders WHERE id = :c AND worksite_id = :w');
+        $fuori = [];
+        for ($id = $folderId, $i = 0; $id && $i < 20; $i++) {
+            $st->execute([':c' => $id, ':w' => $w]);
+            $c = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$c) break;
+            $fuori[] = $c;
+            $id = $c['parent_id'] ? (int)$c['parent_id'] : 0;
+        }
+        return $fuori;
+    }
+
+    /** Chi vede una cartella; in cima ai Documenti (null) CSM e il committente. */
+    private function lettoriCartella(int $w, ?int $folderId, Messaggi $messaggi): array
+    {
+        if ($folderId === null) {
+            return $messaggi->personeRuoli($w, [Accesso::UFFICIO, Accesso::CLIENTE]);
+        }
+        $catena = $this->catena($w, $folderId);
+        if (!$catena) {
+            return [];
+        }
+        $cond = new Condivisione($this->conn, new Accesso($this->conn));
+        $chi = [];
+        foreach ($messaggi->personeRuoli($w, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]) as $p) {
+            foreach ($catena as $c) {
+                if (!$cond->vede($this->utente((int)$p['user_id']), $w, 'cartella', (int)$c['id'], (int)($c['created_by'] ?? 0))) continue 2;
+            }
+            $chi[] = $p;
+        }
+        return $chi;
+    }
+
+    /** Chi vede un documento: condiviso con lui, o chi vede la sua cartella. */
+    private function lettoriFile(int $w, int $fileId, Messaggi $messaggi): array
+    {
+        $st = $this->conn->prepare('SELECT id, folder_id, uploaded_by FROM bb_zone_files WHERE id = :f AND worksite_id = :w');
+        $st->execute([':f' => $fileId, ':w' => $w]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$f) {
+            return [];
+        }
+        $cond = new Condivisione($this->conn, new Accesso($this->conn));
+        $dallaCartella = [];
+        if ($f['folder_id'] !== null) {
+            foreach ($this->lettoriCartella($w, (int)$f['folder_id'], $messaggi) as $p) $dallaCartella[(int)$p['user_id']] = true;
+        }
+        $chi = [];
+        foreach ($messaggi->personeRuoli($w, [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]) as $p) {
+            $uid = (int)$p['user_id'];
+            if (isset($dallaCartella[$uid]) || $cond->vede($this->utente($uid), $w, 'file', $fileId, (int)($f['uploaded_by'] ?? 0))) {
                 $chi[] = $p;
             }
         }

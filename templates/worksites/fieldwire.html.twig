@@ -774,7 +774,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 </div>
                 <div class="bz-file-modal-body" id="bz-file-modal-comments"></div>
                 <div class="bz-file-modal-foot">
-                    <input type="text" id="bz-file-comment-input" placeholder="Aggiungi un commento...">
+                    <input type="text" id="bz-file-comment-input" placeholder="Aggiungi un commento... (@ per menzionare)">
                     <button id="bz-file-comment-send"><i class="fas fa-paper-plane"></i></button>
                 </div>
             </div>
@@ -2035,7 +2035,13 @@ function renderDisegni(items, fwReady) {
                             ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
                             : '')
                         : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)}
-                <a class="bz-dz-btn" href="${d.view_url}" download><i class="fas fa-download"></i></a>
+                ${d.n_segni && ['pdf', 'png', 'jpg', 'jpeg'].includes(String(d.file_type).toLowerCase())
+                    ? `<span class="bz-dz-scarica"><button class="bz-dz-btn" data-dz-scarica="${d.id}" title="Scarica"><i class="fas fa-download"></i></button>
+                         <span class="bz-dz-scarica-menu" hidden>
+                            <a href="${d.view_url}" download><i class="far fa-file"></i> Originale</a>
+                            <button type="button" data-dz-scarica-ann="${d.id}" data-tipo="${escAttr(d.file_type)}" data-nome="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Con annotazioni</button>
+                         </span></span>`
+                    : `<a class="bz-dz-btn" href="${d.view_url}" download title="Scarica"><i class="fas fa-download"></i></a>`}
                 ${DA_UFFICIO && fwReady && !d.fw_synced ? `<button class="bz-dz-btn fw" data-push-fw="${d.id}"><i class="fas fa-cloud-upload-alt"></i> FW</button>` : ''}
                 ${DA_UFFICIO ? `<button class="bz-dz-btn danger" data-del-disegno="${d.id}"><i class="fas fa-trash"></i></button>` : ''}
             </div>
@@ -2258,7 +2264,7 @@ async function loadFiles() {
     renderFolders(cartelleTutte);
     renderFiles(res.data.files || [], MODULI_ATTIVI ? (res.data.moduli || []) : [], res.data.richieste || []);
     const nr = document.getElementById('bz-new-richiesta');
-    if (nr) nr.hidden = !curFolder;
+    if (nr) nr.hidden = false;   // le richieste si fanno in ogni cartella, e anche in cima
     // nelle cartelle del link i documenti arrivano dal link: si fanno solo richieste
     const qui = cartelleTutte.find(f => Number(f.id) === Number(curFolder));
     const soloLink = daLink(qui);
@@ -2305,7 +2311,7 @@ function renderFolders() {
         const figlie = figlieDi(f.id);
         const aperta = aperte.has(Number(f.id));
         return `
-            <button class="bz-folder ${curFolder == f.id ? 'active' : ''}" data-folder="${f.id}" style="padding-left:${10 + livello * 14}px">
+            <button class="bz-folder ${curFolder == f.id ? 'active' : ''}" data-folder="${f.id}" ${daLink(f) ? 'data-folder-link="1"' : ''} style="padding-left:${10 + livello * 14}px">
                 <i class="fas ${iconaCartella(f, aperta && figlie.length)}"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 ${contaRichieste(f.id) ? `<em class="bz-conta-richieste" title="Richieste in attesa">${contaRichieste(f.id)}</em>` : `<em>${f.file_count}</em>`}
                 ${!daLink(f) && (DA_UFFICIO || Number(f.created_by) === Number(IO)) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
@@ -2323,7 +2329,7 @@ function renderBriciole() {
     const el = document.getElementById('bz-files-title');
     const via = percorsoDi(curFolder);
     el.innerHTML = `<button type="button" data-folder="" class="${via.length ? '' : 'qui'}">Documenti</button>`
-        + via.map((c, i) => `<i class="fas fa-chevron-right"></i><button type="button" data-folder="${c.id}" class="${i === via.length - 1 ? 'qui' : ''}">${escHtml(c.name)}</button>`).join('');
+        + via.map((c, i) => `<i class="fas fa-chevron-right"></i><button type="button" data-folder="${c.id}" ${daLink(c) ? 'data-folder-link="1"' : ''} class="${i === via.length - 1 ? 'qui' : ''}">${escHtml(c.name)}</button>`).join('');
 }
 
 function renderFiles(files, moduli, richieste = []) {
@@ -2335,7 +2341,7 @@ function renderFiles(files, moduli, richieste = []) {
     }
     const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
     const righeCartelle = sotto.map(f => `
-        <div class="bz-file-row bz-file-clickable" data-folder="${f.id}">
+        <div class="bz-file-row bz-file-clickable" data-folder="${f.id}" ${daLink(f) ? 'data-folder-link="1"' : ''}>
             <i class="fas ${iconaCartella(f, false)} bz-file-icon bz-icona-cartella"></i>
             <div class="bz-file-info">
                 <div class="bz-file-name">${escHtml(f.name)} ${chiBadge(f)} ${contaRichieste(f.id) ? `<span class="bz-richiesta-stato">${contaRichieste(f.id) === 1 ? '1 richiesta in attesa' : contaRichieste(f.id) + ' richieste in attesa'}</span>` : ''}</div>
@@ -2368,7 +2374,7 @@ function renderFiles(files, moduli, richieste = []) {
             f.richiesta_id ? `<button type="button" class="bz-tag-richiesta" data-richiesta="${f.richiesta_id}" title="Apri la richiesta"><i class="fas fa-inbox"></i> ${escHtml(f.richiesta_titolo || 'Richiesta')}</button>` : '',
         ].join('');
         return `
-        <div class="bz-file-row ${versione ? 'bz-file-versione' : ''}">
+        <div class="bz-file-row ${versione ? 'bz-file-versione' : ''}" ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `draggable="true" data-drag-file="${f.id}" title="Trascinare su una cartella per spostare"` : ''}>
             ${versione ? '<i class="fas fa-turn-up bz-versione-freccia"></i>' : ''}
             <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
             <div class="bz-file-info ${viewable?'bz-file-clickable':''}"
@@ -2387,16 +2393,18 @@ function renderFiles(files, moduli, richieste = []) {
     const righeFile = files.filter(f => !sottoUnOriginale(f))
         .map(f => rigaFile(f, false) + (copie[f.id] || []).map(c => rigaFile(c, true)).join(''))
         .join('');
-    const righeRichieste = richieste.map(q => `
-        <div class="bz-file-row bz-file-clickable" data-richiesta="${q.id}">
-            <i class="fas fa-inbox bz-file-icon bz-icona-richiesta"></i>
-            <div class="bz-file-info">
-                <div class="bz-file-name">${escHtml(q.titolo)}
-                    <span class="bz-richiesta-stato ${q.stato === 'completata' ? 'ok' : ''}">${q.stato === 'completata' ? 'Completata' : 'In attesa'}</span></div>
-                <div class="bz-file-sub">Richiesta · ${escHtml(q.creata_da_nome || '—')} · ${fmtDateTime(q.updated_at || q.created_at)} · ${q.n_messaggi} ${Number(q.n_messaggi) === 1 ? 'messaggio' : 'messaggi'}</div>
-            </div>
-            <i class="fas fa-chevron-right bz-file-freccia"></i>
-        </div>`).join('');
+    // Le richieste non sono cartelle e non devono sembrarlo: un riquadro a
+    // parte, in alto, con le conversazioni aperte in questa cartella.
+    const righeRichieste = richieste.length ? `
+        <div class="bz-richieste-box">
+            <div class="bz-richieste-tit"><i class="fas fa-comments"></i> Richieste${curFolder ? '' : ' (fuori dalle cartelle)'}</div>
+            ${richieste.map(q => `
+            <button type="button" class="bz-richiesta-riga" data-richiesta="${q.id}">
+                <span class="bz-richiesta-stato ${q.stato === 'completata' ? 'ok' : ''}">${q.stato === 'completata' ? 'Completata' : 'In attesa'}</span>
+                <span class="bz-richiesta-tit">${escHtml(q.titolo)}</span>
+                <span class="bz-richiesta-meta">${escHtml(q.creata_da_nome || '—')} · ${fmtDateTime(q.updated_at || q.created_at)} · ${q.n_messaggi} ${Number(q.n_messaggi) === 1 ? 'messaggio' : 'messaggi'}</span>
+            </button>`).join('')}
+        </div>` : '';
     // in alto le richieste (prima quelle in attesa), poi cartelle, moduli e documenti
     list.innerHTML = righeRichieste + righeCartelle + righeModuli + righeFile;
 }
@@ -2416,6 +2424,69 @@ function chiudiModuloPanel(ricarica = true) {
     pan.hidden = true;
     document.getElementById('bz-files-browser').hidden = false;
     if (ricarica) { loadFiles(); if (MODULI_ATTIVI) openForms(); }
+}
+
+/* Trascinare: un documento su una cartella (nell'elenco, nell'albero o nel
+   percorso) lo sposta li'; file dal computer sull'elenco si caricano nella
+   cartella aperta. Le cartelle del link non accettano niente. */
+const TIPO_DOC = 'application/x-bz-documento';
+document.addEventListener('dragstart', e => {
+    const r = e.target.closest?.('[data-drag-file]');
+    if (!r) return;
+    e.dataTransfer.setData(TIPO_DOC, r.dataset.dragFile);
+    e.dataTransfer.effectAllowed = 'move';
+    r.classList.add('bz-trascinato');
+});
+document.addEventListener('dragend', e => {
+    e.target.closest?.('[data-drag-file]')?.classList.remove('bz-trascinato');
+    document.querySelectorAll('.bz-drop-qui').forEach(x => x.classList.remove('bz-drop-qui'));
+});
+const destinazione = e => {
+    if (!e.dataTransfer || ![...e.dataTransfer.types].includes(TIPO_DOC)) return null;
+    const c = e.target.closest?.('#view-files [data-folder]');
+    return c && !c.dataset.folderLink ? c : null;
+};
+document.addEventListener('dragover', e => {
+    const c = destinazione(e);
+    if (c) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; c.classList.add('bz-drop-qui'); return; }
+    // file dal computer sull'elenco della cartella aperta
+    const lista = e.target.closest?.('#view-files .bz-files-main');
+    if (lista && e.dataTransfer && [...e.dataTransfer.types].includes('Files') && caricareQui()) {
+        e.preventDefault();
+        document.getElementById('bz-files-list').classList.add('bz-drop-qui');
+    }
+});
+document.addEventListener('dragleave', e => {
+    const c = e.target.closest?.('[data-folder], #view-files .bz-files-main');
+    if (c && !c.contains(e.relatedTarget)) {
+        c.classList.remove('bz-drop-qui');
+        if (c.matches('.bz-files-main')) document.getElementById('bz-files-list').classList.remove('bz-drop-qui');
+    }
+});
+document.addEventListener('drop', async e => {
+    const c = destinazione(e);
+    if (c) {
+        e.preventDefault();
+        c.classList.remove('bz-drop-qui');
+        const id = e.dataTransfer.getData(TIPO_DOC);
+        const dest = c.dataset.folder ? parseInt(c.dataset.folder) : null;
+        if ((dest ?? null) === (curFolder ?? null)) return;
+        const r = await api(`/worksites/${WID}/zone/files/${id}/sposta`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ folder_id: dest }) });
+        if (!r.ok) { alert(r.error || 'Impossibile spostare il documento.'); return; }
+        loadFiles();
+        return;
+    }
+    const lista = e.target.closest?.('#view-files .bz-files-main');
+    if (lista && e.dataTransfer?.files?.length && caricareQui()) {
+        e.preventDefault();
+        document.getElementById('bz-files-list').classList.remove('bz-drop-qui');
+        for (const f of e.dataTransfer.files) await uploadFile(f);
+    }
+});
+// si carica nella cartella aperta se si puo' caricare e non e' una cartella del link
+function caricareQui() {
+    const up = document.querySelector('#view-files .bz-upload-btn');
+    return !!up && !up.hidden && document.getElementById('bz-modulo-panel').hidden;
 }
 
 /* Compilare un PDF della cartella: la copia compilata si salva nella stessa
@@ -2560,7 +2631,7 @@ async function loadFileComments() {
             <div class="bz-comment-avatar">${initials(c.author_name)}</div>
             <div class="bz-comment-body">
                 <div class="bz-comment-meta"><span class="bz-comment-author">${escHtml(c.author_name||'?')}</span><span class="bz-comment-time">${ago(c.created_at)}</span></div>
-                <div class="bz-comment-text">${escHtml(c.text||'')}</div>
+                <div class="bz-comment-text">${window.BZMenzioni ? BZMenzioni.evidenzia(escHtml(c.text||'')) : escHtml(c.text||'')}</div>
             </div>
         </div>`).join('') : '<div style="font-size:12px;color:#64748b;">Nessun commento.</div>';
     box.scrollTop = box.scrollHeight;
@@ -2570,9 +2641,9 @@ async function sendFileComment() {
     const text = inp.value.trim();
     if (!text || !fileActiveId) return;
     inp.disabled = true;
-    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text}) });
+    const res = await api(`/worksites/${WID}/zone/files/${fileActiveId}/comments`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text, menzioni: window.BZMenzioni ? BZMenzioni.ids(inp) : [] }) });
     inp.disabled = false;
-    if (res.ok) { inp.value=''; loadFileComments(); loadFiles(); }
+    if (res.ok) { inp.value=''; if (window.BZMenzioni) BZMenzioni.azzera(inp); loadFileComments(); loadFiles(); }
     inp.focus();
 }
 
@@ -3111,6 +3182,16 @@ document.addEventListener('click', e => {
         });
         return;
     }
+    const sc = t.closest('[data-dz-scarica]');
+    if (sc) { const m = sc.parentElement.querySelector('.bz-dz-scarica-menu'); document.querySelectorAll('.bz-dz-scarica-menu').forEach(x => { if (x !== m) x.hidden = true; }); m.hidden = !m.hidden; return; }
+    const sca = t.closest('[data-dz-scarica-ann]');
+    if (sca && window.BZAnnotator) {
+        sca.closest('.bz-dz-scarica-menu').hidden = true;
+        BZAnnotator.scaricaConAnnotazioni({ worksiteId: WID, csrf: CSRF, docId: parseInt(sca.dataset.dzScaricaAnn), fileType: sca.dataset.tipo,
+                                            fileName: sca.dataset.nome, viewUrl: `/worksites/${WID}/disegni/${sca.dataset.dzScaricaAnn}/view` });
+        return;
+    }
+    if (!t.closest('.bz-dz-scarica')) document.querySelectorAll('.bz-dz-scarica-menu').forEach(x => x.hidden = true);
     const dwgConv = t.closest('[data-dwg-convert]');
     if (dwgConv) { convertDwg(parseInt(dwgConv.dataset.dwgConvert), dwgConv); return; }
 });
@@ -3821,6 +3902,15 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-dz-meta { font-size: 11px; color: #64748b; }
 .bz-dz-folder { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; background: #273548; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
 .bz-dz-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.bz-dz-scarica { position: relative; display: inline-flex; flex: 1; }
+.bz-dz-scarica .bz-dz-btn { width: 100%; }
+.bz-dz-scarica-menu { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 20; min-width: 180px; background: #0f172a; border: 1px solid #273548; border-radius: 8px; padding: 4px; box-shadow: 0 14px 30px rgba(0,0,0,.45); }
+.bz-dz-scarica-menu[hidden] { display: none; }
+.bz-dz-scarica-menu a, .bz-dz-scarica-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: #e2e8f0; font-size: 12.5px; text-align: left; cursor: pointer; text-decoration: none; font-family: inherit; }
+.bz-dz-scarica-menu a:hover, .bz-dz-scarica-menu button:hover { background: #1e293b; }
+[data-theme="light"] .bz-dz-scarica-menu { background: #fff; border-color: #e2e8f0; }
+[data-theme="light"] .bz-dz-scarica-menu a, [data-theme="light"] .bz-dz-scarica-menu button { color: #1e293b; }
+[data-theme="light"] .bz-dz-scarica-menu a:hover, [data-theme="light"] .bz-dz-scarica-menu button:hover { background: #f1f5f9; }
 .bz-dz-apri { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; flex-basis: 100%; }
 .bz-dz-apri .bz-dz-btn { padding: 8px; font-size: 12px; white-space: nowrap; }
 .bz-dz-btn { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border-radius: 6px; border: 1px solid #273548; background: #0f172a; color: #94a3b8; font-size: 11px; cursor: pointer; text-decoration: none; transition: all .12s; }
@@ -3912,6 +4002,20 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-tag-modulo { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:rgba(167,139,250,.15); color:#c4b5fd; font-size:10.5px; font-weight:600; vertical-align:middle; }
 .bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
 .bz-file-versione { margin-left:28px; border-style:dashed; }
+.bz-trascinato { opacity:.45; }
+[data-drag-file] { cursor:grab; }
+.bz-drop-qui { outline:2px dashed #3b82f6 !important; outline-offset:-2px; background:rgba(59,130,246,.12) !important; }
+.bz-richieste-box { border:1px solid rgba(245,158,11,.35); background:rgba(245,158,11,.06); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+.bz-richieste-tit { font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#fbbf24; margin-bottom:6px; }
+.bz-richiesta-riga { display:flex; align-items:center; gap:10px; flex-wrap:wrap; width:100%; text-align:left; background:none; border:0; border-top:1px solid rgba(245,158,11,.18); padding:8px 2px; cursor:pointer; font-family:inherit; color:inherit; }
+.bz-richiesta-riga:first-of-type { border-top:0; }
+.bz-richiesta-riga:hover .bz-richiesta-tit { text-decoration:underline; }
+.bz-richiesta-tit { font-size:13px; font-weight:600; color:#e2e8f0; }
+.bz-richiesta-meta { font-size:11.5px; color:#64748b; margin-left:auto; }
+[data-theme="light"] .bz-richieste-box { background:#fffbeb; border-color:#fde68a; }
+[data-theme="light"] .bz-richieste-tit { color:#b45309; }
+[data-theme="light"] .bz-richiesta-riga { border-top-color:#fde68a; }
+[data-theme="light"] .bz-richiesta-tit { color:#1e293b; }
 .bz-versione-freccia { transform:rotate(90deg); color:#475569; font-size:12px; }
 .bz-scad { display:inline-block; padding:1px 7px; border-radius:999px; font-size:10.5px; font-weight:700; }
 .bz-scad.ok { background:rgba(34,197,94,.14); color:#4ade80; }
@@ -4020,7 +4124,7 @@ html .bz-dz-empty { color:#94a3b8; }
 }
 </style>
 
-<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css?v=20261112b">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css?v=20261113">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
 <script src="/assets/js/views/fieldwire/forms.js?v=20261112"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -4031,7 +4135,7 @@ html .bz-dz-empty { color:#94a3b8; }
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-<script src="/assets/js/views/fieldwire/annotator.js?v=20261112b"></script>
+<script src="/assets/js/views/fieldwire/annotator.js?v=20261113"></script>
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
@@ -4042,17 +4146,18 @@ html .bz-dz-empty { color:#94a3b8; }
 <link rel="stylesheet" href="/assets/css/views/fieldwire/richieste.css?v=20261112b">
 {% if not soloAccessi %}<script src="/assets/js/views/fieldwire/menzioni.js?v=20261112"></script>
 <script src="/assets/js/views/fieldwire/compila.js?v=20261112b"></script>
-<script src="/assets/js/views/fieldwire/richieste.js?v=20261112b"></script>
+<script src="/assets/js/views/fieldwire/richieste.js?v=20261113"></script>
 <script nonce="{{ cspNonce }}">
 // le richieste si aprono nel pannello dei Documenti
 window.BZRichieste && BZRichieste.init({ apri: () => apriModuloPanel('richiesta'), chiudi: r => chiudiModuloPanel(r) });
 </script>
 <script nonce="{{ cspNonce }}">
 // @ nei messaggi delle attivita': chi vede l'attivita' (in una nota interna solo CSM)
+window.BZMenzioni && BZMenzioni.collega('#bz-file-comment-input', () => fileActiveId ? 'contesto=file&id=' + fileActiveId : '');
 window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
     ? 'contesto=attivita&id=' + activeTaskId + (document.getElementById('bz-flag-interna')?.checked ? '&interna=1' : '')
     : '');
 </script>
-<script src="/assets/js/views/fieldwire/dialogo.js?v=20261112"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113"></script>{% endif %}
 </body>
 </html>

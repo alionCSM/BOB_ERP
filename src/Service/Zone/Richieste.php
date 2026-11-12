@@ -28,7 +28,7 @@ final class Richieste
     public function __construct(private PDO $conn) {}
 
     /** @param int[] $fileIds */
-    public function crea(int $w, int $folderId, string $titolo, int $daChi, string $testo, array $fileIds): int
+    public function crea(int $w, ?int $folderId, string $titolo, int $daChi, string $testo, array $fileIds): int
     {
         $titolo = mb_substr(trim($titolo), 0, 200);
         if ($titolo === '') {
@@ -63,7 +63,8 @@ final class Richieste
      *
      * @return array<int, array<string, mixed>>
      */
-    public function diCartella(int $w, int $folderId): array
+    /** @param int|null $folderId null = in cima ai Documenti */
+    public function diCartella(int $w, ?int $folderId): array
     {
         $st = $this->conn->prepare("
             SELECT r.id, r.titolo, r.stato, r.created_by, r.created_at, r.updated_at, r.completata_at,
@@ -71,10 +72,10 @@ final class Richieste
                    (SELECT COUNT(*) FROM bb_zone_richieste_messaggi m WHERE m.richiesta_id = r.id AND m.sistema IS NULL) AS n_messaggi
             FROM bb_zone_richieste r
             LEFT JOIN bb_users u ON u.id = r.created_by
-            WHERE r.worksite_id = :w AND r.folder_id = :f
+            WHERE r.worksite_id = :w AND " . ($folderId === null ? 'r.folder_id IS NULL' : 'r.folder_id = :f') . "
             ORDER BY r.stato = 'aperta' DESC, r.updated_at DESC
         ");
-        $st->execute([':w' => $w, ':f' => $folderId]);
+        $st->execute([':w' => $w] + ($folderId === null ? [] : [':f' => $folderId]));
         return $st->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -88,7 +89,7 @@ final class Richieste
         $st->execute([':w' => $w]);
         $fuori = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $fuori[(int)$r['folder_id']] = (int)$r['n'];
+            $fuori[(int)($r['folder_id'] ?? 0)] = (int)$r['n'];   // 0 = in cima
         }
         return $fuori;
     }
@@ -195,6 +196,15 @@ final class Richieste
         ');
         $st->execute([':r' => $id, ':r2' => $id]);
         return array_values(array_filter(array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN))));
+    }
+
+    /**
+     * Chi vede una richiesta in cima ai Documenti (fuori dalle cartelle):
+     * CSM, il committente e chi l'ha aperta.
+     */
+    public static function vedeInCima(?string $ruolo, int $io, array $r): bool
+    {
+        return in_array($ruolo, [Accesso::UFFICIO, Accesso::CLIENTE], true) || (int)($r['created_by'] ?? 0) === $io;
     }
 
     /** @return int[] */
