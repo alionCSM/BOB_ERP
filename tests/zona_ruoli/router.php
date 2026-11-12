@@ -11,6 +11,12 @@ ini_set('error_log', sys_get_temp_dir() . '/bob_zona_errori.log');
 
 $_ENV['APP_URL'] = 'https://bob.test';
 $_ENV['CLOUD_ROOT'] = sys_get_temp_dir() . '/bob_zona_cloud';
+// la cartella cloud dei documenti di operai e aziende (Doc condivisi): di prova
+define('BOB_CLOUD_DOCUMENTI', sys_get_temp_dir() . '/bob_zona_docs');
+foreach (['az/durc.pdf', 'az/visura.pdf', 'op/quota.pdf', 'shared_uploads/pos.pdf'] as $f) {
+    $p = BOB_CLOUD_DOCUMENTI . '/' . $f;
+    if (!is_file($p)) { @mkdir(dirname($p), 0775, true); file_put_contents($p, "%PDF-1.4 documento di prova $f"); }
+}
 
 require __DIR__ . '/pagina.php';
 spl_autoload_register(function ($c) {

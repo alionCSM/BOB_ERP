@@ -2239,7 +2239,7 @@ let richiesteAperte = {};   // cartella => richieste aperte
 const contaRichieste = id => Number(richiesteAperte[id] || 0);
 // le cartelle che arrivano dal link condiviso collegato al cantiere
 const daLink = f => !!(f && f.sorgente);
-const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge' })[f.sorgente]
+const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge', link_altri: 'fa-link' })[f.sorgente]
     || (aperta ? 'fa-folder-open' : 'fa-folder');
 // Moduli sospesi per ora (troppa confusione nei Documenti): il codice resta, non si mostrano
 const MODULI_ATTIVI = false;
@@ -2284,7 +2284,7 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) box.innerHTML = DA_UFFICIO && cart ? chiBottone('cartella', cart.id, cart) : '';
     // in cima, CSM vede quale link e' collegato
-    if (lk && !curFolder) lk.querySelector('span').textContent = cartelleTutte.some(f => f.sorgente === 'link_aziende' || f.sorgente === 'link_operai') ? 'Link documenti collegato' : 'Collega link documenti';
+    if (lk && !curFolder) lk.querySelector('span').textContent = cartelleTutte.some(f => ['link_aziende', 'link_operai', 'link_altri'].includes(f.sorgente)) ? 'Link documenti collegato' : 'Collega link documenti';
 }
 
 const figlieDi = id => cartelleTutte
@@ -2516,14 +2516,17 @@ function renderDocumentiLink(docs) {
     if (vuota) vuota.remove();
     list.insertAdjacentHTML('beforeend', docs.map(d => {
         const [cls, lab] = STATO[d.stato] || STATO.valido;
+        const tipo = (d.ext || 'pdf').toLowerCase();
+        const vede = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'].includes(tipo);
+        const apri = vede ? `data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="${escAttr(tipo)}" data-vf-url="${escAttr(d.url)}"` : '';
         return `
         <div class="bz-file-row">
-            <i class="fas fa-file-pdf bz-file-icon"></i>
-            <div class="bz-file-info bz-file-clickable" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}">
+            <i class="fas ${fileIcon(tipo)} bz-file-icon"></i>
+            <div class="bz-file-info ${vede ? 'bz-file-clickable' : ''}" ${apri}>
                 <div class="bz-file-name">${escHtml(d.nome)}</div>
-                <div class="bz-file-sub bz-file-sub-tag"><span class="bz-scad ${cls}">${lab}</span><span>${d.scadenza ? 'Scadenza ' + fmtDate(d.scadenza) : 'Senza scadenza'}</span></div>
+                <div class="bz-file-sub bz-file-sub-tag">${d.tipo === 'manuale' ? '' : `<span class="bz-scad ${cls}">${lab}</span><span>${d.scadenza ? 'Scadenza ' + fmtDate(d.scadenza) : 'Senza scadenza'}</span>`}</div>
             </div>
-            <button class="bz-file-act" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}" title="Anteprima"><i class="fas fa-eye"></i></button>
+            ${vede ? `<button class="bz-file-act" ${apri} title="Anteprima"><i class="fas fa-eye"></i></button>` : ''}
             <a class="bz-file-act" href="${escAttr(d.url)}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
         </div>`;
     }).join(''));
