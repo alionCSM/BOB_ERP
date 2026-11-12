@@ -545,6 +545,28 @@ final class FieldwireController
                         'color'       => '#3b82f6',
                         'created_by'  => (int)($user?->id ?? 0),
                     ]);
+                    // i segni disegnati insieme al punto (un'area, una freccia,
+                    // una nota): restano collegati all'attivita'
+                    foreach (array_slice((array)($pt['segni'] ?? []), 0, 30) as $sg) {
+                        $tipo = (string)($sg['type'] ?? '');
+                        if (!in_array($tipo, ['rectangle', 'ellipse', 'cloud', 'arrow', 'drawing', 'text'], true)
+                            || !is_array($sg['geom'] ?? null)) {
+                            continue;
+                        }
+                        $colore = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($sg['color'] ?? '')) ? $sg['color'] : '#3b82f6';
+                        $this->annRepo->create([
+                            'worksite_id' => $worksiteId,
+                            'document_id' => $doc,
+                            'page'        => max(1, (int)($pt['page'] ?? 1)),
+                            'type'        => $tipo,
+                            'geom'        => $sg['geom'],
+                            'task_id'     => $taskId,
+                            'segnalazione_id' => null,
+                            'text'        => $tipo === 'text' ? mb_substr(trim((string)($sg['text'] ?? '')), 0, 300) : null,
+                            'color'       => $colore,
+                            'created_by'  => (int)($user?->id ?? 0),
+                        ]);
+                    }
                 }
             }
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
@@ -726,6 +748,24 @@ final class FieldwireController
             $this->scriviCommento($id, $request, $body);
             $interna = $this->accesso->daUfficio($user, $worksiteId) && !empty($body['interna']);
             $this->avvisa(fn($a) => $a->commento($taskId, (int)($user?->id ?? 0), $text, $interna));
+            // chi e' stato menzionato con @, fra chi legge questi messaggi
+            if (!empty($body['menzioni'])) {
+                try {
+                    $mz = new \App\Service\Zone\Menzioni($this->conn);
+                    $io = (int)($user?->id ?? 0);
+                    $mz->avvisa(
+                        new \App\Service\Notifications\NotificationService($this->conn, $this->config),
+                        $worksiteId,
+                        \App\Service\Zone\Menzioni::valide($text, (array)$body['menzioni'],
+                            $mz->lettori($worksiteId, 'attivita', ['id' => $taskId, 'interna' => $interna], $io)),
+                        $io,
+                        'attivita-' . $taskId,
+                        $text
+                    );
+                } catch (\Throwable $e) {
+                    error_log('[Zone menzioni] ' . $e->getMessage());
+                }
+            }
 
             // push su Fieldwire
             $task     = $this->zoneRepo->find($taskId);
@@ -1975,6 +2015,7 @@ final class FieldwireController
                 SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
                        d.created_at, d.created_by, d.current_version,
                        (SELECT COUNT(*) FROM bb_worksite_document_versions v WHERE v.document_id = d.id) AS n_versioni,
+                       (SELECT COUNT(*) FROM bb_zone_annotations an WHERE an.document_id = d.id) AS n_segni,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
                        r.status AS dwg_status, r.error AS dwg_error
@@ -2009,6 +2050,8 @@ final class FieldwireController
                     // le versioni: quella in uso e quante ce ne sono di prima
                     'versione'     => (int)($r['current_version'] ?? 1) ?: 1,
                     'n_versioni'   => (int)($r['n_versioni'] ?? 0),
+                    // quante annotazioni ha: si sceglie se aprirlo con o senza
+                    'n_segni'      => (int)($r['n_segni'] ?? 0),
                     'view_url'     => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
                     'fw_synced'    => !empty($r['pushed_at']),
                     'fw_pushed_at' => $r['pushed_at'],

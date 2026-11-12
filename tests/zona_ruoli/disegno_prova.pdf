@@ -1,0 +1,61 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 840 >>
+stream
+0.85 0.85 0.85 RG 0.5 w
+50 40 m 50 560 l S
+100 40 m 100 560 l S
+150 40 m 150 560 l S
+200 40 m 200 560 l S
+250 40 m 250 560 l S
+300 40 m 300 560 l S
+350 40 m 350 560 l S
+400 40 m 400 560 l S
+450 40 m 450 560 l S
+500 40 m 500 560 l S
+550 40 m 550 560 l S
+600 40 m 600 560 l S
+650 40 m 650 560 l S
+700 40 m 700 560 l S
+750 40 m 750 560 l S
+40 40 m 800 40 l S
+40 90 m 800 90 l S
+40 140 m 800 140 l S
+40 190 m 800 190 l S
+40 240 m 800 240 l S
+40 290 m 800 290 l S
+40 340 m 800 340 l S
+40 390 m 800 390 l S
+40 440 m 800 440 l S
+40 490 m 800 490 l S
+40 540 m 800 540 l S
+0 0 0 RG 3 w 60 60 720 480 re S
+2 w 60 300 m 420 300 l S 420 60 m 420 540 l S 600 300 m 780 300 l S
+BT /F1 18 Tf 120 420 Td (Sala A) Tj ET BT /F1 18 Tf 520 420 Td (Sala B) Tj ET BT /F1 18 Tf 180 170 Td (Magazzino) Tj ET BT /F1 12 Tf 60 25 Td (Pianta piano terra - prova) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001132 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1202
+%%EOF

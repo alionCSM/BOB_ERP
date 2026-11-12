@@ -6,6 +6,7 @@ use App\Http\Response;
 use App\Infrastructure\Config;
 use App\Service\Notifications\NotificationService;
 use App\Service\Zone\Accesso;
+use App\Service\Zone\Menzioni;
 use App\Service\Zone\Messaggi;
 use App\Service\Zone\Segnalazioni;
 
@@ -90,6 +91,7 @@ final class ZoneDialogoController
                 $this->messaggi->fissa($id, true, $io);
             }
             $this->avvisaChat($w, $canale, $id, $request, $fissa);
+            $this->avvisaMenzioni($w, 'chat', ['canale' => $canale], 'chat-' . $canale, $body, $io);
             return $this->messaggi->elenco($w, $canale, null, $id - 1, 1)[0] ?? ['id' => $id];
         });
     }
@@ -213,6 +215,8 @@ final class ZoneDialogoController
             }
             return [
                 'segnalazione' => $s,
+                // il punto sul disegno, se c'e' e il disegno si vede
+                'disegno'      => $dopo === 0 ? $this->disegnoDi($request, $w, (int)$s['id']) : null,
                 'messaggi'     => $msg,
                 'puo_gestire'  => Segnalazioni::puoGestire($ruolo),
                 'da_ufficio'   => $ruolo === Accesso::UFFICIO,
@@ -227,8 +231,10 @@ final class ZoneDialogoController
         $this->json(function () use ($request) {
             [$w, $ruolo, $io] = $this->chi($request);
             $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
-            $id = $this->messaggi->scrivi($w, null, (int)$s['id'], $io, $this->corpo()['testo'] ?? null);
+            $body = $this->corpo();
+            $id = $this->messaggi->scrivi($w, null, (int)$s['id'], $io, $body['testo'] ?? null);
             $this->avvisaFilo($s, $request);
+            $this->avvisaMenzioni($w, 'segnalazione', ['id' => (int)$s['id']], 'segnalazione-' . $s['id'], $body, $io);
             return $this->messaggi->elenco($w, null, (int)$s['id'], $id - 1, 1)[0] ?? ['id' => $id];
         });
     }
@@ -353,6 +359,100 @@ final class ZoneDialogoController
     // ─── Interni ──────────────────────────────────────────────────────────────
 
     /** Segna i propri messaggi: il web e l'app li mettono a destra. */
+    // ─── Menzioni ─────────────────────────────────────────────────────────────
+
+    /**
+     * Chi si puo' menzionare con @ in una conversazione: solo chi la legge.
+     * ?contesto=chat&canale=cliente · segnalazione&id=5 · attivita&id=12[&interna=1]
+     */
+    public function menzionabili(Request $request): void
+    {
+        $this->json(function () use ($request) {
+            [$w, $ruolo, $io] = $this->chi($request);
+            $contesto = (string)($_GET['contesto'] ?? '');
+            $id       = (int)($_GET['id'] ?? 0);
+            $dove     = ['canale' => (string)($_GET['canale'] ?? ''), 'id' => $id];
+
+            if ($contesto === 'chat') {
+                if (!in_array($dove['canale'], $this->messaggi->canali($ruolo, $w), true)) {
+                    Accesso::nega('Non puoi leggere questo canale');
+                }
+            } elseif ($contesto === 'segnalazione') {
+                $s = $this->segnalazioni->trova($id);
+                if (!$s || $s['worksite_id'] !== $w || !Segnalazioni::vede($ruolo, $io, $s)) {
+                    Accesso::nega('Segnalazione non trovata');
+                }
+            } elseif ($contesto === 'attivita') {
+                if (!$this->vedeAttivita($request, $w, $ruolo, $id)) {
+                    Accesso::nega('Attività non trovata');
+                }
+                // la nota interna la scrive solo CSM
+                $dove['interna'] = $ruolo === Accesso::UFFICIO && !empty($_GET['interna']);
+            } else {
+                throw new \RuntimeException('Conversazione non valida');
+            }
+
+            return array_map(
+                fn($p) => ['id' => $p['id'], 'nome' => $p['nome'], 'ruolo' => $p['ruolo']],
+                (new Menzioni($this->conn))->lettori($w, $contesto, $dove, $io)
+            );
+        });
+    }
+
+    /** Il disegno su cui e' appuntata una segnalazione, se chi chiede lo vede. */
+    private function disegnoDi(Request $request, int $w, int $segnalazioneId): ?array
+    {
+        try {
+            $p = (new \App\Repository\Fieldwire\ZoneAnnotationRepository($this->conn))->perSegnalazione($segnalazioneId);
+            if (!$p) {
+                return null;
+            }
+            $st = $this->conn->prepare('SELECT file_type, created_by FROM bb_worksite_documents WHERE id = :d AND worksite_id = :w AND is_deleted = 0');
+            $st->execute([':d' => $p['disegno'], ':w' => $w]);
+            $d = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$d) {
+                return null;
+            }
+            $ruolo = $this->accesso->ruolo($request->user(), $w);
+            if ($ruolo !== Accesso::UFFICIO
+                && !(new \App\Service\Zone\Condivisione($this->conn, $this->accesso))
+                    ->vede($request->user(), $w, 'disegno', (int)$p['disegno'], (int)$d['created_by'])) {
+                return null;
+            }
+            return ['document_id' => (int)$p['disegno'], 'page' => (int)$p['pagina'], 'nome' => $p['nome'], 'tipo' => (string)$d['file_type']];
+        } catch (\PDOException $e) {
+            return null;
+        }
+    }
+
+    /** L'attivita' e' di questo cantiere e chi chiede la vede. */
+    private function vedeAttivita(Request $request, int $w, string $ruolo, int $taskId): bool
+    {
+        $st = $this->conn->prepare('SELECT created_by FROM bb_zone_tasks WHERE id = :t AND worksite_id = :w');
+        $st->execute([':t' => $taskId, ':w' => $w]);
+        $creatoDa = $st->fetchColumn();
+        if ($creatoDa === false) {
+            return false;
+        }
+        return $ruolo === Accesso::UFFICIO
+            || (new \App\Service\Zone\Condivisione($this->conn, $this->accesso))
+                ->vede($request->user(), $w, 'attivita', $taskId, (int)$creatoDa);
+    }
+
+    /** Avvisa chi e' stato menzionato con @ (solo fra chi legge la conversazione). */
+    private function avvisaMenzioni(int $w, string $contesto, array $dove, string $ancora, array $body, int $io): void
+    {
+        $testo  = (string)($body['testo'] ?? '');
+        $scelti = (array)($body['menzioni'] ?? []);
+        if ($testo === '' || !$scelti) {
+            return;
+        }
+        $this->avvisa(function (NotificationService $n) use ($w, $contesto, $dove, $ancora, $testo, $scelti, $io) {
+            $m = new Menzioni($this->conn);
+            $m->avvisa($n, $w, Menzioni::valide($testo, $scelti, $m->lettori($w, $contesto, $dove, $io)), $io, $ancora, $testo);
+        });
+    }
+
     private function miei(array $msg, int $io): array
     {
         foreach ($msg as &$m) {

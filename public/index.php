@@ -629,6 +629,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
     // chat del cantiere e segnalazioni: stessi metodi per il sito e per l'app
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
     $router
+        ->get ('/worksites/{id}/zone/menzionabili',                         [ZoneDialogoController::class, 'menzionabili'])
         ->get ('/worksites/{id}/zone/chat',                                 [ZoneDialogoController::class, 'chat'])
         ->get ('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'canale'])
         ->post('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'scriviCanale'])
@@ -1009,6 +1010,7 @@ if (str_starts_with($uri, '/api/v1/')) {
     // chat del cantiere e segnalazioni, gli stessi del sito
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
     $router
+        ->get ('/api/v1/zone/{id}/menzionabili',                            [ZoneDialogoController::class, 'menzionabili'])
         ->get ('/api/v1/zone/{id}/chat',                                    [ZoneDialogoController::class, 'chat'])
         ->get ('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'canale'])
         ->post('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'scriviCanale'])

@@ -430,6 +430,24 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-avviso-x:hover { background: rgba(239, 68, 68, .12); color: #ef4444; }
 @media (hover: none) { .bz-avviso-x { opacity: 1; } }
 .bz-avvisi-azioni { display: flex; gap: 12px; }
+.bz-dz-n { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 2px; border-radius: 9px; background: rgba(59,130,246,.2); color: #93c5fd; font-size: 11px; line-height: 18px; text-align: center; }
+[data-theme="light"] .bz-dz-n { background: #dbeafe; color: #1d4ed8; }
+.bzm-menu { position: fixed; z-index: 10050; min-width: 240px; max-width: 320px; background: #0f172a; border: 1px solid #334155; border-radius: 10px;
+            box-shadow: 0 14px 34px rgba(0,0,0,.45); padding: 4px; }
+.bzm-menu[hidden] { display: none; }
+.bzm-voce { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: none; color: #e2e8f0;
+            font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.bzm-voce.on, .bzm-voce:hover { background: #1e293b; }
+.bzm-iniz { width: 24px; height: 24px; border-radius: 50%; background: #1e3a8a; color: #bfdbfe; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bzm-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bzm-ruolo { font-size: 11px; color: #64748b; }
+.bzm-tag { color: #60a5fa; font-weight: 600; }
+.bzd-msg.mio .bzm-tag { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+[data-theme="light"] .bzm-menu { background: #fff; border-color: #e2e8f0; box-shadow: 0 14px 34px rgba(15,23,42,.15); }
+[data-theme="light"] .bzm-voce { color: #1e293b; }
+[data-theme="light"] .bzm-voce.on, [data-theme="light"] .bzm-voce:hover { background: #f1f5f9; }
+[data-theme="light"] .bzm-iniz { background: #dbeafe; color: #1e40af; }
+[data-theme="light"] .bzm-tag { color: #1d4ed8; }
 .bz-avvisi-vuoto { padding: 22px 14px; text-align: center; font-size: 13px; color: #64748b; }
 [data-theme="light"] .bz-avvisi-panel { background: #fff; border-color: #e2e8f0; box-shadow: 0 16px 40px rgba(15,23,42,.15); }
 [data-theme="light"] .bz-avvisi-testa { color: #1e293b; border-bottom-color: #e2e8f0; }
@@ -779,7 +797,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     <i class="fas fa-camera"></i>
                     <input type="file" id="bz-photo-input" accept="image/*" capture="environment" hidden>
                 </label>
-                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento..." rows="2"></textarea>
+                <textarea class="bz-comment-input" id="bz-comment-input" placeholder="Scrivi un commento... (@ per menzionare)" rows="2"></textarea>
                 <button class="bz-comment-send" id="btn-send-comment"><i class="fas fa-paper-plane"></i></button>
             </div>
             {% if daUfficio %}
@@ -1632,7 +1650,7 @@ async function openTask(id) {
                     ? (task.assignee_name || 'una persona')
                     : (TOCCA_A[task.assegnata_a || 'squadra'] || 'Squadra'))}</dd>
                 ${task.luogo ? `<dt><i class="fas fa-location-dot"></i> Posizione</dt><dd>${escHtml(task.luogo)}</dd>` : ''}
-                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
+                ${task.disegno ? `<dt><i class="fas fa-drafting-compass"></i> Disegno</dt><dd><button type="button" class="bz-link" data-annot="${task.disegno.document_id}" data-annot-type="${escAttr(task.disegno.tipo)}" data-annot-name="${escAttr(task.disegno.nome)}" data-annot-page="${task.disegno.page || 1}" data-annot-task="${task.id}" data-annot-evid="${escAttr(task.name || '')}" title="Aprire il disegno con i segni dell'attività in evidenza">${escHtml(task.disegno.nome)}${task.disegno.page > 1 ? ' · pag. ' + task.disegno.page : ''}</button></dd>` : ''}
                 ${Number(task.priority) > 0 ? `<dt><i class="fas fa-flag"></i> Priorità</dt><dd class="${Number(task.priority) > 1 ? 'urgente' : 'alta'}">${Number(task.priority) > 1 ? 'Urgente' : 'Alta'}</dd>` : ''}
                 ${task.start_date ? `<dt><i class="fas fa-calendar-alt"></i> Inizio</dt><dd>${fmtDate(task.start_date)}</dd>` : ''}
                 ${task.due_date ? `<dt><i class="fas fa-calendar-check"></i> Scadenza</dt><dd class="${task.status !== 'complete' && task.status !== 'verified' && task.due_date.slice(0,10) < new Date().toISOString().slice(0,10) ? 'urgente' : ''}">${fmtDate(task.due_date)}</dd>` : ''}
@@ -1899,7 +1917,7 @@ async function loadComments(taskId) {
                     ${c.interna == 1 ? '<span class="bz-vis-badge solo"><i class="fas fa-lock"></i> interna</span>' : ''}
                     ${DA_UFFICIO || Number(c.author_user_id) === Number(IO) ? `<button class="bz-x-btn bz-comment-del" data-delete-comment="${taskId}:${c.id}" title="Elimina">×</button>` : ''}
                 </div>
-                ${c.text ? `<div class="bz-comment-text">${escHtml(c.text)}</div>` : ''}
+                ${c.text ? `<div class="bz-comment-text">${window.BZMenzioni ? BZMenzioni.evidenzia(escHtml(c.text)) : escHtml(c.text)}</div>` : ''}
                 ${c.file_url ? `<a href="${escAttr(c.file_url)}" target="_blank" rel="noopener"><img class="bz-comment-photo-thumb" src="${escAttr(c.file_url)}" alt="foto" loading="lazy"></a>` : ''}
             </div>
         </div>`).join('');
@@ -1923,9 +1941,9 @@ async function sendComment() {
     inp.disabled = true;
     const res = await api(`/worksites/${WID}/zone/tasks/${activeTaskId}/comments`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, ...flagMessaggio() }),
+        body: JSON.stringify({ text, ...flagMessaggio(), menzioni: window.BZMenzioni ? BZMenzioni.ids(inp) : [] }),
     });
-    if (res.ok) { inp.value = ''; azzeraFlag(); loadComments(activeTaskId); }
+    if (res.ok) { inp.value = ''; if (window.BZMenzioni) BZMenzioni.azzera(inp); azzeraFlag(); loadComments(activeTaskId); }
     inp.disabled = false;
     inp.focus();
 }
@@ -1999,9 +2017,11 @@ function renderDisegni(items, fwReady) {
             ${d.is_dwg && d.dwg_status === 'error' ? `<div class="bz-dz-meta" style="color:#fca5a5;" title="${escAttr(d.dwg_error || '')}">Conversione DWG non riuscita${d.dwg_error ? ': ' + escHtml(d.dwg_error.slice(0, 160)) : ''}</div>` : ''}
             <div class="bz-dz-actions">
                 ${d.annotatable
-                    ? (puoScrivere('disegni')
-                        ? `<button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"><i class="fas fa-map-marker-alt"></i> Annota</button>`
-                        : `<a class="bz-dz-btn" href="${d.view_url}" target="_blank" rel="noopener"><i class="fas fa-eye"></i> Apri</a>`)
+                    ? `<div class="bz-dz-apri"><button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"
+                               title="${puoScrivere('disegni') ? 'Aprire il disegno con le annotazioni e aggiungerne di nuove' : 'Aprire il disegno con le annotazioni'}">
+                           <i class="fas fa-map-marker-alt"></i> Con annotazioni${d.n_segni ? ` <span class="bz-dz-n">${d.n_segni}</span>` : ''}</button>
+                       <button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}" data-annot-pulito="1"
+                               title="Aprire il disegno originale, senza annotazioni"><i class="far fa-file"></i> Senza annotazioni</button></div>`
                     : (d.is_dwg
                         ? (puoScrivere('disegni')
                             ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
@@ -2382,20 +2402,23 @@ function scriviPunto() {
     const el = document.getElementById('task-punto-scelto');
     el.hidden = !puntoNuovo;
     el.innerHTML = puntoNuovo
-        ? `<i class="fas fa-location-dot"></i> ${escHtml(puntoNuovo.nome)}${puntoNuovo.page > 1 ? ' · pag. ' + puntoNuovo.page : ''} <button type="button" id="task-punto-via" title="Togli">×</button>`
+        ? `<i class="fas fa-location-dot"></i> ${escHtml(puntoNuovo.nome)}${puntoNuovo.page > 1 ? ' · pag. ' + puntoNuovo.page : ''}${(puntoNuovo.segni || []).length ? ' · ' + (puntoNuovo.segni.length === 1 ? '1 segno' : puntoNuovo.segni.length + ' segni') : ''} <button type="button" id="task-punto-via" title="Rimuovi">×</button>`
         : '';
     document.getElementById('task-punto-scegli').innerHTML = puntoNuovo
-        ? '<i class="fas fa-location-crosshairs"></i> Cambia punto'
+        ? '<i class="fas fa-location-crosshairs"></i> Modifica posizione'
         : '<i class="fas fa-location-crosshairs"></i> Segna sul disegno';
 }
 document.getElementById('task-punto-scegli')?.addEventListener('click', () => {
     const sel = document.getElementById('task-disegno');
     const opt = sel.options[sel.selectedIndex];
     if (!opt || !window.BZAnnotator) return;
+    // riaprendo lo stesso disegno si ritrovano il punto e i segni gia' messi
+    const stesso = puntoNuovo && puntoNuovo.document_id === parseInt(opt.value);
     window.BZAnnotator.open({
         worksiteId: WID, csrf: CSRF,
         docId: parseInt(opt.value), fileType: opt.dataset.tipo, fileName: opt.textContent,
         viewUrl: `/worksites/${WID}/disegni/${opt.value}/view`,
+        iniziale: stesso ? puntoNuovo : null,
         onPick: p => { puntoNuovo = { document_id: parseInt(opt.value), nome: opt.textContent, ...p }; scriviPunto(); },
     });
 });
@@ -2466,7 +2489,7 @@ async function submitTask() {
         priority:        parseInt(document.getElementById('task-priority').value) || 0,
         // anche un passaggio scritto e non ancora confermato con Invio
         checklist:       [...passiNuovi, document.getElementById('task-passo').value.trim()].filter(Boolean),
-        punto:           puntoNuovo ? { document_id: puntoNuovo.document_id, page: puntoNuovo.page, x: puntoNuovo.x, y: puntoNuovo.y } : null,
+        punto:           puntoNuovo ? { document_id: puntoNuovo.document_id, page: puntoNuovo.page, x: puntoNuovo.x, y: puntoNuovo.y, segni: puntoNuovo.segni || [] } : null,
         ...assegnazioneDaSelect(aSel),
         ...personeDalBottone('task-chi'),
         due_date:        document.getElementById('task-due').value || null,
@@ -2818,13 +2841,22 @@ document.addEventListener('click', e => {
     if (delDz) { deleteDisegno(parseInt(delDz.dataset.delDisegno)); return; }
     const annBtn = t.closest('[data-annot]');
     if (annBtn && window.BZAnnotator) {
+        const ds = annBtn.dataset;
+        // aperto da un'attivita' o da una segnalazione: i suoi segni in evidenza
+        const evidenzia = ds.annotTask ? { task_id: parseInt(ds.annotTask), nome: ds.annotEvid || '' }
+                        : ds.annotSegn ? { segnalazione_id: parseInt(ds.annotSegn), nome: ds.annotEvid || '' }
+                        : null;
         window.BZAnnotator.open({
             worksiteId: WID,
             csrf: CSRF,
-            docId: parseInt(annBtn.dataset.annot),
-            fileType: annBtn.dataset.annotType,
-            fileName: annBtn.dataset.annotName,
-            viewUrl: `/worksites/${WID}/disegni/${annBtn.dataset.annot}/view`,
+            docId: parseInt(ds.annot),
+            fileType: ds.annotType,
+            fileName: ds.annotName,
+            viewUrl: `/worksites/${WID}/disegni/${ds.annot}/view`,
+            page: parseInt(ds.annotPage || '1'),
+            evidenzia,
+            senzaAnnotazioni: ds.annotPulito === '1',
+            solaLettura: !puoScrivere('disegni'),
             // alla chiusura le attivita' si ricaricano: un punto collegato
             // a un'attivita' compare subito nel Kanban e nel dettaglio
             onClose: async () => {
@@ -3544,6 +3576,8 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-dz-meta { font-size: 11px; color: #64748b; }
 .bz-dz-folder { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; background: #273548; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
 .bz-dz-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.bz-dz-apri { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; flex-basis: 100%; }
+.bz-dz-apri .bz-dz-btn { padding: 8px; font-size: 12px; white-space: nowrap; }
 .bz-dz-btn { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border-radius: 6px; border: 1px solid #273548; background: #0f172a; color: #94a3b8; font-size: 11px; cursor: pointer; text-decoration: none; transition: all .12s; }
 .bz-dz-btn:hover { color: #e2e8f0; border-color: #334155; }
 .bz-dz-btn.danger:hover { color: #fca5a5; border-color: #471515; }
@@ -3679,7 +3713,7 @@ html .bz-dz-empty { color:#94a3b8; }
 }
 </style>
 
-<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css?v=20261112">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
 <script src="/assets/js/views/fieldwire/forms.js?v=20261110"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -3690,14 +3724,21 @@ html .bz-dz-empty { color:#94a3b8; }
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-<script src="/assets/js/views/fieldwire/annotator.js?v=20261110"></script>
+<script src="/assets/js/views/fieldwire/annotator.js?v=20261112"></script>
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
 <script src="/assets/js/views/fieldwire/accessi.js?v=20261110"></script>
 {% endif %}
 <script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
-<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261110">
-{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/dialogo.js?v=20261110"></script>{% endif %}
+<link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261112">
+{% if not soloAccessi %}<script src="/assets/js/views/fieldwire/menzioni.js?v=20261112"></script>
+<script nonce="{{ cspNonce }}">
+// @ nei messaggi delle attivita': chi vede l'attivita' (in una nota interna solo CSM)
+window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
+    ? 'contesto=attivita&id=' + activeTaskId + (document.getElementById('bz-flag-interna')?.checked ? '&interna=1' : '')
+    : '');
+</script>
+<script src="/assets/js/views/fieldwire/dialogo.js?v=20261112"></script>{% endif %}
 </body>
 </html>

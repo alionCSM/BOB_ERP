@@ -318,6 +318,53 @@ sql("UPDATE bb_worksites SET zone_cliente=1 WHERE id=100")
 chiama(UFF, 'POST', f"/segnalazioni/{sk['id']}/messaggi", {'testo': 'Chiuso'})
 verifica(S, '... riaccesa, le riceve di nuovo', len(notifiche(CLI)) == 1, str(notifiche(CLI)))
 
+S = '7b. Menzioni con @'
+mz = lambda u, q: chiama(u, 'GET', '/menzionabili?' + q)
+nomi_mz = lambda j: {x['nome'] for x in j.get('data', [])} if puo(j) else set()
+m1 = nomi_mz(mz(CLI, 'contesto=chat&canale=cliente'))
+verifica(S, 'chat CSM e committente: il cliente può menzionare CSM', 'Giulia Ufficio' in m1, str(m1))
+verifica(S, '... ma non la squadra', 'Arben Hoxha' not in m1)
+verifica(S, '... e non sé stesso', 'Paolo Rossi' not in m1)
+verifica(S, 'il cliente non chiede i lettori della chat della squadra', mz(CLI, 'contesto=chat&canale=squadra')['_http'] == 403)
+m2 = nomi_mz(mz(UFF, 'contesto=chat&canale=squadra'))
+verifica(S, 'chat della squadra: CSM menziona il capo, non il cliente', 'Arben Hoxha' in m2 and 'Paolo Rossi' not in m2, str(m2))
+pulisci_notifiche()
+chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Giulia Ufficio può confermare la consegna?', 'menzioni': [UFF]})
+menz = lambda u: [n for n in notifiche(u) if 'menzionato' in n[0]]
+verifica(S, 'la persona menzionata riceve la notifica', len(menz(UFF)) == 1 and menz(UFF)[0][1].endswith('#chat-cliente'), str(notifiche(UFF)))
+pulisci_notifiche()
+chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Arben Hoxha domani ci sei?', 'menzioni': [CAPO]})
+verifica(S, 'menzionare chi non legge la chat non avvisa nessuno', len(menz(CAPO)) == 0)
+chiama(CLI, 'POST', '/chat/cliente', {'testo': 'Grazie', 'menzioni': [UFF]})
+verifica(S, 'senza il nome nel testo la menzione non vale', len(menz(UFF)) == 0)
+m3 = nomi_mz(mz(UFF, f'contesto=attivita&id={t1}&interna=1'))
+verifica(S, 'nota interna: si menziona solo CSM', 'Paolo Rossi' not in m3 and 'Arben Hoxha' not in m3, str(m3))
+m4 = nomi_mz(mz(UFF, f'contesto=attivita&id={t1}'))
+verifica(S, "messaggio sull'attività: si menziona chi la vede", 'Paolo Rossi' in m4, str(m4))
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi serve la vostra conferma', 'menzioni': [CLI]})
+verifica(S, "menzione in un'attività: notifica al committente", len(menz(CLI)) == 1 and menz(CLI)[0][1].endswith(f'#attivita-{t1}'), str(notifiche(CLI)))
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi solo interno', 'menzioni': [CLI], 'interna': True})
+verifica(S, 'menzione in una nota interna: il committente non riceve nulla', len(menz(CLI)) == 0)
+sm = chiama(UFF, 'POST', '/segnalazioni', {'testo': 'Verifica ancoraggi', 'tipo': 'qualita', 'visibilita': 'cantiere'})['data']
+m5 = nomi_mz(mz(UFF, f"contesto=segnalazione&id={sm['id']}"))
+verifica(S, 'segnalazione CSM e cantiere: il committente non si menziona', 'Paolo Rossi' not in m5 and 'Arben Hoxha' in m5, str(m5))
+
+S = '7c. Disegni: posizione, evidenza, annotazioni'
+tp = chiama(UFF, 'POST', '/tasks', {'name': 'Sostituzione pannello', 'punto': {'document_id': 1, 'page': 1, 'x': 0.4, 'y': 0.3, 'segni': [
+    {'type': 'rectangle', 'geom': {'x': 0.35, 'y': 0.25, 'w': 0.1, 'h': 0.08}, 'color': '#3b82f6'},
+    {'type': 'text', 'geom': {'x': 0.36, 'y': 0.24}, 'text': 'Zona da smontare', 'color': '#ef4444'},
+    {'type': 'script', 'geom': {'x': 0}},
+]}})['data']['id']
+segni_t = sql(f"SELECT type FROM bb_zone_annotations WHERE task_id={tp} ORDER BY id")
+verifica(S, "nuova attività: il punto e i segni disegnati restano collegati all'attività", [x[0] for x in segni_t] == ['pin', 'rectangle', 'text'], str(segni_t))
+dz = {d['id']: d for d in chiama(UFF, 'GET', '/disegni')['data']['bob']}
+verifica(S, 'il disegno dice quante annotazioni ha', dz.get(1, {}).get('n_segni', 0) >= 3, str(dz.get(1, {}).get('n_segni')))
+sql("INSERT INTO bb_zone_annotations(worksite_id,document_id,page,segnalazione_id,type,geom,created_by) VALUES (100,1,2,%d,'pin','{\"x\":0.5,\"y\":0.5}',5)" % int(s['id']))
+dd = chiama(UFF, 'GET', f"/segnalazioni/{s['id']}")['data'].get('disegno')
+verifica(S, 'la segnalazione appuntata dice su quale disegno e pagina', bool(dd) and dd['document_id'] == 1 and dd['page'] == 2, str(dd))
+
 S = '8. Chi entra dopo'
 pulisci_notifiche()
 r = chiama(UFF, 'POST', '/accessi', form={'user_id': CLI2})
