@@ -190,7 +190,8 @@ final class WorksitesController
             Response::redirect('/worksites/' . (int)$worksites[0]['id'] . '/zone');
         }
 
-        Response::view('worksites/my.html.twig', $request, compact('worksites', 'nonDisponibile'));
+        $cliente = $soloCondivisi;
+        Response::view('worksites/my.html.twig', $request, compact('worksites', 'nonDisponibile', 'cliente'));
     }
 
     /**
