@@ -1918,7 +1918,7 @@ async function loadComments(taskId) {
     }
     if (!items.length) { el.innerHTML = '<div class="bz-detail-vuoto">Nessun messaggio.</div>'; return; }
     el.innerHTML = items.map(c => `
-        <div class="bz-comment">
+        <div class="bz-comment" data-cid="${c.id}">
             <div class="bz-comment-avatar">${initials(c.author_name)}</div>
             <div class="bz-comment-body">
                 <div class="bz-comment-meta">
@@ -1996,7 +1996,7 @@ function renderDisegni(items, fwReady) {
         return;
     }
     grid.innerHTML = items.map(d => `
-        <div class="bz-dz-card">
+        <div class="bz-dz-card" data-dz-card="${d.id}">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
                 <i class="fas ${dzIconGlyph(d.file_type)} bz-dz-icon ${dzIconClass(d.file_type)}"></i>
                 <span class="bz-dz-folder">${escHtml(d.folder)}</span>
@@ -2374,7 +2374,7 @@ function renderFiles(files, moduli, richieste = []) {
             f.richiesta_id && f.richiesta_stato === 'aperta' ? `<button type="button" class="bz-tag-richiesta" data-richiesta="${f.richiesta_id}" title="Apri la richiesta"><i class="fas fa-inbox"></i> ${escHtml(f.richiesta_titolo || 'Richiesta')}</button>` : '',
         ].join('');
         return `
-        <div class="bz-file-row ${versione ? 'bz-file-versione' : ''}" ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `draggable="true" data-drag-file="${f.id}" title="Trascinare su una cartella per spostare"` : ''}>
+        <div class="bz-file-row ${versione ? 'bz-file-versione' : ''}" data-riga-file="${f.id}" ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `draggable="true" data-drag-file="${f.id}" title="Trascinare su una cartella per spostare"` : ''}>
             ${versione ? '<i class="fas fa-turn-up bz-versione-freccia"></i>' : ''}
             <i class="fas ${fileIcon(f.file_type)} bz-file-icon"></i>
             <div class="bz-file-info ${viewable?'bz-file-clickable':''}"
@@ -2914,25 +2914,67 @@ function avvisiSezioneVista(v) {
 
 /* Porta alla cosa di cui parla l'avviso: #attivita-12, #disegno-3,
    #moduli, #segnalazione-5, #chat-squadra */
+/* Evidenzia la cosa a cui porta una notifica: aspetta che compaia (le
+   sezioni si caricano), la porta al centro e la fa lampeggiare. */
+function evidenzia(selettore, tentativi = 30) {
+    const el = document.querySelector(selettore);
+    if (!el) { if (tentativi > 0) setTimeout(() => evidenzia(selettore, tentativi - 1), 150); return; }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove('bz-evidenziato');
+    void el.offsetWidth;
+    el.classList.add('bz-evidenziato');
+    setTimeout(() => el.classList.remove('bz-evidenziato'), 2600);
+}
+
+/* Porta alla cosa precisa di cui parla l'avviso:
+   attivita-12[.c45]  l'attivita' (e il commento)
+   disegno-3          il disegno, aperto nel visore
+   file-9[.commenti]  il documento nella sua cartella (e i suoi commenti)
+   richiesta-4        la richiesta
+   segnalazione-5[.m7], chat-squadra[.m8]  il messaggio */
 async function vaiAdAvviso(dove) {
-    if (dove.startsWith('attivita-')) {
+    const [base, extra] = String(dove || '').split('.');
+    if (base.startsWith('attivita-')) {
         switchTop('attivita');
-        const id = parseInt(dove.slice(9));
+        const id = parseInt(base.slice(9));
         if (!allTasks.some(t => Number(t.id) === id)) await loadTasks();
-        if (allTasks.some(t => Number(t.id) === id)) openTask(id);
-    } else if (dove.startsWith('disegno')) {
+        if (allTasks.some(t => Number(t.id) === id)) {
+            openTask(id);
+            if (extra && extra[0] === 'c') evidenzia(`.bz-comment[data-cid="${parseInt(extra.slice(1))}"]`);
+        }
+    } else if (base.startsWith('disegno-')) {
+        const id = parseInt(base.slice(8));
         switchTop('disegni');
-    } else if (dove.startsWith('richiesta-')) {
+        await loadDisegni();
+        const b = document.querySelector(`#bz-disegni-grid [data-annot="${id}"]`);
+        if (b) b.click();
+        else evidenzia(`[data-dz-card="${id}"]`);
+    } else if (base.startsWith('disegno')) {
+        switchTop('disegni');
+    } else if (base.startsWith('richiesta-')) {
         switchTop('files');
-        window.BZRichieste?.apri(parseInt(dove.slice(10)));
-    } else if (dove.startsWith('file-')) {
+        window.BZRichieste?.apri(parseInt(base.slice(10)));
+    } else if (base.startsWith('file-')) {
+        const id = parseInt(base.slice(5));
         switchTop('files');
-    } else if (dove === 'moduli') {
+        const r = await api(`/worksites/${WID}/zone/files/${id}/info`);
+        if (!r.ok) return;
+        curFolder = r.data.folder_id;
+        await loadFiles();
+        evidenzia(`[data-riga-file="${id}"]`);
+        if (extra === 'commenti') openFileComments(id, r.data.file_name);
+    } else if (base === 'moduli') {
         switchTop('forms');
-    } else if ((dove.startsWith('segnalazione-') || dove.startsWith('chat-')) && window.bzdApri) {
+    } else if ((base.startsWith('segnalazione-') || base.startsWith('chat-')) && window.bzdApri) {
         window.bzdApri(dove);
     }
 }
+
+// un avviso aperto quando si e' gia' nella pagina (campanello di BOB): cambia solo il #
+window.addEventListener('hashchange', () => {
+    const h = location.hash.slice(1);
+    if (h) vaiAdAvviso(h);
+});
 
 // uscire chiede conferma: un clic sbagliato nell'angolo costa un nuovo accesso
 document.getElementById('bz-esci')?.addEventListener('click', e => {
@@ -4003,6 +4045,9 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
 .bz-file-versione { margin-left:28px; border-style:dashed; }
 .bz-trascinato { opacity:.45; }
+@keyframes bz-lampeggia { 0%, 100% { box-shadow: 0 0 0 0 rgba(250,204,21,0); } 20%, 60% { box-shadow: 0 0 0 3px rgba(250,204,21,.85); background-color: rgba(250,204,21,.12); } }
+.bz-evidenziato { animation: bz-lampeggia 2.4s ease-in-out; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .bz-evidenziato { animation: none; outline: 3px solid #facc15; } }
 [data-drag-file] { cursor:grab; }
 .bz-drop-qui { outline:2px dashed #3b82f6 !important; outline-offset:-2px; background:rgba(59,130,246,.12) !important; }
 .bz-richieste-box { border:1px solid rgba(245,158,11,.35); background:rgba(245,158,11,.06); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
@@ -4158,6 +4203,6 @@ window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
     ? 'contesto=attivita&id=' + activeTaskId + (document.getElementById('bz-flag-interna')?.checked ? '&interna=1' : '')
     : '');
 </script>
-<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113b"></script>{% endif %}
 </body>
 </html>

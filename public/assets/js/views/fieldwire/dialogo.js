@@ -382,6 +382,7 @@
             </div>`;
         C.ultimo = messaggi.length ? messaggi[messaggi.length - 1].id : 0;
         inFondo(rootC().querySelector('.bzd-msgs'));
+        if (C.evidenzia) { evidenziaMessaggio(C.evidenzia); C.evidenzia = null; }
     }
 
     async function inviaChat(dati) {
@@ -579,13 +580,22 @@
         apriDa(location.hash.slice(1));
     })();
 
+    /** Il messaggio a cui porta una notifica: al centro, e lampeggia. */
+    function evidenziaMessaggio(mid) {
+        if (mid && typeof evidenzia === 'function') evidenzia(`[data-mid="${mid}"]`);
+    }
+
+    // segnalazione-12[.m5], chat-squadra[.m8]
     function apriDa(h) {
-        if (h.startsWith('segnalazione-') && typeof switchTop === 'function') {
+        const [base, extra] = String(h || '').split('.');
+        const mid = extra && extra[0] === 'm' ? parseInt(extra.slice(1)) : null;
+        if (base.startsWith('segnalazione-') && typeof switchTop === 'function') {
             switchTop('segnalazioni');
-            const id = parseInt(h.slice(13));
-            setTimeout(() => apriSegnalazione(id), 300);
-        } else if (h.startsWith('chat-') && typeof switchTop === 'function') {
-            C.canale = h.slice(5);
+            const id = parseInt(base.slice(13));
+            setTimeout(() => apriSegnalazione(id).then(() => evidenziaMessaggio(mid)), 300);
+        } else if (base.startsWith('chat-') && typeof switchTop === 'function') {
+            C.canale = base.slice(5);
+            C.evidenzia = mid;
             switchTop('chat');
         }
     }

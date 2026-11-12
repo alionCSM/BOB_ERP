@@ -798,7 +798,7 @@ Per impostazione predefinita il committente **non vede** le presenze. CSM può a
 
 #### 5.19.6 Notifiche della Zone
 
-- Il **campanello** del cantiere elenca le novità; un clic porta direttamente al contenuto. I numeri accanto alle voci del menu (Attività, Disegni, Documenti, Segnalazioni, Chat) indicano gli elementi nuovi.
+- Il **campanello** del cantiere elenca le novità; un clic porta **alla cosa precisa**, che viene evidenziata per un momento: il commento dell'attività, il messaggio della chat o della segnalazione, il disegno (aperto nel visore), il documento nella sua cartella (con i commenti, se la notifica riguarda una menzione), la richiesta. Vale anche per le notifiche del campanello di BOB, per le email e, nell'app, per attività, segnalazioni, chat, disegni e documenti. I numeri accanto alle voci del menu (Attività, Disegni, Documenti, Segnalazioni, Chat) indicano gli elementi nuovi.
 - La pagina si aggiorna automaticamente **ogni 30 secondi**.
 - Le notifiche vengono generate **al momento** dell'evento (attività assegnata, modulo da compilare, nuovo file, nuovo disegno, nuova foto, messaggio, segnalazione) e inviate anche come notifica push sull'app.
 - Ricevono la notifica solo le persone che possono vedere il contenuto; chi ha compiuto l'azione non riceve notifica.

@@ -86,7 +86,7 @@ final class AvvisiZona
      * gruppo: una squadra di dieci con un avviso a ogni "ok" la silenzia.
      * Una nota interna resta all'ufficio anche qui.
      */
-    public function commento(int $taskId, int $daChi, string $testo, bool $interna): void
+    public function commento(int $taskId, int $daChi, string $testo, bool $interna, ?int $commentoId = null): void
     {
         $st = $this->conn->prepare("
             SELECT t.*, w.name AS cantiere FROM bb_zone_tasks t JOIN bb_worksites w ON w.id = t.worksite_id
@@ -120,7 +120,8 @@ final class AvvisiZona
             if ($p['ruolo'] !== Accesso::UFFICIO
                 && !$cond->vede($this->utente($uid), $w, 'attivita', $taskId, (int)($t['created_by'] ?? 0))) continue;
             $p['worksite_id'] = $w;
-            $p['dove'] = 'attivita-' . $taskId;
+            // al commento preciso: attivita-12.c45
+            $p['dove'] = 'attivita-' . $taskId . ($commentoId ? '.c' . $commentoId : '');
             $this->manda($p, 'zona_commento_t', 'zona_commento', [
                 'cantiere' => $t['cantiere'],
                 'nome'     => mb_substr((string)$t['name'], 0, 80),
