@@ -110,6 +110,13 @@
                             data-expires="{{ link.expires_at is not empty ? link.expires_at|date('Y-m-d') : '9999-12-31' }}">
                             <td class="sl-title-cell">
                                 {{ link.title }}
+                                {% if link.cantieri is not empty %}
+                                    <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;" title="Cantieri collegati: i documenti compaiono nella loro BOB Zone">
+                                        {% for c in link.cantieri %}
+                                            <span style="font-size:11px;font-weight:600;color:#0f766e;background:#ccfbf1;border-radius:999px;padding:1px 8px;">{{ c.worksite_code ? c.worksite_code ~ ' · ' : '' }}{{ c.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
                             </td>
                             <td>
                                 <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">

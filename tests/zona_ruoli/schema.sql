@@ -68,6 +68,8 @@ INSERT INTO bb_workers VALUES (300,'Arben','Hoxha','CSM'),(301,'Ion','Popescu','
 CREATE TABLE bb_shared_links(id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, link_token VARCHAR(64), password VARCHAR(255) NULL, title VARCHAR(200), expires_at DATETIME NULL, is_active TINYINT DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_shared_link_workers(shared_link_id INT, worker_id INT);
 CREATE TABLE bb_shared_link_companies(shared_link_id INT, company_id INT);
+CREATE TABLE bb_shared_link_files(id INT AUTO_INCREMENT PRIMARY KEY, shared_link_id INT, file_path VARCHAR(300), original_name VARCHAR(200), worker_id INT NULL, source VARCHAR(20), company_id INT NULL);
+INSERT INTO bb_shared_link_files(shared_link_id,file_path,original_name,source,company_id) VALUES (1,'shared_uploads/pos.pdf','POS di cantiere','manual',NULL),(1,'shared_uploads/pos.pdf','Certificato iscrizione','manual',900);
 CREATE TABLE bb_company_documents(id INT AUTO_INCREMENT PRIMARY KEY, company_id INT, tipo_documento VARCHAR(100), data_emissione DATE NULL, scadenza DATE NULL, file_path VARCHAR(300));
 CREATE TABLE bb_worker_documents(id INT AUTO_INCREMENT PRIMARY KEY, worker_id INT, tipo_documento VARCHAR(100), data_emissione DATE NULL, scadenza DATE NULL, path VARCHAR(300));
 INSERT INTO bb_companies VALUES (900,'Edilnord Srl'),(901,'Montaggi Sud Srl');

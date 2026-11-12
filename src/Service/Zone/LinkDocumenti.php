@@ -28,6 +28,7 @@ final class LinkDocumenti
     public const AZIENDA = 'link_azienda';
     public const OPERAI  = 'link_operai';
     public const OPERAIO = 'link_operaio';
+    public const ALTRI   = 'link_altri';      // documenti caricati a mano nel link, senza azienda
 
     public function __construct(private PDO $conn, private Condivisione $condivisione) {}
 
@@ -84,11 +85,14 @@ final class LinkDocumenti
         if ($link) {
             $vogliamo[self::AZIENDE . ':0'] = ['nome' => 'Documenti azienda', 'su' => null];
             $vogliamo[self::OPERAI . ':0']  = ['nome' => 'Documenti operai', 'su' => null];
-            $az = $this->conn->prepare('
-                SELECT c.id, c.name FROM bb_shared_link_companies lc JOIN bb_companies c ON c.id = lc.company_id
-                WHERE lc.shared_link_id = :l ORDER BY c.name
-            ');
-            $az->execute([':l' => (int)$link['id']]);
+            // le aziende del link, e quelle a cui sono legati documenti caricati a mano
+            $az = $this->conn->prepare("
+                SELECT c.id, c.name FROM bb_companies c
+                WHERE c.id IN (SELECT company_id FROM bb_shared_link_companies WHERE shared_link_id = :l)
+                   OR c.id IN (SELECT company_id FROM bb_shared_link_files WHERE shared_link_id = :l2 AND source = 'manual' AND company_id IS NOT NULL)
+                ORDER BY c.name
+            ");
+            $az->execute([':l' => (int)$link['id'], ':l2' => (int)$link['id']]);
             foreach ($az->fetchAll(PDO::FETCH_ASSOC) as $a) {
                 $vogliamo[self::AZIENDA . ':' . (int)$a['id']] = ['nome' => (string)$a['name'], 'su' => self::AZIENDE . ':0'];
             }
@@ -101,6 +105,12 @@ final class LinkDocumenti
             foreach ($op->fetchAll(PDO::FETCH_ASSOC) as $o) {
                 $nome = $o['nome'] . (trim((string)$o['company']) !== '' ? ' · ' . trim((string)$o['company']) : '');
                 $vogliamo[self::OPERAIO . ':' . (int)$o['id']] = ['nome' => $nome, 'su' => self::OPERAI . ':0'];
+            }
+            // documenti caricati a mano nel link senza un'azienda: "Altri documenti"
+            $al = $this->conn->prepare("SELECT 1 FROM bb_shared_link_files WHERE shared_link_id = :l AND source = 'manual' AND company_id IS NULL LIMIT 1");
+            $al->execute([':l' => (int)$link['id']]);
+            if ($al->fetchColumn()) {
+                $vogliamo[self::ALTRI . ':0'] = ['nome' => 'Altri documenti', 'su' => null];
             }
         }
 
@@ -172,20 +182,36 @@ final class LinkDocumenti
     public function documenti(int $w, array $cartella): array
     {
         $link = $this->collegato($w);
-        if (!$link || !in_array($cartella['sorgente'] ?? '', [self::AZIENDA, self::OPERAIO], true)) {
+        if (!$link || !in_array($cartella['sorgente'] ?? '', [self::AZIENDA, self::OPERAIO, self::ALTRI], true)) {
             return [];
         }
         $rif = (int)$cartella['sorgente_id'];
+        $manuali = [];
+        if ($cartella['sorgente'] !== self::OPERAIO) {
+            // i documenti caricati a mano nel link: dell'azienda, o senza azienda
+            $mq = $this->conn->prepare("
+                SELECT id, original_name AS nome, NULL AS scadenza, file_path AS percorso FROM bb_shared_link_files
+                WHERE shared_link_id = :l AND source = 'manual' AND " . ($cartella['sorgente'] === self::ALTRI ? 'company_id IS NULL' : 'company_id = :r') . "
+                ORDER BY original_name
+            ");
+            $mq->execute([':l' => (int)$link['id']] + ($cartella['sorgente'] === self::ALTRI ? [] : [':r' => $rif]));
+            $manuali = array_map(fn($d) => ['tipo' => 'manuale', 'id' => (int)$d['id'], 'nome' => (string)$d['nome'], 'scadenza' => null, 'stato' => 'valido',
+                                            'ext' => strtolower(pathinfo((string)$d['percorso'], PATHINFO_EXTENSION))],
+                                 $mq->fetchAll(PDO::FETCH_ASSOC));
+        }
+        if ($cartella['sorgente'] === self::ALTRI) {
+            return $manuali;
+        }
         if ($cartella['sorgente'] === self::AZIENDA) {
             $st = $this->conn->prepare('
-                SELECT d.id, d.tipo_documento AS nome, d.scadenza
+                SELECT d.id, d.tipo_documento AS nome, d.scadenza, d.file_path AS percorso
                 FROM bb_shared_link_companies lc JOIN bb_company_documents d ON d.company_id = lc.company_id
                 WHERE lc.shared_link_id = :l AND lc.company_id = :r ORDER BY d.tipo_documento
             ');
             $tipo = 'azienda';
         } else {
             $st = $this->conn->prepare('
-                SELECT d.id, d.tipo_documento AS nome, d.scadenza
+                SELECT d.id, d.tipo_documento AS nome, d.scadenza, d.path AS percorso
                 FROM bb_shared_link_workers lw JOIN bb_worker_documents d ON d.worker_id = lw.worker_id
                 WHERE lw.shared_link_id = :l AND lw.worker_id = :r ORDER BY d.tipo_documento
             ');
@@ -194,13 +220,14 @@ final class LinkDocumenti
         $st->execute([':l' => (int)$link['id'], ':r' => $rif]);
         $oggi = date('Y-m-d');
         $tra30 = date('Y-m-d', strtotime('+30 days'));
-        return array_map(fn($d) => [
+        return array_merge(array_map(fn($d) => [
             'tipo'     => $tipo,
             'id'       => (int)$d['id'],
             'nome'     => (string)$d['nome'],
             'scadenza' => $d['scadenza'] ?: null,
+            'ext'      => strtolower(pathinfo((string)$d['percorso'], PATHINFO_EXTENSION)),
             'stato'    => !$d['scadenza'] ? 'valido' : ($d['scadenza'] < $oggi ? 'scaduto' : ($d['scadenza'] <= $tra30 ? 'in_scadenza' : 'valido')),
-        ], $st->fetchAll(PDO::FETCH_ASSOC));
+        ], $st->fetchAll(PDO::FETCH_ASSOC)), $manuali);
     }
 
     /**
@@ -229,11 +256,20 @@ final class LinkDocumenti
                 WHERE d.id = :d
             ');
             $sorgente = self::OPERAIO;
+        } elseif ($tipo === 'manuale') {
+            $st = $this->conn->prepare("
+                SELECT file_path AS percorso, original_name AS nome, company_id AS rif
+                FROM bb_shared_link_files WHERE id = :d AND shared_link_id = :l AND source = 'manual'
+            ");
+            $sorgente = self::AZIENDA;
         } else {
             return null;
         }
         $st->execute([':l' => (int)$link['id'], ':d' => $docId]);
         $r = $st->fetch(PDO::FETCH_ASSOC);
+        if ($r && $tipo === 'manuale' && $r['rif'] === null) {
+            $sorgente = self::ALTRI;
+        }
         return $r ? ['percorso' => (string)$r['percorso'], 'nome' => (string)$r['nome'], 'sorgente' => $sorgente, 'sorgente_id' => (int)$r['rif']] : null;
     }
 }

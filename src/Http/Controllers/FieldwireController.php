@@ -1411,6 +1411,11 @@ final class FieldwireController
                                 $link->documenti($worksiteId, $cartelle[$folderId]))
                     : [],
                 'current_folder' => $folderId,
+                // per il pulsante di CSM: il link collegato, se c'e'
+                'link_collegato' => (function () use ($link, $worksiteId) {
+                    try { $l = $link->collegato($worksiteId); return $l ? (string)$l['title'] : null; }
+                    catch (\PDOException $e) { return null; }
+                })(),
             ];
         });
     }
@@ -1825,15 +1830,24 @@ final class FieldwireController
                 if (($c['sorgente'] ?? '') === $doc['sorgente'] && (int)$c['sorgente_id'] === $doc['sorgente_id']) { $vede = true; break; }
             }
         }
-        $base = realpath(dirname(APP_ROOT) . '/cloud');
+        // la cartella cloud di BOB, la stessa da cui si aprono documenti di operai e aziende
+        $base = realpath(defined('BOB_CLOUD_DOCUMENTI') ? BOB_CLOUD_DOCUMENTI : dirname(APP_ROOT) . '/cloud');
         $real = $doc && $vede && $base ? realpath($base . '/' . $doc['percorso']) : false;
         if (!$real || strpos($real, $base) !== 0 || !is_file($real)) {
             http_response_code(404);
             exit('Documento non trovato');
         }
+        // il tipo vero del file (un PDF, una foto, un documento Word...)
+        $ext  = strtolower(pathinfo($real, PATHINFO_EXTENSION));
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($real) ?: 'application/octet-stream';
+        $nome = str_replace('"', '', $doc['nome']);
+        if ($ext !== '' && !str_ends_with(strtolower($nome), '.' . $ext)) {
+            $nome .= '.' . $ext;
+        }
+        $inline = str_starts_with($mime, 'image/') || $mime === 'application/pdf';
         while (ob_get_level() > 0) { ob_end_clean(); }
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="' . str_replace('"', '', $doc['nome']) . '.pdf"');
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . $nome . '"');
         header('Content-Length: ' . filesize($real));
         header('Cache-Control: private, no-store');
         header('X-Frame-Options: SAMEORIGIN');

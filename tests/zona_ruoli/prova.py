@@ -381,9 +381,22 @@ verifica(S, 'il committente le vede', 'Documenti operai' in ck and 'Ion Popescu 
 cq = {c['name'] for c in chiama(CAPO, 'GET', '/files')['data']['folders']}
 verifica(S, 'la squadra no (documenti personali)', 'Documenti operai' not in cq and 'Arben Hoxha · CSM' not in cq, str(cq))
 ed = chiama(CLI, 'GET', f"/files?folder={cu['Edilnord Srl']['id']}")['data']['documenti_link']
-verifica(S, "nella cartella dell'azienda i suoi documenti, con lo stato della scadenza", {d['nome']: d['stato'] for d in ed} == {'DURC': 'scaduto', 'Visura camerale': 'valido'}, str(ed))
+verifica(S, "nella cartella dell'azienda i suoi documenti, con lo stato della scadenza", {d['nome']: d['stato'] for d in ed if d['tipo'] == 'azienda'} == {'DURC': 'scaduto', 'Visura camerale': 'valido'}, str(ed))
 verifica(S, 'non si carica nelle cartelle del link', not puo(chiama(UFF, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'folder_id': cu['Edilnord Srl']['id']}})))
 verifica(S, 'non si eliminano dalla Zone', not puo(chiama(UFF, 'POST', f"/files/folder/{cu['Documenti operai']['id']}/delete", {})))
+verifica(S, "i documenti caricati a mano nel link: quelli dell'azienda nella sua cartella", 'Certificato iscrizione' in [d['nome'] for d in ed], str(ed))
+verifica(S, '... quelli senza azienda in "Altri documenti"', 'Altri documenti' in cu
+         and [d['nome'] for d in chiama(CLI, 'GET', f"/files?folder={cu['Altri documenti']['id']}")['data']['documenti_link']] == ['POS di cantiere'])
+def scarica(chi, url):
+    req = urllib.request.Request('http://127.0.0.1:8833' + url, headers={'X-Test-User': str(chi)})
+    try:
+        with urllib.request.urlopen(req) as r: return r.status, r.read()
+    except urllib.error.HTTPError as e: return e.code, b''
+durc = [d for d in ed if d['nome'] == 'DURC'][0]
+st, corpo = scarica(CLI, durc['url'])
+verifica(S, 'il committente apre davvero il documento del link (il file vero)', st == 200 and corpo.startswith(b'%PDF') and b'az/durc.pdf' in corpo, str(st))
+verifica(S, '... la squadra no', scarica(CAPO, durc['url'])[0] == 404)
+verifica(S, 'un documento di un altro link non si apre cambiando il numero', scarica(CLI, durc['url'].rsplit('/', 1)[0] + '/99999')[0] == 404)
 rl = chiama(CLI, 'POST', '/richieste', form={'folder_id': cu['Edilnord Srl']['id'], 'titolo': 'DURC scaduto', 'testo': 'Il DURC è scaduto: ci inviate quello aggiornato?'})
 verifica(S, 'dentro si crea una richiesta', puo(rl), rl.get('error', ''))
 verifica(S, 'un documento del link non si apre senza vedere la sua cartella', chiama(CAPO, 'GET', f"/link-documento/operaio/{ed[0]['id']}")['_http'] == 404)

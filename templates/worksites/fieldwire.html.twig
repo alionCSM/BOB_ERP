@@ -2239,7 +2239,7 @@ let richiesteAperte = {};   // cartella => richieste aperte
 const contaRichieste = id => Number(richiesteAperte[id] || 0);
 // le cartelle che arrivano dal link condiviso collegato al cantiere
 const daLink = f => !!(f && f.sorgente);
-const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge' })[f.sorgente]
+const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge', link_altri: 'fa-link' })[f.sorgente]
     || (aperta ? 'fa-folder-open' : 'fa-folder');
 // Moduli sospesi per ora (troppa confusione nei Documenti): il codice resta, non si mostrano
 const MODULI_ATTIVI = false;
@@ -2284,7 +2284,10 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) box.innerHTML = DA_UFFICIO && cart ? chiBottone('cartella', cart.id, cart) : '';
     // in cima, CSM vede quale link e' collegato
-    if (lk && !curFolder) lk.querySelector('span').textContent = cartelleTutte.some(f => f.sorgente === 'link_aziende' || f.sorgente === 'link_operai') ? 'Link documenti collegato' : 'Collega link documenti';
+    if (lk && !curFolder) {
+        lk.querySelector('span').textContent = res.data.link_collegato ? 'Link: ' + res.data.link_collegato : 'Collega link documenti';
+        lk.title = res.data.link_collegato ? 'Link documenti collegato: ' + res.data.link_collegato : 'Collegare un link di Doc condivisi';
+    }
 }
 
 const figlieDi = id => cartelleTutte
@@ -2516,14 +2519,17 @@ function renderDocumentiLink(docs) {
     if (vuota) vuota.remove();
     list.insertAdjacentHTML('beforeend', docs.map(d => {
         const [cls, lab] = STATO[d.stato] || STATO.valido;
+        const tipo = (d.ext || 'pdf').toLowerCase();
+        const vede = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'].includes(tipo);
+        const apri = vede ? `data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="${escAttr(tipo)}" data-vf-url="${escAttr(d.url)}"` : '';
         return `
         <div class="bz-file-row">
-            <i class="fas fa-file-pdf bz-file-icon"></i>
-            <div class="bz-file-info bz-file-clickable" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}">
+            <i class="fas ${fileIcon(tipo)} bz-file-icon"></i>
+            <div class="bz-file-info ${vede ? 'bz-file-clickable' : ''}" ${apri}>
                 <div class="bz-file-name">${escHtml(d.nome)}</div>
-                <div class="bz-file-sub bz-file-sub-tag"><span class="bz-scad ${cls}">${lab}</span><span>${d.scadenza ? 'Scadenza ' + fmtDate(d.scadenza) : 'Senza scadenza'}</span></div>
+                <div class="bz-file-sub bz-file-sub-tag">${d.tipo === 'manuale' ? '' : `<span class="bz-scad ${cls}">${lab}</span><span>${d.scadenza ? 'Scadenza ' + fmtDate(d.scadenza) : 'Senza scadenza'}</span>`}</div>
             </div>
-            <button class="bz-file-act" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}" title="Anteprima"><i class="fas fa-eye"></i></button>
+            ${vede ? `<button class="bz-file-act" ${apri} title="Anteprima"><i class="fas fa-eye"></i></button>` : ''}
             <a class="bz-file-act" href="${escAttr(d.url)}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
         </div>`;
     }).join(''));
@@ -2541,7 +2547,7 @@ async function linkDocumenti() {
     pop.className = 'bz-link-pop';
     pop.innerHTML = `
         <h4><i class="fas fa-link"></i> Link documenti del cantiere</h4>
-        <p>I documenti delle aziende e degli operai del link compaiono nelle cartelle "Documenti azienda" e "Documenti operai", sempre aggiornati. Di base le vedono CSM e il committente.</p>
+        <p>I documenti delle aziende e degli operai del link compaiono nelle cartelle "Documenti azienda" e "Documenti operai", sempre aggiornati. Di base le vedono CSM e il committente. Il collegamento si può fare anche da "Doc condivisi", nel link.</p>
         <select id="bz-link-sel">
             <option value="">— Nessun link —</option>
             ${disponibili.map(l => `<option value="${l.id}" ${collegato && Number(collegato.id) === Number(l.id) ? 'selected' : ''}>${escHtml(l.title)}${l.expires_at ? ' · scade il ' + fmtDate(l.expires_at) : ''}</option>`).join('')}
@@ -2552,6 +2558,8 @@ async function linkDocumenti() {
             <button type="button" class="bz-file-act primario" id="bz-link-salva">Salva</button>
         </div>`;
     document.querySelector('#view-files .bz-files-bar').appendChild(pop);
+    // si cerca il link per titolo
+    if (window.TomSelect) new TomSelect(pop.querySelector('#bz-link-sel'), { maxOptions: 300, allowEmptyOption: true, dropdownParent: 'body' });
     pop.querySelector('#bz-link-annulla').onclick = () => pop.remove();
     pop.querySelector('#bz-link-salva').onclick = async () => {
         const id = pop.querySelector('#bz-link-sel').value;
@@ -4076,6 +4084,7 @@ html .bz-dz-empty { color:#94a3b8; }
 [data-theme="light"] .bz-scad.att { background:#fef3c7; color:#b45309; }
 [data-theme="light"] .bz-scad.ko { background:#fee2e2; color:#b91c1c; }
 .bz-files-bar { position:relative; }
+body > .ts-dropdown { z-index:10060; }
 .bz-link-pop { position:absolute; right:20px; top:calc(100% + 6px); z-index:50; width:min(420px, calc(100vw - 40px)); background:#0f172a; border:1px solid #273548; border-radius:10px; padding:14px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 .bz-link-pop h4 { margin:0 0 6px; font-size:14px; color:#f1f5f9; }
 .bz-link-pop h4 i { color:#60a5fa; }

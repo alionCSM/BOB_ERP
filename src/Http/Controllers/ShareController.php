@@ -20,6 +20,12 @@ final class ShareController
         $userId    = (int)($GLOBALS['authenticated_user']['user_id'] ?? 0);
         $ctrl      = new SharedLinkController($this->conn, $userId);
         $links     = $ctrl->getAllLinks();
+        // i cantieri a cui e' collegato ogni link (si vede nella BOB Zone)
+        $collegati = $this->cantieriPerLink();
+        foreach ($links as &$l) {
+            $l['cantieri'] = $collegati[(int)$l['id']] ?? [];
+        }
+        unset($l);
         $pageTitle = 'Link Condivisi';
         $now         = date('Y-m-d H:i:s');
         $totalLinks  = count($links);
@@ -38,6 +44,7 @@ final class ShareController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $linkId = $ctrl->createFromRequest($_POST, $_FILES);
+            $this->collegaCantieri($linkId, $_POST, $userId);
 
             $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
             if ($isAjax) {
@@ -51,8 +58,10 @@ final class ShareController
 
         $workers   = $this->workerRepo->getAllActive();
         $companies = $ctrl->getAllCompanies();
+        $cantieri  = $this->cantieriPerScelta();
+        $cantieriCollegati = [];
         $pageTitle = 'Crea Link Condiviso';
-        Response::view('share/create.html.twig', $request, compact('workers', 'companies', 'pageTitle', 'successMessage'));
+        Response::view('share/create.html.twig', $request, compact('workers', 'companies', 'pageTitle', 'successMessage', 'cantieri', 'cantieriCollegati'));
     }
 
     // ── GET|POST /share/{id}/edit ─────────────────────────────────────────────
@@ -82,6 +91,7 @@ final class ShareController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ctrl->updateFromRequest($linkId, $_POST, $_FILES);
+            $this->collegaCantieri($linkId, $_POST, $userId);
 
             $isAjax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
             if ($isAjax) {
@@ -92,10 +102,12 @@ final class ShareController
 
         $workers   = $this->workerRepo->getAllActive();
         $companies = $ctrl->getAllCompanies();
+        $cantieri  = $this->cantieriPerScelta();
+        $cantieriCollegati = array_column($this->cantieriPerLink()[$linkId] ?? [], 'id');
         $pageTitle = 'Modifica Link Condiviso';
         Response::view('share/edit.html.twig', $request, compact(
             'link', 'linkedWorkers', 'linkedCompanies', 'manualFiles',
-            'workers', 'companies', 'pageTitle', 'successMessage'
+            'workers', 'companies', 'pageTitle', 'successMessage', 'cantieri', 'cantieriCollegati'
         ));
     }
 
@@ -286,5 +298,66 @@ final class ShareController
             'completed'      => $completed,
             'uploaded_token' => $completed ? $token : null,
         ]);
+    }
+
+    // ── Cantieri collegati (BOB Zone) ─────────────────────────────────────────
+
+    /** I cantieri fra cui scegliere: prima quelli in corso. */
+    private function cantieriPerScelta(): array
+    {
+        try {
+            return $this->conn->query("
+                SELECT id, name, worksite_code, status, zone_share_link_id
+                FROM bb_worksites WHERE is_draft = 0
+                ORDER BY status = 'In corso' DESC, name ASC
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return [];   // colonna del link non ancora creata
+        }
+    }
+
+    /** @return array<int, array<int, array{id:int, name:string, worksite_code:?string}>> link => cantieri */
+    private function cantieriPerLink(): array
+    {
+        $fuori = [];
+        try {
+            foreach ($this->conn->query('
+                SELECT id, name, worksite_code, zone_share_link_id FROM bb_worksites WHERE zone_share_link_id IS NOT NULL ORDER BY name
+            ')->fetchAll(\PDO::FETCH_ASSOC) as $w) {
+                $fuori[(int)$w['zone_share_link_id']][] = ['id' => (int)$w['id'], 'name' => $w['name'], 'worksite_code' => $w['worksite_code']];
+            }
+        } catch (\PDOException $e) {
+            // colonna del link non ancora creata
+        }
+        return $fuori;
+    }
+
+    /**
+     * Collega il link ai cantieri scelti (e lo scollega da quelli tolti). Nella
+     * BOB Zone di ogni cantiere compaiono le cartelle "Documenti azienda" e
+     * "Documenti operai". Un cantiere ha un link solo: sceglierlo qui lo
+     * sposta da un eventuale altro link.
+     */
+    private function collegaCantieri(int $linkId, array $post, int $userId): void
+    {
+        if (empty($post['cantieri_inviati']) || $linkId <= 0) {
+            return;
+        }
+        $voluti = array_values(array_unique(array_filter(array_map('intval', (array)($post['cantieri'] ?? [])))));
+        try {
+            $link = new \App\Service\Zone\LinkDocumenti(
+                $this->conn,
+                new \App\Service\Zone\Condivisione($this->conn, new \App\Service\Zone\Accesso($this->conn))
+            );
+            $prima = array_column($this->cantieriPerLink()[$linkId] ?? [], 'id');
+            foreach (array_diff($prima, $voluti) as $w) {
+                $link->collega((int)$w, null, $userId);
+            }
+            foreach (array_diff($voluti, $prima) as $w) {
+                $link->collega((int)$w, $linkId, $userId);
+            }
+        } catch (\Throwable $e) {
+            error_log('[Share cantieri] ' . $e->getMessage());
+        }
     }
 }

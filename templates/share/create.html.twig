@@ -79,6 +79,28 @@
                     </div>
                 </div>
 
+                <!-- Cantieri collegati: nella BOB Zone del cantiere compaiono i documenti del link -->
+                <div class="cl-card" style="margin-bottom:16px;">
+                    <div class="cl-card-header">
+                        <div class="cl-card-header-icon" style="background:#ccfbf1;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2.5"><path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1 1"/><path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1-1"/></svg>
+                        </div>
+                        <div>
+                            <div class="cl-card-header-title">Cantieri collegati</div>
+                            <div class="cl-card-header-sub">I documenti del link compaiono nella BOB Zone dei cantieri scelti</div>
+                        </div>
+                    </div>
+                    <div class="cl-card-body">
+                        <input type="hidden" name="cantieri_inviati" value="1">
+                        <select name="cantieri[]" id="cl-cantieri" multiple placeholder="Cercare un cantiere per nome o codice...">
+                            {% for c in cantieri %}
+                                <option value="{{ c.id }}" {{ c.id in cantieriCollegati ? 'selected' : '' }}>{{ c.worksite_code ? c.worksite_code ~ ' · ' : '' }}{{ c.name }}{{ c.status and c.status != 'In corso' ? ' (' ~ c.status ~ ')' : '' }}{{ c.zone_share_link_id and c.id not in cantieriCollegati ? ' — già collegato a un altro link' : '' }}</option>
+                            {% endfor %}
+                        </select>
+                        <p style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.45;">Nella BOB Zone di ogni cantiere compaiono le cartelle "Documenti azienda" e "Documenti operai", visibili a CSM e al committente. Un cantiere ha un solo link: sceglierlo qui lo scollega da un eventuale altro link.</p>
+                    </div>
+                </div>
+
                 <!-- Selezione -->
                 <div class="cl-card">
                     <div class="cl-card-header">
@@ -288,5 +310,13 @@
 {% endblock %}
 
 {% block scripts %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script nonce="{{ cspNonce }}">
+// i cantieri collegati al link: si cerca per nome o codice
+if (window.TomSelect && document.getElementById('cl-cantieri')) {
+    new TomSelect('#cl-cantieri', { plugins: ['remove_button'], maxOptions: 300, hidePlaceholder: true });
+}
+</script>
 <script src="/assets/js/views/share/create_link.js"></script>
 {% endblock %}
