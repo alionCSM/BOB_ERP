@@ -2029,9 +2029,7 @@ function renderDisegni(items, fwReady) {
                 ${d.annotatable
                     ? `<div class="bz-dz-apri"><button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}"
                                title="${puoScrivere('disegni') ? 'Aprire il disegno con le annotazioni e aggiungerne di nuove' : 'Aprire il disegno con le annotazioni'}">
-                           <i class="fas fa-map-marker-alt"></i> Con annotazioni${d.n_segni ? ` <span class="bz-dz-n">${d.n_segni}</span>` : ''}</button>
-                       <button class="bz-dz-btn" data-annot="${d.id}" data-annot-type="${escAttr(d.file_type)}" data-annot-name="${escAttr(d.file_name)}" data-annot-pulito="1"
-                               title="Aprire il disegno originale, senza annotazioni"><i class="far fa-file"></i> Senza annotazioni</button></div>`
+                           <i class="fas fa-eye"></i> Apri${d.n_segni ? ` <span class="bz-dz-n" title="Annotazioni">${d.n_segni}</span>` : ''}</button></div>`
                     : (d.is_dwg
                         ? (puoScrivere('disegni')
                             ? `<button class="bz-dz-btn" data-dwg-convert="${d.id}"><i class="fas fa-sync"></i> Converti</button>`
@@ -2237,11 +2235,13 @@ const contaRichieste = id => Number(richiesteAperte[id] || 0);
 const daLink = f => !!(f && f.sorgente);
 const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge' })[f.sorgente]
     || (aperta ? 'fa-folder-open' : 'fa-folder');
-const CREA_MODULI_DOC = DA_UFFICIO || RUOLO === 'cliente';
+// Moduli sospesi per ora (troppa confusione nei Documenti): il codice resta, non si mostrano
+const MODULI_ATTIVI = false;
+const CREA_MODULI_DOC = MODULI_ATTIVI && (DA_UFFICIO || RUOLO === 'cliente');
 
 function apriDocumenti() {
     chiudiModuloPanel(false);
-    openForms();          // prepara i moduli e il riquadro "Da compilare"
+    if (MODULI_ATTIVI) openForms();   // prepara i moduli e il riquadro "Da compilare"
     loadFiles();
 }
 
@@ -2256,7 +2256,7 @@ async function loadFiles() {
     renderBriciole();
     richiesteAperte = res.data.richieste_aperte || {};
     renderFolders(cartelleTutte);
-    renderFiles(res.data.files || [], res.data.moduli || [], res.data.richieste || []);
+    renderFiles(res.data.files || [], MODULI_ATTIVI ? (res.data.moduli || []) : [], res.data.richieste || []);
     const nr = document.getElementById('bz-new-richiesta');
     if (nr) nr.hidden = !curFolder;
     // nelle cartelle del link i documenti arrivano dal link: si fanno solo richieste
@@ -2270,7 +2270,7 @@ async function loadFiles() {
     renderDocumentiLink(res.data.documenti_link || []);
     // "Da compilare" (i moduli assegnati) solo in cima
     const ass = document.getElementById('bz-assegnazioni-root');
-    if (ass) ass.hidden = !!curFolder;
+    if (ass) ass.hidden = !MODULI_ATTIVI || !!curFolder;
     const nm = document.getElementById('bz-new-modulo');
     if (nm) nm.hidden = !CREA_MODULI_DOC || soloLink;
     // dentro una cartella, CSM decide chi la vede: vale per tutto il contenuto
@@ -2415,7 +2415,7 @@ function chiudiModuloPanel(ricarica = true) {
     if (!pan || pan.hidden) return;
     pan.hidden = true;
     document.getElementById('bz-files-browser').hidden = false;
-    if (ricarica) { loadFiles(); openForms(); }
+    if (ricarica) { loadFiles(); if (MODULI_ATTIVI) openForms(); }
 }
 
 /* Compilare un PDF della cartella: la copia compilata si salva nella stessa

@@ -364,6 +364,10 @@ final class AvvisiZona
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {
+        // moduli sospesi per ora: nessun avviso per qualcosa che non si vede
+        if (!\App\Service\Zone\ScadenzeModuli::ATTIVI) {
+            return;
+        }
         $st = $this->conn->prepare("
             SELECT fa.*, t.name AS modulo, w.name AS cantiere, w.zone_cliente
             FROM bb_zone_form_assegnazioni fa

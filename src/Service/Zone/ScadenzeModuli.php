@@ -34,6 +34,9 @@ use PDO;
  */
 final class ScadenzeModuli
 {
+    /** Moduli della Zone sospesi per ora: niente promemoria ne' avvisi. */
+    public const ATTIVI = false;
+
     public function __construct(private PDO $conn) {}
 
     /** Da quando conta una compilazione: oggi, da lunedi', o da sempre. */
