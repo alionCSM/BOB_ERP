@@ -781,8 +781,9 @@ Le regole di visibilità sono separate dai permessi:
 | **Attività** | Elenco, Kanban e Gantt delle attività. Stati: **Aperto → In corso → Completato → Verificato**. Ogni attività riporta chi l'ha creata e la **cronologia** (chi l'ha presa in carico, completata, verificata o riaperta, e quando). Si possono allegare foto e commenti. |
 | **Disegni** | Tavole del cantiere in PDF, DWG, DXF o immagine, con versioni successive. Sul disegno si appongono annotazioni puntuali: una nota, un'attività o una segnalazione collegata al punto esatto. Un'attività creata dal disegno mostra il collegamento al disegno. I file DWG vengono convertiti automaticamente per la visualizzazione; in caso di errore il motivo compare sulla scheda del disegno (visibile a CSM). |
 | **Foto** | Foto del cantiere e delle attività. |
-| **File** | Cartelle e documenti del cantiere, con condivisione per cartella o per singolo file. |
-| **Moduli** | Moduli da compilare (es. verifiche DPI, check list). Frequenza: **giornaliera**, **settimanale**, **mensile** o **una tantum**. CSM vede chi ha compilato e chi manca nel periodo. Il committente può creare propri modelli, per un singolo cantiere o per **tutti i suoi cantieri**. Uscendo da un modulo non salvato viene richiesta conferma. |
+| **Documenti** | Spazio unico per file e moduli, organizzato come un cloud: cartelle, anche una dentro l'altra, che contengono documenti e moduli. Chi vede una cartella lo decide CSM; una nuova cartella eredita le impostazioni di quella che la contiene, e chiudendo una cartella si chiude anche il suo contenuto. Dentro una cartella si può caricare un documento, creare una sottocartella o creare un modulo (CSM e committente). In cima alla sezione, il riquadro **Da compilare** elenca i moduli assegnati. |
+| ↳ *Richieste* | Una richiesta si crea dentro una cartella ed è una piccola discussione: oggetto, messaggio e, se serve, documenti allegati (es. «Ci serve il DURC aggiornato», oppure «Vi inviamo il modulo di collaudo da compilare»). L'altra parte risponde con un messaggio e un documento; un PDF allegato si può **compilare direttamente in BOB** (campi del modulo, testo, spunte, data, firma) e la copia compilata viene inviata come risposta, lasciando intatto l'originale. La copia compilata è salvata nella stessa cartella e compare sotto il documento originale come **versione compilata**; i documenti arrivati con una richiesta riportano l'oggetto della richiesta, da cui si apre la discussione. Il pulsante **Compila** è disponibile anche sui PDF delle cartelle, fuori dalle richieste. Stato: **In attesa → Completata**; la cartella mostra quante richieste sono in attesa. Gli allegati restano tra i documenti della cartella. Chi vede la cartella vede le sue richieste; può eliminarle chi le ha create o CSM. |
+| ↳ *Moduli* | Moduli da compilare (es. verifiche DPI, check list), collocati nelle cartelle. Si compilano, si modificano e se ne consultano le compilazioni senza uscire dalla cartella. Frequenza delle assegnazioni: **giornaliera**, **settimanale**, **mensile** o **una tantum**; CSM vede chi ha compilato e chi manca nel periodo. Il committente può creare propri modelli, per un singolo cantiere o per **tutti i suoi cantieri**, e vede solo quelli della propria azienda. Uscendo da un modulo non salvato viene richiesta conferma. |
 | **Presenze** | Presenze giornaliere del cantiere, inserite manualmente da CSM: persona o azienda (con numero di persone), giornata intera o mezza giornata. Solo CSM può inserirle, modificarle ed eliminarle. Pasti, alloggi e costi non sono mai mostrati. |
 | **Segnalazioni** | Problemi o comunicazioni rapide, eventualmente fissate su un punto del disegno. Stati: **Aperta → Presa in carico → Risolta**. Può eliminarle chi le ha scritte oppure CSM. |
 | **Chat** | Messaggi del cantiere, con destinatario "Tutti" o singole persone. |
@@ -795,11 +796,12 @@ Per impostazione predefinita il committente **non vede** le presenze. CSM può a
 
 #### 5.19.6 Notifiche della Zone
 
-- Il **campanello** del cantiere elenca le novità; un clic porta direttamente al contenuto. I numeri accanto alle voci del menu (Attività, Disegni, File, Moduli, Segnalazioni, Chat) indicano gli elementi nuovi.
+- Il **campanello** del cantiere elenca le novità; un clic porta direttamente al contenuto. I numeri accanto alle voci del menu (Attività, Disegni, Documenti, Segnalazioni, Chat) indicano gli elementi nuovi.
 - La pagina si aggiorna automaticamente **ogni 30 secondi**.
 - Le notifiche vengono generate **al momento** dell'evento (attività assegnata, modulo da compilare, nuovo file, nuovo disegno, nuova foto, messaggio, segnalazione) e inviate anche come notifica push sull'app.
 - Ricevono la notifica solo le persone che possono vedere il contenuto; chi ha compiuto l'azione non riceve notifica.
 - Promemoria moduli: ogni giorno alle **16:00** a chi deve ancora compilare un modulo (per i moduli giornalieri, solo a chi è pianificato quel giorno sul cantiere).
+- Richieste nei Documenti: una nuova richiesta avvisa l'altra parte (se la crea il committente o la squadra, CSM; se la crea CSM, chi vede la cartella); ogni risposta avvisa chi partecipa alla discussione; al completamento è avvisato chi l'ha aperta.
 - Aggiornando la pagina si rimane nella sezione aperta.
 
 #### 5.19.7 Elenco Zone (`/zone`)
@@ -1307,7 +1309,16 @@ Chiunque la veda può portarla a In corso e a Completato. Solo CSM può portarla
 Il ruolo Cantiere è dedicato all'esecuzione: completa, commenta, carica file e foto, annota i disegni. Creare attività e caricare disegni spetta a CSM e al committente.
 
 **Come creo un modulo valido per tutti i miei cantieri?** (committente)
-Nella sezione Moduli selezionare "Nuovo modulo" e scegliere l'opzione "Tutti i miei cantieri".
+Nella sezione Documenti selezionare "Nuovo modulo" e, nel modulo, scegliere l'opzione "Tutti i miei cantieri".
+
+**Come chiedo un documento o invio un modulo da compilare?**
+Nella sezione Documenti aprire la cartella giusta e selezionare "Nuova richiesta": scrivere l'oggetto e il messaggio e, se serve, allegare il documento. La risposta arriva nella stessa richiesta, con una notifica.
+
+**Come compilo un PDF ricevuto in una richiesta?**
+Aprire la richiesta e selezionare "Compila" accanto al PDF: compilare i campi oppure scrivere sul documento con gli strumenti Testo, spunta, Data e Firma, quindi "Salva". La copia compilata viene inviata come risposta e salvata nella cartella sotto l'originale, come versione compilata; l'originale resta invariato. Un PDF di una cartella si può compilare anche direttamente, con "Compila" accanto al documento.
+
+**Dove sono finiti File e Moduli?**
+Sono riuniti nella sezione **Documenti**: i moduli si trovano nelle cartelle insieme ai documenti, e quelli assegnati sono nel riquadro "Da compilare" in cima alla sezione.
 
 **Chi decide quali moduli si compilano e ogni quanto?**
 CSM, scegliendo frequenza giornaliera, settimanale, mensile o una tantum e le persone assegnate.

@@ -21,10 +21,10 @@ CREATE TABLE bb_zone_task_comments(id INT AUTO_INCREMENT PRIMARY KEY, task_id IN
 CREATE TABLE bb_zone_file_comments(id INT AUTO_INCREMENT PRIMARY KEY, file_id INT, text TEXT, author_name VARCHAR(80), author_user_id INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_fw_floorplans(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, fw_id VARCHAR(40), name VARCHAR(100), sheets_count INT DEFAULT 0);
 CREATE TABLE bb_zone_task_checklist(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, fw_id VARCHAR(40) NULL, name VARCHAR(200), completed TINYINT DEFAULT 0, position INT DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
+CREATE TABLE bb_zone_folders(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, parent_id INT NULL, name VARCHAR(200), created_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_files(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT NULL, origine_file_id INT NULL, richiesta_id INT NULL, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10),
   size_bytes BIGINT DEFAULT 0, uploaded_by INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, client_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
+CREATE TABLE bb_zone_form_templates(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT NULL, client_id INT NULL, folder_id INT NULL, name VARCHAR(200), description TEXT NULL, fields TEXT, active TINYINT DEFAULT 1,
   created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_form_submissions(id INT AUTO_INCREMENT PRIMARY KEY, template_id INT, worksite_id INT, template_name VARCHAR(200), `values` TEXT,
   submitter_name VARCHAR(80) NULL, submitted_by INT NULL, source VARCHAR(20) DEFAULT 'internal', assegnazione_id INT NULL, visibilita VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
@@ -35,6 +35,9 @@ CREATE TABLE bb_worksite_documents(id INT AUTO_INCREMENT PRIMARY KEY, worksite_i
 CREATE TABLE bb_worksite_document_versions(id INT AUTO_INCREMENT PRIMARY KEY, document_id INT, version_number INT, file_name VARCHAR(200), file_path VARCHAR(300), file_type VARCHAR(10), uploaded_by INT NULL, note TEXT NULL, created_at DATETIME);
 CREATE TABLE bb_zone_disegno_sync(document_id INT, fw_sheet_upload_id VARCHAR(40) NULL, pushed_at DATETIME NULL);
 CREATE TABLE bb_zone_dwg_render(document_id INT, svg_path VARCHAR(500) NULL, status VARCHAR(10), error TEXT NULL);
+CREATE TABLE bb_zone_doc_calibration(id INT AUTO_INCREMENT PRIMARY KEY, document_id INT, page INT DEFAULT 1, m_per_wfrac DECIMAL(14,6), created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY(document_id, page));
+CREATE TABLE bb_zone_richieste(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, folder_id INT, titolo VARCHAR(200), stato VARCHAR(16) DEFAULT 'aperta', created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, completata_da INT NULL, completata_at DATETIME NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE bb_zone_richieste_messaggi(id INT AUTO_INCREMENT PRIMARY KEY, richiesta_id INT, user_id INT NULL, testo TEXT NULL, file_ids VARCHAR(500) NULL, sistema VARCHAR(32) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_annotations(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, document_id INT, page INT, segnalazione_id INT NULL, task_id INT NULL, created_by INT NULL, geom TEXT NULL, type VARCHAR(20) NULL, text TEXT NULL, color VARCHAR(20) NULL);
 CREATE TABLE bb_zone_messaggi(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, canale VARCHAR(10) NULL, segnalazione_id INT NULL, user_id INT NULL, testo TEXT NULL,
   rapido VARCHAR(30) NULL, foto VARCHAR(300) NULL, sistema TINYINT DEFAULT 0, fissato TINYINT DEFAULT 0, fissato_da INT NULL, eliminato_at DATETIME NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);

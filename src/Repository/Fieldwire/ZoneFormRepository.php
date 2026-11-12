@@ -25,7 +25,7 @@ final class ZoneFormRepository
     public function templatesFor(int $worksiteId, ?int $soloCliente = null): array
     {
         $stmt = $this->db->prepare("
-            SELECT t.id, t.worksite_id, t.client_id, t.name, t.description, t.active, t.created_at, t.created_by,
+            SELECT t.id, t.worksite_id, t.client_id, t.folder_id, t.name, t.description, t.active, t.created_at, t.created_by,
                    (SELECT COUNT(*) FROM bb_zone_form_submissions s WHERE s.template_id = t.id) AS sub_count
             FROM bb_zone_form_templates t
             WHERE t.active = 1
@@ -52,10 +52,11 @@ final class ZoneFormRepository
     public function create(array $d): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_form_templates (worksite_id, client_id, name, description, fields, created_by)
-            VALUES (:w, :c, :n, :desc, :f, :u)
+            INSERT INTO bb_zone_form_templates (worksite_id, client_id, folder_id, name, description, fields, created_by)
+            VALUES (:w, :c, :cart, :n, :desc, :f, :u)
         ");
         $stmt->execute([
+            ':cart' => $d['folder_id'] ?? null,      // la cartella dei Documenti (null = in cima)
             ':w'    => $d['worksite_id'],            // null = universale
             ':c'    => $d['client_id'] ?? null,      // il committente a cui appartiene
             ':n'    => $d['name'],
@@ -70,9 +71,10 @@ final class ZoneFormRepository
     {
         $this->db->prepare("
             UPDATE bb_zone_form_templates
-            SET name = :n, description = :desc, fields = :f, worksite_id = :w, client_id = :c
+            SET name = :n, description = :desc, fields = :f, worksite_id = :w, client_id = :c, folder_id = :cart
             WHERE id = :id
         ")->execute([
+            ':cart' => $d['folder_id'] ?? null,
             ':c'    => $d['client_id'] ?? null,
             ':n'    => $d['name'],
             ':desc' => $d['description'] ?? null,

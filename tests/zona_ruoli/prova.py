@@ -295,6 +295,73 @@ fc = [x['file_name'] for x in chiama(CAPO, 'GET', '/files')['data']['files']]
 verifica(S, 'la squadra vede il file del cliente', 'foto_scaffale.pdf' in fc)
 verifica(S, 'il cliente non carica in "Contratti"', not puo(chiama(CLI, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'folder_id': f2}})))
 
+S = '6a. Documenti come un cloud'
+sub1 = chiama(UFF, 'POST', '/files/folder', {'name': 'Verbali di collaudo', 'parent_id': f1})['data']['id']
+sub2 = chiama(UFF, 'POST', '/files/folder', {'name': 'Riservati', 'parent_id': f2})['data']['id']
+cart_k = {int(c['id']): c for c in chiama(CLI, 'GET', '/files')['data']['folders']}
+verifica(S, 'una cartella dentro "Verbali" la vede chi vede "Verbali"', sub1 in cart_k and int(cart_k[sub1]['parent_id']) == f1, str(list(cart_k)))
+verifica(S, 'una cartella dentro "Contratti" (solo CSM) il committente non la vede', sub2 not in cart_k)
+verifica(S, 'il committente non crea cartelle dentro una cartella che non vede', not puo(chiama(CLI, 'POST', '/files/folder', {'name': 'x', 'parent_id': f2})))
+sub3 = chiama(UFF, 'POST', '/files/folder', {'name': 'Foto consegna', 'parent_id': sub1})['data']['id']
+sql(f"DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo='cartella' AND oggetto_id={sub1}; DELETE FROM bb_zone_condivisioni WHERE tipo='cartella' AND oggetto_id={sub1}")
+cart_k = {int(c['id']) for c in chiama(CLI, 'GET', '/files')['data']['folders']}
+verifica(S, 'chiudendo una cartella si chiude anche quello che contiene', sub1 not in cart_k and sub3 not in cart_k, str(cart_k))
+sub4 = chiama(CLI, 'POST', '/files/folder', {'name': 'Moduli impresa', 'parent_id': f1})['data']['id']
+mod = chiama(CLI, 'POST', '/forms', {'name': 'Verbale di consegna', 'fields': campo, 'folder_id': sub4})
+verifica(S, 'il committente crea un modulo dentro una sua cartella', puo(mod), mod.get('error', ''))
+in_sub = [t['name'] for t in chiama(CLI, 'GET', f'/files?folder={sub4}')['data']['moduli']]
+in_cima = [t['name'] for t in chiama(CLI, 'GET', '/files')['data']['moduli']]
+verifica(S, '... il modulo sta in quella cartella, non in cima', 'Verbale di consegna' in in_sub and 'Verbale di consegna' not in in_cima, str(in_sub) + str(in_cima))
+verifica(S, 'non si mette un modulo in una cartella che non si vede', not puo(chiama(CLI, 'POST', '/forms', {'name': 'x', 'fields': campo, 'folder_id': f2})))
+verifica(S, 'la squadra non vede i modelli nelle cartelle (compila quelli assegnati)', chiama(CAPO, 'GET', f'/files?folder={f1}')['data']['moduli'] == [])
+chiama(UFF, 'POST', f'/files/folder/{sub4}/delete', {})
+in_f1 = [t['name'] for t in chiama(CLI, 'GET', f'/files?folder={f1}')['data']['moduli']]
+verifica(S, 'eliminando la cartella, il modulo sale nella cartella che la conteneva', 'Verbale di consegna' in in_f1, str(in_f1))
+
+S = '6b. Richieste nelle cartelle'
+pulisci_notifiche()
+rq = chiama(CLI, 'POST', '/richieste', file={'nome': 'modulo_collaudo.pdf', 'campi': {'folder_id': f1, 'titolo': 'Modulo di collaudo', 'testo': 'Vi mandiamo il modulo da compilare entro venerdì.'}})
+verifica(S, 'il committente crea una richiesta in una cartella, con un documento', puo(rq), rq.get('error', ''))
+rid = rq['data']['id'] if puo(rq) else 0
+nr = [n for n in notifiche(UFF) if n[0] == 'Nuova richiesta']
+verifica(S, 'CSM riceve "Nuova richiesta", che porta alla richiesta', len(nr) == 1 and nr[0][1].endswith(f'#richiesta-{rid}'), str(notifiche(UFF)))
+verifica(S, '... la squadra no (la richiesta del committente va a CSM)', not [n for n in notifiche(CAPO) if n[0] == 'Nuova richiesta'])
+fu = chiama(UFF, 'GET', f'/files?folder={f1}')['data']
+verifica(S, "l'allegato è un documento della cartella", 'modulo_collaudo.pdf' in [x['file_name'] for x in fu['files']])
+verifica(S, 'la cartella elenca la richiesta e conta quelle aperte', [x['id'] for x in fu['richieste']] == [rid] and fu['richieste_aperte'].get(str(f1), fu['richieste_aperte'].get(f1)) == 1, str(fu['richieste_aperte']))
+verifica(S, 'non si crea una richiesta in una cartella che non si vede', not puo(chiama(CLI, 'POST', '/richieste', form={'folder_id': f2, 'titolo': 'x', 'testo': 'y'})))
+verifica(S, 'né fuori da una cartella', not puo(chiama(CLI, 'POST', '/richieste', form={'titolo': 'x', 'testo': 'y'})))
+verifica(S, 'una risposta vuota non si invia', not puo(chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', form={'testo': ' '})))
+pulisci_notifiche()
+rr = chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', file={'nome': 'modulo_collaudo (compilato).pdf', 'campi': {'testo': 'Ecco il modulo compilato.', 'completa': '1'}})
+verifica(S, 'CSM risponde con il documento compilato e la completa', puo(rr), rr.get('error', ''))
+tk = [n[0] for n in notifiche(CLI)]
+verifica(S, 'il committente riceve la risposta e "Richiesta completata"', 'Nuova risposta a una richiesta' in tk and 'Richiesta completata' in tk, str(tk))
+dk = chiama(CLI, 'GET', f'/richieste/{rid}')['data']
+verifica(S, 'nella discussione: stato completata, due messaggi con i documenti, e la riga di chiusura',
+         dk['richiesta']['stato'] == 'completata' and [len(m['allegati']) for m in dk['messaggi'] if not m['sistema']] == [1, 1]
+         and dk['messaggi'][-1]['sistema'] == 'completata', str(dk)[:400])
+verifica(S, 'gli allegati si scaricano dalla cartella', dk['messaggi'][0]['allegati'][0]['download_url'].endswith('/download'))
+verifica(S, 'la squadra che vede la cartella legge la richiesta', puo(chiama(CAPO, 'GET', f'/richieste/{rid}')))
+verifica(S, '... ma non la elimina (non è sua)', not puo(chiama(CAPO, 'POST', f'/richieste/{rid}/elimina', {})))
+verifica(S, 'si riapre', puo(chiama(CLI, 'POST', f'/richieste/{rid}/stato', {'stato': 'aperta'})) and chiama(CLI, 'GET', f'/richieste/{rid}')['data']['richiesta']['stato'] == 'aperta')
+orig_id = [x for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files'] if x['file_name'] == 'modulo_collaudo.pdf'][0]['id']
+comp = [x for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files'] if x['file_name'] == 'modulo_collaudo (compilato).pdf']
+verifica(S, "i documenti arrivati con una richiesta ne portano l'oggetto", comp and comp[0]['richiesta_titolo'] == 'Modulo di collaudo', str(comp)[:200])
+vr = chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', file={'nome': 'modulo_collaudo (compilato).pdf', 'campi': {'testo': 'Versione corretta', 'da_file_id': orig_id}})
+cv = sql(f"SELECT origine_file_id, richiesta_id FROM bb_zone_files WHERE richiesta_id={rid} ORDER BY id DESC LIMIT 1")
+verifica(S, "la copia compilata da una richiesta è una versione dell'originale", puo(vr) and cv == [[str(orig_id), str(rid)]], str(cv))
+sub_v = chiama(UFF, 'POST', '/files', file={'nome': 'collaudo (compilato).pdf', 'campi': {'da_file_id': orig_id}})
+sv = sql(f"SELECT origine_file_id, folder_id FROM bb_zone_files WHERE id={sub_v['data']['id']}") if puo(sub_v) else []
+verifica(S, "compilando un PDF della cartella la copia va nella stessa cartella, come versione", sv == [[str(orig_id), str(f1)]], str(sv))
+verifica(S, 'non si compila da un documento che non si vede', not puo(chiama(CLI, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'da_file_id': 999999}})))
+f3 = chiama(UFF, 'POST', '/files/folder', {'name': 'Documenti impresa'})['data']['id']
+r3 = chiama(CLI, 'POST', '/richieste', form={'folder_id': f3, 'titolo': 'DURC aggiornato', 'testo': 'Ci serve il DURC aggiornato.'})['data']['id']
+sql(f"DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo='cartella' AND oggetto_id={f3}; DELETE FROM bb_zone_condivisioni WHERE tipo='cartella' AND oggetto_id={f3}")
+verifica(S, 'chiusa la cartella, il committente non vede più la richiesta', chiama(CLI, 'GET', f'/richieste/{r3}')['_http'] == 404)
+verifica(S, 'CSM elimina una richiesta; i documenti restano nella cartella', puo(chiama(UFF, 'POST', f'/richieste/{rid}/elimina', {}))
+         and 'modulo_collaudo.pdf' in [x['file_name'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files']])
+
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
 verifica(S, 'cliente: Ufficio e Tutto il cantiere', canali(CLI) == ['cliente', 'tutti'], str(canali(CLI)))
@@ -317,6 +384,53 @@ verifica(S, 'condivisione spenta: il cliente che aveva aperto la segnalazione no
 sql("UPDATE bb_worksites SET zone_cliente=1 WHERE id=100")
 chiama(UFF, 'POST', f"/segnalazioni/{sk['id']}/messaggi", {'testo': 'Chiuso'})
 verifica(S, '... riaccesa, le riceve di nuovo', len(notifiche(CLI)) == 1, str(notifiche(CLI)))
+
+S = '7b. Menzioni con @'
+mz = lambda u, q: chiama(u, 'GET', '/menzionabili?' + q)
+nomi_mz = lambda j: {x['nome'] for x in j.get('data', [])} if puo(j) else set()
+m1 = nomi_mz(mz(CLI, 'contesto=chat&canale=cliente'))
+verifica(S, 'chat CSM e committente: il cliente può menzionare CSM', 'Giulia Ufficio' in m1, str(m1))
+verifica(S, '... ma non la squadra', 'Arben Hoxha' not in m1)
+verifica(S, '... e non sé stesso', 'Paolo Rossi' not in m1)
+verifica(S, 'il cliente non chiede i lettori della chat della squadra', mz(CLI, 'contesto=chat&canale=squadra')['_http'] == 403)
+m2 = nomi_mz(mz(UFF, 'contesto=chat&canale=squadra'))
+verifica(S, 'chat della squadra: CSM menziona il capo, non il cliente', 'Arben Hoxha' in m2 and 'Paolo Rossi' not in m2, str(m2))
+pulisci_notifiche()
+chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Giulia Ufficio può confermare la consegna?', 'menzioni': [UFF]})
+menz = lambda u: [n for n in notifiche(u) if 'menzionato' in n[0]]
+verifica(S, 'la persona menzionata riceve la notifica', len(menz(UFF)) == 1 and menz(UFF)[0][1].endswith('#chat-cliente'), str(notifiche(UFF)))
+pulisci_notifiche()
+chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Arben Hoxha domani ci sei?', 'menzioni': [CAPO]})
+verifica(S, 'menzionare chi non legge la chat non avvisa nessuno', len(menz(CAPO)) == 0)
+chiama(CLI, 'POST', '/chat/cliente', {'testo': 'Grazie', 'menzioni': [UFF]})
+verifica(S, 'senza il nome nel testo la menzione non vale', len(menz(UFF)) == 0)
+m3 = nomi_mz(mz(UFF, f'contesto=attivita&id={t1}&interna=1'))
+verifica(S, 'nota interna: si menziona solo CSM', 'Paolo Rossi' not in m3 and 'Arben Hoxha' not in m3, str(m3))
+m4 = nomi_mz(mz(UFF, f'contesto=attivita&id={t1}'))
+verifica(S, "messaggio sull'attività: si menziona chi la vede", 'Paolo Rossi' in m4, str(m4))
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi serve la vostra conferma', 'menzioni': [CLI]})
+verifica(S, "menzione in un'attività: notifica al committente", len(menz(CLI)) == 1 and menz(CLI)[0][1].endswith(f'#attivita-{t1}'), str(notifiche(CLI)))
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi solo interno', 'menzioni': [CLI], 'interna': True})
+verifica(S, 'menzione in una nota interna: il committente non riceve nulla', len(menz(CLI)) == 0)
+sm = chiama(UFF, 'POST', '/segnalazioni', {'testo': 'Verifica ancoraggi', 'tipo': 'qualita', 'visibilita': 'cantiere'})['data']
+m5 = nomi_mz(mz(UFF, f"contesto=segnalazione&id={sm['id']}"))
+verifica(S, 'segnalazione CSM e cantiere: il committente non si menziona', 'Paolo Rossi' not in m5 and 'Arben Hoxha' in m5, str(m5))
+
+S = '7c. Disegni: posizione, evidenza, annotazioni'
+tp = chiama(UFF, 'POST', '/tasks', {'name': 'Sostituzione pannello', 'punto': {'document_id': 1, 'page': 1, 'x': 0.4, 'y': 0.3, 'segni': [
+    {'type': 'rectangle', 'geom': {'x': 0.35, 'y': 0.25, 'w': 0.1, 'h': 0.08}, 'color': '#3b82f6'},
+    {'type': 'text', 'geom': {'x': 0.36, 'y': 0.24}, 'text': 'Zona da smontare', 'color': '#ef4444'},
+    {'type': 'script', 'geom': {'x': 0}},
+]}})['data']['id']
+segni_t = sql(f"SELECT type FROM bb_zone_annotations WHERE task_id={tp} ORDER BY id")
+verifica(S, "nuova attività: il punto e i segni disegnati restano collegati all'attività", [x[0] for x in segni_t] == ['pin', 'rectangle', 'text'], str(segni_t))
+dz = {d['id']: d for d in chiama(UFF, 'GET', '/disegni')['data']['bob']}
+verifica(S, 'il disegno dice quante annotazioni ha', dz.get(1, {}).get('n_segni', 0) >= 3, str(dz.get(1, {}).get('n_segni')))
+sql("INSERT INTO bb_zone_annotations(worksite_id,document_id,page,segnalazione_id,type,geom,created_by) VALUES (100,1,2,%d,'pin','{\"x\":0.5,\"y\":0.5}',5)" % int(s['id']))
+dd = chiama(UFF, 'GET', f"/segnalazioni/{s['id']}")['data'].get('disegno')
+verifica(S, 'la segnalazione appuntata dice su quale disegno e pagina', bool(dd) and dd['document_id'] == 1 and dd['page'] == 2, str(dd))
 
 S = '8. Chi entra dopo'
 pulisci_notifiche()

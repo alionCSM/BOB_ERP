@@ -7,6 +7,11 @@
     'use strict';
 
     let WID = 0, CSRF = '';
+    // Dentro i Documenti: si apre in un pannello sopra le cartelle e, finito
+    // (salvato, inviato, indietro), si torna alla cartella.
+    let alTermine = null, onApri = null;
+    let subsModello = null;   // l'elenco compilazioni da cui si e' aperta una compilazione
+    const apri = () => { if (typeof onApri === 'function') onApri(); };
     // Chi puo' fare cosa. Compilare un modulo e' scrivere, quindi vuole il
     // livello "vede e modifica"; disegnare il modello e' dell'ufficio, come
     // sul server. Il server rifiuta comunque: qui si evita solo di mettere
@@ -65,6 +70,8 @@
         DA_UFFICIO    = !!cfg.daUfficio;
         CREA_MODULI   = DA_UFFICIO || PER_CLIENTE;
         META = { wsName: cfg.wsName || '', wsCode: cfg.wsCode || '', clientName: cfg.clientName || '' };
+        alTermine = typeof cfg.alTermine === 'function' ? cfg.alTermine : null;
+        onApri    = typeof cfg.onApri === 'function' ? cfg.onApri : null;
         root = document.getElementById('bz-forms-root');
     }
 
@@ -98,6 +105,7 @@
 
     async function loadTemplates() {
         view = 'list';
+        if (alTermine) { alTermine(); return; }
         root.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
         const res = await api(base());
         const tpls = (res.ok && Array.isArray(res.data)) ? res.data : [];
@@ -182,15 +190,19 @@
     }
 
     // ── BUILDER ─────────────────────────────────────────────────────────────
-    async function openBuilder(id) {
+    async function openBuilder(id, opz = {}) {
+        apri();
         view = 'builder';
         if (id) {
             const res = await api(`${base()}/${id}`);
-            if (!res.ok) { alert('Errore'); return; }
+            if (!res.ok) { alert('Impossibile aprire il modulo.'); return; }
             builder = { id, name: res.data.name, description: res.data.description || '',
-                        universal: !res.data.worksite_id, fields: res.data.fields || [] };
+                        universal: !res.data.worksite_id, fields: res.data.fields || [],
+                        folder_id: res.data.folder_id ?? null };
         } else {
-            builder = { id: null, name: '', description: '', universal: false, fields: [] };
+            // un modulo nuovo nasce nella cartella in cui ci si trova
+            builder = { id: null, name: '', description: '', universal: false, fields: [],
+                        folder_id: opz.folder_id ?? null };
         }
         builderIniziale = JSON.stringify(builder);
         renderBuilder();
@@ -336,6 +348,7 @@
     let fillAssegnazione = null;
 
     async function openFill(tplId, assegnazioneId) {
+        apri();
         fillAssegnazione = assegnazioneId || null;
         const res = await api(`${base()}/${tplId}`);
         if (!res.ok) { alert('Errore'); return; }
@@ -448,9 +461,38 @@
     }
 
     // ── VISUALIZZA COMPILAZIONE ─────────────────────────────────────────────
+    /** Le compilazioni di un modulo (o tutte, senza modulo), nel pannello dei Documenti. */
+    async function openSubmissions(tplId, nome) {
+        apri();
+        view = 'submissions';
+        subsModello = { id: tplId || null, nome: nome || '' };
+        root.innerHTML = `
+            <div class="bzf-bar">
+                <button class="bzf-btn-ghost" id="bzf-back"><i class="fas fa-arrow-left"></i> Indietro</button>
+                <div class="bzf-sub-name" style="margin-left:8px;">Compilazioni${nome ? ' · ' + esc(nome) : ''}</div>
+            </div>
+            <div id="bzf-content"><div class="bz-empty"><i class="fas fa-spinner bz-spin"></i></div></div>`;
+        root.querySelector('#bzf-back').addEventListener('click', () => loadTemplates());
+        const res = await api(`${base()}/submissions${tplId ? '?template=' + tplId : ''}`);
+        const subs = (res.ok && Array.isArray(res.data)) ? res.data : [];
+        const c = root.querySelector('#bzf-content');
+        if (!subs.length) { c.innerHTML = '<div class="bzf-empty">Nessuna compilazione.</div>'; return; }
+        c.innerHTML = '<div class="bzf-sub-list">' + subs.map(s => `
+            <div class="bzf-sub-row" data-sub="${s.id}">
+                <i class="fas fa-file-lines"></i>
+                <div style="flex:1;min-width:0;">
+                    <div class="bzf-sub-name">${esc(s.template_name || '—')}</div>
+                    <div class="bzf-sub-meta">${esc(s.submitter_name || s.user_name || '—')} · ${fmtDate(s.created_at)}${s.source === 'link' ? ' · link' : ''}</div>
+                </div>
+                <i class="fas fa-chevron-right"></i>
+            </div>`).join('') + '</div>';
+        c.querySelectorAll('[data-sub]').forEach(r => r.addEventListener('click', () => openSubmission(parseInt(r.dataset.sub))));
+    }
+
     async function openSubmission(subId) {
+        apri();
         const res = await api(`${base()}/submission/${subId}`);
-        if (!res.ok) { alert('Errore'); return; }
+        if (!res.ok) { alert('Impossibile aprire la compilazione.'); return; }
         const s = res.data;
         root.innerHTML = `
             <div class="bzf-bar">
@@ -464,7 +506,10 @@
               </div>
             </div>
         `;
-        root.querySelector('#bzf-back').addEventListener('click', () => { loadTemplates().then(() => root.querySelector('[data-tab="submissions"]')?.click()); });
+        root.querySelector('#bzf-back').addEventListener('click', () => {
+            if (alTermine) { subsModello ? openSubmissions(subsModello.id, subsModello.nome) : loadTemplates(); return; }
+            loadTemplates().then(() => root.querySelector('[data-tab="submissions"]')?.click());
+        });
         root.querySelector('#bzf-print').addEventListener('click', () => window.print());
     }
 
@@ -487,5 +532,5 @@
         return isNaN(d) ? s : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    window.BZForms = { init, show, loadTemplates, openFill };
+    window.BZForms = { init, show, loadTemplates, openFill, openBuilder, openSubmissions, openSubmission };
 })();

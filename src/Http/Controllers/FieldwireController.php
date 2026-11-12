@@ -76,6 +76,11 @@ final class FieldwireController
         'files'                 => P::VEDERE,
         'downloadFile'          => P::VEDERE,
         'fileComments'          => P::VEDERE,
+        'richiesta'             => P::VEDERE,
+        'creaRichiesta'         => P::SCRIVERE,
+        'rispondiRichiesta'     => P::SCRIVERE,
+        'statoRichiesta'        => P::SCRIVERE,
+        'eliminaRichiesta'      => P::SCRIVERE,
         'disegni'               => P::VEDERE,
         'fileDisegno'           => P::VEDERE,
         'floorplans'            => P::VEDERE,
@@ -545,6 +550,28 @@ final class FieldwireController
                         'color'       => '#3b82f6',
                         'created_by'  => (int)($user?->id ?? 0),
                     ]);
+                    // i segni disegnati insieme al punto (un'area, una freccia,
+                    // una nota): restano collegati all'attivita'
+                    foreach (array_slice((array)($pt['segni'] ?? []), 0, 30) as $sg) {
+                        $tipo = (string)($sg['type'] ?? '');
+                        if (!in_array($tipo, ['rectangle', 'ellipse', 'cloud', 'arrow', 'drawing', 'text'], true)
+                            || !is_array($sg['geom'] ?? null)) {
+                            continue;
+                        }
+                        $colore = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($sg['color'] ?? '')) ? $sg['color'] : '#3b82f6';
+                        $this->annRepo->create([
+                            'worksite_id' => $worksiteId,
+                            'document_id' => $doc,
+                            'page'        => max(1, (int)($pt['page'] ?? 1)),
+                            'type'        => $tipo,
+                            'geom'        => $sg['geom'],
+                            'task_id'     => $taskId,
+                            'segnalazione_id' => null,
+                            'text'        => $tipo === 'text' ? mb_substr(trim((string)($sg['text'] ?? '')), 0, 300) : null,
+                            'color'       => $colore,
+                            'created_by'  => (int)($user?->id ?? 0),
+                        ]);
+                    }
                 }
             }
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
@@ -726,6 +753,24 @@ final class FieldwireController
             $this->scriviCommento($id, $request, $body);
             $interna = $this->accesso->daUfficio($user, $worksiteId) && !empty($body['interna']);
             $this->avvisa(fn($a) => $a->commento($taskId, (int)($user?->id ?? 0), $text, $interna));
+            // chi e' stato menzionato con @, fra chi legge questi messaggi
+            if (!empty($body['menzioni'])) {
+                try {
+                    $mz = new \App\Service\Zone\Menzioni($this->conn);
+                    $io = (int)($user?->id ?? 0);
+                    $mz->avvisa(
+                        new \App\Service\Notifications\NotificationService($this->conn, $this->config),
+                        $worksiteId,
+                        \App\Service\Zone\Menzioni::valide($text, (array)$body['menzioni'],
+                            $mz->lettori($worksiteId, 'attivita', ['id' => $taskId, 'interna' => $interna], $io)),
+                        $io,
+                        'attivita-' . $taskId,
+                        $text
+                    );
+                } catch (\Throwable $e) {
+                    error_log('[Zone menzioni] ' . $e->getMessage());
+                }
+            }
 
             // push su Fieldwire
             $task     = $this->zoneRepo->find($taskId);
@@ -1102,12 +1147,23 @@ final class FieldwireController
             // un modello del committente resta suo anche se lo ritocca CSM
             $clientId = $cliente ?? (isset($prima['client_id']) ? (int)$prima['client_id'] : null);
             $wsId = !empty($body['universal']) ? null : $worksiteId;
+            // la cartella dei Documenti: solo per i modelli di questo cantiere,
+            // e solo una cartella che chi salva vede
+            $cartella = array_key_exists('folder_id', $body)
+                ? ($body['folder_id'] !== null && $body['folder_id'] !== '' ? (int)$body['folder_id'] : null)
+                : (isset($prima['folder_id']) ? (int)$prima['folder_id'] : null);
+            if ($wsId === null) {
+                $cartella = null;
+            } elseif ($cartella !== null && !isset($this->cartelleVisibili($request, $worksiteId)[$cartella])) {
+                \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+            }
 
             $data = [
                 'worksite_id' => $wsId,
                 'client_id'   => $clientId,
                 'name'        => mb_substr($name, 0, 200),
                 'description' => trim($body['description'] ?? '') ?: null,
+                'folder_id'   => $cartella,
                 'fields'      => $fields,
                 'created_by'  => (int)($user?->id ?? 0),
             ];
@@ -1321,9 +1377,16 @@ final class FieldwireController
                 $f['download_url'] = "/worksites/{$worksiteId}/zone/files/{$f['id']}/download";
                 $f['is_image'] = in_array(strtolower($f['file_type'] ?? ''), ['jpg','jpeg','png','webp','gif'], true);
             }
+            unset($f);
             return [
                 'folders'        => $this->conChiSuRighe($request, 'cartella', array_values($cartelle)),
                 'files'          => $this->conChiSuRighe($request, 'file', $files),
+                // i moduli che stanno in questa cartella: per chi crea moduli
+                // (CSM e il committente); la squadra compila quelli assegnati
+                'moduli'         => $this->moduliInCartella($request, $worksiteId, $folderId, $cartelle),
+                // le richieste della cartella, e quante sono aperte in ogni cartella
+                'richieste'      => $folderId !== null ? (new \App\Service\Zone\Richieste($this->conn))->diCartella($worksiteId, $folderId) : [],
+                'richieste_aperte' => array_intersect_key((new \App\Service\Zone\Richieste($this->conn))->apertePerCartella($worksiteId), $cartelle),
                 'current_folder' => $folderId,
             ];
         });
@@ -1338,7 +1401,19 @@ final class FieldwireController
             $body = $this->jsonBody();
             $name = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome cartella obbligatorio');
-            $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0));
+            // dentro un'altra cartella: si crea solo dove si vede, e chi la
+            // vede e' lo stesso della cartella che la contiene (si cambia dopo)
+            $parent = !empty($body['parent_id']) ? (int)$body['parent_id'] : null;
+            if ($parent !== null) {
+                if (!isset($this->cartelleVisibili($request, $worksiteId)[$parent])) {
+                    \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+                }
+                if (!is_array($body['parti'] ?? null) && !is_array($body['persone'] ?? null)) {
+                    $body['parti']   = $this->condivisione->partiDi('cartella', [$parent])[$parent] ?? [];
+                    $body['persone'] = $this->condivisione->conChi('cartella', [$parent])[$parent] ?? [];
+                }
+            }
+            $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0), $parent);
             $con = $this->condivisioneNuova($request, $worksiteId, 'cartella', $id, $body);
             return ['id' => $id, 'name' => $name, 'condivisa_con' => $con];
         });
@@ -1386,34 +1461,17 @@ final class FieldwireController
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
             }
 
-            if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $caricati = $this->fileRicevuti('file');
+            if (!$caricati) {
                 throw new \RuntimeException('Nessun file ricevuto');
             }
-            $f = $_FILES['file'];
-            if (($f['size'] ?? 0) > 50 * 1024 * 1024) throw new \RuntimeException('File troppo grande (max 50 MB)');
-
-            $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
-            // blocca eseguibili/script
-            $blocked = ['php','phtml','exe','sh','bat','cmd','js','jar','com','msi','dll','app','scr'];
-            if ($ext === '' || in_array($ext, $blocked, true)) {
-                throw new \RuntimeException('Tipo di file non consentito');
+            // una copia compilata in BOB va nella cartella dell'originale, come sua versione
+            $orig = $this->origineCompilata($request);
+            if ($orig) {
+                $folderId = $orig['folder_id'] !== null ? (int)$orig['folder_id'] : null;
             }
-
-            $dir  = \CloudPath::ensureZoneFilesDir($worksiteId);
-            $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo($f['name'], PATHINFO_FILENAME));
-            $stored = $safe . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
-            $dest = $dir . DIRECTORY_SEPARATOR . $stored;
-            if (!move_uploaded_file($f['tmp_name'], $dest)) throw new \RuntimeException('Salvataggio fallito');
-
-            $id = $this->fileRepo->create([
-                'worksite_id' => $worksiteId,
-                'folder_id'   => $folderId,
-                'file_name'   => mb_substr($f['name'], 0, 255),
-                'file_path'   => \CloudPath::relativeToRoot($dest),
-                'file_type'   => $ext,
-                'size_bytes'  => (int)($f['size'] ?? 0),
-                'uploaded_by' => (int)($user?->id ?? 0),
-            ]);
+            $id = $this->salvaFileZona($worksiteId, $folderId, $caricati[0], (int)($user?->id ?? 0),
+                ['origine_file_id' => $orig ? (int)$orig['id'] : null]);
 
             // Nella radice non c'e' una cartella da cui ereditare: un file
             // caricato li' nasce condiviso come prima faceva l'etichetta —
@@ -1433,6 +1491,90 @@ final class FieldwireController
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+
+    /**
+     * I file arrivati con un modulo multipart sotto un nome, uno o piu'
+     * (name="file" o name="file[]").
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fileRicevuti(string $campo): array
+    {
+        $f = $_FILES[$campo] ?? null;
+        if (!$f) {
+            return [];
+        }
+        if (!is_array($f['name'])) {
+            return ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE ? [] : [$f];
+        }
+        $fuori = [];
+        foreach (array_keys($f['name']) as $i) {
+            if (($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            $fuori[] = ['name' => $f['name'][$i], 'type' => $f['type'][$i] ?? '', 'tmp_name' => $f['tmp_name'][$i],
+                        'error' => $f['error'][$i], 'size' => $f['size'][$i] ?? 0];
+        }
+        return $fuori;
+    }
+
+    /**
+     * Salva un file caricato fra i documenti della Zone, in una cartella.
+     *
+     * @param array{origine_file_id?:?int, richiesta_id?:?int} $legami
+     */
+    private function salvaFileZona(int $worksiteId, ?int $folderId, array $f, int $userId, array $legami = []): int
+    {
+        if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Caricamento del documento non riuscito.');
+        }
+        if (($f['size'] ?? 0) > 50 * 1024 * 1024) throw new \RuntimeException('File troppo grande (max 50 MB)');
+
+        $ext = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION));
+        // blocca eseguibili/script
+        $blocked = ['php','phtml','exe','sh','bat','cmd','js','jar','com','msi','dll','app','scr'];
+        if ($ext === '' || in_array($ext, $blocked, true)) {
+            throw new \RuntimeException('Tipo di file non consentito');
+        }
+
+        $dir  = \CloudPath::ensureZoneFilesDir($worksiteId);
+        $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo((string)$f['name'], PATHINFO_FILENAME));
+        $stored = $safe . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
+        $dest = $dir . DIRECTORY_SEPARATOR . $stored;
+        if (!move_uploaded_file((string)$f['tmp_name'], $dest)) throw new \RuntimeException('Salvataggio fallito');
+
+        return $this->fileRepo->create([
+            'worksite_id' => $worksiteId,
+            'folder_id'   => $folderId,
+            'file_name'   => mb_substr((string)$f['name'], 0, 255),
+            'file_path'   => \CloudPath::relativeToRoot($dest),
+            'file_type'   => $ext,
+            'size_bytes'  => (int)($f['size'] ?? 0),
+            'uploaded_by' => $userId ?: null,
+            'origine_file_id' => $legami['origine_file_id'] ?? null,
+            'richiesta_id'    => $legami['richiesta_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Il documento da cui si e' compilata una copia (campo "da_file_id"):
+     * deve essere di questo cantiere e visibile a chi carica. Una copia di
+     * una copia punta all'originale.
+     */
+    private function origineCompilata(Request $request): ?array
+    {
+        $da = (int)($_POST['da_file_id'] ?? 0);
+        if ($da <= 0) {
+            return null;
+        }
+        $orig = $this->fileRepo->find($da);
+        $this->fileVisibile($request, $orig);
+        if (!empty($orig['origine_file_id'])) {
+            $prima = $this->fileRepo->find((int)$orig['origine_file_id']);
+            if ($prima && (int)$prima['worksite_id'] === (int)$orig['worksite_id']) {
+                $orig = $prima;
+            }
+        }
+        return $orig;
     }
 
     public function deleteFile(Request $request): void
@@ -1512,6 +1654,171 @@ final class FieldwireController
             $author = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? 'Utente');
             $id = $this->fileRepo->addComment($fileId, $text, $author, (int)($user?->id ?? 0));
             return ['id' => $id, 'text' => $text, 'author_name' => $author, 'created_at' => date('Y-m-d H:i:s')];
+        });
+    }
+
+    /**
+     * I modelli di modulo che stanno in una cartella. In cima (null) anche
+     * quelli per tutti i cantieri e quelli la cui cartella non si vede piu'.
+     *
+     * @param array<int, array<string, mixed>> $cartelle le cartelle visibili
+     */
+    private function moduliInCartella(Request $request, int $w, ?int $folderId, array $cartelle): array
+    {
+        $ruolo = $this->ruoloQui($request);
+        if (!\App\Service\Zone\Permessi::puo($ruolo, \App\Service\Zone\Permessi::CREARE_MODULI)) {
+            return [];
+        }
+        $fuori = [];
+        foreach ($this->formRepo->templatesFor($w, $this->clienteDiChi($request)) as $t) {
+            $cart = $t['worksite_id'] !== null && !empty($t['folder_id']) ? (int)$t['folder_id'] : null;
+            if ($cart !== null && !isset($cartelle[$cart])) {
+                $cart = null;
+            }
+            if ($cart === $folderId) {
+                $fuori[] = $t;
+            }
+        }
+        return $fuori;
+    }
+
+    // ─── Richieste (nei Documenti) ────────────────────────────────────────────
+
+    /** La richiesta, se e' di questo cantiere e chi chiede ne vede la cartella. */
+    private function richiestaVisibile(Request $request, int $id): array
+    {
+        $w = (int)$request->param('id');
+        $r = (new \App\Service\Zone\Richieste($this->conn))->trova($id);
+        if (!$r || (int)$r['worksite_id'] !== $w || !isset($this->cartelleVisibili($request, $w)[(int)$r['folder_id']])) {
+            Response::json(['ok' => false, 'error' => 'Richiesta non trovata'], 404);
+        }
+        return $r;
+    }
+
+    /** Gli allegati del multipart salvati nella cartella della richiesta. @return int[] */
+    private function allegatiRichiesta(Request $request, int $w, int $folderId, ?int $richiestaId = null): array
+    {
+        $orig = $this->origineCompilata($request);
+        $ids = [];
+        foreach (array_slice($this->fileRicevuti('file'), 0, 10) as $f) {
+            $ids[] = $this->salvaFileZona($w, $folderId, $f, (int)($request->user()->id ?? 0), [
+                'origine_file_id' => $orig ? (int)$orig['id'] : null,
+                'richiesta_id'    => $richiestaId,
+            ]);
+        }
+        return $ids;
+    }
+
+    /** Nuova richiesta in una cartella (multipart: folder_id, titolo, testo, file[]). */
+    public function creaRichiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $cartella = (int)($_POST['folder_id'] ?? 0);
+            if ($cartella <= 0 || !isset($this->cartelleVisibili($request, $w)[$cartella])) {
+                throw new \RuntimeException('Aprire una cartella per creare la richiesta.');
+            }
+            $titolo = trim((string)($_POST['titolo'] ?? ''));
+            if ($titolo === '') {
+                throw new \RuntimeException('Inserire l\'oggetto della richiesta.');
+            }
+            $allegati = $this->allegatiRichiesta($request, $w, $cartella);
+            $id = (new \App\Service\Zone\Richieste($this->conn))->crea($w, $cartella, $titolo, $io, (string)($_POST['testo'] ?? ''), $allegati);
+            if ($allegati) {
+                $this->conn->prepare('UPDATE bb_zone_files SET richiesta_id = ? WHERE id IN (' . implode(',', array_map('intval', $allegati)) . ')')
+                    ->execute([$id]);
+            }
+            $this->avvisa(fn($a) => $a->richiestaNuova($id, $io));
+            return ['id' => $id];
+        });
+    }
+
+    /** Una richiesta con la sua discussione. */
+    public function richiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $msg = (new \App\Service\Zone\Richieste($this->conn))->messaggi((int)$r['id']);
+            foreach ($msg as &$m) {
+                $m['mio'] = (int)($m['user_id'] ?? 0) === $io;
+                foreach ($m['allegati'] as &$a) {
+                    if ($a['esiste']) $a['download_url'] = "/worksites/{$w}/zone/files/{$a['id']}/download";
+                }
+                unset($a);
+            }
+            unset($m);
+            return [
+                'richiesta'     => $r,
+                'messaggi'      => $msg,
+                'cartella'      => $this->cartelleVisibili($request, $w)[(int)$r['folder_id']]['name'] ?? '',
+                'puo_eliminare' => $this->ruoloQui($request) === \App\Service\Zone\Accesso::UFFICIO || (int)$r['created_by'] === $io,
+            ];
+        });
+    }
+
+    /** Risposta (multipart: testo, file[], completa=1 per chiuderla insieme). */
+    public function rispondiRichiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $svc = new \App\Service\Zone\Richieste($this->conn);
+            $testo = (string)($_POST['testo'] ?? '');
+            if (trim($testo) === '' && !$this->fileRicevuti('file')) {
+                throw new \RuntimeException('Scrivere un messaggio o allegare un documento.');
+            }
+            $allegati = $this->allegatiRichiesta($request, $w, (int)$r['folder_id'], (int)$r['id']);
+            $svc->scrivi((int)$r['id'], $io, $testo, $allegati);
+            $anteprima = trim($testo) !== '' ? $testo : \App\Service\Lingua::testo('zona_documento_allegato', 'it');
+            $this->avvisa(fn($a) => $a->richiestaRisposta((int)$r['id'], $io, $anteprima));
+            if (!empty($_POST['completa']) && $r['stato'] !== \App\Service\Zone\Richieste::COMPLETATA) {
+                $svc->cambiaStato((int)$r['id'], \App\Service\Zone\Richieste::COMPLETATA, $io);
+                $this->avvisa(fn($a) => $a->richiestaCompletata((int)$r['id'], $io));
+            }
+            return ['ok' => true];
+        });
+    }
+
+    /** Completata / riaperta. */
+    public function statoRichiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $io = (int)($request->user()->id ?? 0);
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $stato = (string)($this->jsonBody()['stato'] ?? '');
+            if ($stato === $r['stato']) {
+                return ['stato' => $stato];
+            }
+            (new \App\Service\Zone\Richieste($this->conn))->cambiaStato((int)$r['id'], $stato, $io);
+            if ($stato === \App\Service\Zone\Richieste::COMPLETATA) {
+                $this->avvisa(fn($a) => $a->richiestaCompletata((int)$r['id'], $io));
+            }
+            return ['stato' => $stato];
+        });
+    }
+
+    /** Elimina una richiesta: chi l'ha aperta, o CSM. I documenti restano nella cartella. */
+    public function eliminaRichiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $r = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $this->pretendeMio($request, (int)($r['created_by'] ?? 0), 'richieste');
+            (new \App\Service\Zone\Richieste($this->conn))->elimina((int)$r['id']);
+            return ['eliminata' => true];
         });
     }
 
@@ -1622,6 +1929,7 @@ final class FieldwireController
             str_starts_with($dove, 'attivita-')     => 'attivita',
             str_starts_with($dove, 'disegno')       => 'disegni',
             str_starts_with($dove, 'file-')         => 'files',
+            str_starts_with($dove, 'richiesta-')    => 'files',
             $dove === 'moduli'                      => 'forms',
             str_starts_with($dove, 'segnalazione-') => 'segnalazioni',
             str_starts_with($dove, 'chat-')         => 'chat',
@@ -1975,6 +2283,7 @@ final class FieldwireController
                 SELECT d.id, d.file_name, d.file_type, d.note, d.subcategory,
                        d.created_at, d.created_by, d.current_version,
                        (SELECT COUNT(*) FROM bb_worksite_document_versions v WHERE v.document_id = d.id) AS n_versioni,
+                       (SELECT COUNT(*) FROM bb_zone_annotations an WHERE an.document_id = d.id) AS n_segni,
                        TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                        s.fw_sheet_upload_id, s.pushed_at,
                        r.status AS dwg_status, r.error AS dwg_error
@@ -2009,6 +2318,8 @@ final class FieldwireController
                     // le versioni: quella in uso e quante ce ne sono di prima
                     'versione'     => (int)($r['current_version'] ?? 1) ?: 1,
                     'n_versioni'   => (int)($r['n_versioni'] ?? 0),
+                    // quante annotazioni ha: si sceglie se aprirlo con o senza
+                    'n_segni'      => (int)($r['n_segni'] ?? 0),
                     'view_url'     => "/worksites/{$worksiteId}/disegni/{$r['id']}/view",
                     'fw_synced'    => !empty($r['pushed_at']),
                     'fw_pushed_at' => $r['pushed_at'],
@@ -3220,10 +3531,23 @@ final class FieldwireController
     private function cartelleVisibili(Request $request, int $worksiteId): array
     {
         $vede  = $this->filtro($request, 'cartella');
+        $tutte = [];
         $fuori = [];
         foreach ($this->fileRepo->folders($worksiteId) as $c) {
+            $tutte[(int)$c['id']] = $c;
             if ($vede($c)) {
                 $fuori[(int)$c['id']] = $c;
+            }
+        }
+        // una cartella si vede solo se si vedono anche quelle che la
+        // contengono: chiudere "Contratti" chiude anche cio' che c'e' dentro
+        foreach (array_keys($fuori) as $id) {
+            $su = $tutte[$id]['parent_id'] ?? null;
+            $giri = 0;
+            while ($su !== null && $su !== '' && $giri++ < 20) {
+                if (!isset($tutte[(int)$su])) { break; }   // contenitore sparito: resta in cima
+                if (!$vede($tutte[(int)$su])) { unset($fuori[$id]); break; }
+                $su = $tutte[(int)$su]['parent_id'] ?? null;
             }
         }
         return $fuori;

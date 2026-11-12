@@ -116,3 +116,9 @@
     .bzd:not(.dett-aperto) .bzd-dett { display: none; }
     .bzd-msg { max-width: 88%; }
 }
+
+/* Il disegno su cui e' appuntata la segnalazione */
+.bzd-link-disegno { display: inline-flex; align-items: center; gap: 6px; background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.35);
+                    color: #93c5fd; border-radius: 7px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.bzd-link-disegno:hover { background: rgba(59,130,246,.2); }
+[data-theme="light"] .bzd-link-disegno { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }

@@ -27,20 +27,29 @@ final class ZoneFileRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function createFolder(int $worksiteId, string $name, ?int $userId): int
+    /** @param int|null $parentId la cartella che la contiene (null = in cima) */
+    public function createFolder(int $worksiteId, string $name, ?int $userId, ?int $parentId = null): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_folders (worksite_id, name, created_by) VALUES (:w, :n, :u)
+            INSERT INTO bb_zone_folders (worksite_id, parent_id, name, created_by) VALUES (:w, :p, :n, :u)
         ");
-        $stmt->execute([':w' => $worksiteId, ':n' => $name, ':u' => $userId]);
+        $stmt->execute([':w' => $worksiteId, ':p' => $parentId, ':n' => $name, ':u' => $userId]);
         return (int)$this->db->lastInsertId();
     }
 
     public function deleteFolder(int $worksiteId, int $folderId): void
     {
-        // i file della cartella tornano in "root" (folder_id = NULL)
-        $this->db->prepare("UPDATE bb_zone_files SET folder_id = NULL WHERE folder_id = :f AND worksite_id = :w")
-                 ->execute([':f' => $folderId, ':w' => $worksiteId]);
+        // quello che c'era dentro (file, cartelle, moduli) sale di un livello
+        $st = $this->db->prepare("SELECT parent_id FROM bb_zone_folders WHERE id = :f AND worksite_id = :w");
+        $st->execute([':f' => $folderId, ':w' => $worksiteId]);
+        $su = $st->fetchColumn();
+        $su = $su === false || $su === null ? null : (int)$su;
+        $this->db->prepare("UPDATE bb_zone_files SET folder_id = :su WHERE folder_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
+        $this->db->prepare("UPDATE bb_zone_folders SET parent_id = :su WHERE parent_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
+        $this->db->prepare("UPDATE bb_zone_form_templates SET folder_id = :su WHERE folder_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
         $this->db->prepare("DELETE FROM bb_zone_folders WHERE id = :f AND worksite_id = :w")
                  ->execute([':f' => $folderId, ':w' => $worksiteId]);
     }
@@ -53,9 +62,11 @@ final class ZoneFileRepository
         $sql = "
             SELECT f.*,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
-                   (SELECT COUNT(*) FROM bb_zone_file_comments c WHERE c.file_id = f.id) AS comment_count
+                   (SELECT COUNT(*) FROM bb_zone_file_comments c WHERE c.file_id = f.id) AS comment_count,
+                   r.titolo AS richiesta_titolo
             FROM bb_zone_files f
             LEFT JOIN bb_users u ON u.id = f.uploaded_by
+            LEFT JOIN bb_zone_richieste r ON r.id = f.richiesta_id
             WHERE f.worksite_id = :w AND " . ($folderId === null ? "f.folder_id IS NULL" : "f.folder_id = :f") . "
             ORDER BY f.created_at DESC
         ";
@@ -76,10 +87,12 @@ final class ZoneFileRepository
     public function create(array $d): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_files (worksite_id, folder_id, file_name, file_path, file_type, size_bytes, uploaded_by)
-            VALUES (:w, :folder, :name, :path, :type, :size, :uid)
+            INSERT INTO bb_zone_files (worksite_id, folder_id, file_name, file_path, file_type, size_bytes, uploaded_by, origine_file_id, richiesta_id)
+            VALUES (:w, :folder, :name, :path, :type, :size, :uid, :orig, :rich)
         ");
         $stmt->execute([
+            ':orig'   => $d['origine_file_id'] ?? null,   // compilato da questo documento
+            ':rich'   => $d['richiesta_id'] ?? null,      // arrivato con questa richiesta
             ':w'      => $d['worksite_id'],
             ':folder' => $d['folder_id'] ?? null,
             ':name'   => $d['file_name'],

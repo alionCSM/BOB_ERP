@@ -117,7 +117,7 @@
         if (m.rapido) {
             h += `<div class="rapido">${esc((RAPIDI[m.rapido] || m.rapido).replace('{autore}', m.autore || ''))}</div>`;
         }
-        if (m.testo) h += `<div class="testo">${esc(m.testo)}</div>`;
+        if (m.testo) h += `<div class="testo">${window.BZMenzioni ? BZMenzioni.evidenzia(esc(m.testo)) : esc(m.testo)}</div>`;
         if (m.ha_foto) h += `<img src="${BASE}/messaggi/${m.id}/foto" alt="" data-bzd-zoom loading="lazy">`;
         return h;
     }
@@ -293,13 +293,19 @@
                     ${s.presa_da_nome ? ` · in carico a <b>${esc(s.presa_da_nome)}</b>` : ''}
                     ${s.task_id ? ` · <a href="#" data-bzd-task="${s.task_id}" style="color:#60a5fa">Apri attività</a>` : ''}
                 </div>
+                ${r.data.disegno ? `<div class="sub" style="margin-top:6px">
+                    <button type="button" class="bzd-link-disegno" data-annot="${r.data.disegno.document_id}" data-annot-type="${esc(r.data.disegno.tipo)}"
+                            data-annot-name="${esc(r.data.disegno.nome)}" data-annot-page="${r.data.disegno.page || 1}"
+                            data-annot-segn="${s.id}" data-annot-evid="${esc(s.testo.slice(0, 80))}" title="Aprire il disegno con il punto della segnalazione in evidenza">
+                        <i class="fas fa-drafting-compass"></i> Sul disegno: ${esc(r.data.disegno.nome)}${r.data.disegno.page > 1 ? ' · pag. ' + r.data.disegno.page : ''}
+                    </button></div>` : ''}
                 ${s.esito ? `<div class="sub" style="margin-top:6px;color:#4ade80"><i class="fas fa-check"></i> ${esc(s.esito)}</div>` : ''}
                 ${azioni.length ? `<div class="bzd-azioni">${azioni.join('')}</div>` : ''}
             </div>
             <div class="bzd-msgs">${messaggi.map(m => rigaMessaggio(m, false)).join('') || '<div class="bzd-vuoto" style="padding:20px">Nessun messaggio. Scrivi qui sotto per rispondere.</div>'}</div>
             <div class="bzd-scrivi">
                 <label class="ico" title="Foto"><i class="fas fa-camera"></i><input type="file" accept="image/*" hidden data-bzd-foto-segn></label>
-                <textarea rows="1" placeholder="Rispondi..." data-bzd-testo-segn></textarea>
+                <textarea rows="1" placeholder="Rispondi... (@ per menzionare)" data-bzd-testo-segn></textarea>
                 <button class="ico invia" data-bzd-invia-segn><i class="fas fa-paper-plane"></i></button>
             </div>`;
         S.ultimo = messaggi.length ? messaggi[messaggi.length - 1].id : 0;
@@ -368,7 +374,7 @@
                 <div class="bzd-rapidi"${PER_CLIENTE ? ' hidden' : ''}>${Object.keys(RAPIDI).filter(k => !k.startsWith('sys_')).map(k => `<button data-bzd-rapido="${k}">${esc(RAPIDI[k])}</button>`).join('')}</div>
                 <div class="bzd-scrivi">
                     <label class="ico" title="Foto"><i class="fas fa-camera"></i><input type="file" accept="image/*" hidden data-bzd-foto-chat></label>
-                    <textarea rows="1" placeholder="Scrivi in ${esc(c.label)}..." data-bzd-testo-chat></textarea>
+                    <textarea rows="1" placeholder="Scrivi in ${esc(c.label)}... (@ per menzionare)" data-bzd-testo-chat></textarea>
                     <button class="ico invia" data-bzd-invia-chat><i class="fas fa-paper-plane"></i></button>
                 </div>
                 ${C.puoFissare ? '<label class="bzd-fissa"><input type="checkbox" data-bzd-fissa-nuovo> <i class="fas fa-thumbtack"></i> Fissa in alto come avviso (per tutti in questo canale)</label>' : ''}
@@ -473,9 +479,11 @@
         if (t.closest('[data-bzd-invia-segn]')) {
             const ta = rootS().querySelector('[data-bzd-testo-segn]');
             if (!ta.value.trim()) return;
-            const r = await post(`${BASE}/segnalazioni/${S.apertaId}/messaggi`, { testo: ta.value });
+            const menzioni = window.BZMenzioni ? BZMenzioni.ids(ta) : [];
+            const r = await post(`${BASE}/segnalazioni/${S.apertaId}/messaggi`, { testo: ta.value, menzioni });
             if (!r.ok) { alert(r.error || 'Non inviato'); return; }
             ta.value = '';
+            if (window.BZMenzioni) BZMenzioni.azzera(ta);
             apriSegnalazione(S.apertaId, true);
             return;
         }
@@ -485,8 +493,10 @@
             const ta = rootC().querySelector('[data-bzd-testo-chat]');
             if (!ta.value.trim()) return;
             const testo = ta.value;
+            const menzioni = window.BZMenzioni ? BZMenzioni.ids(ta) : [];
             ta.value = '';
-            inviaChat({ testo });
+            if (window.BZMenzioni) BZMenzioni.azzera(ta);
+            inviaChat({ testo, menzioni });
             return;
         }
         if ((el = t.closest('[data-bzd-letto]')))     { chiLHaLetto(el.dataset.bzdLetto); return; }
@@ -538,6 +548,12 @@
         if (e.target.matches('[data-bzd-testo-chat]')) { e.preventDefault(); rootC().querySelector('[data-bzd-invia-chat]').click(); }
         if (e.target.matches('[data-bzd-testo-segn]')) { e.preventDefault(); rootS().querySelector('[data-bzd-invia-segn]').click(); }
     });
+
+    // @ nei messaggi: si menziona solo chi legge la conversazione
+    if (window.BZMenzioni) {
+        BZMenzioni.collega('[data-bzd-testo-chat]', () => C.canale ? 'contesto=chat&canale=' + encodeURIComponent(C.canale) : '');
+        BZMenzioni.collega('[data-bzd-testo-segn]', () => S.apertaId ? 'contesto=segnalazione&id=' + S.apertaId : '');
+    }
 
     window.BZDialogo = {
         /** La pagina cambia vista: si apre quella giusta e si ascolta. */

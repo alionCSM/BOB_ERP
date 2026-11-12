@@ -84,6 +84,8 @@ if (str_starts_with($path, '/assets/')) {
     header('Content-Type: ' . (str_ends_with($f, '.css') ? 'text/css' : 'application/javascript'));
     readfile($f); exit;
 }
+// il file di un disegno: nel banco di prova una pianta finta, per provare il visore nel browser
+if (preg_match('#^/worksites/\d+/disegni/\d+/view$#', $path)) { header('Content-Type: application/pdf'); readfile(__DIR__ . '/disegno_prova.pdf'); exit; }
 $verbo = strtolower($_SERVER['REQUEST_METHOD']);
 preg_match_all("#->(get|post)\s*\(\s*'(/worksites/\{id\}/zone[^']*)',\s*\[(\w+)::class,\s*'(\w+)'\]#", file_get_contents(ERP . '/public/index.php'), $m, PREG_SET_ORDER);
 foreach ($m as [, $v, $rotta, $classe, $metodo]) {

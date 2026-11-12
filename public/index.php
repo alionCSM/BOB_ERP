@@ -615,6 +615,11 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/files/{fileId}/delete',                                   [FieldwireController::class, 'deleteFile'])
            ->get( '/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'fileComments'])
            ->post('/worksites/{id}/zone/files/{fileId}/comments',                                 [FieldwireController::class, 'postFileComment'])
+           ->post('/worksites/{id}/zone/richieste',                                               [FieldwireController::class, 'creaRichiesta'])
+           ->get( '/worksites/{id}/zone/richieste/{rid}',                                         [FieldwireController::class, 'richiesta'])
+           ->post('/worksites/{id}/zone/richieste/{rid}/messaggi',                                [FieldwireController::class, 'rispondiRichiesta'])
+           ->post('/worksites/{id}/zone/richieste/{rid}/stato',                                   [FieldwireController::class, 'statoRichiesta'])
+           ->post('/worksites/{id}/zone/richieste/{rid}/elimina',                                 [FieldwireController::class, 'eliminaRichiesta'])
            ->get( '/worksites/{id}/zone/floorplans',                                              [FieldwireController::class, 'floorplans'])
            ->get( '/worksites/{id}/zone/disegni',                                                 [FieldwireController::class, 'disegni'])
            ->post('/worksites/{id}/zone/disegni/{docId}/push-fieldwire',                          [FieldwireController::class, 'pushDisegno'])
@@ -629,6 +634,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
     // chat del cantiere e segnalazioni: stessi metodi per il sito e per l'app
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
     $router
+        ->get ('/worksites/{id}/zone/menzionabili',                         [ZoneDialogoController::class, 'menzionabili'])
         ->get ('/worksites/{id}/zone/chat',                                 [ZoneDialogoController::class, 'chat'])
         ->get ('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'canale'])
         ->post('/worksites/{id}/zone/chat/{canale}',                        [ZoneDialogoController::class, 'scriviCanale'])
@@ -990,6 +996,11 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/files/{fileId}/download',          [FieldwireController::class, 'downloadFile'])
         ->get( '/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'fileComments'])
         ->post('/api/v1/zone/{id}/files/{fileId}/comments',          [FieldwireController::class, 'postFileComment'])
+        ->post('/api/v1/zone/{id}/richieste',                        [FieldwireController::class, 'creaRichiesta'])
+        ->get( '/api/v1/zone/{id}/richieste/{rid}',                  [FieldwireController::class, 'richiesta'])
+        ->post('/api/v1/zone/{id}/richieste/{rid}/messaggi',         [FieldwireController::class, 'rispondiRichiesta'])
+        ->post('/api/v1/zone/{id}/richieste/{rid}/stato',            [FieldwireController::class, 'statoRichiesta'])
+        ->post('/api/v1/zone/{id}/richieste/{rid}/elimina',          [FieldwireController::class, 'eliminaRichiesta'])
         // moduli: si compilano in cantiere, i template si fanno da ufficio
         ->get( '/api/v1/zone/{id}/forms',                            [FieldwireController::class, 'formTemplates'])
         ->get( '/api/v1/zone/{id}/forms/assegnazioni',               [FieldwireController::class, 'assegnazioniModuli'])
@@ -1009,6 +1020,7 @@ if (str_starts_with($uri, '/api/v1/')) {
     // chat del cantiere e segnalazioni, gli stessi del sito
     require_once APP_ROOT . '/src/Http/Controllers/ZoneDialogoController.php';
     $router
+        ->get ('/api/v1/zone/{id}/menzionabili',                            [ZoneDialogoController::class, 'menzionabili'])
         ->get ('/api/v1/zone/{id}/chat',                                    [ZoneDialogoController::class, 'chat'])
         ->get ('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'canale'])
         ->post('/api/v1/zone/{id}/chat/{canale}',                           [ZoneDialogoController::class, 'scriviCanale'])
