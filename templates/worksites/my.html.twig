@@ -22,7 +22,10 @@
 .mc-codice { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #1e40af; background: #eff6ff; border-radius: 6px; padding: 2px 8px; }
 .mc-nome { font-size: 16px; font-weight: 700; color: #0f172a; line-height: 1.3; margin-top: 8px; }
 .mc-luogo { font-size: 12.5px; color: #64748b; margin-top: 3px; }
-.mc-rif { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #5b21b6; background: #f5f3ff; border-radius: 999px; padding: 3px 10px; align-self: flex-start; }
+.mc-rif-codice { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: #5b21b6; background: #f5f3ff; border-radius: 6px; padding: 2px 8px; }
+.mc-nostro { font-size: 12.5px; color: #475569; margin-top: 4px; }
+.mc-nostro b { font-weight: 600; color: #334155; }
+.mc-senza-rif { font-size: 11.5px; color: #94a3b8; font-style: italic; }
 .mc-numeri { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .mc-num { background: #f8fafc; border-radius: 10px; padding: 8px 10px; }
 .mc-num b { display: block; font-size: 18px; color: #0f172a; line-height: 1.1; }
@@ -44,8 +47,9 @@
             <h2>{{ t('menu_cantieri') }}</h2>
             <p>{{ worksites|length }} {{ worksites|length == 1 ? 'cantiere' : 'cantieri' }} · attività, foto, disegni, documenti e chat con CSM</p>
         </div>
-        {% if worksites|length > 3 %}
-            <input type="search" class="mc-cerca" id="mc-cerca" placeholder="Cerca per nome, codice o luogo…">
+        {% if worksites|length > 1 %}
+            <input type="search" class="mc-cerca" id="mc-cerca" autocomplete="off"
+                   placeholder="{{ cliente ? 'Cerca per nome, codice commessa, codice CSM o località…' : 'Cerca per nome, codice o località…' }}">
         {% endif %}
     </div>
 
@@ -56,23 +60,30 @@
     {% if worksites is empty %}
         <div class="mc-vuoto">
             <h3>Nessun cantiere per ora</h3>
-            <p>Quando CSM condivide un cantiere con te, lo trovi qui e ricevi un'email.
-               Per qualsiasi dubbio scrivi a <a href="mailto:info@csmontaggi.it">info@csmontaggi.it</a>.</p>
+            <p>I cantieri condivisi da CSM compariranno in questa pagina e ne riceverete comunicazione via email.
+               Per informazioni scrivere a <a href="mailto:info@csmontaggi.it">info@csmontaggi.it</a>.</p>
         </div>
     {% else %}
         <div class="mc-griglia" id="mc-griglia">
             {% for w in worksites %}
                 <a class="mc-card" href="/worksites/{{ w.id }}/zone"
                    data-cerca="{{ (w.name ~ ' ' ~ w.worksite_code ~ ' ' ~ w.location ~ ' ' ~ (w.riferimento.nome ?? '') ~ ' ' ~ (w.riferimento.codice ?? ''))|lower }}">
+                    {% set rifNome = w.riferimento.nome ?? '' %}
+                    {% set rifCodice = w.riferimento.codice ?? '' %}
                     <div>
-                        {% if w.worksite_code %}<span class="mc-codice">{{ w.worksite_code }}</span>{% endif %}
-                        <div class="mc-nome">{{ w.name }}</div>
+                        {% if cliente and (rifNome or rifCodice) %}
+                            {# Per il committente prima il suo nome e la sua commessa, poi i nostri #}
+                            {% if rifCodice %}<span class="mc-rif-codice" title="Vostro codice commessa">{{ rifCodice }}</span>{% endif %}
+                            <div class="mc-nome">{{ rifNome ?: w.name }}</div>
+                            <div class="mc-nostro">CSM: <b>{{ w.name }}</b>{% if w.worksite_code %} · {{ w.worksite_code }}{% endif %}</div>
+                        {% else %}
+                            {% if w.worksite_code %}<span class="mc-codice">{{ w.worksite_code }}</span>{% endif %}
+                            <div class="mc-nome">{{ w.name }}</div>
+                        {% endif %}
                         {% if w.location %}<div class="mc-luogo">{{ w.location }}</div>{% endif %}
                     </div>
-                    {% if w.riferimento %}
-                        <span class="mc-rif" title="Il vostro riferimento">
-                            {{ [w.riferimento.nome, w.riferimento.codice]|filter(v => v)|join(' · ') }}
-                        </span>
+                    {% if cliente and not (rifNome or rifCodice) %}
+                        <span class="mc-senza-rif">Vostro nome e codice commessa non impostati: modificabili dalla Zone del cantiere.</span>
                     {% endif %}
                     <div class="mc-numeri">
                         <div class="mc-num {{ w.aperte ? 'acceso' : '' }}"><b>{{ w.aperte }}</b><span>attività aperte</span></div>
@@ -86,7 +97,7 @@
                 </a>
             {% endfor %}
         </div>
-        <div class="mc-nessuno" id="mc-nessuno">Nessun cantiere con questo nome.</div>
+        <div class="mc-nessuno" id="mc-nessuno">Nessun cantiere corrisponde alla ricerca.</div>
     {% endif %}
 </div>
 {% endblock %}

@@ -581,6 +581,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/presenze',                                               [FieldwireController::class, 'aggiungiPresenza'])
            ->get( '/worksites/{id}/zone/avvisi',                                                 [FieldwireController::class, 'avvisi'])
            ->post('/worksites/{id}/zone/avvisi/letti',                                           [FieldwireController::class, 'avvisiLetti'])
+           ->post('/worksites/{id}/zone/avvisi/elimina',                                         [FieldwireController::class, 'avvisiElimina'])
            ->post('/worksites/{id}/zone/presenze/cliente',                                       [FieldwireController::class, 'presenzeAlCliente'])
            ->post('/worksites/{id}/zone/presenze/{pId}/elimina',                                 [FieldwireController::class, 'eliminaPresenza'])
            ->post('/worksites/{id}/zone/presenze/{pId}',                                         [FieldwireController::class, 'modificaPresenza'])

@@ -422,6 +422,14 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .bz-avviso .t { font-size: 13px; font-weight: 600; color: #e2e8f0; }
 .bz-avviso .m { font-size: 12.5px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .bz-avviso .q { font-size: 11px; color: #64748b; }
+.bz-avviso-riga { position: relative; }
+.bz-avviso-riga .bz-avviso { padding-right: 38px; }
+.bz-avviso-x { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border: 0; border-radius: 6px; background: none;
+               color: #64748b; cursor: pointer; opacity: 0; transition: opacity .15s, background .15s; }
+.bz-avviso-riga:hover .bz-avviso-x, .bz-avviso-x:focus-visible { opacity: 1; }
+.bz-avviso-x:hover { background: rgba(239, 68, 68, .12); color: #ef4444; }
+@media (hover: none) { .bz-avviso-x { opacity: 1; } }
+.bz-avvisi-azioni { display: flex; gap: 12px; }
 .bz-avvisi-vuoto { padding: 22px 14px; text-align: center; font-size: 13px; color: #64748b; }
 [data-theme="light"] .bz-avvisi-panel { background: #fff; border-color: #e2e8f0; box-shadow: 0 16px 40px rgba(15,23,42,.15); }
 [data-theme="light"] .bz-avvisi-testa { color: #1e293b; border-bottom-color: #e2e8f0; }
@@ -480,7 +488,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 <div class="bz-avvisi-panel" id="bz-avvisi-panel" hidden>
                     <div class="bz-avvisi-testa">
                         <span>Notifiche del cantiere</span>
-                        <button type="button" id="bz-avvisi-tutte">Segna tutte come lette</button>
+                        <span class="bz-avvisi-azioni">
+                            <button type="button" id="bz-avvisi-tutte">Segna tutte come lette</button>
+                            <button type="button" id="bz-avvisi-elimina-lette">Elimina lette</button>
+                        </span>
                     </div>
                     <div class="bz-avvisi-lista" id="bz-avvisi-lista"></div>
                 </div>
@@ -2540,14 +2551,17 @@ async function caricaAvvisi() {
     const lista = document.getElementById('bz-avvisi-lista');
     lista.innerHTML = avvisiStato.avvisi.length
         ? avvisiStato.avvisi.map(a => `
-            <button type="button" class="bz-avviso ${a.letta ? '' : 'nuovo'}" data-avviso="${a.id}" data-dove="${escAttr(a.dove)}">
-                <i class="fas ${ICONA_AVVISO[a.sezione] || 'fa-bell'}"></i>
-                <span class="c">
-                    <span class="t">${escHtml(a.titolo)}</span>
-                    <span class="m">${escHtml(a.testo)}</span>
-                    <span class="q">${escHtml(quandoAvviso(a.quando))}</span>
-                </span>
-            </button>`).join('')
+            <div class="bz-avviso-riga">
+                <button type="button" class="bz-avviso ${a.letta ? '' : 'nuovo'}" data-avviso="${a.id}" data-dove="${escAttr(a.dove)}">
+                    <i class="fas ${ICONA_AVVISO[a.sezione] || 'fa-bell'}"></i>
+                    <span class="c">
+                        <span class="t">${escHtml(a.titolo)}</span>
+                        <span class="m">${escHtml(a.testo)}</span>
+                        <span class="q">${escHtml(quandoAvviso(a.quando))}</span>
+                    </span>
+                </button>
+                <button type="button" class="bz-avviso-x" data-elimina-avviso="${a.id}" title="Elimina notifica" aria-label="Elimina notifica"><i class="fas fa-trash-can"></i></button>
+            </div>`).join('')
         : '<div class="bz-avvisi-vuoto">Nessuna notifica per questo cantiere.</div>';
 }
 
@@ -2596,7 +2610,25 @@ document.getElementById('bz-avvisi-tutte')?.addEventListener('click', e => {
     e.stopPropagation();
     segnaAvvisi({});
 });
+async function eliminaAvvisi(corpo) {
+    const r = await api(`/worksites/${WID}/zone/avvisi/elimina`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    });
+    if (!r.ok) alert(r.error || 'Si è verificato un errore.');
+    caricaAvvisi();
+}
+document.getElementById('bz-avvisi-elimina-lette')?.addEventListener('click', e => {
+    e.stopPropagation();
+    if (confirm('Eliminare tutte le notifiche già lette di questo cantiere?')) eliminaAvvisi({ lette: true });
+});
 document.getElementById('bz-avvisi-lista')?.addEventListener('click', e => {
+    const x = e.target.closest('[data-elimina-avviso]');
+    if (x) {
+        e.stopPropagation();
+        x.closest('.bz-avviso-riga')?.remove();
+        eliminaAvvisi({ id: parseInt(x.dataset.eliminaAvviso) });
+        return;
+    }
     const a = e.target.closest('[data-avviso]');
     if (!a) return;
     document.getElementById('bz-avvisi-panel').hidden = true;

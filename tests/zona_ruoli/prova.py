@@ -179,6 +179,16 @@ verifica(S, 'cliccandola diventa letta', all(x['letta'] for x in chiama(UFF, 'GE
 chiama(UFF, 'POST', '/avvisi/letti', {'sezione': 'attivita'})
 verifica(S, 'aprendo Attività si azzera il numero', chiama(UFF, 'GET', '/avvisi')['data']['per_sezione']['attivita'] == 0)
 verifica(S, 'non si segnano gli avvisi degli altri', chiama(CLI, 'POST', '/avvisi/letti', {})['_http'] == 200 and not all(x['letta'] for x in chiama(CAPO, 'GET', '/avvisi')['data']['avvisi']))
+capo_ids = [x['id'] for x in chiama(CAPO, 'GET', '/avvisi')['data']['avvisi']]
+if capo_ids:
+    chiama(CLI, 'POST', '/avvisi/elimina', {'id': capo_ids[0]})
+verifica(S, 'non si eliminano gli avvisi degli altri', bool(capo_ids) and capo_ids[0] in [x['id'] for x in chiama(CAPO, 'GET', '/avvisi')['data']['avvisi']])
+if mia:
+    chiama(UFF, 'POST', '/avvisi/elimina', {'id': mia[0]['id']})
+verifica(S, 'una notifica si elimina', bool(mia) and all(x['id'] != mia[0]['id'] for x in chiama(UFF, 'GET', '/avvisi')['data']['avvisi']))
+chiama(UFF, 'POST', '/avvisi/letti', {})
+chiama(UFF, 'POST', '/avvisi/elimina', {'lette': True})
+verifica(S, 'le notifiche lette si eliminano tutte insieme', chiama(UFF, 'GET', '/avvisi')['data']['avvisi'] == [])
 
 S = '5e. Notifiche di file'
 rf = chiama(CLI, 'POST', '/files', file={'nome': 'computo_metrico.pdf'})

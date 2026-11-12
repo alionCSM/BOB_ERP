@@ -84,6 +84,9 @@ final class CompanyModuleGuard
         '/documents'                => 'documents',
         '/companies'                => 'companies',
         '/worksites'                => 'worksites',
+        // BOB Zone, l'elenco dei cantieri: segue i cantieri della societa',
+        // come la Zone di ogni cantiere (/worksites/{id}/zone)
+        '/zone'                     => 'worksites',
         '/fleet'                    => 'fleet_view',
         '/ai'                       => 'ai_chat',
         '/attestati'                => 'documents',

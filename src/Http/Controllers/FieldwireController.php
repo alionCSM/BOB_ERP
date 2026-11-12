@@ -96,6 +96,7 @@ final class FieldwireController
         // gli avvisi di questo cantiere, per il campanello della Zone
         'avvisi'                => P::VEDERE,
         'avvisiLetti'           => P::VEDERE,
+        'avvisiElimina'         => P::VEDERE,
         // le presenze scritte a mano: solo CSM
         'aggiungiPresenza'      => P::GESTIRE,
         'eliminaPresenza'       => P::GESTIRE,
@@ -1714,6 +1715,34 @@ final class FieldwireController
                 }
             }
             return ['segnate' => count($ids)];
+        });
+    }
+
+    /**
+     * Elimina gli avvisi di questo cantiere di chi guarda: uno (id) o
+     * tutti quelli gia' letti (lette). Solo i propri, come nel campanello.
+     */
+    public function avvisiElimina(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w    = (int)$request->param('id');
+            $io   = (int)($request->user()->id ?? 0);
+            $body = $this->jsonBody();
+            $id   = (int)($body['id'] ?? 0);
+            $dove = ' AND (link = :l1 OR link LIKE :l2)';
+            $arg  = [':u' => $io, ':l1' => '/worksites/' . $w . '/zone', ':l2' => '/worksites/' . $w . '/zone#%'];
+            if ($id > 0) {
+                $st = $this->conn->prepare('DELETE FROM bb_notifications WHERE user_id = :u AND id = :id' . $dove);
+                $st->execute($arg + [':id' => $id]);
+            } elseif (!empty($body['lette'])) {
+                $st = $this->conn->prepare('DELETE FROM bb_notifications WHERE user_id = :u AND is_read = 1' . $dove);
+                $st->execute($arg);
+            } else {
+                throw new \InvalidArgumentException('Indicare la notifica da eliminare.');
+            }
+            return ['eliminate' => $st->rowCount()];
         });
     }
 
