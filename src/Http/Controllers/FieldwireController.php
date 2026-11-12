@@ -1147,12 +1147,23 @@ final class FieldwireController
             // un modello del committente resta suo anche se lo ritocca CSM
             $clientId = $cliente ?? (isset($prima['client_id']) ? (int)$prima['client_id'] : null);
             $wsId = !empty($body['universal']) ? null : $worksiteId;
+            // la cartella dei Documenti: solo per i modelli di questo cantiere,
+            // e solo una cartella che chi salva vede
+            $cartella = array_key_exists('folder_id', $body)
+                ? ($body['folder_id'] !== null && $body['folder_id'] !== '' ? (int)$body['folder_id'] : null)
+                : (isset($prima['folder_id']) ? (int)$prima['folder_id'] : null);
+            if ($wsId === null) {
+                $cartella = null;
+            } elseif ($cartella !== null && !isset($this->cartelleVisibili($request, $worksiteId)[$cartella])) {
+                \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+            }
 
             $data = [
                 'worksite_id' => $wsId,
                 'client_id'   => $clientId,
                 'name'        => mb_substr($name, 0, 200),
                 'description' => trim($body['description'] ?? '') ?: null,
+                'folder_id'   => $cartella,
                 'fields'      => $fields,
                 'created_by'  => (int)($user?->id ?? 0),
             ];
@@ -1374,6 +1385,9 @@ final class FieldwireController
             return [
                 'folders'        => $this->conChiSuRighe($request, 'cartella', array_values($cartelle)),
                 'files'          => $this->conChiSuRighe($request, 'file', $files),
+                // i moduli che stanno in questa cartella: per chi crea moduli
+                // (CSM e il committente); la squadra compila quelli assegnati
+                'moduli'         => $this->moduliInCartella($request, $worksiteId, $folderId, $cartelle),
                 'current_folder' => $folderId,
             ];
         });
@@ -1388,7 +1402,19 @@ final class FieldwireController
             $body = $this->jsonBody();
             $name = trim($body['name'] ?? '');
             if ($name === '') throw new \RuntimeException('Nome cartella obbligatorio');
-            $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0));
+            // dentro un'altra cartella: si crea solo dove si vede, e chi la
+            // vede e' lo stesso della cartella che la contiene (si cambia dopo)
+            $parent = !empty($body['parent_id']) ? (int)$body['parent_id'] : null;
+            if ($parent !== null) {
+                if (!isset($this->cartelleVisibili($request, $worksiteId)[$parent])) {
+                    \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+                }
+                if (!is_array($body['parti'] ?? null) && !is_array($body['persone'] ?? null)) {
+                    $body['parti']   = $this->condivisione->partiDi('cartella', [$parent])[$parent] ?? [];
+                    $body['persone'] = $this->condivisione->conChi('cartella', [$parent])[$parent] ?? [];
+                }
+            }
+            $id = $this->fileRepo->createFolder($worksiteId, mb_substr($name, 0, 255), (int)($request->user()?->id ?? 0), $parent);
             $con = $this->condivisioneNuova($request, $worksiteId, 'cartella', $id, $body);
             return ['id' => $id, 'name' => $name, 'condivisa_con' => $con];
         });
@@ -1563,6 +1589,31 @@ final class FieldwireController
             $id = $this->fileRepo->addComment($fileId, $text, $author, (int)($user?->id ?? 0));
             return ['id' => $id, 'text' => $text, 'author_name' => $author, 'created_at' => date('Y-m-d H:i:s')];
         });
+    }
+
+    /**
+     * I modelli di modulo che stanno in una cartella. In cima (null) anche
+     * quelli per tutti i cantieri e quelli la cui cartella non si vede piu'.
+     *
+     * @param array<int, array<string, mixed>> $cartelle le cartelle visibili
+     */
+    private function moduliInCartella(Request $request, int $w, ?int $folderId, array $cartelle): array
+    {
+        $ruolo = $this->ruoloQui($request);
+        if (!\App\Service\Zone\Permessi::puo($ruolo, \App\Service\Zone\Permessi::CREARE_MODULI)) {
+            return [];
+        }
+        $fuori = [];
+        foreach ($this->formRepo->templatesFor($w, $this->clienteDiChi($request)) as $t) {
+            $cart = $t['worksite_id'] !== null && !empty($t['folder_id']) ? (int)$t['folder_id'] : null;
+            if ($cart !== null && !isset($cartelle[$cart])) {
+                $cart = null;
+            }
+            if ($cart === $folderId) {
+                $fuori[] = $t;
+            }
+        }
+        return $fuori;
     }
 
     // ─── PDF da compilare ─────────────────────────────────────────────────────
@@ -3457,10 +3508,23 @@ final class FieldwireController
     private function cartelleVisibili(Request $request, int $worksiteId): array
     {
         $vede  = $this->filtro($request, 'cartella');
+        $tutte = [];
         $fuori = [];
         foreach ($this->fileRepo->folders($worksiteId) as $c) {
+            $tutte[(int)$c['id']] = $c;
             if ($vede($c)) {
                 $fuori[(int)$c['id']] = $c;
+            }
+        }
+        // una cartella si vede solo se si vedono anche quelle che la
+        // contengono: chiudere "Contratti" chiude anche cio' che c'e' dentro
+        foreach (array_keys($fuori) as $id) {
+            $su = $tutte[$id]['parent_id'] ?? null;
+            $giri = 0;
+            while ($su !== null && $su !== '' && $giri++ < 20) {
+                if (!isset($tutte[(int)$su])) { break; }   // contenitore sparito: resta in cima
+                if (!$vede($tutte[(int)$su])) { unset($fuori[$id]); break; }
+                $su = $tutte[(int)$su]['parent_id'] ?? null;
             }
         }
         return $fuori;

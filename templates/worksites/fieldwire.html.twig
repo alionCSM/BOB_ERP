@@ -538,8 +538,8 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                 {% if accessi.attivita > 0 %}<button class="bz-nav-item active" data-view="attivita"><i class="fas fa-list-check"></i><span>Attività</span><span class="bzd-badge" id="bz-badge-attivita" hidden></span></button>{% endif %}
                 {% if accessi.disegni  > 0 %}<button class="bz-nav-item" data-view="disegni"><i class="fas fa-drafting-compass"></i><span>Disegni</span><span class="bzd-badge" id="bz-badge-disegni" hidden></span></button>{% endif %}
                 {% if accessi.foto     > 0 %}<button class="bz-nav-item" data-view="media"><i class="fas fa-images"></i><span>Foto</span></button>{% endif %}
-                {% if accessi.file     > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>File</span><span class="bzd-badge" id="bz-badge-files" hidden></span></button>{% endif %}
-                {% if accessi.moduli   > 0 %}<button class="bz-nav-item" data-view="forms"><i class="fas fa-clipboard-list"></i><span>Moduli</span><span class="bzd-badge" id="bz-badge-forms" hidden></span></button>{% endif %}
+                {# Documenti: file e moduli insieme, in cartelle, come un cloud #}
+                {% if accessi.file > 0 or accessi.moduli > 0 %}<button class="bz-nav-item" data-view="files"><i class="fas fa-folder-open"></i><span>Documenti</span><span class="bzd-badge" id="bz-badge-files" hidden></span></button>{% endif %}
                 {# presenze, chat e segnalazioni: chiunque entri nel cantiere;
                    cosa legge lo decide il server #}
                 {% if not soloAccessi %}
@@ -697,11 +697,6 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
 
-        {# Moduli #}
-        <div class="bz-view" id="view-forms">
-            <div id="bz-assegnazioni-root"></div>
-            <div id="bz-forms-root"></div>
-        </div>
 
         {# Galleria (foto dai task) #}
         {# Registro presenze: le presenze VERE di BOB, in sola lettura.
@@ -724,26 +719,34 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
         </div>
 
-        {# File (repository documenti con cartelle) #}
+        {# Documenti: cartelle (anche una dentro l'altra) con dentro file e
+           moduli. Un modulo si compila, si modifica o se ne leggono le
+           compilazioni nel pannello qui sotto, senza lasciare la cartella. #}
         <div class="bz-view" id="view-files">
-            <div class="bz-files">
+            <div class="bz-files" id="bz-files-browser">
                 <aside class="bz-folders" id="bz-folders"></aside>
                 <div class="bz-files-main">
                     <div class="bz-files-bar">
-                        <div class="bz-files-title" id="bz-files-title">Tutti i file</div>
+                        <nav class="bz-briciole" id="bz-files-title" aria-label="Percorso"></nav>
                         <div class="bz-folder-vis" id="bz-folder-vis"></div>
-                        <div style="display:flex;gap:8px;">
+                        <div class="bz-files-azioni">
+                            <button type="button" class="bz-azione-doc" id="bz-new-folder-top"><i class="fas fa-folder-plus"></i> Nuova cartella</button>
+                            <button type="button" class="bz-azione-doc" id="bz-new-modulo" hidden><i class="fas fa-clipboard-list"></i> Nuovo modulo</button>
                             {% if accessi.file > 1 %}
-                            <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica file
+                            <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica documento
                                 <input type="file" id="bz-file-input" hidden>
                             </label>
                             {% endif %}
                         </div>
                     </div>
+                    <div id="bz-assegnazioni-root"></div>
                     <div class="bz-files-list" id="bz-files-list">
                         <div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>
                     </div>
                 </div>
+            </div>
+            <div class="bz-modulo-panel" id="bz-modulo-panel" hidden>
+                <div id="bz-forms-root"></div>
             </div>
         </div>
 
@@ -1316,21 +1319,23 @@ let currentTop = 'attivita';   // attivita | disegni | media | files | forms
 let activeSub  = 'kanban';     // kanban | gantt | calendar
 
 function switchTop(v) {
+    // Moduli e File sono una sezione sola, Documenti (vale anche per i link
+    // delle notifiche e per una pagina salvata prima del cambio)
+    if (v === 'forms') v = 'files';
     // un modulo a meta' (in costruzione o in compilazione) non si perde in silenzio
-    if (currentTop === 'forms' && v !== 'forms' && window.bzfPuoiUscire && !window.bzfPuoiUscire()) return;
+    if (currentTop === 'files' && v !== 'files' && window.bzfPuoiUscire && !window.bzfPuoiUscire()) return;
     currentTop = v;
     // la sezione aperta resta dopo un "aggiorna pagina"
     try { sessionStorage.setItem('bz-vista-' + WID, v); } catch (_) {}
     // aprendo una sezione, le sue notifiche sono viste
-    if (typeof avvisiSezioneVista === 'function') avvisiSezioneVista(v);
+    if (typeof avvisiSezioneVista === 'function') { avvisiSezioneVista(v); if (v === 'files') avvisiSezioneVista('forms'); }
     document.querySelectorAll('.bz-view').forEach(x => x.classList.remove('active'));
     document.getElementById('view-' + v)?.classList.add('active');
     document.querySelectorAll('.bz-nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === v));
     if (v === 'attivita')      renderSub();
     else if (v === 'disegni')  loadDisegni();
     else if (v === 'media')    loadMedia();
-    else if (v === 'files')    loadFiles();
-    else if (v === 'forms')    openForms();
+    else if (v === 'files')    apriDocumenti();
     else if (v === 'presenze') loadPresenze();
     window.BZDialogo?.vista(v);
 }
@@ -1358,11 +1363,13 @@ function openForms() {
             daUfficio: DA_UFFICIO,
             wsName: {{ worksite.name|json_encode|raw }},
             wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
-            clientName: {{ (clientName ?? '')|json_encode|raw }}
+            clientName: {{ (clientName ?? '')|json_encode|raw }},
+            // dentro i Documenti: un pannello sopra le cartelle
+            onApri: apriModuloPanel,
+            alTermine: () => chiudiModuloPanel(true),
         });
         window._bzFormsInited = true;
     }
-    BZForms.show();
 }
 
 /* compat: chiamato dopo modifiche ai task → ridisegna la vista attività corrente */
@@ -2216,44 +2223,117 @@ function humanSize(b) {
     return (b/1048576).toFixed(1) + ' MB';
 }
 
+/* ══════════ DOCUMENTI ══════════
+   Un cloud: cartelle (anche una dentro l'altra) con dentro file e moduli.
+   Chi vede una cartella la decide CSM (una cartella nuova eredita da quella
+   che la contiene); una cartella chiusa chiude anche cio' che contiene. */
+let cartelleTutte = [];
+const CREA_MODULI_DOC = DA_UFFICIO || RUOLO === 'cliente';
+
+function apriDocumenti() {
+    chiudiModuloPanel(false);
+    openForms();          // prepara i moduli e il riquadro "Da compilare"
+    loadFiles();
+}
+
 async function loadFiles() {
     const list = document.getElementById('bz-files-list');
     list.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
     const res = await api(`/worksites/${WID}/zone/files${curFolder ? '?folder=' + curFolder : ''}`);
-    if (!res.ok) { list.innerHTML = '<div class="bz-dz-empty">Errore caricamento file.</div>'; return; }
-    renderFolders(res.data.folders || []);
-    renderFiles(res.data.files || []);
-    // dentro una cartella, l'ufficio decide chi la vede: vale per tutti i file
-    const cart = (res.data.folders || []).find(f => f.id == curFolder);
+    if (!res.ok) { list.innerHTML = '<div class="bz-dz-empty">Impossibile caricare i documenti.</div>'; return; }
+    cartelleTutte = res.data.folders || [];
+    // la cartella non c'e' piu' (eliminata, o non piu' condivisa): in cima
+    if (curFolder && !cartelleTutte.some(f => Number(f.id) === Number(curFolder))) { curFolder = null; return loadFiles(); }
+    renderFolders(cartelleTutte);
+    renderBriciole();
+    renderFiles(res.data.files || [], res.data.moduli || []);
+    // "Da compilare" (i moduli assegnati) solo in cima
+    const ass = document.getElementById('bz-assegnazioni-root');
+    if (ass) ass.hidden = !!curFolder;
+    const nm = document.getElementById('bz-new-modulo');
+    if (nm) nm.hidden = !CREA_MODULI_DOC;
+    // dentro una cartella, CSM decide chi la vede: vale per tutto il contenuto
+    const cart = cartelleTutte.find(f => f.id == curFolder);
     const box  = document.getElementById('bz-folder-vis');
-    if (box) {
-        box.innerHTML = DA_UFFICIO && cart
-            ? chiBottone('cartella', cart.id, cart)
-            : '';
-    }
+    if (box) box.innerHTML = DA_UFFICIO && cart ? chiBottone('cartella', cart.id, cart) : '';
 }
 
-function renderFolders(folders) {
+const figlieDi = id => cartelleTutte
+    .filter(f => (f.parent_id ? Number(f.parent_id) : null) === (id === null ? null : Number(id))
+                 // una cartella il cui contenitore non si vede sta in cima
+                 || (id === null && f.parent_id && !cartelleTutte.some(x => Number(x.id) === Number(f.parent_id))))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'it'));
+
+function percorsoDi(id) {
+    const via = [];
+    let c = cartelleTutte.find(f => Number(f.id) === Number(id));
+    let giri = 0;
+    while (c && giri++ < 20) {
+        via.unshift(c);
+        c = c.parent_id ? cartelleTutte.find(f => Number(f.id) === Number(c.parent_id)) : null;
+    }
+    return via;
+}
+
+function renderFolders() {
     const el = document.getElementById('bz-folders');
-    el.innerHTML = `
-        <button class="bz-folder ${curFolder===null?'active':''}" data-folder=""><i class="fas fa-inbox"></i> Tutti i file</button>
-        ${folders.map(f => `
-            <button class="bz-folder ${curFolder==f.id?'active':''}" data-folder="${f.id}">
-                <i class="fas fa-folder"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
+    const aperte = new Set(percorsoDi(curFolder).map(c => Number(c.id)));
+    const ramo = (id, livello) => figlieDi(id).map(f => {
+        const figlie = figlieDi(f.id);
+        const aperta = aperte.has(Number(f.id));
+        return `
+            <button class="bz-folder ${curFolder == f.id ? 'active' : ''}" data-folder="${f.id}" style="padding-left:${10 + livello * 14}px">
+                <i class="fas ${aperta && figlie.length ? 'fa-folder-open' : 'fa-folder'}"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 <em>${f.file_count}</em>
                 ${DA_UFFICIO || Number(f.created_by) === Number(IO) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
-            </button>`).join('')}
+            </button>
+            ${aperta ? ramo(f.id, livello + 1) : ''}`;
+    }).join('');
+    el.innerHTML = `
+        <button class="bz-folder ${curFolder === null ? 'active' : ''}" data-folder=""><i class="fas fa-cloud"></i> Documenti</button>
+        ${ramo(null, 0)}
         <button class="bz-folder-new" id="bz-new-folder"><i class="fas fa-plus"></i> Nuova cartella</button>
     `;
 }
 
-function renderFiles(files) {
+function renderBriciole() {
+    const el = document.getElementById('bz-files-title');
+    const via = percorsoDi(curFolder);
+    el.innerHTML = `<button type="button" data-folder="" class="${via.length ? '' : 'qui'}">Documenti</button>`
+        + via.map((c, i) => `<i class="fas fa-chevron-right"></i><button type="button" data-folder="${c.id}" class="${i === via.length - 1 ? 'qui' : ''}">${escHtml(c.name)}</button>`).join('');
+}
+
+function renderFiles(files, moduli) {
     const list = document.getElementById('bz-files-list');
-    const title = document.getElementById('bz-files-title');
-    title.textContent = 'File' + (curFolder ? '' : ' — tutti');
-    if (!files.length) { list.innerHTML = '<div class="bz-dz-empty">Nessun file presente.</div>'; return; }
+    const sotto = figlieDi(curFolder);
+    if (!files.length && !moduli.length && !sotto.length) {
+        list.innerHTML = `<div class="bz-dz-empty">${curFolder ? 'Questa cartella è vuota.' : 'Nessun documento presente.'}</div>`;
+        return;
+    }
     const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
-    list.innerHTML = files.map(f => {
+    const righeCartelle = sotto.map(f => `
+        <div class="bz-file-row bz-file-clickable" data-folder="${f.id}">
+            <i class="fas fa-folder bz-file-icon bz-icona-cartella"></i>
+            <div class="bz-file-info">
+                <div class="bz-file-name">${escHtml(f.name)} ${chiBadge(f)}</div>
+                <div class="bz-file-sub">Cartella · ${f.file_count} ${Number(f.file_count) === 1 ? 'documento' : 'documenti'}</div>
+            </div>
+            <i class="fas fa-chevron-right bz-file-freccia"></i>
+        </div>`).join('');
+    const righeModuli = moduli.map(t => `
+        <div class="bz-file-row">
+            <i class="fas fa-clipboard-list bz-file-icon bz-icona-modulo"></i>
+            <div class="bz-file-info ${puoScrivere('moduli') ? 'bz-file-clickable' : ''}" ${puoScrivere('moduli') ? `data-modulo-compila="${t.id}"` : ''}>
+                <div class="bz-file-name">${escHtml(t.name)}
+                    ${t.worksite_id ? '' : `<span class="bz-tag-modulo">${t.client_id ? (RUOLO === 'cliente' ? 'Tutti i miei cantieri' : 'Tutti i cantieri del committente') : 'Tutti i cantieri'}</span>`}</div>
+                <div class="bz-file-sub">Modulo${t.description ? ' · ' + escHtml(t.description) : ''} · ${t.sub_count} ${Number(t.sub_count) === 1 ? 'compilazione' : 'compilazioni'}</div>
+            </div>
+            ${puoScrivere('moduli') ? `<button class="bz-file-act primario" data-modulo-compila="${t.id}" title="Compila il modulo"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
+            <button class="bz-file-act" data-modulo-compilazioni="${t.id}" data-modulo-nome="${escAttr(t.name)}" title="Compilazioni"><i class="fas fa-list-check"></i> ${t.sub_count > 0 ? t.sub_count : ''}</button>
+            <button class="bz-file-act" data-modulo-modifica="${t.id}" title="Modifica il modulo"><i class="fas fa-sliders"></i></button>
+            <button class="bz-file-act danger" data-modulo-elimina="${t.id}" title="Elimina il modulo"><i class="fas fa-trash"></i></button>
+        </div>`).join('');
+    const righeFile = files.map(f => {
         const viewable = canView(f.file_type);
         return `
         <div class="bz-file-row">
@@ -2269,18 +2349,37 @@ function renderFiles(files) {
             ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `<button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}
         </div>`;
     }).join('');
+    list.innerHTML = righeCartelle + righeModuli + righeFile;
+}
+
+/* Il pannello di un modulo (compilazione, modifica, compilazioni): sopra
+   le cartelle; finito, si torna alla cartella in cui si era. */
+function apriModuloPanel() {
+    document.getElementById('bz-files-browser').hidden = true;
+    document.getElementById('bz-modulo-panel').hidden = false;
+    document.getElementById('view-files').scrollTop = 0;
+}
+function chiudiModuloPanel(ricarica = true) {
+    const pan = document.getElementById('bz-modulo-panel');
+    if (!pan || pan.hidden) return;
+    pan.hidden = true;
+    document.getElementById('bz-files-browser').hidden = false;
+    if (ricarica) { loadFiles(); openForms(); }
 }
 
 async function createFolder() {
-    const name = prompt('Nome cartella:');
+    const name = prompt(curFolder ? 'Nome della nuova cartella (dentro «' + (percorsoDi(curFolder).pop()?.name || '') + '»):' : 'Nome della nuova cartella:');
     if (!name || !name.trim()) return;
-    await api(`/worksites/${WID}/zone/files/folder`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim()}) });
+    const r = await api(`/worksites/${WID}/zone/files/folder`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name: name.trim(), parent_id: curFolder }) });
+    if (!r.ok) { alert(r.error || 'Impossibile creare la cartella.'); return; }
+    curFolder = r.data.id;
     loadFiles();
 }
 async function deleteFolder(id) {
-    if (!confirm('Eliminare la cartella? I file contenuti verranno spostati in "Tutti i file".')) return;
-    await api(`/worksites/${WID}/zone/files/folder/${id}/delete`, { method:'POST' });
-    if (curFolder == id) curFolder = null;
+    if (!confirm('Eliminare la cartella? Il contenuto verrà spostato nella cartella che la contiene.')) return;
+    const r = await api(`/worksites/${WID}/zone/files/folder/${id}/delete`, { method:'POST' });
+    if (!r.ok) { alert(r.error || 'Impossibile eliminare la cartella.'); return; }
+    if (curFolder == id) curFolder = percorsoDi(id).slice(-2, -1)[0]?.id || null;
     loadFiles();
 }
 async function uploadFile(file) {
@@ -2290,10 +2389,10 @@ async function uploadFile(file) {
     if (curFolder) fd.append('folder_id', curFolder);
     const res = await api(`/worksites/${WID}/zone/files`, { method:'POST', body: fd });
     if (res.ok) loadFiles();
-    else alert('Errore di caricamento: ' + (res.error || 'sconosciuto'));
+    else alert('Impossibile caricare il documento' + (res.error ? ': ' + res.error : '.'));
 }
 async function deleteFile(id) {
-    if (!confirm('Eliminare questo file?')) return;
+    if (!confirm('Eliminare questo documento?')) return;
     await api(`/worksites/${WID}/zone/files/${id}/delete`, { method:'POST' });
     loadFiles();
 }
@@ -2359,7 +2458,21 @@ document.addEventListener('click', e => {
     if (folBtn && !e.target.closest('[data-del-folder]')) { curFolder = folBtn.dataset.folder ? parseInt(folBtn.dataset.folder) : null; loadFiles(); return; }
     const delFol = e.target.closest('[data-del-folder]');
     if (delFol) { e.stopPropagation(); deleteFolder(parseInt(delFol.dataset.delFolder)); return; }
-    if (e.target.closest('#bz-new-folder')) { createFolder(); return; }
+    if (e.target.closest('#bz-new-folder') || e.target.closest('#bz-new-folder-top')) { createFolder(); return; }
+    // moduli dentro le cartelle
+    let m;
+    if (e.target.closest('#bz-new-modulo')) { window.BZForms?.openBuilder(null, { folder_id: curFolder }); return; }
+    if ((m = e.target.closest('[data-modulo-compila]')))      { window.BZForms?.openFill(parseInt(m.dataset.moduloCompila)); return; }
+    if ((m = e.target.closest('[data-modulo-modifica]')))     { window.BZForms?.openBuilder(parseInt(m.dataset.moduloModifica)); return; }
+    if ((m = e.target.closest('[data-modulo-compilazioni]'))) { window.BZForms?.openSubmissions(parseInt(m.dataset.moduloCompilazioni), m.dataset.moduloNome); return; }
+    if ((m = e.target.closest('[data-modulo-elimina]'))) {
+        if (!confirm('Eliminare questo modulo? Le compilazioni già inviate restano disponibili.')) return;
+        api(`/worksites/${WID}/zone/forms/${m.dataset.moduloElimina}/delete`, { method: 'POST' }).then(r => {
+            if (!r.ok) alert(r.error || 'Impossibile eliminare il modulo.');
+            loadFiles();
+        });
+        return;
+    }
     const vf = e.target.closest('[data-view-file]');
     if (vf) { openFileView(vf.dataset.vfName, vf.dataset.vfType, vf.dataset.vfUrl); return; }
     const fc = e.target.closest('[data-file-comments]');
@@ -2564,10 +2677,11 @@ async function caricaAvvisi() {
     const n = document.getElementById('bz-avvisi-n');
     n.hidden = !avvisiStato.non_lette;
     n.textContent = avvisiStato.non_lette > 99 ? '99+' : avvisiStato.non_lette;
-    ['attivita', 'disegni', 'files', 'forms'].forEach(k => {
+    ['attivita', 'disegni', 'files'].forEach(k => {
         const b = document.getElementById('bz-badge-' + k);
         if (!b) return;
-        const x = avvisiStato.per_sezione[k] || 0;
+        // Documenti conta anche i moduli da compilare
+        const x = (avvisiStato.per_sezione[k] || 0) + (k === 'files' ? (avvisiStato.per_sezione.forms || 0) : 0);
         b.hidden = !x;
         b.textContent = x;
     });
@@ -3650,6 +3764,41 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-file-modal-foot button { background:#3b82f6; border:none; color:#fff; border-radius:7px; padding:8px 14px; cursor:pointer; }
 [data-theme="light"] .bz-folders { border-color:#e2e8f0; }
 [data-theme="light"] .bz-files-bar { border-color:#e2e8f0; }
+/* Documenti come un cloud: percorso, azioni, sottocartelle, moduli */
+.bz-files-bar { flex-wrap: wrap; gap: 10px; }
+.bz-briciole { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; font-size:14px; }
+.bz-briciole button { background:none; border:0; padding:2px 4px; border-radius:5px; color:#94a3b8; font:inherit; font-weight:600; cursor:pointer; }
+.bz-briciole button:hover { color:#e2e8f0; background:#1e293b; }
+.bz-briciole button.qui { color:#f1f5f9; cursor:default; background:none; }
+.bz-briciole i { font-size:10px; color:#475569; }
+.bz-files-azioni { display:flex; gap:8px; flex-wrap:wrap; margin-left:auto; }
+.bz-azione-doc { display:inline-flex; align-items:center; gap:6px; padding:7px 12px; background:#1e293b; border:1px solid #273548; color:#cbd5e1; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+.bz-azione-doc:hover { color:#f1f5f9; border-color:#334155; }
+.bz-azione-doc[hidden] { display:none; }
+.bz-icona-cartella { color:#fbbf24; }
+.bz-icona-modulo { color:#a78bfa; }
+.bz-file-freccia { color:#475569; font-size:12px; }
+.bz-tag-modulo { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:rgba(167,139,250,.15); color:#c4b5fd; font-size:10.5px; font-weight:600; vertical-align:middle; }
+.bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
+.bz-file-act.primario:hover { background:#1d4ed8; color:#fff; }
+#bz-assegnazioni-root:not(:empty) { padding:14px 20px 0; }
+#bz-assegnazioni-root[hidden] { display:none; }
+.bz-files[hidden], .bz-modulo-panel[hidden] { display:none !important; }
+.bz-modulo-panel { flex:1; overflow-y:auto; }
+[data-theme="light"] .bz-briciole button { color:#64748b; }
+[data-theme="light"] .bz-briciole button:hover { color:#0f172a; background:#f1f5f9; }
+[data-theme="light"] .bz-briciole button.qui { color:#0f172a; }
+[data-theme="light"] .bz-azione-doc { background:#fff; border-color:#e2e8f0; color:#334155; }
+[data-theme="light"] .bz-azione-doc:hover { color:#0f172a; border-color:#cbd5e1; }
+[data-theme="light"] .bz-icona-cartella { color:#d97706; }
+[data-theme="light"] .bz-icona-modulo { color:#7c3aed; }
+[data-theme="light"] .bz-tag-modulo { background:#ede9fe; color:#6d28d9; }
+[data-theme="light"] .bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; }
+@media (max-width: 760px) {
+    .bz-files { flex-direction:column; overflow:visible; }
+    .bz-folders { width:auto; border-right:0; border-bottom:1px solid #1e293b; max-height:34vh; }
+    .bz-files-azioni { margin-left:0; width:100%; }
+}
 [data-theme="light"] .bz-file-row { border-color:#e2e8f0; }
 [data-theme="light"] .bz-file-name, [data-theme="light"] .bz-files-title { color:#1e293b; }
 [data-theme="light"] .bz-file-modal-box { background:#fff; border-color:#e2e8f0; }

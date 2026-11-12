@@ -27,20 +27,29 @@ final class ZoneFileRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function createFolder(int $worksiteId, string $name, ?int $userId): int
+    /** @param int|null $parentId la cartella che la contiene (null = in cima) */
+    public function createFolder(int $worksiteId, string $name, ?int $userId, ?int $parentId = null): int
     {
         $stmt = $this->db->prepare("
-            INSERT INTO bb_zone_folders (worksite_id, name, created_by) VALUES (:w, :n, :u)
+            INSERT INTO bb_zone_folders (worksite_id, parent_id, name, created_by) VALUES (:w, :p, :n, :u)
         ");
-        $stmt->execute([':w' => $worksiteId, ':n' => $name, ':u' => $userId]);
+        $stmt->execute([':w' => $worksiteId, ':p' => $parentId, ':n' => $name, ':u' => $userId]);
         return (int)$this->db->lastInsertId();
     }
 
     public function deleteFolder(int $worksiteId, int $folderId): void
     {
-        // i file della cartella tornano in "root" (folder_id = NULL)
-        $this->db->prepare("UPDATE bb_zone_files SET folder_id = NULL WHERE folder_id = :f AND worksite_id = :w")
-                 ->execute([':f' => $folderId, ':w' => $worksiteId]);
+        // quello che c'era dentro (file, cartelle, moduli) sale di un livello
+        $st = $this->db->prepare("SELECT parent_id FROM bb_zone_folders WHERE id = :f AND worksite_id = :w");
+        $st->execute([':f' => $folderId, ':w' => $worksiteId]);
+        $su = $st->fetchColumn();
+        $su = $su === false || $su === null ? null : (int)$su;
+        $this->db->prepare("UPDATE bb_zone_files SET folder_id = :su WHERE folder_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
+        $this->db->prepare("UPDATE bb_zone_folders SET parent_id = :su WHERE parent_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
+        $this->db->prepare("UPDATE bb_zone_form_templates SET folder_id = :su WHERE folder_id = :f AND worksite_id = :w")
+                 ->execute([':su' => $su, ':f' => $folderId, ':w' => $worksiteId]);
         $this->db->prepare("DELETE FROM bb_zone_folders WHERE id = :f AND worksite_id = :w")
                  ->execute([':f' => $folderId, ':w' => $worksiteId]);
     }

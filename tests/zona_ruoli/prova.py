@@ -295,6 +295,29 @@ fc = [x['file_name'] for x in chiama(CAPO, 'GET', '/files')['data']['files']]
 verifica(S, 'la squadra vede il file del cliente', 'foto_scaffale.pdf' in fc)
 verifica(S, 'il cliente non carica in "Contratti"', not puo(chiama(CLI, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'folder_id': f2}})))
 
+S = '6a. Documenti come un cloud'
+sub1 = chiama(UFF, 'POST', '/files/folder', {'name': 'Verbali di collaudo', 'parent_id': f1})['data']['id']
+sub2 = chiama(UFF, 'POST', '/files/folder', {'name': 'Riservati', 'parent_id': f2})['data']['id']
+cart_k = {int(c['id']): c for c in chiama(CLI, 'GET', '/files')['data']['folders']}
+verifica(S, 'una cartella dentro "Verbali" la vede chi vede "Verbali"', sub1 in cart_k and int(cart_k[sub1]['parent_id']) == f1, str(list(cart_k)))
+verifica(S, 'una cartella dentro "Contratti" (solo CSM) il committente non la vede', sub2 not in cart_k)
+verifica(S, 'il committente non crea cartelle dentro una cartella che non vede', not puo(chiama(CLI, 'POST', '/files/folder', {'name': 'x', 'parent_id': f2})))
+sub3 = chiama(UFF, 'POST', '/files/folder', {'name': 'Foto consegna', 'parent_id': sub1})['data']['id']
+sql(f"DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo='cartella' AND oggetto_id={sub1}; DELETE FROM bb_zone_condivisioni WHERE tipo='cartella' AND oggetto_id={sub1}")
+cart_k = {int(c['id']) for c in chiama(CLI, 'GET', '/files')['data']['folders']}
+verifica(S, 'chiudendo una cartella si chiude anche quello che contiene', sub1 not in cart_k and sub3 not in cart_k, str(cart_k))
+sub4 = chiama(CLI, 'POST', '/files/folder', {'name': 'Moduli impresa', 'parent_id': f1})['data']['id']
+mod = chiama(CLI, 'POST', '/forms', {'name': 'Verbale di consegna', 'fields': campo, 'folder_id': sub4})
+verifica(S, 'il committente crea un modulo dentro una sua cartella', puo(mod), mod.get('error', ''))
+in_sub = [t['name'] for t in chiama(CLI, 'GET', f'/files?folder={sub4}')['data']['moduli']]
+in_cima = [t['name'] for t in chiama(CLI, 'GET', '/files')['data']['moduli']]
+verifica(S, '... il modulo sta in quella cartella, non in cima', 'Verbale di consegna' in in_sub and 'Verbale di consegna' not in in_cima, str(in_sub) + str(in_cima))
+verifica(S, 'non si mette un modulo in una cartella che non si vede', not puo(chiama(CLI, 'POST', '/forms', {'name': 'x', 'fields': campo, 'folder_id': f2})))
+verifica(S, 'la squadra non vede i modelli nelle cartelle (compila quelli assegnati)', chiama(CAPO, 'GET', f'/files?folder={f1}')['data']['moduli'] == [])
+chiama(UFF, 'POST', f'/files/folder/{sub4}/delete', {})
+in_f1 = [t['name'] for t in chiama(CLI, 'GET', f'/files?folder={f1}')['data']['moduli']]
+verifica(S, 'eliminando la cartella, il modulo sale nella cartella che la conteneva', 'Verbale di consegna' in in_f1, str(in_f1))
+
 S = '6b. PDF da compilare'
 pdf = chiama(CLI, 'POST', '/files', file={'nome': 'modulo_collaudo.pdf', 'campi': {'folder_id': f1}})['data']['id']
 pulisci_notifiche()
