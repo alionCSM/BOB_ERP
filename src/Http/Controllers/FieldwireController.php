@@ -76,11 +76,11 @@ final class FieldwireController
         'files'                 => P::VEDERE,
         'downloadFile'          => P::VEDERE,
         'fileComments'          => P::VEDERE,
-        'versioneFile'          => P::VEDERE,
-        'daCompilare'           => P::VEDERE,
-        'richiediCompilazione'  => P::SCRIVERE,
-        'annullaCompilazione'   => P::SCRIVERE,
-        'compilaFile'           => P::COMPILARE,
+        'richiesta'             => P::VEDERE,
+        'creaRichiesta'         => P::SCRIVERE,
+        'rispondiRichiesta'     => P::SCRIVERE,
+        'statoRichiesta'        => P::SCRIVERE,
+        'eliminaRichiesta'      => P::SCRIVERE,
         'disegni'               => P::VEDERE,
         'fileDisegno'           => P::VEDERE,
         'floorplans'            => P::VEDERE,
@@ -1372,14 +1372,10 @@ final class FieldwireController
                 $this->fileRepo->files($worksiteId, $folderId),
                 fn(array $f) => $this->vedeFile($request, $f, $cartelle)
             ));
-            // arricchisci con url download/preview, e con lo stato della
-            // compilazione per i PDF da compilare
-            $ruolo = $this->ruoloQui($request);
-            $comp  = (new \App\Service\Zone\Compilazioni($this->conn))->perFile(array_column($files, 'id'));
+            // arricchisci con url download/preview
             foreach ($files as &$f) {
                 $f['download_url'] = "/worksites/{$worksiteId}/zone/files/{$f['id']}/download";
                 $f['is_image'] = in_array(strtolower($f['file_type'] ?? ''), ['jpg','jpeg','png','webp','gif'], true);
-                $this->conCompilazione($f, $worksiteId, $ruolo, $comp, (int)($request->user()->id ?? 0));
             }
             unset($f);
             return [
@@ -1388,6 +1384,9 @@ final class FieldwireController
                 // i moduli che stanno in questa cartella: per chi crea moduli
                 // (CSM e il committente); la squadra compila quelli assegnati
                 'moduli'         => $this->moduliInCartella($request, $worksiteId, $folderId, $cartelle),
+                // le richieste della cartella, e quante sono aperte in ogni cartella
+                'richieste'      => $folderId !== null ? (new \App\Service\Zone\Richieste($this->conn))->diCartella($worksiteId, $folderId) : [],
+                'richieste_aperte' => array_intersect_key((new \App\Service\Zone\Richieste($this->conn))->apertePerCartella($worksiteId), $cartelle),
                 'current_folder' => $folderId,
             ];
         });
@@ -1462,34 +1461,11 @@ final class FieldwireController
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
             }
 
-            if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            $caricati = $this->fileRicevuti('file');
+            if (!$caricati) {
                 throw new \RuntimeException('Nessun file ricevuto');
             }
-            $f = $_FILES['file'];
-            if (($f['size'] ?? 0) > 50 * 1024 * 1024) throw new \RuntimeException('File troppo grande (max 50 MB)');
-
-            $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
-            // blocca eseguibili/script
-            $blocked = ['php','phtml','exe','sh','bat','cmd','js','jar','com','msi','dll','app','scr'];
-            if ($ext === '' || in_array($ext, $blocked, true)) {
-                throw new \RuntimeException('Tipo di file non consentito');
-            }
-
-            $dir  = \CloudPath::ensureZoneFilesDir($worksiteId);
-            $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo($f['name'], PATHINFO_FILENAME));
-            $stored = $safe . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
-            $dest = $dir . DIRECTORY_SEPARATOR . $stored;
-            if (!move_uploaded_file($f['tmp_name'], $dest)) throw new \RuntimeException('Salvataggio fallito');
-
-            $id = $this->fileRepo->create([
-                'worksite_id' => $worksiteId,
-                'folder_id'   => $folderId,
-                'file_name'   => mb_substr($f['name'], 0, 255),
-                'file_path'   => \CloudPath::relativeToRoot($dest),
-                'file_type'   => $ext,
-                'size_bytes'  => (int)($f['size'] ?? 0),
-                'uploaded_by' => (int)($user?->id ?? 0),
-            ]);
+            $id = $this->salvaFileZona($worksiteId, $folderId, $caricati[0], (int)($user?->id ?? 0));
 
             // Nella radice non c'e' una cartella da cui ereditare: un file
             // caricato li' nasce condiviso come prima faceva l'etichetta —
@@ -1509,6 +1485,62 @@ final class FieldwireController
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+
+    /**
+     * I file arrivati con un modulo multipart sotto un nome, uno o piu'
+     * (name="file" o name="file[]").
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function fileRicevuti(string $campo): array
+    {
+        $f = $_FILES[$campo] ?? null;
+        if (!$f) {
+            return [];
+        }
+        if (!is_array($f['name'])) {
+            return ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE ? [] : [$f];
+        }
+        $fuori = [];
+        foreach (array_keys($f['name']) as $i) {
+            if (($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            $fuori[] = ['name' => $f['name'][$i], 'type' => $f['type'][$i] ?? '', 'tmp_name' => $f['tmp_name'][$i],
+                        'error' => $f['error'][$i], 'size' => $f['size'][$i] ?? 0];
+        }
+        return $fuori;
+    }
+
+    /** Salva un file caricato fra i documenti della Zone, in una cartella. */
+    private function salvaFileZona(int $worksiteId, ?int $folderId, array $f, int $userId): int
+    {
+        if (($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            throw new \RuntimeException('Caricamento del documento non riuscito.');
+        }
+        if (($f['size'] ?? 0) > 50 * 1024 * 1024) throw new \RuntimeException('File troppo grande (max 50 MB)');
+
+        $ext = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION));
+        // blocca eseguibili/script
+        $blocked = ['php','phtml','exe','sh','bat','cmd','js','jar','com','msi','dll','app','scr'];
+        if ($ext === '' || in_array($ext, $blocked, true)) {
+            throw new \RuntimeException('Tipo di file non consentito');
+        }
+
+        $dir  = \CloudPath::ensureZoneFilesDir($worksiteId);
+        $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo((string)$f['name'], PATHINFO_FILENAME));
+        $stored = $safe . '_' . date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '.' . $ext;
+        $dest = $dir . DIRECTORY_SEPARATOR . $stored;
+        if (!move_uploaded_file((string)$f['tmp_name'], $dest)) throw new \RuntimeException('Salvataggio fallito');
+
+        return $this->fileRepo->create([
+            'worksite_id' => $worksiteId,
+            'folder_id'   => $folderId,
+            'file_name'   => mb_substr((string)$f['name'], 0, 255),
+            'file_path'   => \CloudPath::relativeToRoot($dest),
+            'file_type'   => $ext,
+            'size_bytes'  => (int)($f['size'] ?? 0),
+            'uploaded_by' => $userId ?: null,
+        ]);
     }
 
     public function deleteFile(Request $request): void
@@ -1616,187 +1648,135 @@ final class FieldwireController
         return $fuori;
     }
 
-    // ─── PDF da compilare ─────────────────────────────────────────────────────
+    // ─── Richieste (nei Documenti) ────────────────────────────────────────────
 
-    /** Stato della compilazione e versioni compilate di un documento, per l'elenco. */
-    private function conCompilazione(array &$f, int $w, ?string $ruolo, array $comp, int $io): void
+    /** La richiesta, se e' di questo cantiere e chi chiede ne vede la cartella. */
+    private function richiestaVisibile(Request $request, int $id): array
     {
-        $id = (int)$f['id'];
-        $r  = $comp['richieste'][$id] ?? null;
-        $f['compilabile'] = \App\Service\Zone\Compilazioni::compilabile($f);
-        $f['compilazione'] = $r ? [
-            'id'             => (int)$r['id'],
-            'stato'          => $r['stato'],
-            'per_ruolo'      => $r['per_ruolo'],
-            'nota'           => $r['nota'],
-            'richiesto_da'   => $r['richiesto_da_nome'] ?? null,
-            'richiesto_mio'  => (int)($r['richiesto_da'] ?? 0) === $io,
-            'created_at'     => $r['created_at'],
-            'compilato_da'   => $r['compilato_da_nome'] ?? null,
-            'compilato_at'   => $r['compilato_at'],
-        ] : null;
-        $aperta = $r && $r['stato'] === 'da_compilare' ? $r : null;
-        $f['puo_compilare']  = $f['compilabile'] && \App\Service\Zone\Compilazioni::puoCompilare($ruolo, $aperta);
-        $f['puo_richiedere'] = $f['compilabile'] && !$aperta && $ruolo !== null;
-        $f['destinatari']    = $ruolo ? \App\Service\Zone\Compilazioni::destinatari($ruolo) : [];
-        $f['puo_annullare']  = $aperta && ($ruolo === \App\Service\Zone\Accesso::UFFICIO
-                                || (int)$aperta['richiesto_da'] === $io);
-        $f['versioni'] = array_map(fn($v) => [
-            'id'         => (int)$v['id'],
-            'creato_da'  => $v['creato_da_nome'] ?? null,
-            'created_at' => $v['created_at'],
-            'url'        => "/worksites/{$w}/zone/files/{$id}/versioni/{$v['id']}/download",
-        ], $comp['versioni'][$id] ?? []);
+        $w = (int)$request->param('id');
+        $r = (new \App\Service\Zone\Richieste($this->conn))->trova($id);
+        if (!$r || (int)$r['worksite_id'] !== $w || !isset($this->cartelleVisibili($request, $w)[(int)$r['folder_id']])) {
+            Response::json(['ok' => false, 'error' => 'Richiesta non trovata'], 404);
+        }
+        return $r;
     }
 
-    /** Chiede che un PDF venga compilato: committente e squadra a CSM, CSM al committente o alla squadra. */
-    public function richiediCompilazione(Request $request): void
+    /** Gli allegati del multipart salvati nella cartella della richiesta. @return int[] */
+    private function allegatiRichiesta(Request $request, int $w, int $folderId): array
+    {
+        $ids = [];
+        foreach (array_slice($this->fileRicevuti('file'), 0, 10) as $f) {
+            $ids[] = $this->salvaFileZona($w, $folderId, $f, (int)($request->user()->id ?? 0));
+        }
+        return $ids;
+    }
+
+    /** Nuova richiesta in una cartella (multipart: folder_id, titolo, testo, file[]). */
+    public function creaRichiesta(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $w    = (int)$request->param('id');
-            $file = $this->fileRepo->find((int)$request->param('fileId'));
-            $this->fileVisibile($request, $file);
-            $body = $this->jsonBody();
-            $io   = (int)($request->user()->id ?? 0);
-            $id = (new \App\Service\Zone\Compilazioni($this->conn))->richiedi(
-                $w, $file, $io, (string)$this->ruoloQui($request),
-                isset($body['per_ruolo']) ? (string)$body['per_ruolo'] : null,
-                (string)($body['nota'] ?? '')
-            );
-            $this->avvisa(fn($a) => $a->daCompilare($id, $io));
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $cartella = (int)($_POST['folder_id'] ?? 0);
+            if ($cartella <= 0 || !isset($this->cartelleVisibili($request, $w)[$cartella])) {
+                throw new \RuntimeException('Aprire una cartella per creare la richiesta.');
+            }
+            $titolo = trim((string)($_POST['titolo'] ?? ''));
+            if ($titolo === '') {
+                throw new \RuntimeException('Inserire l\'oggetto della richiesta.');
+            }
+            $allegati = $this->allegatiRichiesta($request, $w, $cartella);
+            $id = (new \App\Service\Zone\Richieste($this->conn))->crea($w, $cartella, $titolo, $io, (string)($_POST['testo'] ?? ''), $allegati);
+            $this->avvisa(fn($a) => $a->richiestaNuova($id, $io));
             return ['id' => $id];
         });
     }
 
-    /** Annulla la richiesta aperta: chi l'ha fatta, o CSM. */
-    public function annullaCompilazione(Request $request): void
+    /** Una richiesta con la sua discussione. */
+    public function richiesta(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $file = $this->fileRepo->find((int)$request->param('fileId'));
-            $this->fileVisibile($request, $file);
-            $c = new \App\Service\Zone\Compilazioni($this->conn);
-            $r = $c->aperta((int)$file['id']);
-            if (!$r) {
-                throw new \RuntimeException('Non ci sono richieste di compilazione aperte per questo documento.');
+            $w  = (int)$request->param('id');
+            $io = (int)($request->user()->id ?? 0);
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $msg = (new \App\Service\Zone\Richieste($this->conn))->messaggi((int)$r['id']);
+            foreach ($msg as &$m) {
+                $m['mio'] = (int)($m['user_id'] ?? 0) === $io;
+                foreach ($m['allegati'] as &$a) {
+                    if ($a['esiste']) $a['download_url'] = "/worksites/{$w}/zone/files/{$a['id']}/download";
+                }
+                unset($a);
             }
-            if ($this->ruoloQui($request) !== \App\Service\Zone\Accesso::UFFICIO
-                && (int)$r['richiesto_da'] !== (int)($request->user()->id ?? 0)) {
-                \App\Service\Zone\Accesso::nega('La richiesta può essere annullata solo da chi l\'ha fatta o da CSM.');
-            }
-            $c->annulla((int)$r['id']);
-            return ['annullata' => true];
+            unset($m);
+            return [
+                'richiesta'     => $r,
+                'messaggi'      => $msg,
+                'cartella'      => $this->cartelleVisibili($request, $w)[(int)$r['folder_id']]['name'] ?? '',
+                'puo_eliminare' => $this->ruoloQui($request) === \App\Service\Zone\Accesso::UFFICIO || (int)$r['created_by'] === $io,
+            ];
         });
     }
 
-    /**
-     * Salva il PDF compilato nel browser come nuova versione del documento.
-     * L'originale non si tocca. Multipart: campo "file".
-     */
-    public function compilaFile(Request $request): void
+    /** Risposta (multipart: testo, file[], completa=1 per chiuderla insieme). */
+    public function rispondiRichiesta(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $w    = (int)$request->param('id');
-            $file = $this->fileRepo->find((int)$request->param('fileId'));
-            $this->fileVisibile($request, $file);
-            $c = new \App\Service\Zone\Compilazioni($this->conn);
-            if (!\App\Service\Zone\Compilazioni::compilabile($file)) {
-                throw new \RuntimeException('Solo i documenti PDF possono essere compilati in BOB Zone.');
-            }
-            if (!\App\Service\Zone\Compilazioni::puoCompilare($this->ruoloQui($request), $c->aperta((int)$file['id']))) {
-                \App\Service\Zone\Accesso::nega('La compilazione di questo documento è stata richiesta a un altro ruolo.');
-            }
-            $up = $_FILES['file'] ?? null;
-            if (!$up || ($up['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
-                throw new \RuntimeException('Il documento compilato non è stato ricevuto.');
-            }
-            if (($up['size'] ?? 0) > 50 * 1024 * 1024) {
-                throw new \RuntimeException('Il documento supera la dimensione massima di 50 MB.');
-            }
-            $testa = (string)file_get_contents((string)$up['tmp_name'], false, null, 0, 5);
-            if ($testa !== '%PDF-') {
-                throw new \RuntimeException('Il documento compilato non è un PDF valido.');
-            }
-            $dir  = \CloudPath::ensureZoneFilesDir($w);
-            $base = preg_replace('/[^A-Za-z0-9._-]/', '_', pathinfo((string)$file['file_name'], PATHINFO_FILENAME));
-            $dest = $dir . DIRECTORY_SEPARATOR . $base . '_compilato_' . date('Ymd_His') . '_' . bin2hex(random_bytes(3)) . '.pdf';
-            if (!move_uploaded_file((string)$up['tmp_name'], $dest)) {
-                throw new \RuntimeException('Salvataggio del documento non riuscito.');
-            }
+            $w  = (int)$request->param('id');
             $io = (int)($request->user()->id ?? 0);
-            $esito = $c->salvaCompilato($w, $file, $io, \CloudPath::relativeToRoot($dest), (int)($up['size'] ?? 0));
-            if ($esito['richiesta']) {
-                $rid = (int)$esito['richiesta']['id'];
-                $this->avvisa(fn($a) => $a->compilato($rid, $io));
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $svc = new \App\Service\Zone\Richieste($this->conn);
+            $testo = (string)($_POST['testo'] ?? '');
+            if (trim($testo) === '' && !$this->fileRicevuti('file')) {
+                throw new \RuntimeException('Scrivere un messaggio o allegare un documento.');
             }
-            return ['versione_id' => $esito['versione_id'], 'richiesta_chiusa' => (bool)$esito['richiesta']];
+            $allegati = $this->allegatiRichiesta($request, $w, (int)$r['folder_id']);
+            $svc->scrivi((int)$r['id'], $io, $testo, $allegati);
+            $anteprima = trim($testo) !== '' ? $testo : \App\Service\Lingua::testo('zona_documento_allegato', 'it');
+            $this->avvisa(fn($a) => $a->richiestaRisposta((int)$r['id'], $io, $anteprima));
+            if (!empty($_POST['completa']) && $r['stato'] !== \App\Service\Zone\Richieste::COMPLETATA) {
+                $svc->cambiaStato((int)$r['id'], \App\Service\Zone\Richieste::COMPLETATA, $io);
+                $this->avvisa(fn($a) => $a->richiestaCompletata((int)$r['id'], $io));
+            }
+            return ['ok' => true];
         });
     }
 
-    /** Una versione compilata, a chi vede il documento. */
-    public function versioneFile(Request $request): void
-    {
-        $this->guardia(__FUNCTION__, $request);
-        $this->assertZone();
-
-        $file = $this->fileRepo->find((int)$request->param('fileId'));
-        $this->fileVisibile($request, $file);
-        $v = (new \App\Service\Zone\Compilazioni($this->conn))->versione((int)$request->param('vid'));
-        $root = realpath(\CloudPath::getRoot());
-        $real = $v ? realpath(\CloudPath::getRoot() . DIRECTORY_SEPARATOR . $v['file_path']) : false;
-        if (!$v || (int)$v['file_id'] !== (int)$file['id'] || $real === false || $root === false
-            || strpos($real, $root) !== 0 || !is_file($real)) {
-            http_response_code(404);
-            exit('Versione non trovata');
-        }
-        $nome = pathinfo((string)$file['file_name'], PATHINFO_FILENAME) . ' (compilato ' . date('d-m-Y', strtotime((string)$v['created_at'])) . ').pdf';
-        while (ob_get_level() > 0) { ob_end_clean(); }
-        header('Content-Type: application/pdf');
-        header('Content-Disposition: inline; filename="' . str_replace('"', '', $nome) . '"');
-        header('Content-Length: ' . filesize($real));
-        header('X-Frame-Options: SAMEORIGIN');
-        readfile($real);
-        exit;
-    }
-
-    /** I PDF da compilare del cantiere che chi chiede vede: per la sezione Moduli. */
-    public function daCompilare(Request $request): void
+    /** Completata / riaperta. */
+    public function statoRichiesta(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
 
         $this->jsonResponse(function () use ($request) {
-            $w = (int)$request->param('id');
-            $cartelle = $this->cartelleVisibili($request, $w);
-            $ruolo = $this->ruoloQui($request);
             $io = (int)($request->user()->id ?? 0);
-            $fuori = [];
-            foreach ((new \App\Service\Zone\Compilazioni($this->conn))->delCantiere($w) as $r) {
-                $f = ['id' => (int)$r['file_id'], 'folder_id' => $r['folder_id'], 'uploaded_by' => $r['uploaded_by'], 'file_type' => $r['file_type']];
-                if (!$this->vedeFile($request, $f, $cartelle)) continue;
-                $aperta = $r['stato'] === 'da_compilare';
-                $fuori[] = [
-                    'id'            => (int)$r['id'],
-                    'file_id'       => (int)$r['file_id'],
-                    'file_name'     => $r['file_name'],
-                    'stato'         => $r['stato'],
-                    'per_ruolo'     => $r['per_ruolo'],
-                    'nota'          => $r['nota'],
-                    'richiesto_da'  => $r['richiesto_da_nome'],
-                    'richiesto_mio' => (int)$r['richiesto_da'] === $io,
-                    'created_at'    => $r['created_at'],
-                    'compilato_da'  => $r['compilato_da_nome'] ?: null,
-                    'compilato_at'  => $r['compilato_at'],
-                    'versione_url'  => $r['versione_id'] ? "/worksites/{$w}/zone/files/{$r['file_id']}/versioni/{$r['versione_id']}/download" : null,
-                    'download_url'  => "/worksites/{$w}/zone/files/{$r['file_id']}/download",
-                    'puo_compilare' => \App\Service\Zone\Compilazioni::puoCompilare($ruolo, $aperta ? $r : null),
-                ];
+            $r  = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $stato = (string)($this->jsonBody()['stato'] ?? '');
+            if ($stato === $r['stato']) {
+                return ['stato' => $stato];
             }
-            return $fuori;
+            (new \App\Service\Zone\Richieste($this->conn))->cambiaStato((int)$r['id'], $stato, $io);
+            if ($stato === \App\Service\Zone\Richieste::COMPLETATA) {
+                $this->avvisa(fn($a) => $a->richiestaCompletata((int)$r['id'], $io));
+            }
+            return ['stato' => $stato];
+        });
+    }
+
+    /** Elimina una richiesta: chi l'ha aperta, o CSM. I documenti restano nella cartella. */
+    public function eliminaRichiesta(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $r = $this->richiestaVisibile($request, (int)$request->param('rid'));
+            $this->pretendeMio($request, (int)($r['created_by'] ?? 0), 'richieste');
+            (new \App\Service\Zone\Richieste($this->conn))->elimina((int)$r['id']);
+            return ['eliminata' => true];
         });
     }
 
@@ -1907,6 +1887,7 @@ final class FieldwireController
             str_starts_with($dove, 'attivita-')     => 'attivita',
             str_starts_with($dove, 'disegno')       => 'disegni',
             str_starts_with($dove, 'file-')         => 'files',
+            str_starts_with($dove, 'richiesta-')    => 'files',
             $dove === 'moduli'                      => 'forms',
             str_starts_with($dove, 'segnalazione-') => 'segnalazioni',
             str_starts_with($dove, 'chat-')         => 'chat',

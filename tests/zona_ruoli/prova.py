@@ -318,40 +318,39 @@ chiama(UFF, 'POST', f'/files/folder/{sub4}/delete', {})
 in_f1 = [t['name'] for t in chiama(CLI, 'GET', f'/files?folder={f1}')['data']['moduli']]
 verifica(S, 'eliminando la cartella, il modulo sale nella cartella che la conteneva', 'Verbale di consegna' in in_f1, str(in_f1))
 
-S = '6b. PDF da compilare'
-pdf = chiama(CLI, 'POST', '/files', file={'nome': 'modulo_collaudo.pdf', 'campi': {'folder_id': f1}})['data']['id']
+S = '6b. Richieste nelle cartelle'
 pulisci_notifiche()
-rq = chiama(CLI, 'POST', f'/files/{pdf}/compilazione', {'nota': 'Da compilare entro venerdì', 'per_ruolo': 'cliente'})
-verifica(S, 'il committente chiede la compilazione di un PDF', puo(rq), rq.get('error', ''))
-verifica(S, '... sempre a CSM, anche se indica un altro ruolo', sql(f"SELECT per_ruolo FROM bb_zone_file_compilazioni WHERE file_id={pdf}") == [['ufficio']])
-nu = [n for n in notifiche(UFF) if n[0] == 'Documento da compilare']
-verifica(S, 'CSM riceve la notifica, che porta ai Moduli', len(nu) == 1 and nu[0][1].endswith('#moduli'), str(notifiche(UFF)))
-verifica(S, 'una sola richiesta aperta per documento', not puo(chiama(CLI, 'POST', f'/files/{pdf}/compilazione', {})))
-dc_u = {x['file_id']: x for x in chiama(UFF, 'GET', '/da-compilare')['data']}
-dc_k = {x['file_id']: x for x in chiama(CLI, 'GET', '/da-compilare')['data']}
-verifica(S, 'nei Moduli di CSM: da compilare, e la può compilare', dc_u.get(pdf, {}).get('puo_compilare') is True)
-verifica(S, '... il committente la vede ma non la compila lui', pdf in dc_k and dc_k[pdf]['puo_compilare'] is False)
-verifica(S, 'il committente non salva la compilazione chiesta a CSM', not puo(chiama(CLI, 'POST', f'/files/{pdf}/compila', file={'nome': 'compilato.pdf'})))
-verifica(S, 'la squadra non annulla la richiesta del committente', not puo(chiama(CAPO, 'POST', f'/files/{pdf}/compilazione/annulla', {})))
+rq = chiama(CLI, 'POST', '/richieste', file={'nome': 'modulo_collaudo.pdf', 'campi': {'folder_id': f1, 'titolo': 'Modulo di collaudo', 'testo': 'Vi mandiamo il modulo da compilare entro venerdì.'}})
+verifica(S, 'il committente crea una richiesta in una cartella, con un documento', puo(rq), rq.get('error', ''))
+rid = rq['data']['id'] if puo(rq) else 0
+nr = [n for n in notifiche(UFF) if n[0] == 'Nuova richiesta']
+verifica(S, 'CSM riceve "Nuova richiesta", che porta alla richiesta', len(nr) == 1 and nr[0][1].endswith(f'#richiesta-{rid}'), str(notifiche(UFF)))
+verifica(S, '... la squadra no (la richiesta del committente va a CSM)', not [n for n in notifiche(CAPO) if n[0] == 'Nuova richiesta'])
+fu = chiama(UFF, 'GET', f'/files?folder={f1}')['data']
+verifica(S, "l'allegato è un documento della cartella", 'modulo_collaudo.pdf' in [x['file_name'] for x in fu['files']])
+verifica(S, 'la cartella elenca la richiesta e conta quelle aperte', [x['id'] for x in fu['richieste']] == [rid] and fu['richieste_aperte'].get(str(f1), fu['richieste_aperte'].get(f1)) == 1, str(fu['richieste_aperte']))
+verifica(S, 'non si crea una richiesta in una cartella che non si vede', not puo(chiama(CLI, 'POST', '/richieste', form={'folder_id': f2, 'titolo': 'x', 'testo': 'y'})))
+verifica(S, 'né fuori da una cartella', not puo(chiama(CLI, 'POST', '/richieste', form={'titolo': 'x', 'testo': 'y'})))
+verifica(S, 'una risposta vuota non si invia', not puo(chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', form={'testo': ' '})))
 pulisci_notifiche()
-rc = chiama(UFF, 'POST', f'/files/{pdf}/compila', file={'nome': 'compilato.pdf'})
-verifica(S, 'CSM compila e salva', puo(rc) and rc['data']['richiesta_chiusa'] is True, rc.get('error', ''))
-nk = [n for n in notifiche(CLI) if n[0] == 'Documento compilato']
-verifica(S, 'il committente riceve "Documento compilato", che porta al documento', len(nk) == 1 and nk[0][1].endswith(f'#file-{pdf}'), str(notifiche(CLI)))
-fk = {int(x['id']): x for x in chiama(CLI, 'GET', f'/files?folder={f1}')['data']['files']}
-verifica(S, "nell'elenco: stato compilato, con chi e la versione compilata", fk[pdf]['compilazione']['stato'] == 'compilato'
-         and fk[pdf]['compilazione']['compilato_da'] == 'Giulia Ufficio' and len(fk[pdf]['versioni']) == 1, str(fk.get(pdf))[:300])
-vurl = fk[pdf]['versioni'][0]['url'].split('/zone', 1)[1]
-vreq = urllib.request.Request(BASE + '100/zone' + vurl, headers={'X-Test-User': str(CLI)})
-with urllib.request.urlopen(vreq) as rr:
-    corpo_v = rr.read()
-verifica(S, 'la versione compilata si apre (e l\'originale resta)', corpo_v.startswith(b'%PDF') and fk[pdf]['download_url'].endswith(f'/files/{pdf}/download'))
-rq2 = chiama(UFF, 'POST', f'/files/{pdf}/compilazione', {'per_ruolo': 'cliente', 'nota': 'Firmare in fondo'})
-verifica(S, 'CSM chiede al committente di compilare', puo(rq2))
-verifica(S, '... e il committente compila e salva', puo(chiama(CLI, 'POST', f'/files/{pdf}/compila', file={'nome': 'firmato.pdf'})))
-verifica(S, 'ora il documento ha due versioni compilate', len(sql(f"SELECT id FROM bb_zone_file_versioni WHERE file_id={pdf}")) == 2)
-txt = chiama(CLI, 'POST', '/files', file={'nome': 'note.txt', 'campi': {'folder_id': f1}})['data']['id']
-verifica(S, 'un file che non è PDF non si chiede di compilarlo', not puo(chiama(CLI, 'POST', f'/files/{txt}/compilazione', {})))
+rr = chiama(UFF, 'POST', f'/richieste/{rid}/messaggi', file={'nome': 'modulo_collaudo (compilato).pdf', 'campi': {'testo': 'Ecco il modulo compilato.', 'completa': '1'}})
+verifica(S, 'CSM risponde con il documento compilato e la completa', puo(rr), rr.get('error', ''))
+tk = [n[0] for n in notifiche(CLI)]
+verifica(S, 'il committente riceve la risposta e "Richiesta completata"', 'Nuova risposta a una richiesta' in tk and 'Richiesta completata' in tk, str(tk))
+dk = chiama(CLI, 'GET', f'/richieste/{rid}')['data']
+verifica(S, 'nella discussione: stato completata, due messaggi con i documenti, e la riga di chiusura',
+         dk['richiesta']['stato'] == 'completata' and [len(m['allegati']) for m in dk['messaggi'] if not m['sistema']] == [1, 1]
+         and dk['messaggi'][-1]['sistema'] == 'completata', str(dk)[:400])
+verifica(S, 'gli allegati si scaricano dalla cartella', dk['messaggi'][0]['allegati'][0]['download_url'].endswith('/download'))
+verifica(S, 'la squadra che vede la cartella legge la richiesta', puo(chiama(CAPO, 'GET', f'/richieste/{rid}')))
+verifica(S, '... ma non la elimina (non è sua)', not puo(chiama(CAPO, 'POST', f'/richieste/{rid}/elimina', {})))
+verifica(S, 'si riapre', puo(chiama(CLI, 'POST', f'/richieste/{rid}/stato', {'stato': 'aperta'})) and chiama(CLI, 'GET', f'/richieste/{rid}')['data']['richiesta']['stato'] == 'aperta')
+f3 = chiama(UFF, 'POST', '/files/folder', {'name': 'Documenti impresa'})['data']['id']
+r3 = chiama(CLI, 'POST', '/richieste', form={'folder_id': f3, 'titolo': 'DURC aggiornato', 'testo': 'Ci serve il DURC aggiornato.'})['data']['id']
+sql(f"DELETE FROM bb_zone_condivisioni_ruoli WHERE tipo='cartella' AND oggetto_id={f3}; DELETE FROM bb_zone_condivisioni WHERE tipo='cartella' AND oggetto_id={f3}")
+verifica(S, 'chiusa la cartella, il committente non vede più la richiesta', chiama(CLI, 'GET', f'/richieste/{r3}')['_http'] == 404)
+verifica(S, 'CSM elimina una richiesta; i documenti restano nella cartella', puo(chiama(UFF, 'POST', f'/richieste/{rid}/elimina', {}))
+         and 'modulo_collaudo.pdf' in [x['file_name'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files']])
 
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]

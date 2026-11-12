@@ -250,86 +250,115 @@ final class AvvisiZona
     }
 
     /**
-     * Chi del cantiere, con uno di questi ruoli, vede un documento.
+     * Chi del cantiere, con uno di questi ruoli, vede una cartella (e tutte
+     * quelle che la contengono).
      *
      * @param string[] $ruoli
-     * @return array{0: array<int, array<string, mixed>>, 1: ?array} persone, riga del file
+     * @return array<int, array<string, mixed>> per user_id
      */
-    private function vedonoFile(int $worksiteId, int $fileId, array $ruoli): array
+    private function vedonoCartella(int $worksiteId, int $folderId, array $ruoli): array
     {
-        $st = $this->conn->prepare('
-            SELECT f.file_name, f.folder_id, f.uploaded_by, w.name AS cantiere
-            FROM bb_zone_files f JOIN bb_worksites w ON w.id = f.worksite_id
-            WHERE f.id = :f AND f.worksite_id = :w
-        ');
-        $st->execute([':f' => $fileId, ':w' => $worksiteId]);
-        $f = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$f) {
-            return [[], null];
+        $catena = [];
+        $st = $this->conn->prepare('SELECT id, parent_id, created_by FROM bb_zone_folders WHERE id = :c AND worksite_id = :w');
+        $id = $folderId;
+        for ($i = 0; $id && $i < 20; $i++) {
+            $st->execute([':c' => $id, ':w' => $worksiteId]);
+            $c = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$c) break;
+            $catena[] = $c;
+            $id = $c['parent_id'] ? (int)$c['parent_id'] : 0;
         }
-        $cartella = null;
-        if (!empty($f['folder_id'])) {
-            $c = $this->conn->prepare('SELECT id, created_by FROM bb_zone_folders WHERE id = :c');
-            $c->execute([':c' => (int)$f['folder_id']]);
-            $cartella = $c->fetch(PDO::FETCH_ASSOC) ?: null;
+        if (!$catena) {
+            return [];
         }
         $cond = new Condivisione($this->conn, new Accesso($this->conn));
         $chi = [];
         foreach ($this->persone($worksiteId, $ruoli, null) as $p) {
             $u = $this->utente((int)$p['user_id']);
-            if ($cond->vede($u, $worksiteId, 'file', $fileId, (int)($f['uploaded_by'] ?? 0))
-                || ($cartella && $cond->vede($u, $worksiteId, 'cartella', (int)$cartella['id'], (int)($cartella['created_by'] ?? 0)))) {
-                $chi[] = $p;
+            foreach ($catena as $c) {
+                if (!$cond->vede($u, $worksiteId, 'cartella', (int)$c['id'], (int)($c['created_by'] ?? 0))) continue 2;
+            }
+            $chi[(int)$p['user_id']] = $p;
+        }
+        return $chi;
+    }
+
+    /** I dati di una richiesta per gli avvisi. */
+    private function richiesta(int $id): ?array
+    {
+        $st = $this->conn->prepare('
+            SELECT r.*, w.name AS cantiere FROM bb_zone_richieste r JOIN bb_worksites w ON w.id = r.worksite_id WHERE r.id = :id
+        ');
+        $st->execute([':id' => $id]);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Una richiesta nuova: all'altra parte. Se la apre CSM, al committente e
+     * alla squadra che vedono la cartella; se la apre il committente o la
+     * squadra, a CSM.
+     */
+    public function richiestaNuova(int $id, int $daChi): void
+    {
+        $r = $this->richiesta($id);
+        if (!$r) return;
+        $w = (int)$r['worksite_id'];
+        $ruoli = $this->ruoloDi($w, $daChi) === Accesso::UFFICIO ? [Accesso::CLIENTE, Accesso::CANTIERE] : [Accesso::UFFICIO];
+        $chi = $this->nome($daChi);
+        foreach ($this->vedonoCartella($w, (int)$r['folder_id'], $ruoli) as $uid => $p) {
+            if ($uid === $daChi) continue;
+            $p['worksite_id'] = $w;
+            $p['dove'] = 'richiesta-' . $id;
+            $this->manda($p, 'zona_richiesta_t', 'zona_richiesta', [
+                'cantiere' => $r['cantiere'], 'chi' => $chi, 'titolo' => mb_substr((string)$r['titolo'], 0, 100),
+            ], 'high', $daChi);
+        }
+    }
+
+    /**
+     * Una risposta: a chi partecipa alla discussione (chi l'ha aperta e chi
+     * ha scritto) e a CSM se scrive qualcun altro. Solo a chi vede ancora la
+     * cartella.
+     */
+    public function richiestaRisposta(int $id, int $daChi, string $testo): void
+    {
+        $r = $this->richiesta($id);
+        if (!$r) return;
+        $w = (int)$r['worksite_id'];
+        $vedono = $this->vedonoCartella($w, (int)$r['folder_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
+        $a = array_fill_keys((new Richieste($this->conn))->partecipanti($id), true);
+        if ($this->ruoloDi($w, $daChi) !== Accesso::UFFICIO) {
+            foreach ($vedono as $uid => $p) {
+                if ($p['ruolo'] === Accesso::UFFICIO) $a[$uid] = true;
             }
         }
-        return [$chi, $f];
-    }
-
-    /** Un PDF da compilare: a chi lo deve compilare (e lo vede). */
-    public function daCompilare(int $richiestaId, int $daChi): void
-    {
-        $st = $this->conn->prepare('SELECT * FROM bb_zone_file_compilazioni WHERE id = :id');
-        $st->execute([':id' => $richiestaId]);
-        $r = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$r) {
-            return;
-        }
-        $w = (int)$r['worksite_id'];
-        [$persone, $f] = $this->vedonoFile($w, (int)$r['file_id'], [(string)$r['per_ruolo']]);
         $chi = $this->nome($daChi);
-        foreach ($persone as $p) {
-            if ((int)$p['user_id'] === $daChi) continue;
+        foreach (array_keys($a) as $uid) {
+            if ($uid === $daChi || !isset($vedono[$uid])) continue;
+            $p = $vedono[$uid];
             $p['worksite_id'] = $w;
-            $p['dove'] = 'moduli';
-            $this->manda($p, 'zona_da_compilare_t', 'zona_da_compilare', [
-                'cantiere' => $f['cantiere'],
-                'nome'     => mb_substr((string)$f['file_name'], 0, 100),
-                'chi'      => $chi,
-            ], 'high', $daChi);
+            $p['dove'] = 'richiesta-' . $id;
+            $this->manda($p, 'zona_richiesta_msg_t', 'zona_richiesta_msg', [
+                'cantiere' => $r['cantiere'], 'chi' => $chi, 'titolo' => mb_substr((string)$r['titolo'], 0, 80),
+                'testo' => mb_substr($testo, 0, 140),
+            ], 'normal', $daChi);
         }
     }
 
-    /** Un PDF compilato e salvato: a chi l'aveva chiesto (se lo vede ancora). */
-    public function compilato(int $richiestaId, int $daChi): void
+    /** Richiesta completata: a chi l'aveva aperta. */
+    public function richiestaCompletata(int $id, int $daChi): void
     {
-        $st = $this->conn->prepare('SELECT * FROM bb_zone_file_compilazioni WHERE id = :id');
-        $st->execute([':id' => $richiestaId]);
-        $r = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$r || empty($r['richiesto_da']) || (int)$r['richiesto_da'] === $daChi) {
-            return;
-        }
+        $r = $this->richiesta($id);
+        if (!$r || empty($r['created_by']) || (int)$r['created_by'] === $daChi) return;
         $w = (int)$r['worksite_id'];
-        [$persone, $f] = $this->vedonoFile($w, (int)$r['file_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
-        foreach ($persone as $p) {
-            if ((int)$p['user_id'] !== (int)$r['richiesto_da']) continue;
-            $p['worksite_id'] = $w;
-            $p['dove'] = 'file-' . (int)$r['file_id'];
-            $this->manda($p, 'zona_compilato_t', 'zona_compilato', [
-                'cantiere' => $f['cantiere'],
-                'nome'     => mb_substr((string)$f['file_name'], 0, 100),
-                'chi'      => $this->nome($daChi),
-            ], 'high', $daChi);
-        }
+        $vedono = $this->vedonoCartella($w, (int)$r['folder_id'], [Accesso::UFFICIO, Accesso::CANTIERE, Accesso::CLIENTE]);
+        $p = $vedono[(int)$r['created_by']] ?? null;
+        if (!$p) return;
+        $p['worksite_id'] = $w;
+        $p['dove'] = 'richiesta-' . $id;
+        $this->manda($p, 'zona_richiesta_ok_t', 'zona_richiesta_ok', [
+            'cantiere' => $r['cantiere'], 'chi' => $this->nome($daChi), 'titolo' => mb_substr((string)$r['titolo'], 0, 100),
+        ], 'high', $daChi);
     }
 
     /** Un modulo assegnato: a chi lo deve compilare. */

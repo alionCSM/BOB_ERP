@@ -731,6 +731,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                         <div class="bz-folder-vis" id="bz-folder-vis"></div>
                         <div class="bz-files-azioni">
                             <button type="button" class="bz-azione-doc" id="bz-new-folder-top"><i class="fas fa-folder-plus"></i> Nuova cartella</button>
+                            <button type="button" class="bz-azione-doc" id="bz-new-richiesta" hidden><i class="fas fa-inbox"></i> Nuova richiesta</button>
                             <button type="button" class="bz-azione-doc" id="bz-new-modulo" hidden><i class="fas fa-clipboard-list"></i> Nuovo modulo</button>
                             {% if accessi.file > 1 %}
                             <label class="bz-upload-btn"><i class="fas fa-upload"></i> Carica documento
@@ -747,6 +748,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
             </div>
             <div class="bz-modulo-panel" id="bz-modulo-panel" hidden>
                 <div id="bz-forms-root"></div>
+                <div id="bz-richiesta-root" hidden></div>
             </div>
         </div>
 
@@ -1365,7 +1367,7 @@ function openForms() {
             wsCode: {{ (worksite.worksite_code ?? '')|json_encode|raw }},
             clientName: {{ (clientName ?? '')|json_encode|raw }},
             // dentro i Documenti: un pannello sopra le cartelle
-            onApri: apriModuloPanel,
+            onApri: () => apriModuloPanel('modulo'),
             alTermine: () => chiudiModuloPanel(true),
         });
         window._bzFormsInited = true;
@@ -2228,6 +2230,8 @@ function humanSize(b) {
    Chi vede una cartella la decide CSM (una cartella nuova eredita da quella
    che la contiene); una cartella chiusa chiude anche cio' che contiene. */
 let cartelleTutte = [];
+let richiesteAperte = {};   // cartella => richieste aperte
+const contaRichieste = id => Number(richiesteAperte[id] || 0);
 const CREA_MODULI_DOC = DA_UFFICIO || RUOLO === 'cliente';
 
 function apriDocumenti() {
@@ -2244,9 +2248,12 @@ async function loadFiles() {
     cartelleTutte = res.data.folders || [];
     // la cartella non c'e' piu' (eliminata, o non piu' condivisa): in cima
     if (curFolder && !cartelleTutte.some(f => Number(f.id) === Number(curFolder))) { curFolder = null; return loadFiles(); }
-    renderFolders(cartelleTutte);
     renderBriciole();
-    renderFiles(res.data.files || [], res.data.moduli || []);
+    richiesteAperte = res.data.richieste_aperte || {};
+    renderFolders(cartelleTutte);
+    renderFiles(res.data.files || [], res.data.moduli || [], res.data.richieste || []);
+    const nr = document.getElementById('bz-new-richiesta');
+    if (nr) nr.hidden = !curFolder;
     // "Da compilare" (i moduli assegnati) solo in cima
     const ass = document.getElementById('bz-assegnazioni-root');
     if (ass) ass.hidden = !!curFolder;
@@ -2284,7 +2291,7 @@ function renderFolders() {
         return `
             <button class="bz-folder ${curFolder == f.id ? 'active' : ''}" data-folder="${f.id}" style="padding-left:${10 + livello * 14}px">
                 <i class="fas ${aperta && figlie.length ? 'fa-folder-open' : 'fa-folder'}"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
-                <em>${f.file_count}</em>
+                ${contaRichieste(f.id) ? `<em class="bz-conta-richieste" title="Richieste in attesa">${contaRichieste(f.id)}</em>` : `<em>${f.file_count}</em>`}
                 ${DA_UFFICIO || Number(f.created_by) === Number(IO) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
             </button>
             ${aperta ? ramo(f.id, livello + 1) : ''}`;
@@ -2303,10 +2310,10 @@ function renderBriciole() {
         + via.map((c, i) => `<i class="fas fa-chevron-right"></i><button type="button" data-folder="${c.id}" class="${i === via.length - 1 ? 'qui' : ''}">${escHtml(c.name)}</button>`).join('');
 }
 
-function renderFiles(files, moduli) {
+function renderFiles(files, moduli, richieste = []) {
     const list = document.getElementById('bz-files-list');
     const sotto = figlieDi(curFolder);
-    if (!files.length && !moduli.length && !sotto.length) {
+    if (!files.length && !moduli.length && !sotto.length && !richieste.length) {
         list.innerHTML = `<div class="bz-dz-empty">${curFolder ? 'Questa cartella è vuota.' : 'Nessun documento presente.'}</div>`;
         return;
     }
@@ -2315,7 +2322,7 @@ function renderFiles(files, moduli) {
         <div class="bz-file-row bz-file-clickable" data-folder="${f.id}">
             <i class="fas fa-folder bz-file-icon bz-icona-cartella"></i>
             <div class="bz-file-info">
-                <div class="bz-file-name">${escHtml(f.name)} ${chiBadge(f)}</div>
+                <div class="bz-file-name">${escHtml(f.name)} ${chiBadge(f)} ${contaRichieste(f.id) ? `<span class="bz-richiesta-stato">${contaRichieste(f.id) === 1 ? '1 richiesta in attesa' : contaRichieste(f.id) + ' richieste in attesa'}</span>` : ''}</div>
                 <div class="bz-file-sub">Cartella · ${f.file_count} ${Number(f.file_count) === 1 ? 'documento' : 'documenti'}</div>
             </div>
             <i class="fas fa-chevron-right bz-file-freccia"></i>
@@ -2349,14 +2356,27 @@ function renderFiles(files, moduli) {
             ${DA_UFFICIO || Number(f.uploaded_by) === Number(IO) ? `<button class="bz-file-act danger" data-del-file="${f.id}" title="Elimina"><i class="fas fa-trash"></i></button>` : ''}
         </div>`;
     }).join('');
-    list.innerHTML = righeCartelle + righeModuli + righeFile;
+    const righeRichieste = richieste.map(q => `
+        <div class="bz-file-row bz-file-clickable" data-richiesta="${q.id}">
+            <i class="fas fa-inbox bz-file-icon bz-icona-richiesta"></i>
+            <div class="bz-file-info">
+                <div class="bz-file-name">${escHtml(q.titolo)}
+                    <span class="bz-richiesta-stato ${q.stato === 'completata' ? 'ok' : ''}">${q.stato === 'completata' ? 'Completata' : 'In attesa'}</span></div>
+                <div class="bz-file-sub">Richiesta · ${escHtml(q.creata_da_nome || '—')} · ${fmtDateTime(q.updated_at || q.created_at)} · ${q.n_messaggi} ${Number(q.n_messaggi) === 1 ? 'messaggio' : 'messaggi'}</div>
+            </div>
+            <i class="fas fa-chevron-right bz-file-freccia"></i>
+        </div>`).join('');
+    // in alto le richieste (prima quelle in attesa), poi cartelle, moduli e documenti
+    list.innerHTML = righeRichieste + righeCartelle + righeModuli + righeFile;
 }
 
 /* Il pannello di un modulo (compilazione, modifica, compilazioni): sopra
    le cartelle; finito, si torna alla cartella in cui si era. */
-function apriModuloPanel() {
+function apriModuloPanel(cosa = 'modulo') {
     document.getElementById('bz-files-browser').hidden = true;
     document.getElementById('bz-modulo-panel').hidden = false;
+    document.getElementById('bz-forms-root').hidden = cosa !== 'modulo';
+    document.getElementById('bz-richiesta-root').hidden = cosa !== 'richiesta';
     document.getElementById('view-files').scrollTop = 0;
 }
 function chiudiModuloPanel(ricarica = true) {
@@ -2462,6 +2482,8 @@ document.addEventListener('click', e => {
     // moduli dentro le cartelle
     let m;
     if (e.target.closest('#bz-new-modulo')) { window.BZForms?.openBuilder(null, { folder_id: curFolder }); return; }
+    if (e.target.closest('#bz-new-richiesta')) { window.BZRichieste?.nuova(curFolder, percorsoDi(curFolder).pop()?.name || ''); return; }
+    if ((m = e.target.closest('[data-richiesta]'))) { window.BZRichieste?.apri(parseInt(m.dataset.richiesta)); return; }
     if ((m = e.target.closest('[data-modulo-compila]')))      { window.BZForms?.openFill(parseInt(m.dataset.moduloCompila)); return; }
     if ((m = e.target.closest('[data-modulo-modifica]')))     { window.BZForms?.openBuilder(parseInt(m.dataset.moduloModifica)); return; }
     if ((m = e.target.closest('[data-modulo-compilazioni]'))) { window.BZForms?.openSubmissions(parseInt(m.dataset.moduloCompilazioni), m.dataset.moduloNome); return; }
@@ -2666,7 +2688,7 @@ function quandoAvviso(s) {
     return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }) + ' alle ' + d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
 
-const ICONA_AVVISO = { attivita: 'fa-list-check', disegni: 'fa-drafting-compass', files: 'fa-folder-open', forms: 'fa-clipboard-list',
+const ICONA_AVVISO = { attivita: 'fa-list-check', disegni: 'fa-drafting-compass', files: 'fa-folder-open', forms: 'fa-clipboard-list', richiesta: 'fa-inbox',
                        segnalazioni: 'fa-triangle-exclamation', chat: 'fa-comments' };
 
 async function caricaAvvisi() {
@@ -2723,6 +2745,9 @@ async function vaiAdAvviso(dove) {
         if (allTasks.some(t => Number(t.id) === id)) openTask(id);
     } else if (dove.startsWith('disegno')) {
         switchTop('disegni');
+    } else if (dove.startsWith('richiesta-')) {
+        switchTop('files');
+        window.BZRichieste?.apri(parseInt(dove.slice(10)));
     } else if (dove.startsWith('file-')) {
         switchTop('files');
     } else if (dove === 'moduli') {
@@ -2781,7 +2806,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(caricaAvvisi, 30000);
     // il link di una notifica aperto da fuori (email, campanello di BOB)
     const h = location.hash.slice(1);
-    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h === 'moduli') {
+    if (h.startsWith('attivita-') || h.startsWith('disegno') || h.startsWith('file-') || h.startsWith('richiesta-') || h === 'moduli') {
         setTimeout(() => vaiAdAvviso(h), 400);
         return;
     }
@@ -3864,7 +3889,7 @@ html .bz-dz-empty { color:#94a3b8; }
 
 <link rel="stylesheet" href="/assets/css/views/fieldwire/annotator.css?v=20261112b">
 <link rel="stylesheet" href="/assets/css/views/fieldwire/forms.css">
-<script src="/assets/js/views/fieldwire/forms.js?v=20261110"></script>
+<script src="/assets/js/views/fieldwire/forms.js?v=20261112"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script nonce="{{ cspNonce }}">
   // configura il worker di PDF.js (stesso CDN)
@@ -3881,7 +3906,14 @@ html .bz-dz-empty { color:#94a3b8; }
 {% endif %}
 <script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261112">
+<link rel="stylesheet" href="/assets/css/views/fieldwire/richieste.css?v=20261112">
 {% if not soloAccessi %}<script src="/assets/js/views/fieldwire/menzioni.js?v=20261112"></script>
+<script src="/assets/js/views/fieldwire/compila.js?v=20261112"></script>
+<script src="/assets/js/views/fieldwire/richieste.js?v=20261112"></script>
+<script nonce="{{ cspNonce }}">
+// le richieste si aprono nel pannello dei Documenti
+window.BZRichieste && BZRichieste.init({ apri: () => apriModuloPanel('richiesta'), chiudi: r => chiudiModuloPanel(r) });
+</script>
 <script nonce="{{ cspNonce }}">
 // @ nei messaggi delle attivita': chi vede l'attivita' (in una nota interna solo CSM)
 window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
