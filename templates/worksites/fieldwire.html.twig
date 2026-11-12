@@ -2284,7 +2284,10 @@ async function loadFiles() {
     const box  = document.getElementById('bz-folder-vis');
     if (box) box.innerHTML = DA_UFFICIO && cart ? chiBottone('cartella', cart.id, cart) : '';
     // in cima, CSM vede quale link e' collegato
-    if (lk && !curFolder) lk.querySelector('span').textContent = cartelleTutte.some(f => ['link_aziende', 'link_operai', 'link_altri'].includes(f.sorgente)) ? 'Link documenti collegato' : 'Collega link documenti';
+    if (lk && !curFolder) {
+        lk.querySelector('span').textContent = res.data.link_collegato ? 'Link: ' + res.data.link_collegato : 'Collega link documenti';
+        lk.title = res.data.link_collegato ? 'Link documenti collegato: ' + res.data.link_collegato : 'Collegare un link di Doc condivisi';
+    }
 }
 
 const figlieDi = id => cartelleTutte
@@ -2544,7 +2547,7 @@ async function linkDocumenti() {
     pop.className = 'bz-link-pop';
     pop.innerHTML = `
         <h4><i class="fas fa-link"></i> Link documenti del cantiere</h4>
-        <p>I documenti delle aziende e degli operai del link compaiono nelle cartelle "Documenti azienda" e "Documenti operai", sempre aggiornati. Di base le vedono CSM e il committente.</p>
+        <p>I documenti delle aziende e degli operai del link compaiono nelle cartelle "Documenti azienda" e "Documenti operai", sempre aggiornati. Di base le vedono CSM e il committente. Il collegamento si può fare anche da "Doc condivisi", nel link.</p>
         <select id="bz-link-sel">
             <option value="">— Nessun link —</option>
             ${disponibili.map(l => `<option value="${l.id}" ${collegato && Number(collegato.id) === Number(l.id) ? 'selected' : ''}>${escHtml(l.title)}${l.expires_at ? ' · scade il ' + fmtDate(l.expires_at) : ''}</option>`).join('')}
@@ -2555,6 +2558,8 @@ async function linkDocumenti() {
             <button type="button" class="bz-file-act primario" id="bz-link-salva">Salva</button>
         </div>`;
     document.querySelector('#view-files .bz-files-bar').appendChild(pop);
+    // si cerca il link per titolo
+    if (window.TomSelect) new TomSelect(pop.querySelector('#bz-link-sel'), { maxOptions: 300, allowEmptyOption: true, dropdownParent: 'body' });
     pop.querySelector('#bz-link-annulla').onclick = () => pop.remove();
     pop.querySelector('#bz-link-salva').onclick = async () => {
         const id = pop.querySelector('#bz-link-sel').value;
@@ -4079,6 +4084,7 @@ html .bz-dz-empty { color:#94a3b8; }
 [data-theme="light"] .bz-scad.att { background:#fef3c7; color:#b45309; }
 [data-theme="light"] .bz-scad.ko { background:#fee2e2; color:#b91c1c; }
 .bz-files-bar { position:relative; }
+body > .ts-dropdown { z-index:10060; }
 .bz-link-pop { position:absolute; right:20px; top:calc(100% + 6px); z-index:50; width:min(420px, calc(100vw - 40px)); background:#0f172a; border:1px solid #273548; border-radius:10px; padding:14px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 .bz-link-pop h4 { margin:0 0 6px; font-size:14px; color:#f1f5f9; }
 .bz-link-pop h4 i { color:#60a5fa; }

@@ -1411,6 +1411,11 @@ final class FieldwireController
                                 $link->documenti($worksiteId, $cartelle[$folderId]))
                     : [],
                 'current_folder' => $folderId,
+                // per il pulsante di CSM: il link collegato, se c'e'
+                'link_collegato' => (function () use ($link, $worksiteId) {
+                    try { $l = $link->collegato($worksiteId); return $l ? (string)$l['title'] : null; }
+                    catch (\PDOException $e) { return null; }
+                })(),
             ];
         });
     }
