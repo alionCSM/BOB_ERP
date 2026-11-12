@@ -362,6 +362,32 @@ verifica(S, 'chiusa la cartella, il committente non vede più la richiesta', chi
 verifica(S, 'CSM elimina una richiesta; i documenti restano nella cartella', puo(chiama(UFF, 'POST', f'/richieste/{rid}/elimina', {}))
          and 'modulo_collaudo.pdf' in [x['file_name'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files']])
 
+S = '6c. Link condiviso collegato al cantiere'
+verifica(S, 'solo CSM sceglie il link', chiama(CLI, 'GET', '/link-condivisi')['_http'] == 403 and puo(chiama(UFF, 'GET', '/link-condivisi')))
+verifica(S, 'il committente non collega link', not puo(chiama(CLI, 'POST', '/link-condivisi', {'link_id': 1})))
+verifica(S, 'CSM collega il link', puo(chiama(UFF, 'POST', '/link-condivisi', {'link_id': 1})))
+cu = {c['name']: c for c in chiama(UFF, 'GET', '/files')['data']['folders']}
+verifica(S, 'compaiono "Documenti azienda" con una cartella per azienda', 'Documenti azienda' in cu and 'Edilnord Srl' in cu and 'Montaggi Sud Srl' in cu
+         and int(cu['Edilnord Srl']['parent_id']) == int(cu['Documenti azienda']['id']), str(list(cu)))
+verifica(S, '... e "Documenti operai" con nome e azienda di ogni operaio', 'Arben Hoxha · CSM' in cu and 'Ion Popescu · Edilnord' in cu, str(list(cu)))
+ck = {c['name'] for c in chiama(CLI, 'GET', '/files')['data']['folders']}
+verifica(S, 'il committente le vede', 'Documenti operai' in ck and 'Ion Popescu · Edilnord' in ck, str(ck))
+cq = {c['name'] for c in chiama(CAPO, 'GET', '/files')['data']['folders']}
+verifica(S, 'la squadra no (documenti personali)', 'Documenti operai' not in cq and 'Arben Hoxha · CSM' not in cq, str(cq))
+ed = chiama(CLI, 'GET', f"/files?folder={cu['Edilnord Srl']['id']}")['data']['documenti_link']
+verifica(S, "nella cartella dell'azienda i suoi documenti, con lo stato della scadenza", {d['nome']: d['stato'] for d in ed} == {'DURC': 'scaduto', 'Visura camerale': 'valido'}, str(ed))
+verifica(S, 'non si carica nelle cartelle del link', not puo(chiama(UFF, 'POST', '/files', file={'nome': 'x.pdf', 'campi': {'folder_id': cu['Edilnord Srl']['id']}})))
+verifica(S, 'non si eliminano dalla Zone', not puo(chiama(UFF, 'POST', f"/files/folder/{cu['Documenti operai']['id']}/delete", {})))
+rl = chiama(CLI, 'POST', '/richieste', form={'folder_id': cu['Edilnord Srl']['id'], 'titolo': 'DURC scaduto', 'testo': 'Il DURC è scaduto: ci inviate quello aggiornato?'})
+verifica(S, 'dentro si crea una richiesta', puo(rl), rl.get('error', ''))
+verifica(S, 'un documento del link non si apre senza vedere la sua cartella', chiama(CAPO, 'GET', f"/link-documento/operaio/{ed[0]['id']}")['_http'] == 404)
+sql("DELETE FROM bb_shared_link_companies WHERE company_id=901")
+cu2 = {c['name'] for c in chiama(UFF, 'GET', '/files')['data']['folders']}
+verifica(S, "togliendo un'azienda dal link sparisce la sua cartella (vuota)", 'Montaggi Sud Srl' not in cu2 and 'Edilnord Srl' in cu2, str(cu2))
+chiama(UFF, 'POST', '/link-condivisi', {'link_id': 0})
+cu3 = {c['name'] for c in chiama(UFF, 'GET', '/files')['data']['folders']}
+verifica(S, 'scollegando il link restano solo le cartelle con dentro una richiesta', 'Edilnord Srl' in cu3 and 'Ion Popescu · Edilnord' not in cu3, str(cu3))
+
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
 verifica(S, 'cliente: Ufficio e Tutto il cantiere', canali(CLI) == ['cliente', 'tutti'], str(canali(CLI)))

@@ -730,6 +730,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                         <nav class="bz-briciole" id="bz-files-title" aria-label="Percorso"></nav>
                         <div class="bz-folder-vis" id="bz-folder-vis"></div>
                         <div class="bz-files-azioni">
+                            {% if daUfficio %}<button type="button" class="bz-azione-doc" id="bz-link-doc" hidden><i class="fas fa-link"></i> <span>Link documenti</span></button>{% endif %}
                             <button type="button" class="bz-azione-doc" id="bz-new-folder-top"><i class="fas fa-folder-plus"></i> Nuova cartella</button>
                             <button type="button" class="bz-azione-doc" id="bz-new-richiesta" hidden><i class="fas fa-inbox"></i> Nuova richiesta</button>
                             <button type="button" class="bz-azione-doc" id="bz-new-modulo" hidden><i class="fas fa-clipboard-list"></i> Nuovo modulo</button>
@@ -2232,6 +2233,10 @@ function humanSize(b) {
 let cartelleTutte = [];
 let richiesteAperte = {};   // cartella => richieste aperte
 const contaRichieste = id => Number(richiesteAperte[id] || 0);
+// le cartelle che arrivano dal link condiviso collegato al cantiere
+const daLink = f => !!(f && f.sorgente);
+const iconaCartella = (f, aperta) => ({ link_aziende: 'fa-building', link_azienda: 'fa-building', link_operai: 'fa-id-card', link_operaio: 'fa-id-badge' })[f.sorgente]
+    || (aperta ? 'fa-folder-open' : 'fa-folder');
 const CREA_MODULI_DOC = DA_UFFICIO || RUOLO === 'cliente';
 
 function apriDocumenti() {
@@ -2254,15 +2259,26 @@ async function loadFiles() {
     renderFiles(res.data.files || [], res.data.moduli || [], res.data.richieste || []);
     const nr = document.getElementById('bz-new-richiesta');
     if (nr) nr.hidden = !curFolder;
+    // nelle cartelle del link i documenti arrivano dal link: si fanno solo richieste
+    const qui = cartelleTutte.find(f => Number(f.id) === Number(curFolder));
+    const soloLink = daLink(qui);
+    document.getElementById('bz-new-folder-top').hidden = soloLink;
+    const up = document.querySelector('#view-files .bz-upload-btn');
+    if (up) up.hidden = soloLink;
+    const lk = document.getElementById('bz-link-doc');
+    if (lk) lk.hidden = !!curFolder;
+    renderDocumentiLink(res.data.documenti_link || []);
     // "Da compilare" (i moduli assegnati) solo in cima
     const ass = document.getElementById('bz-assegnazioni-root');
     if (ass) ass.hidden = !!curFolder;
     const nm = document.getElementById('bz-new-modulo');
-    if (nm) nm.hidden = !CREA_MODULI_DOC;
+    if (nm) nm.hidden = !CREA_MODULI_DOC || soloLink;
     // dentro una cartella, CSM decide chi la vede: vale per tutto il contenuto
     const cart = cartelleTutte.find(f => f.id == curFolder);
     const box  = document.getElementById('bz-folder-vis');
     if (box) box.innerHTML = DA_UFFICIO && cart ? chiBottone('cartella', cart.id, cart) : '';
+    // in cima, CSM vede quale link e' collegato
+    if (lk && !curFolder) lk.querySelector('span').textContent = cartelleTutte.some(f => f.sorgente === 'link_aziende' || f.sorgente === 'link_operai') ? 'Link documenti collegato' : 'Collega link documenti';
 }
 
 const figlieDi = id => cartelleTutte
@@ -2290,9 +2306,9 @@ function renderFolders() {
         const aperta = aperte.has(Number(f.id));
         return `
             <button class="bz-folder ${curFolder == f.id ? 'active' : ''}" data-folder="${f.id}" style="padding-left:${10 + livello * 14}px">
-                <i class="fas ${aperta && figlie.length ? 'fa-folder-open' : 'fa-folder'}"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
+                <i class="fas ${iconaCartella(f, aperta && figlie.length)}"></i> <span>${escHtml(f.name)}</span>${chiBadge(f)}
                 ${contaRichieste(f.id) ? `<em class="bz-conta-richieste" title="Richieste in attesa">${contaRichieste(f.id)}</em>` : `<em>${f.file_count}</em>`}
-                ${DA_UFFICIO || Number(f.created_by) === Number(IO) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
+                ${!daLink(f) && (DA_UFFICIO || Number(f.created_by) === Number(IO)) ? `<i class="fas fa-trash bz-folder-del" data-del-folder="${f.id}" title="Elimina cartella"></i>` : ''}
             </button>
             ${aperta ? ramo(f.id, livello + 1) : ''}`;
     }).join('');
@@ -2320,10 +2336,10 @@ function renderFiles(files, moduli, richieste = []) {
     const canView = t => ['jpg','jpeg','png','webp','gif','pdf'].includes((t||'').toLowerCase());
     const righeCartelle = sotto.map(f => `
         <div class="bz-file-row bz-file-clickable" data-folder="${f.id}">
-            <i class="fas fa-folder bz-file-icon bz-icona-cartella"></i>
+            <i class="fas ${iconaCartella(f, false)} bz-file-icon bz-icona-cartella"></i>
             <div class="bz-file-info">
                 <div class="bz-file-name">${escHtml(f.name)} ${chiBadge(f)} ${contaRichieste(f.id) ? `<span class="bz-richiesta-stato">${contaRichieste(f.id) === 1 ? '1 richiesta in attesa' : contaRichieste(f.id) + ' richieste in attesa'}</span>` : ''}</div>
-                <div class="bz-file-sub">Cartella · ${f.file_count} ${Number(f.file_count) === 1 ? 'documento' : 'documenti'}</div>
+                <div class="bz-file-sub">${daLink(f) ? 'Dal link documenti' : 'Cartella · ' + f.file_count + ' ' + (Number(f.file_count) === 1 ? 'documento' : 'documenti')}</div>
             </div>
             <i class="fas fa-chevron-right bz-file-freccia"></i>
         </div>`).join('');
@@ -2420,6 +2436,61 @@ function compilaDocumento(btn) {
     });
 }
 
+/* I documenti del link (azienda o operaio): si aprono e si scaricano. */
+function renderDocumentiLink(docs) {
+    if (!docs.length) return;
+    const list = document.getElementById('bz-files-list');
+    const STATO = { valido: ['ok', 'Valido'], in_scadenza: ['att', 'In scadenza'], scaduto: ['ko', 'Scaduto'] };
+    const vuota = list.querySelector('.bz-dz-empty');
+    if (vuota) vuota.remove();
+    list.insertAdjacentHTML('beforeend', docs.map(d => {
+        const [cls, lab] = STATO[d.stato] || STATO.valido;
+        return `
+        <div class="bz-file-row">
+            <i class="fas fa-file-pdf bz-file-icon"></i>
+            <div class="bz-file-info bz-file-clickable" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}">
+                <div class="bz-file-name">${escHtml(d.nome)}</div>
+                <div class="bz-file-sub bz-file-sub-tag"><span class="bz-scad ${cls}">${lab}</span><span>${d.scadenza ? 'Scadenza ' + fmtDate(d.scadenza) : 'Senza scadenza'}</span></div>
+            </div>
+            <button class="bz-file-act" data-view-file="1" data-vf-name="${escAttr(d.nome)}" data-vf-type="pdf" data-vf-url="${escAttr(d.url)}" title="Anteprima"><i class="fas fa-eye"></i></button>
+            <a class="bz-file-act" href="${escAttr(d.url)}" target="_blank" rel="noopener" title="Scarica"><i class="fas fa-download"></i></a>
+        </div>`;
+    }).join(''));
+}
+
+/* CSM collega al cantiere un link di Doc condivisi: compaiono le cartelle
+   "Documenti azienda" e "Documenti operai". */
+async function linkDocumenti() {
+    const r = await api(`/worksites/${WID}/zone/link-condivisi`);
+    if (!r.ok) { alert(r.error || 'Si è verificato un errore.'); return; }
+    const { collegato, disponibili } = r.data;
+    document.getElementById('bz-link-pop')?.remove();
+    const pop = document.createElement('div');
+    pop.id = 'bz-link-pop';
+    pop.className = 'bz-link-pop';
+    pop.innerHTML = `
+        <h4><i class="fas fa-link"></i> Link documenti del cantiere</h4>
+        <p>I documenti delle aziende e degli operai del link compaiono nelle cartelle "Documenti azienda" e "Documenti operai", sempre aggiornati. Di base le vedono CSM e il committente.</p>
+        <select id="bz-link-sel">
+            <option value="">— Nessun link —</option>
+            ${disponibili.map(l => `<option value="${l.id}" ${collegato && Number(collegato.id) === Number(l.id) ? 'selected' : ''}>${escHtml(l.title)}${l.expires_at ? ' · scade il ' + fmtDate(l.expires_at) : ''}</option>`).join('')}
+        </select>
+        ${disponibili.length ? '' : '<p class="bz-link-nota">Nessun link attivo: crearlo prima in "Doc condivisi".</p>'}
+        <div class="bz-link-azioni">
+            <button type="button" class="bz-azione-doc" id="bz-link-annulla">Annulla</button>
+            <button type="button" class="bz-file-act primario" id="bz-link-salva">Salva</button>
+        </div>`;
+    document.querySelector('#view-files .bz-files-bar').appendChild(pop);
+    pop.querySelector('#bz-link-annulla').onclick = () => pop.remove();
+    pop.querySelector('#bz-link-salva').onclick = async () => {
+        const id = pop.querySelector('#bz-link-sel').value;
+        const x = await api(`/worksites/${WID}/zone/link-condivisi`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link_id: id ? parseInt(id) : 0 }) });
+        if (!x.ok) { alert(x.error || 'Si è verificato un errore.'); return; }
+        pop.remove();
+        loadFiles();
+    };
+}
+
 async function createFolder() {
     const name = prompt(curFolder ? 'Nome della nuova cartella (dentro «' + (percorsoDi(curFolder).pop()?.name || '') + '»):' : 'Nome della nuova cartella:');
     if (!name || !name.trim()) return;
@@ -2512,6 +2583,7 @@ document.addEventListener('click', e => {
     const delFol = e.target.closest('[data-del-folder]');
     if (delFol) { e.stopPropagation(); deleteFolder(parseInt(delFol.dataset.delFolder)); return; }
     if (e.target.closest('#bz-new-folder') || e.target.closest('#bz-new-folder-top')) { createFolder(); return; }
+    if (e.target.closest('#bz-link-doc')) { linkDocumenti(); return; }
     // moduli dentro le cartelle
     let m;
     if (e.target.closest('#bz-new-modulo')) { window.BZForms?.openBuilder(null, { folder_id: curFolder }); return; }
@@ -3841,6 +3913,24 @@ html .bz-dz-empty { color:#94a3b8; }
 .bz-file-act.primario { background:#2563eb; border-color:#2563eb; color:#fff; font-weight:600; }
 .bz-file-versione { margin-left:28px; border-style:dashed; }
 .bz-versione-freccia { transform:rotate(90deg); color:#475569; font-size:12px; }
+.bz-scad { display:inline-block; padding:1px 7px; border-radius:999px; font-size:10.5px; font-weight:700; }
+.bz-scad.ok { background:rgba(34,197,94,.14); color:#4ade80; }
+.bz-scad.att { background:rgba(251,191,36,.15); color:#fbbf24; }
+.bz-scad.ko { background:rgba(239,68,68,.15); color:#f87171; }
+[data-theme="light"] .bz-scad.ok { background:#dcfce7; color:#15803d; }
+[data-theme="light"] .bz-scad.att { background:#fef3c7; color:#b45309; }
+[data-theme="light"] .bz-scad.ko { background:#fee2e2; color:#b91c1c; }
+.bz-files-bar { position:relative; }
+.bz-link-pop { position:absolute; right:20px; top:calc(100% + 6px); z-index:50; width:min(420px, calc(100vw - 40px)); background:#0f172a; border:1px solid #273548; border-radius:10px; padding:14px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+.bz-link-pop h4 { margin:0 0 6px; font-size:14px; color:#f1f5f9; }
+.bz-link-pop h4 i { color:#60a5fa; }
+.bz-link-pop p { margin:0 0 10px; font-size:12.5px; color:#94a3b8; line-height:1.45; }
+.bz-link-pop select { width:100%; background:#1e293b; border:1px solid #273548; border-radius:7px; padding:8px; color:#e2e8f0; font-size:13px; }
+.bz-link-nota { margin-top:8px !important; color:#fbbf24 !important; }
+.bz-link-azioni { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+[data-theme="light"] .bz-link-pop { background:#fff; border-color:#e2e8f0; box-shadow:0 16px 40px rgba(15,23,42,.15); }
+[data-theme="light"] .bz-link-pop h4 { color:#0f172a; }
+[data-theme="light"] .bz-link-pop select { background:#fff; border-color:#e2e8f0; color:#1e293b; }
 .bz-file-sub-tag { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; white-space:normal; }
 .bz-file-sub-tag .bz-tag-versioni, .bz-file-sub-tag .bz-tag-richiesta { margin-left:0; }
 .bz-tag-versioni { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:rgba(34,197,94,.14); color:#4ade80; font-size:10.5px; font-weight:600; vertical-align:middle; }

@@ -77,6 +77,9 @@ final class FieldwireController
         'downloadFile'          => P::VEDERE,
         'fileComments'          => P::VEDERE,
         'richiesta'             => P::VEDERE,
+        'linkCondivisi'         => P::VEDERE,
+        'documentoLink'         => P::VEDERE,
+        'collegaLink'           => P::GESTIRE,
         'creaRichiesta'         => P::SCRIVERE,
         'rispondiRichiesta'     => P::SCRIVERE,
         'statoRichiesta'        => P::SCRIVERE,
@@ -1154,8 +1157,14 @@ final class FieldwireController
                 : (isset($prima['folder_id']) ? (int)$prima['folder_id'] : null);
             if ($wsId === null) {
                 $cartella = null;
-            } elseif ($cartella !== null && !isset($this->cartelleVisibili($request, $worksiteId)[$cartella])) {
-                \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+            } elseif ($cartella !== null) {
+                $visibili = $this->cartelleVisibili($request, $worksiteId);
+                if (!isset($visibili[$cartella])) {
+                    \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+                }
+                if (\App\Service\Zone\LinkDocumenti::daLink($visibili[$cartella])) {
+                    throw new \RuntimeException(self::SOLO_LINK);
+                }
             }
 
             $data = [
@@ -1364,6 +1373,13 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = isset($_GET['folder']) && $_GET['folder'] !== '' ? (int)$_GET['folder'] : null;
+            // le cartelle del link condiviso seguono il link (aziende e operai aggiunti o tolti)
+            $link = $this->linkDocumenti();
+            try {
+                if ($link->collegato($worksiteId)) $link->sincronizza($worksiteId, (int)($request->user()->id ?? 0));
+            } catch (\PDOException $e) {
+                // colonne del link non ancora create: i Documenti funzionano lo stesso
+            }
             $cartelle = $this->cartelleVisibili($request, $worksiteId);
             if ($folderId !== null && !isset($cartelle[$folderId])) {
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
@@ -1387,6 +1403,11 @@ final class FieldwireController
                 // le richieste della cartella, e quante sono aperte in ogni cartella
                 'richieste'      => $folderId !== null ? (new \App\Service\Zone\Richieste($this->conn))->diCartella($worksiteId, $folderId) : [],
                 'richieste_aperte' => array_intersect_key((new \App\Service\Zone\Richieste($this->conn))->apertePerCartella($worksiteId), $cartelle),
+                // in una cartella di un'azienda o di un operaio: i documenti dal link
+                'documenti_link' => $folderId !== null && \App\Service\Zone\LinkDocumenti::daLink($cartelle[$folderId] ?? null)
+                    ? array_map(fn($d) => $d + ['url' => "/worksites/{$worksiteId}/zone/link-documento/{$d['tipo']}/{$d['id']}"],
+                                $link->documenti($worksiteId, $cartelle[$folderId]))
+                    : [],
                 'current_folder' => $folderId,
             ];
         });
@@ -1405,8 +1426,12 @@ final class FieldwireController
             // vede e' lo stesso della cartella che la contiene (si cambia dopo)
             $parent = !empty($body['parent_id']) ? (int)$body['parent_id'] : null;
             if ($parent !== null) {
-                if (!isset($this->cartelleVisibili($request, $worksiteId)[$parent])) {
+                $visibili = $this->cartelleVisibili($request, $worksiteId);
+                if (!isset($visibili[$parent])) {
                     \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+                }
+                if (\App\Service\Zone\LinkDocumenti::daLink($visibili[$parent])) {
+                    throw new \RuntimeException(self::SOLO_LINK);
                 }
                 if (!is_array($body['parti'] ?? null) && !is_array($body['persone'] ?? null)) {
                     $body['parti']   = $this->condivisione->partiDi('cartella', [$parent])[$parent] ?? [];
@@ -1426,10 +1451,14 @@ final class FieldwireController
         $this->jsonResponse(function () use ($request) {
             $worksiteId = (int) $request->param('id');
             $folderId   = (int) $request->param('folderId');
-            $st = $this->conn->prepare('SELECT created_by FROM bb_zone_folders WHERE id = :f AND worksite_id = :w');
+            $st = $this->conn->prepare('SELECT * FROM bb_zone_folders WHERE id = :f AND worksite_id = :w');
             $st->execute([':f' => $folderId, ':w' => $worksiteId]);
-            $creata = $st->fetchColumn();
-            if ($creata === false) throw new \RuntimeException('Cartella non trovata');
+            $riga = $st->fetch(\PDO::FETCH_ASSOC);
+            if (!$riga) throw new \RuntimeException('Cartella non trovata');
+            if (\App\Service\Zone\LinkDocumenti::daLink($riga)) {
+                throw new \RuntimeException('Questa cartella arriva dal link condiviso collegato al cantiere: per toglierla, modificare o scollegare il link.');
+            }
+            $creata = $riga['created_by'];
             $this->pretendeMio($request, (int)$creata, 'cartelle');
             // una cartella non dell'ufficio si cancella solo vuota: dentro
             // ci possono essere file di altri
@@ -1456,9 +1485,13 @@ final class FieldwireController
             $worksiteId = (int) $request->param('id');
             $user       = $request->user();
             $folderId   = !empty($_POST['folder_id']) ? (int)$_POST['folder_id'] : null;
-            // si carica solo dove si vede
-            if ($folderId !== null && !isset($this->cartelleVisibili($request, $worksiteId)[$folderId])) {
+            // si carica solo dove si vede, e non nelle cartelle del link
+            $visibili = $this->cartelleVisibili($request, $worksiteId);
+            if ($folderId !== null && !isset($visibili[$folderId])) {
                 \App\Service\Zone\Accesso::nega('Non hai accesso a questa cartella');
+            }
+            if ($folderId !== null && \App\Service\Zone\LinkDocumenti::daLink($visibili[$folderId])) {
+                throw new \RuntimeException(self::SOLO_LINK);
             }
 
             $caricati = $this->fileRicevuti('file');
@@ -1680,6 +1713,80 @@ final class FieldwireController
             }
         }
         return $fuori;
+    }
+
+    // ─── Link di Doc condivisi collegato al cantiere ──────────────────────────
+
+    private const SOLO_LINK = 'I documenti di questa cartella arrivano dal link condiviso e non si modificano da qui. È possibile creare una richiesta.';
+
+    private function linkDocumenti(): \App\Service\Zone\LinkDocumenti
+    {
+        return new \App\Service\Zone\LinkDocumenti($this->conn, $this->condivisione);
+    }
+
+    /** Per CSM: il link collegato e quelli fra cui scegliere. */
+    public function linkCondivisi(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w = (int)$request->param('id');
+            if ($this->ruoloQui($request) !== \App\Service\Zone\Accesso::UFFICIO) {
+                \App\Service\Zone\Accesso::nega('Solo CSM collega un link condiviso al cantiere');
+            }
+            $l = $this->linkDocumenti();
+            return ['collegato' => $l->collegato($w), 'disponibili' => $l->disponibili()];
+        });
+    }
+
+    /** Collega (link_id) o scollega (link_id vuoto) un link al cantiere. */
+    public function collegaLink(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w  = (int)$request->param('id');
+            $id = (int)($this->jsonBody()['link_id'] ?? 0);
+            if ($id > 0) {
+                $st = $this->conn->prepare('SELECT id FROM bb_shared_links WHERE id = :id AND is_active = 1');
+                $st->execute([':id' => $id]);
+                if (!$st->fetchColumn()) {
+                    throw new \RuntimeException('Link condiviso non trovato o non attivo.');
+                }
+            }
+            $this->linkDocumenti()->collega($w, $id > 0 ? $id : null, (int)($request->user()->id ?? 0));
+            return ['collegato' => $this->linkDocumenti()->collegato($w)];
+        });
+    }
+
+    /** Un documento del link, a chi vede la cartella in cui compare. */
+    public function documentoLink(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+        $this->assertZone();
+
+        $w   = (int)$request->param('id');
+        $doc = $this->linkDocumenti()->documento($w, (string)$request->param('tipo'), (int)$request->param('docId'));
+        $vede = false;
+        if ($doc) {
+            foreach ($this->cartelleVisibili($request, $w) as $c) {
+                if (($c['sorgente'] ?? '') === $doc['sorgente'] && (int)$c['sorgente_id'] === $doc['sorgente_id']) { $vede = true; break; }
+            }
+        }
+        $base = realpath(dirname(APP_ROOT) . '/cloud');
+        $real = $doc && $vede && $base ? realpath($base . '/' . $doc['percorso']) : false;
+        if (!$real || strpos($real, $base) !== 0 || !is_file($real)) {
+            http_response_code(404);
+            exit('Documento non trovato');
+        }
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . str_replace('"', '', $doc['nome']) . '.pdf"');
+        header('Content-Length: ' . filesize($real));
+        header('Cache-Control: private, no-store');
+        header('X-Frame-Options: SAMEORIGIN');
+        readfile($real);
+        exit;
     }
 
     // ─── Richieste (nei Documenti) ────────────────────────────────────────────
