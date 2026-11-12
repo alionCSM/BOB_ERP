@@ -78,6 +78,7 @@ final class FieldwireController
         'fileComments'          => P::VEDERE,
         'richiesta'             => P::VEDERE,
         'spostaFile'            => P::CARICARE,
+        'infoFile'              => P::VEDERE,
         'linkCondivisi'         => P::VEDERE,
         'documentoLink'         => P::VEDERE,
         'collegaLink'           => P::GESTIRE,
@@ -756,7 +757,7 @@ final class FieldwireController
             $id = $this->zoneRepo->addComment($taskId, $text, $authorName);
             $this->scriviCommento($id, $request, $body);
             $interna = $this->accesso->daUfficio($user, $worksiteId) && !empty($body['interna']);
-            $this->avvisa(fn($a) => $a->commento($taskId, (int)($user?->id ?? 0), $text, $interna));
+            $this->avvisa(fn($a) => $a->commento($taskId, (int)($user?->id ?? 0), $text, $interna, $id));
             // chi e' stato menzionato con @, fra chi legge questi messaggi
             if (!empty($body['menzioni'])) {
                 try {
@@ -768,7 +769,7 @@ final class FieldwireController
                         \App\Service\Zone\Menzioni::valide($text, (array)$body['menzioni'],
                             $mz->lettori($worksiteId, 'attivita', ['id' => $taskId, 'interna' => $interna], $io)),
                         $io,
-                        'attivita-' . $taskId,
+                        'attivita-' . $taskId . '.c' . $id,
                         $text
                     );
                 } catch (\Throwable $e) {
@@ -845,8 +846,8 @@ final class FieldwireController
                 $taskId,
                 (int)($user?->id ?? 0),
                 $text !== '' ? $text : \App\Service\Lingua::testo('zona_foto_allegata', 'it'),
-                !empty($_POST['interna'])
-            ));
+                !empty($_POST['interna']),
+                $id));
 
             echo json_encode(['ok' => true, 'data' => [
                 'id' => $id, 'text' => $text, 'author_name' => $authorName,
@@ -1647,6 +1648,19 @@ final class FieldwireController
         });
     }
 
+    /** Dove sta un documento (per aprirlo da una notifica, nella sua cartella). */
+    public function infoFile(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $f = $this->fileRepo->find((int)$request->param('fileId'));
+            $this->fileVisibile($request, $f);
+            return ['id' => (int)$f['id'], 'folder_id' => $f['folder_id'] !== null ? (int)$f['folder_id'] : null,
+                    'file_name' => $f['file_name'], 'file_type' => strtolower((string)$f['file_type'])];
+        });
+    }
+
     public function deleteFile(Request $request): void
     {
         $this->guardia(__FUNCTION__, $request);
@@ -1723,7 +1737,7 @@ final class FieldwireController
             $this->fileVisibile($request, $this->fileRepo->find($fileId));
             $author = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')) ?: ($user->username ?? 'Utente');
             $id = $this->fileRepo->addComment($fileId, $text, $author, (int)($user?->id ?? 0));
-            $this->avvisaMenzioniZona((int)$request->param('id'), 'file', $fileId, 'file-' . $fileId, $text, (array)($body['menzioni'] ?? []), (int)($user?->id ?? 0));
+            $this->avvisaMenzioniZona((int)$request->param('id'), 'file', $fileId, 'file-' . $fileId . '.commenti', $text, (array)($body['menzioni'] ?? []), (int)($user?->id ?? 0));
             return ['id' => $id, 'text' => $text, 'author_name' => $author, 'created_at' => date('Y-m-d H:i:s')];
         });
     }
@@ -1885,7 +1899,11 @@ final class FieldwireController
     /** Le richieste di una cartella, o quelle in cima che chi chiede vede. */
     private function richiesteQui(Request $request, int $w, ?int $folderId): array
     {
-        $tutte = (new \App\Service\Zone\Richieste($this->conn))->diCartella($w, $folderId);
+        // una richiesta completata non resta nella cartella: i suoi documenti si'
+        $tutte = array_values(array_filter(
+            (new \App\Service\Zone\Richieste($this->conn))->diCartella($w, $folderId),
+            fn($r) => $r['stato'] === \App\Service\Zone\Richieste::APERTA
+        ));
         if ($folderId !== null) {
             return $tutte;
         }

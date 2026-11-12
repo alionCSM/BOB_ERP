@@ -91,7 +91,8 @@ final class ZoneDialogoController
                 $this->messaggi->fissa($id, true, $io);
             }
             $this->avvisaChat($w, $canale, $id, $request, $fissa);
-            $this->avvisaMenzioni($w, 'chat', ['canale' => $canale], 'chat-' . $canale, $body, $io);
+            // il link porta al messaggio preciso: chat-cliente.m123
+            $this->avvisaMenzioni($w, 'chat', ['canale' => $canale], 'chat-' . $canale . '.m' . $id, $body, $io);
             return $this->messaggi->elenco($w, $canale, null, $id - 1, 1)[0] ?? ['id' => $id];
         });
     }
@@ -235,8 +236,8 @@ final class ZoneDialogoController
             $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
             $body = $this->corpo();
             $id = $this->messaggi->scrivi($w, null, (int)$s['id'], $io, $body['testo'] ?? null);
-            $this->avvisaFilo($s, $request);
-            $this->avvisaMenzioni($w, 'segnalazione', ['id' => (int)$s['id']], 'segnalazione-' . $s['id'], $body, $io);
+            $this->avvisaFilo($s, $request, $id);
+            $this->avvisaMenzioni($w, 'segnalazione', ['id' => (int)$s['id']], 'segnalazione-' . $s['id'] . '.m' . $id, $body, $io);
             return $this->messaggi->elenco($w, null, (int)$s['id'], $id - 1, 1)[0] ?? ['id' => $id];
         });
     }
@@ -251,7 +252,7 @@ final class ZoneDialogoController
             // la foto di chi l'ha appena aperta non avvisa di nuovo: l'avviso
             // della segnalazione e' partito un attimo fa
             if ((int)$s['created_by'] !== $io || strtotime((string)$s['created_at']) < time() - 600) {
-                $this->avvisaFilo($s, $request);
+                $this->avvisaFilo($s, $request, $id);
             }
             return $this->messaggi->elenco($w, null, (int)$s['id'], $id - 1, 1)[0] ?? ['id' => $id];
         });
@@ -306,8 +307,9 @@ final class ZoneDialogoController
                 ->execute([':s' => $id, ':w' => $w]);
             $this->conn->prepare('DELETE FROM bb_zone_annotations WHERE segnalazione_id = :s AND worksite_id = :w')
                 ->execute([':s' => $id, ':w' => $w]);
-            $this->conn->prepare('DELETE FROM bb_notifications WHERE link = :l')
-                ->execute([':l' => Segnalazioni::link($w, 'segnalazione-' . $id)]);
+            // anche quelle che portano a un messaggio preciso (segnalazione-12.m5)
+            $this->conn->prepare('DELETE FROM bb_notifications WHERE link = :l OR link LIKE :l2')
+                ->execute([':l' => Segnalazioni::link($w, 'segnalazione-' . $id), ':l2' => Segnalazioni::link($w, 'segnalazione-' . $id) . '.%']);
             $this->conn->prepare('DELETE FROM bb_zone_segnalazioni WHERE id = :s AND worksite_id = :w')
                 ->execute([':s' => $id, ':w' => $w]);
             return ['eliminata' => true];
@@ -568,7 +570,7 @@ final class ZoneDialogoController
                     $p['user_id'],
                     \App\Service\Lingua::testo($fissato ? 'zona_avviso_t' : 'zona_chat_t', $p['lingua'], ['cantiere' => $cantiere]),
                     ($m['autore'] ?? 'BOB') . ': ' . $this->anteprima($m, $p['lingua']),
-                    Segnalazioni::link($w, 'chat-' . $canale),
+                    Segnalazioni::link($w, 'chat-' . $canale . '.m' . $id),
                     'zone',
                     $fissato ? 'high' : 'normal',
                     $io,
@@ -578,7 +580,7 @@ final class ZoneDialogoController
     }
 
     /** Push per un messaggio nel filo di una segnalazione. */
-    private function avvisaFilo(array $s, Request $request): void
+    private function avvisaFilo(array $s, Request $request, ?int $messaggioId = null): void
     {
         $io = (int)($request->user()->id ?? 0);
         $this->avvisa(function (NotificationService $n) use ($s, $io) {
@@ -595,7 +597,7 @@ final class ZoneDialogoController
                     $p['user_id'],
                     \App\Service\Lingua::testo('zona_segn_msg_t', $p['lingua']),
                     $this->nomeCantiere($w) . ': ' . mb_substr((string)$s['testo'], 0, 100),
-                    Segnalazioni::link($w, 'segnalazione-' . $s['id']),
+                    Segnalazioni::link($w, 'segnalazione-' . $s['id'] . ($messaggioId ? '.m' . $messaggioId : '')),
                     'zone',
                     'normal',
                     $io,

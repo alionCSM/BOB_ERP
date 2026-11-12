@@ -128,7 +128,7 @@
                     <h3>${esc(q.titolo)}</h3>
                     <div class="bzr-sub">Aperta da ${esc(q.creata_da_nome || '—')} · ${esc(quando(q.created_at))}${fatta && q.completata_da_nome ? ` · completata da ${esc(q.completata_da_nome)} ${esc(quando(q.completata_at))}` : ''}</div>
                 </div>
-                <div class="bzr-filo">${messaggi.map(riga).join('')}</div>
+                <div class="bzr-filo">${messaggi.map(m => riga(m, fatta)).join('')}</div>
                 <div class="bzr-scrivi">
                     <textarea id="bzr-risposta" rows="3" placeholder="Scrivere una risposta... (@ per menzionare)"></textarea>
                     <div class="bzr-chips" id="bzr-risposta-lista"></div>
@@ -159,7 +159,7 @@
         filo.scrollTop = filo.scrollHeight;
     }
 
-    function riga(m) {
+    function riga(m, fatta = false) {
         if (m.sistema) {
             return `<div class="bzr-sys">${m.sistema === 'completata' ? '<i class="fas fa-check"></i> Completata' : '<i class="fas fa-rotate-left"></i> Riaperta'} da ${esc(m.autore || '—')} · ${esc(quando(m.created_at))}</div>`;
         }
@@ -169,7 +169,7 @@
                 <a href="${esc(a.download_url)}" target="_blank" rel="noopener">${esc(a.file_name)}</a>
                 ${a.origine ? '<span class="bzr-compilato">Versione compilata</span>' : ''}
                 <span class="bzr-peso">${peso(a.size_bytes)}</span>
-                ${a.file_type === 'pdf' ? `<button type="button" class="bzr-btn piccolo" data-bzr-compila="${a.id}" data-url="${esc(a.download_url)}" data-nome="${esc(a.file_name)}" title="Compilare il PDF in BOB e inviarlo come risposta"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
+                ${a.file_type === 'pdf' && !fatta ? `<button type="button" class="bzr-btn piccolo" data-bzr-compila="${a.id}" data-url="${esc(a.download_url)}" data-nome="${esc(a.file_name)}" title="Compilare il PDF in BOB e inviarlo come risposta"><i class="fas fa-pen-to-square"></i> Compila</button>` : ''}
             </div>` : '<div class="bzr-allegato via"><i class="fas fa-file-circle-xmark"></i> Documento eliminato dalla cartella</div>').join('');
         const testo = m.testo ? `<div class="bzr-testo">${window.BZMenzioni ? BZMenzioni.evidenzia(esc(m.testo)) : esc(m.testo)}</div>` : '';
         return `

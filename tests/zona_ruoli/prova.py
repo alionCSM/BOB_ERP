@@ -345,6 +345,8 @@ dk = chiama(CLI, 'GET', f'/richieste/{rid}')['data']
 verifica(S, 'nella discussione: stato completata, due messaggi con i documenti, e la riga di chiusura',
          dk['richiesta']['stato'] == 'completata' and [len(m['allegati']) for m in dk['messaggi'] if not m['sistema']] == [1, 1]
          and dk['messaggi'][-1]['sistema'] == 'completata', str(dk)[:400])
+verifica(S, 'una richiesta completata sparisce dalla cartella (i documenti restano)', rid not in [x['id'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['richieste']]
+         and 'modulo_collaudo.pdf' in [x['file_name'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files']])
 verifica(S, 'gli allegati si scaricano dalla cartella', dk['messaggi'][0]['allegati'][0]['download_url'].endswith('/download'))
 verifica(S, 'la squadra che vede la cartella legge la richiesta', puo(chiama(CAPO, 'GET', f'/richieste/{rid}')))
 verifica(S, '... ma non la elimina (non è sua)', not puo(chiama(CAPO, 'POST', f'/richieste/{rid}/elimina', {})))
@@ -403,7 +405,7 @@ mzf = {x['nome'] for x in chiama(CLI, 'GET', f'/menzionabili?contesto=file&id={f
 verifica(S, 'nei commenti a un documento si menziona chi lo vede', 'Giulia Ufficio' in mzf, str(mzf))
 pulisci_notifiche()
 chiama(CLI, 'POST', f'/files/{fm}/comments', {'text': '@Giulia Ufficio lo potete controllare?', 'menzioni': [UFF]})
-verifica(S, '... e la persona menzionata riceve la notifica', any('menzionato' in n[0] and n[1].endswith(f'#file-{fm}') for n in notifiche(UFF)), str(notifiche(UFF)))
+verifica(S, '... e la persona menzionata riceve la notifica', any('menzionato' in n[0] and n[1].endswith(f'#file-{fm}.commenti') for n in notifiche(UFF)), str(notifiche(UFF)))
 mzc = {x['nome'] for x in chiama(UFF, 'GET', f'/menzionabili?contesto=cartella&id={f2}')['data']}
 verifica(S, 'in una cartella di sola CSM il committente non si menziona', 'Paolo Rossi' not in mzc, str(mzc))
 verifica(S, 'il committente non chiede chi legge una cartella che non vede', chiama(CLI, 'GET', f'/menzionabili?contesto=cartella&id={f2}')['_http'] == 403)
@@ -412,6 +414,19 @@ verifica(S, 'scrivendo una segnalazione si menziona chi la leggerà', 'Giulia Uf
 pulisci_notifiche()
 chiama(CAPO, 'POST', '/segnalazioni', {'testo': '@Paolo Rossi serve il vostro via libera per la gru', 'tipo': 'altro', 'menzioni': [CLI]})
 verifica(S, 'menzione in una segnalazione nuova: notifica al committente', any('menzionato' in n[0] for n in notifiche(CLI)), str(notifiche(CLI)))
+
+S = '6e. Notifiche precise'
+pulisci_notifiche()
+cm = chiama(CLI, 'POST', '/chat/cliente', {'testo': 'Consegna confermata'})
+mid = cm['data']['id'] if puo(cm) else 0
+verifica(S, 'la notifica di un messaggio porta a quel messaggio', any(n[1].endswith(f'#chat-cliente.m{mid}') for n in notifiche(UFF)), str(notifiche(UFF)))
+chiama(UFF, 'GET', '/chat/cliente')   # aperto: il prossimo messaggio avvisa di nuovo
+pulisci_notifiche()
+ck = chiama(UFF, 'POST', f'/tasks/{ta}/comments', {'text': 'Quote verificate'})
+verifica(S, "la notifica di un commento porta a quel commento dell'attività", any(f'#attivita-{ta}.c{ck["data"]["id"]}' in n[1] for n in notifiche(CLI)), str(notifiche(CLI)))
+inf = chiama(UFF, 'GET', f'/files/{fm}/info')['data']
+verifica(S, 'si sa in che cartella sta un documento, per aprirlo dalla notifica', inf['folder_id'] == fdest, str(inf))
+verifica(S, '... ma solo se lo si vede', chiama(ALTRO, 'GET', f'/files/{fm}/info')['_http'] in (403, 404))
 
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
@@ -449,7 +464,7 @@ verifica(S, 'chat della squadra: CSM menziona il capo, non il cliente', 'Arben H
 pulisci_notifiche()
 chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Giulia Ufficio può confermare la consegna?', 'menzioni': [UFF]})
 menz = lambda u: [n for n in notifiche(u) if 'menzionato' in n[0]]
-verifica(S, 'la persona menzionata riceve la notifica', len(menz(UFF)) == 1 and menz(UFF)[0][1].endswith('#chat-cliente'), str(notifiche(UFF)))
+verifica(S, 'la persona menzionata riceve la notifica', len(menz(UFF)) == 1 and '#chat-cliente.m' in menz(UFF)[0][1], str(notifiche(UFF)))
 pulisci_notifiche()
 chiama(CLI, 'POST', '/chat/cliente', {'testo': '@Arben Hoxha domani ci sei?', 'menzioni': [CAPO]})
 verifica(S, 'menzionare chi non legge la chat non avvisa nessuno', len(menz(CAPO)) == 0)
@@ -461,7 +476,7 @@ m4 = nomi_mz(mz(UFF, f'contesto=attivita&id={t1}'))
 verifica(S, "messaggio sull'attività: si menziona chi la vede", 'Paolo Rossi' in m4, str(m4))
 pulisci_notifiche()
 chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi serve la vostra conferma', 'menzioni': [CLI]})
-verifica(S, "menzione in un'attività: notifica al committente", len(menz(CLI)) == 1 and menz(CLI)[0][1].endswith(f'#attivita-{t1}'), str(notifiche(CLI)))
+verifica(S, "menzione in un'attività: notifica al committente", len(menz(CLI)) == 1 and f'#attivita-{t1}.c' in menz(CLI)[0][1], str(notifiche(CLI)))
 pulisci_notifiche()
 chiama(UFF, 'POST', f'/tasks/{t1}/comments', {'text': '@Paolo Rossi solo interno', 'menzioni': [CLI], 'interna': True})
 verifica(S, 'menzione in una nota interna: il committente non riceve nulla', len(menz(CLI)) == 0)
