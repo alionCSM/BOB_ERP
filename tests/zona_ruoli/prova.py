@@ -345,6 +345,8 @@ dk = chiama(CLI, 'GET', f'/richieste/{rid}')['data']
 verifica(S, 'nella discussione: stato completata, due messaggi con i documenti, e la riga di chiusura',
          dk['richiesta']['stato'] == 'completata' and [len(m['allegati']) for m in dk['messaggi'] if not m['sistema']] == [1, 1]
          and dk['messaggi'][-1]['sistema'] == 'completata', str(dk)[:400])
+verifica(S, 'una richiesta completata sparisce dalla cartella (i documenti restano)', rid not in [x['id'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['richieste']]
+         and 'modulo_collaudo.pdf' in [x['file_name'] for x in chiama(UFF, 'GET', f'/files?folder={f1}')['data']['files']])
 verifica(S, 'gli allegati si scaricano dalla cartella', dk['messaggi'][0]['allegati'][0]['download_url'].endswith('/download'))
 verifica(S, 'la squadra che vede la cartella legge la richiesta', puo(chiama(CAPO, 'GET', f'/richieste/{rid}')))
 verifica(S, '... ma non la elimina (non è sua)', not puo(chiama(CAPO, 'POST', f'/richieste/{rid}/elimina', {})))

@@ -1885,7 +1885,11 @@ final class FieldwireController
     /** Le richieste di una cartella, o quelle in cima che chi chiede vede. */
     private function richiesteQui(Request $request, int $w, ?int $folderId): array
     {
-        $tutte = (new \App\Service\Zone\Richieste($this->conn))->diCartella($w, $folderId);
+        // una richiesta completata non resta nella cartella: i suoi documenti si'
+        $tutte = array_values(array_filter(
+            (new \App\Service\Zone\Richieste($this->conn))->diCartella($w, $folderId),
+            fn($r) => $r['stato'] === \App\Service\Zone\Richieste::APERTA
+        ));
         if ($folderId !== null) {
             return $tutte;
         }

@@ -63,7 +63,7 @@ final class ZoneFileRepository
             SELECT f.*,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS uploader,
                    (SELECT COUNT(*) FROM bb_zone_file_comments c WHERE c.file_id = f.id) AS comment_count,
-                   r.titolo AS richiesta_titolo
+                   r.titolo AS richiesta_titolo, r.stato AS richiesta_stato
             FROM bb_zone_files f
             LEFT JOIN bb_users u ON u.id = f.uploaded_by
             LEFT JOIN bb_zone_richieste r ON r.id = f.richiesta_id
