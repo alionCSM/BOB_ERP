@@ -110,6 +110,9 @@
                             data-expires="{{ link.expires_at is not empty ? link.expires_at|date('Y-m-d') : '9999-12-31' }}">
                             <td class="sl-title-cell">
                                 {{ link.title }}
+                                {% if link.richieste %}
+                                    <a href="/share/{{ link.id }}/edit#richieste" style="display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:999px;padding:1px 8px;text-decoration:none;" title="Richieste di documenti arrivate dai cantieri">{{ link.richieste }} {{ link.richieste == 1 ? 'richiesta' : 'richieste' }}</a>
+                                {% endif %}
                                 {% if link.cantieri is not empty %}
                                     <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;" title="Cantieri collegati: i documenti compaiono nella loro BOB Zone">
                                         {% for c in link.cantieri %}

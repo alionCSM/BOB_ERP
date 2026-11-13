@@ -222,6 +222,9 @@ final class CompaniesController
             }
 
             $this->ctrl->updateDocumentFromRequest($_POST, $_FILES, (int)$user->id);
+            if (!empty($_FILES['document_file']['tmp_name'])) {
+                \App\Service\Zone\RichiesteLink::dopoDocumento($this->conn, 'azienda', 0, (int)$_POST['document_id'], (int)$user->id);
+            }
             Response::json(['success' => true]);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'error' => $e->getMessage()]);
@@ -246,6 +249,8 @@ final class CompaniesController
             }
 
             $this->ctrl->uploadDocumentFromRequest($_POST, $_FILES, (int)$user->id);
+            // un documento nuovo chiude le richieste aperte per quell'azienda nella BOB Zone
+            \App\Service\Zone\RichiesteLink::dopoDocumento($this->conn, 'azienda', (int)$_POST['company_id'], null, (int)$user->id);
             AuditLogger::log(
                 $this->conn, $user, 'company_doc_upload', 'company_document', null,
                 $_POST['doc_type'] ?? null,

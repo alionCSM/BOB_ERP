@@ -52,6 +52,11 @@ final class DocumentsController
 
             $controller = new WorkerDocumentController($this->conn);
             $controller->updateFromRequest($user, (int)$user->id, $_POST, $_FILES);
+            // un documento rinnovato (file nuovo) chiude le richieste aperte nella BOB Zone
+            if (!empty($_FILES) && array_filter(array_column($_FILES, 'tmp_name'))) {
+                $docId = (int)($_POST['document_id'] ?? $_POST['doc_id'] ?? 0);
+                \App\Service\Zone\RichiesteLink::dopoDocumento($this->conn, 'operaio', (int)($_POST['worker_id'] ?? 0), $docId ?: null, (int)$user->id);
+            }
 
             Response::json(['success' => true]);
         } catch (\Throwable $e) {
@@ -70,6 +75,8 @@ final class DocumentsController
         try {
             $controller = new WorkerDocumentController($this->conn);
             $controller->uploadFromRequest($user, $_POST, $_FILES);
+            // un documento nuovo chiude le richieste aperte per quell'operaio nella BOB Zone
+            \App\Service\Zone\RichiesteLink::dopoDocumento($this->conn, 'operaio', (int)($_POST['worker_id'] ?? 0), null, (int)$user->id);
             AuditLogger::log(
                 $this->conn, $user, 'document_upload', 'document', null,
                 $_POST['doc_type'] ?? null,

@@ -1167,6 +1167,7 @@ if ($uri === '/share' || str_starts_with($uri, '/share/')) {
            ->post('/share/{id}/edit',                        [\ShareController::class, 'edit'])
            ->post('/share/delete',                           [\ShareController::class, 'destroy'])
            ->post('/share/toggle-active',                    [\ShareController::class, 'toggleActive'])
+           ->post('/share/richieste/{rid}/completa',         [\ShareController::class, 'completaRichiesta'])
            ->post('/share/update-password',                  [\ShareController::class, 'updatePassword'])
            ->get('/share/fetch-companies',                   [\ShareController::class, 'fetchCompanies'])
            ->get('/share/fetch-company-documents',           [\ShareController::class, 'fetchCompanyDocuments'])

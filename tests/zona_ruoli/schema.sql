@@ -58,6 +58,7 @@ CREATE TABLE test_email(id INT AUTO_INCREMENT PRIMARY KEY, a VARCHAR(80), oggett
 INSERT INTO bb_clients VALUES (1,'Rossi Logistica Spa'),(2,'Bianchi Srl');
 -- 1 superadmin escluso apposta; 5 ufficio; 6 ufficio senza accesso; 30 capo; 10/11 cliente Rossi; 20 cliente Bianchi
 INSERT INTO bb_users(id,username,first_name,last_name,email,type,client_id,worker_id) VALUES
+ (7,'sara','Sara','Documenti','sara@test.it','user',NULL,NULL),
  (5,'giulia','Giulia','Ufficio','giulia@test.it','user',NULL,NULL),
  (6,'marco','Marco','Ufficio','marco@test.it','user',NULL,NULL),
  (30,'arben','Arben','Hoxha','arben@test.it','worker',NULL,300),
@@ -90,3 +91,4 @@ INSERT INTO bb_zone_condivisioni_ruoli VALUES (100,'disegno',1,'cantiere',NOW())
 CREATE TABLE bb_zone_presenze_manuali(id INT AUTO_INCREMENT PRIMARY KEY, worksite_id INT, data DATE, nome VARCHAR(120) NULL, azienda VARCHAR(120) NULL,
   persone INT DEFAULT 1, mezza TINYINT DEFAULT 0, created_by INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE bb_zone_task_eventi(id INT AUTO_INCREMENT PRIMARY KEY, task_id INT, worksite_id INT, user_id INT NULL, stato_da VARCHAR(20) NULL, stato_a VARCHAR(20), created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO bb_user_permissions VALUES (7,'share',1);
