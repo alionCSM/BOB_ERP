@@ -596,6 +596,17 @@ final class FieldwireController
         });
     }
 
+    /** Le segnalazioni collegate a un'attivita' ne seguono stato e responsabile. */
+    private function segnalazioniSeguono(int $taskId, int $io): void
+    {
+        try {
+            (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
+                ->seguiAttivita($taskId, $io, new \App\Service\Notifications\NotificationService($this->conn, $this->config));
+        } catch (\Throwable $e) {
+            error_log('[Segnalazioni seguono attivita] ' . $e->getMessage());
+        }
+    }
+
     /** Collega una segnalazione (che chi crea l'attivita' vede) all'attivita' nuova. */
     private function collegaSegnalazione(Request $request, int $w, int $taskId, int $sid, bool $copiaPunto): void
     {
@@ -609,11 +620,8 @@ final class FieldwireController
                 return;
             }
             $svc->collegaAttivita($sid, $taskId);
-            if ($s['stato'] === 'aperta') {
-                $svc->cambiaStato($s, 'presa', $io, null);
-                $notifiche = new \App\Service\Notifications\NotificationService($this->conn, $this->config);
-                $svc->avvisaStato($notifiche, $sid, $io);
-            }
+            // da ora la segnalazione segue l'attivita' (in carico a chi ce l'ha)
+            $svc->seguiAttivita($taskId, $io, new \App\Service\Notifications\NotificationService($this->conn, $this->config));
             if ($copiaPunto && ($pin = $this->annRepo->perSegnalazione($sid))) {
                 $this->annRepo->create([
                     'worksite_id' => $w, 'document_id' => $pin['disegno'], 'page' => $pin['pagina'], 'type' => 'pin',
@@ -659,6 +667,8 @@ final class FieldwireController
             if ((int)($dopo['assignee_user_id'] ?? 0) !== (int)($existing['assignee_user_id'] ?? 0)
                 || ($dopo['assegnata_a'] ?? '') !== ($existing['assegnata_a'] ?? '')) {
                 $this->avvisa(fn($a) => $a->attivita($taskId, (int)($request->user()?->id ?? 0)));
+                // "in carico a" della segnalazione collegata segue chi ha l'attivita'
+                $this->segnalazioniSeguono($taskId, (int)($request->user()?->id ?? 0));
             }
 
             // push update su Fieldwire se collegato
@@ -708,6 +718,9 @@ final class FieldwireController
                     // tabella non ancora creata: lo stato e' cambiato lo stesso
                 }
             }
+
+            // le segnalazioni collegate seguono lo stato dell'attivita'
+            $this->segnalazioniSeguono($taskId, (int)($request->user()->id ?? 0));
 
             // push status su Fieldwire
             $task     = $this->zoneRepo->find($taskId);

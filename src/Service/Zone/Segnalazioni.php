@@ -61,6 +61,7 @@ final class Segnalazioni
             SELECT s.*,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS autore,
                    TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))) AS presa_da_nome,
+                   tk.assegnata_a AS task_assegnata_a, tk.name AS task_nome,
                    (SELECT COUNT(*) FROM bb_zone_messaggi m
                      WHERE m.segnalazione_id = s.id AND m.foto IS NOT NULL AND m.eliminato_at IS NULL) AS foto,
                    (SELECT MAX(m.id) FROM bb_zone_messaggi m WHERE m.segnalazione_id = s.id) AS ultimo_msg,
@@ -74,6 +75,7 @@ final class Segnalazioni
             FROM   bb_zone_segnalazioni s
             JOIN   bb_users u ON u.id = s.created_by
             LEFT JOIN bb_users p ON p.id = s.presa_da
+            LEFT JOIN bb_zone_tasks tk ON tk.id = s.task_id
             WHERE  s.worksite_id = :w
             ORDER BY FIELD(s.stato, 'aperta', 'presa', 'risolta'),
                      FIELD(s.gravita, 'blocca', 'alta', 'bassa'),
@@ -101,10 +103,12 @@ final class Segnalazioni
             SELECT s.*,
                    TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS autore,
                    TRIM(CONCAT(COALESCE(p.first_name,''),' ',COALESCE(p.last_name,''))) AS presa_da_nome,
+                   tk.assegnata_a AS task_assegnata_a, tk.name AS task_nome,
                    0 AS foto, NULL AS ultimo_msg
             FROM   bb_zone_segnalazioni s
             JOIN   bb_users u ON u.id = s.created_by
             LEFT JOIN bb_users p ON p.id = s.presa_da
+            LEFT JOIN bb_zone_tasks tk ON tk.id = s.task_id
             WHERE  s.id = :id
         ");
         $st->execute([':id' => $id]);
@@ -172,6 +176,44 @@ final class Segnalazioni
             $stato === 'risolta' ? ($par[':e'] ?? null) : null,
             'sys_' . $stato, null, true,
         );
+    }
+
+    /**
+     * Una segnalazione collegata a un'attivita' ne segue lo stato:
+     *   attivita' aperta o in corso  -> presa in carico (da chi ha l'attivita')
+     *   attivita' completata/verificata -> risolta
+     *   attivita' riaperta            -> di nuovo presa in carico
+     * "In carico a" e' la persona a cui e' assegnata l'attivita' (non chi l'ha
+     * creata); se e' assegnata a un gruppo, il gruppo. Chi ha aperto la
+     * segnalazione riceve l'avviso di ogni cambio.
+     */
+    public function seguiAttivita(int $taskId, int $daChi, ?NotificationService $n = null): void
+    {
+        $st = $this->conn->prepare('SELECT id, name, status, assignee_user_id, assegnata_a FROM bb_zone_tasks WHERE id = :t');
+        $st->execute([':t' => $taskId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) {
+            return;
+        }
+        $ids = $this->conn->prepare('SELECT id FROM bb_zone_segnalazioni WHERE task_id = :t');
+        $ids->execute([':t' => $taskId]);
+        $responsabile = !empty($t['assignee_user_id']) ? (int)$t['assignee_user_id'] : null;
+        $voluto = in_array($t['status'], ['complete', 'verified'], true) ? 'risolta' : 'presa';
+        foreach (array_map('intval', $ids->fetchAll(PDO::FETCH_COLUMN)) as $sid) {
+            $s = $this->trova($sid);
+            if (!$s) continue;
+            if ($s['stato'] !== $voluto) {
+                // la riga del filo la firma chi ha l'attivita' (o chi l'ha cambiata)
+                $this->cambiaStato($s, $voluto, $responsabile ?? $daChi,
+                    $voluto === 'risolta' ? 'Risolta con l\'attività «' . $t['name'] . '»' : null);
+                if ($n) {
+                    try { $this->avvisaStato($n, $sid, $daChi); } catch (\Throwable $e) { error_log('[Segnalazione segue attivita] ' . $e->getMessage()); }
+                }
+            }
+            // in carico a chi ha l'attivita' (NULL = un gruppo: si mostra il gruppo)
+            $this->conn->prepare('UPDATE bb_zone_segnalazioni SET presa_da = :p WHERE id = :id')
+                ->execute([':p' => $responsabile, ':id' => $sid]);
+        }
     }
 
     public function cambiaVisibilita(int $id, string $vis): void
@@ -314,6 +356,14 @@ final class Segnalazioni
         $s['presa_da']  = $s['presa_da'] !== null ? (int)$s['presa_da'] : null;
         $s['task_id']   = $s['task_id'] !== null ? (int)$s['task_id'] : null;
         $s['presa_da_nome'] = trim((string)$s['presa_da_nome']) ?: null;
+        // collegata a un'attivita' assegnata a un gruppo: in carico al gruppo
+        if ($s['presa_da_nome'] === null && $s['task_id'] && $s['stato'] !== 'aperta') {
+            $s['presa_da_nome'] = match ((string)($s['task_assegnata_a'] ?? '')) {
+                'ufficio' => 'CSM',
+                'cliente' => 'Committente',
+                default   => 'Squadra',
+            };
+        }
         $s['disegno_id'] = isset($s['disegno_id']) && $s['disegno_id'] !== null
             ? (int)$s['disegno_id'] : null;
         $s['disegno_pagina'] = isset($s['disegno_pagina']) && $s['disegno_pagina'] !== null

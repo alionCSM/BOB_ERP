@@ -267,7 +267,8 @@
         const t = TIPI[s.tipo] || TIPI.altro;
         const gest = r.data.puo_gestire;
         const azioni = [];
-        if (gest) {
+        // collegata a un'attivita': lo stato segue l'attivita', niente bottoni
+        if (gest && !s.task_id) {
             if (s.stato === 'aperta') azioni.push('<button class="bzd-btn blu" data-bzd-stato="presa"><i class="fas fa-hand"></i> Prendi in carico</button>');
             if (s.stato !== 'risolta') azioni.push('<button class="bzd-btn verde" data-bzd-stato="risolta"><i class="fas fa-check"></i> Risolta</button>');
             if (s.stato === 'risolta') azioni.push('<button class="bzd-btn" data-bzd-stato="aperta"><i class="fas fa-rotate-left"></i> Riapri</button>');
@@ -297,6 +298,7 @@
                     ${s.presa_da_nome ? ` · in carico a <b>${esc(s.presa_da_nome)}</b>` : ''}
                     ${s.task_id ? ` · <a href="#" data-bzd-task="${s.task_id}" style="color:#60a5fa">Apri attività</a>` : ''}
                 </div>
+                ${s.task_id ? `<div class="sub" style="margin-top:4px"><i class="fas fa-link"></i> Lo stato segue l'attività collegata${s.task_nome ? ' «' + esc(s.task_nome) + '»' : ''}.</div>` : ''}
                 ${r.data.disegno ? `<div class="sub" style="margin-top:6px">
                     <button type="button" class="bzd-link-disegno" data-annot="${r.data.disegno.document_id}" data-annot-type="${esc(r.data.disegno.tipo)}"
                             data-annot-name="${esc(r.data.disegno.nome)}" data-annot-page="${r.data.disegno.page || 1}"

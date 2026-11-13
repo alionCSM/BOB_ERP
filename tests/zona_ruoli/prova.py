@@ -470,6 +470,22 @@ ss = sql(f"SELECT task_id, stato FROM bb_zone_segnalazioni WHERE id={sp}")
 verifica(S, "attività creata dal modulo completo partendo da una segnalazione: collegata, e la segnalazione è presa in carico", ss == [[str(ta2), 'presa']], str(ss))
 verifica(S, "... e l'attività prende il punto della segnalazione sul disegno", sql(f"SELECT document_id FROM bb_zone_annotations WHERE task_id={ta2}") == [['1']])
 
+S = '6g. Segnalazione che segue la sua attività'
+sx = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Porta tagliafuoco danneggiata', 'tipo': 'danno'})['data']['id']
+tx = chiama(UFF, 'POST', '/tasks', {'name': 'Riparare la porta tagliafuoco', 'assegnata_a': 'persona', 'assignee_user_id': CAPO, 'da_segnalazione': sx})['data']['id']
+sg = lambda: chiama(UFF, 'GET', f'/segnalazioni/{sx}')['data']['segnalazione']
+verifica(S, "presa in carico dalla persona a cui è assegnata l'attività (non da chi l'ha creata)", sg()['stato'] == 'presa' and sg()['presa_da_nome'] == 'Arben Hoxha', str(sg())[:300])
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{tx}/status', {'status': 'complete'})
+verifica(S, "attività completata: la segnalazione diventa risolta, con l'attività come esito", sg()['stato'] == 'risolta' and 'Riparare la porta' in (sg().get('esito') or ''), str(sg())[:300])
+verifica(S, '... e chi l\'aveva aperta riceve l\'avviso', len(notifiche(CLI)) >= 1, str(notifiche(CLI)))
+chiama(UFF, 'POST', f'/tasks/{tx}/status', {'status': 'open'})
+verifica(S, 'attività riaperta: la segnalazione torna presa in carico', sg()['stato'] == 'presa')
+sy = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Ponteggio lato est da controllare', 'tipo': 'sicurezza'})['data']['id']
+chiama(UFF, 'POST', '/tasks', {'name': 'Controllo ponteggio est', 'assegnata_a': 'squadra', 'da_segnalazione': sy})
+sgy = chiama(UFF, 'GET', f'/segnalazioni/{sy}')['data']['segnalazione']
+verifica(S, "attività alla squadra: in carico alla squadra", sgy['stato'] == 'presa' and sgy['presa_da_nome'] == 'Squadra', str(sgy)[:300])
+
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
 verifica(S, 'cliente: Ufficio e Tutto il cantiere', canali(CLI) == ['cliente', 'tutti'], str(canali(CLI)))

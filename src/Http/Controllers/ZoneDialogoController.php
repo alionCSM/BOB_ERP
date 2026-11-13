@@ -264,6 +264,10 @@ final class ZoneDialogoController
         $this->json(function () use ($request) {
             [$w, $ruolo, $io] = $this->chi($request);
             $s = $this->segnalazioneMia($request, $w, $ruolo, $io);
+            // collegata a un'attivita': lo stato lo decide l'attivita'
+            if (!empty($s['task_id'])) {
+                throw new \RuntimeException('Lo stato di questa segnalazione segue l\'attività collegata: cambiare lo stato dell\'attività.');
+            }
             if (!Segnalazioni::puoGestire($ruolo)) {
                 Accesso::nega('La segnalazione la gestiscono capo squadra e CSM');
             }
@@ -349,10 +353,8 @@ final class ZoneDialogoController
                 ->aggiungiAssegnatari($w, $taskId);
 
             $this->segnalazioni->collegaAttivita((int)$s['id'], $taskId);
-            if ($s['stato'] === 'aperta') {
-                $this->segnalazioni->cambiaStato($s, 'presa', $io, null);
-                $this->avvisa(fn(NotificationService $n) => $this->segnalazioni->avvisaStato($n, (int)$s['id'], $io));
-            }
+            // da ora segue l'attivita' (in carico a chi ce l'ha)
+            $this->avvisa(fn(NotificationService $n) => $this->segnalazioni->seguiAttivita($taskId, $io, $n));
             $this->avvisa(function (NotificationService $n) use ($taskId, $io) {
                 (new \App\Service\Zone\AvvisiZona($this->conn, $n))->attivita($taskId, $io);
             });
