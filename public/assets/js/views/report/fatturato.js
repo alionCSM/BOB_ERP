@@ -152,11 +152,7 @@
                 };
                 var somma = function (c) { return d.righe.filter(function (r) { return r.conteggio === c; }).reduce(function (t, r) { return t + r.imponibile; }, 0); };
                 mBody.innerHTML =
-                    '<div class="rp-modal-hint">Ogni causale con il registro in cui è registrata e dove viene conteggiata. '
-                  + 'Le righe del registro vendite con un fornitore come controparte sono autofatture del reverse charge: '
-                  + 'non sono ricavi e restano fuori dal fatturato (il costo è già negli acquisti). '
-                  + 'Cliccare una riga per l\'elenco dei documenti.</div>'
-                  + '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-docs>Tutti i documenti del mese</button>'
+                    '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-docs>Tutti i documenti del mese</button>'
                   + '<a class="rp-btn" href="' + urlDocumenti({}, 'csv') + '">Esporta CSV</a></div>'
                   + '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
                   + '<th>Causale</th><th>Registro</th><th>Controparte</th><th class="right">Doc.</th>'
@@ -166,7 +162,7 @@
                         return '<tr class="rp-click" data-causale="' + esc(r.causale) + '" data-registro="' + esc(r.registro) + '" data-tipo="' + esc(r.tipo) + '"'
                           + ' data-nome="' + esc((r.descrizione || 'Causale ' + r.causale) + ' · ' + (REG[r.registro] || r.registro)) + '"'
                           + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
-                          + '<td>' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : 'Causale ' + r.causale) + '</td>'
+                          + '<td class="rp-wrap">' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : 'Causale ' + r.causale) + '</td>'
                           + '<td>' + esc(REG[r.registro] || r.registro) + '</td>'
                           + '<td>' + badge(r.tipo) + '</td>'
                           + '<td class="right">' + r.documenti + '</td>'
@@ -217,7 +213,7 @@
                     '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-back>&larr; Torna alle causali</button>'
                   + '<a class="rp-btn" href="' + urlDocumenti(filtro, 'csv') + '">Esporta CSV</a>'
                   + '<span class="rp-doc-n">' + righe.length + (righe.length === 1 ? ' documento' : ' documenti') + '</span></div>'
-                  + (d.limite ? '<div class="rp-modal-hint">Elenco incompleto: mostrati i primi ' + d.limite + ' documenti. Per l\'elenco completo usare l\'esportazione CSV.</div>' : '')
+                  + (d.limite ? '<div class="rp-modal-avviso">Elenco incompleto: primi ' + d.limite + ' documenti.</div>' : '')
                   + (!righe.length ? '<div class="rp-empty">Nessun documento.</div>' :
                     '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
                   + '<th>Data doc.</th><th>Data reg.</th>' + (conNumero ? '<th>Numero</th><th>Prot.</th>' : '')
@@ -228,8 +224,8 @@
                         return '<tr' + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
                           + '<td>' + fmtData(r.data) + '</td><td>' + fmtData(r.data_reg) + '</td>'
                           + (conNumero ? '<td>' + esc((r.numero || '') + (r.serie ? '/' + r.serie : '')) + '</td><td>' + esc(r.protocollo || '') + '</td>' : '')
-                          + '<td>' + esc(r.controparte || '—') + (r.piva ? '<br><small>' + esc(r.piva) + '</small>' : '') + ' ' + badge(r.tipo) + '</td>'
-                          + '<td>' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : r.causale) + '</td>'
+                          + '<td class="rp-wrap">' + esc(r.controparte || '—') + (r.piva ? '<br><small>' + esc(r.piva) + '</small>' : '') + '</td>'
+                          + '<td class="rp-wrap">' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : r.causale) + '</td>'
                           + '<td>' + esc(REG[r.registro] || r.registro) + '</td>'
                           + '<td class="right">' + fmtEuro(r.imponibile) + '</td>'
                           + '<td class="right">' + fmtEuro(r.iva) + '</td>'
