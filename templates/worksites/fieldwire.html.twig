@@ -868,6 +868,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
                     <option value="2">Urgente</option>
                 </select>
             </div>
+            <div class="bz-modal-avviso" id="task-avviso-segn" hidden>
+                <i class="fas fa-circle-info"></i>
+                <span>La segnalazione è visibile solo a CSM e al committente: la squadra vedrà solo questa attività (titolo e descrizione). Verificare che la descrizione non contenga informazioni riservate.</span>
+            </div>
         </div>
         <div class="bz-modal-row">
             <div class="bz-modal-field">
@@ -1885,7 +1889,8 @@ async function loadBobUsers() {
     const res = await api(`/worksites/${WID}/zone/users?qui=1`);
     if (!res.ok || !Array.isArray(res.data)) return;
     // il nome con l'azienda: due Rossi si distinguono cosi'
-    const html = res.data.map(u => `<option value="${u.id}">${escHtml(u.label + (u.azienda ? ' · ' + u.azienda : ''))}</option>`).join('');
+    // data-sq: chi lavora in cantiere (non cliente, senza il modulo Zone)
+    const html = res.data.map(u => `<option value="${u.id}" ${u.tipo !== 'client' && !u.ha_modulo_zone ? 'data-sq="1"' : ''}>${escHtml(u.label + (u.azienda ? ' · ' + u.azienda : ''))}</option>`).join('');
     document.querySelectorAll('#task-assignee, #edit-task-assignee').forEach(sel => {
         // value = user_id (per notifiche); il testo è il nome (per display/Fieldwire)
         // prima i gruppi: un'attivita' di tutta la squadra non e' di nessuno
@@ -2803,7 +2808,17 @@ document.getElementById('task-modal')?.addEventListener('click', e => {
 /* Il modulo della nuova attivita', con tutte le opzioni. Da un disegno o da
    una segnalazione si apre lo stesso modulo, gia' compilato con quello che
    si sa (titolo, descrizione, priorita', punto sul disegno). */
-let segnalazioneNuova = null;
+let segnalazioneNuova = null, segnalazioneRiservata = false;
+/* Nota: attivita' alla squadra da una segnalazione che la squadra non vede */
+function avvisoSegnalazione() {
+    const box = document.getElementById('task-avviso-segn');
+    if (!box) return;
+    const sel = document.getElementById('task-assignee');
+    const opt = sel?.selectedOptions[0];
+    const allaSquadra = sel && (sel.value === '' || opt?.dataset.sq === '1');
+    box.hidden = !(segnalazioneNuova && segnalazioneRiservata && allaSquadra);
+}
+document.getElementById('task-assignee')?.addEventListener('change', avvisoSegnalazione);
 function openModal(pre = {}) {
     // vuoto = di base: la vedono tutti. Si tocca solo per stringere.
     const chiNuovo = document.getElementById('task-chi');
@@ -2811,6 +2826,9 @@ function openModal(pre = {}) {
     chiNuovo.dataset.parti   = '';
     chiNuovo.innerHTML = '<i class="fas fa-eye"></i> Tutti';
     segnalazioneNuova = pre.daSegnalazione || null;
+    // la squadra non vede le segnalazioni "solo CSM" e "CSM e committente"
+    segnalazioneRiservata = ['ufficio', 'cliente'].includes(pre.visibilitaSegnalazione || '');
+    avvisoSegnalazione();
     if (pre.name) document.getElementById('task-name').value = pre.name;
     if (pre.description) document.getElementById('task-desc').value = pre.description;
     if (pre.priority != null) document.getElementById('task-priority').value = String(pre.priority);
@@ -2834,7 +2852,8 @@ function closeModal() {
         if (el) el.value = '';
     });
     document.getElementById('task-priority').value = '0';
-    segnalazioneNuova = null;
+    segnalazioneNuova = null; segnalazioneRiservata = false;
+    avvisoSegnalazione();
     passiNuovi = []; fotoNuove = [];
     disegnaPassi(); disegnaFoto();
 }
@@ -4175,6 +4194,9 @@ body > .ts-dropdown { z-index:10060; }
 /* Galleria */
 .bz-media { flex:1; overflow-y:auto; padding:20px 24px; }
 .bz-media-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; }
+.bz-modal-avviso { grid-column:1/-1; display:flex; gap:8px; align-items:flex-start; margin:4px 0 10px; padding:9px 12px; border-radius:8px; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); color:#fbbf24; font-size:12.5px; line-height:1.45; }
+.bz-modal-avviso[hidden] { display:none; }
+[data-theme="light"] .bz-modal-avviso { background:#fffbeb; border-color:#fde68a; color:#92400e; }
 .bz-foto-filtri { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; grid-column:1/-1; }
 .bz-foto-filtri button { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid #273548; background:#1e293b; color:#cbd5e1; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; }
 .bz-foto-filtri button.on { background:#2563eb; border-color:#2563eb; color:#fff; }
@@ -4274,6 +4296,6 @@ window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
     ? 'contesto=attivita&id=' + activeTaskId + (document.getElementById('bz-flag-interna')?.checked ? '&interna=1' : '')
     : '');
 </script>
-<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113d"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113e"></script>{% endif %}
 </body>
 </html>

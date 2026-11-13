@@ -383,6 +383,54 @@ final class AvvisiZona
         ], 'high', $daChi);
     }
 
+    /**
+     * Un'attivita' eliminata (da chiamare PRIMA di cancellarla): avvisa chi
+     * ci lavorava (la persona a cui era assegnata, chi l'aveva creata) e, se
+     * era nata da segnalazioni, chi le aveva aperte (le segnalazioni tornano
+     * aperte). CSM e' avvisato quando a eliminarla e' qualcun altro.
+     */
+    public function attivitaEliminata(int $taskId, int $daChi): void
+    {
+        $st = $this->conn->prepare('
+            SELECT t.*, w.name AS cantiere FROM bb_zone_tasks t JOIN bb_worksites w ON w.id = t.worksite_id WHERE t.id = :id
+        ');
+        $st->execute([':id' => $taskId]);
+        $t = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$t) {
+            return;
+        }
+        $w = (int)$t['worksite_id'];
+        $sg = $this->conn->prepare("SELECT id, testo, created_by, stato FROM bb_zone_segnalazioni WHERE task_id = :t");
+        $sg->execute([':t' => $taskId]);
+        $segnalazioni = $sg->fetchAll(PDO::FETCH_ASSOC);
+
+        $chi = [];
+        foreach ([(int)($t['assignee_user_id'] ?? 0), (int)($t['created_by'] ?? 0)] as $uid) {
+            if ($uid > 0) $chi[$uid] = true;
+        }
+        foreach ($segnalazioni as $x) {
+            $chi[(int)$x['created_by']] = true;
+        }
+        if ($this->ruoloDi($w, $daChi) !== Accesso::UFFICIO) {
+            foreach ($this->persone($w, [Accesso::UFFICIO], null) as $p) $chi[(int)$p['user_id']] = true;
+        }
+        unset($chi[$daChi]);
+        $nomeChi = $this->nome($daChi);
+        $aperta  = array_values(array_filter($segnalazioni, fn($x) => $x['stato'] !== 'risolta'));
+        foreach (array_keys($chi) as $uid) {
+            foreach ($this->persone($w, [], $uid) as $p) {
+                $p['worksite_id'] = $w;
+                $p['dove'] = $aperta ? 'segnalazione-' . (int)$aperta[0]['id'] : '';
+                $this->manda($p, 'zona_attivita_eliminata_t', $aperta ? 'zona_attivita_eliminata_segn' : 'zona_attivita_eliminata', [
+                    'cantiere' => $t['cantiere'],
+                    'chi'      => $nomeChi,
+                    'nome'     => mb_substr((string)$t['name'], 0, 80),
+                    'testo'    => $aperta ? mb_substr((string)$aperta[0]['testo'], 0, 80) : '',
+                ], 'high', $daChi);
+            }
+        }
+    }
+
     /** Un modulo assegnato: a chi lo deve compilare. */
     public function modulo(int $assegnazioneId, int $daChi): void
     {

@@ -216,6 +216,28 @@ final class Segnalazioni
         }
     }
 
+    /**
+     * L'attivita' collegata e' stata eliminata: la segnalazione si scollega e,
+     * se non era gia' risolta, torna aperta (non la segue piu' nessuno), con
+     * la riga nel filo. Chi l'ha aperta riceve l'avviso.
+     */
+    public function scollegaAttivita(int $taskId, int $daChi, ?NotificationService $n = null): void
+    {
+        $st = $this->conn->prepare('SELECT id FROM bb_zone_segnalazioni WHERE task_id = :t');
+        $st->execute([':t' => $taskId]);
+        foreach (array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN)) as $sid) {
+            $s = $this->trova($sid);
+            if (!$s) continue;
+            $this->conn->prepare('UPDATE bb_zone_segnalazioni SET task_id = NULL WHERE id = :id')->execute([':id' => $sid]);
+            if ($s['stato'] === 'risolta') continue;
+            $this->conn->prepare("UPDATE bb_zone_segnalazioni SET stato = 'aperta', presa_da = NULL, presa_at = NULL WHERE id = :id")
+                ->execute([':id' => $sid]);
+            $this->messaggi->scrivi((int)$s['worksite_id'], null, $sid, $daChi,
+                'Attività collegata eliminata: la segnalazione torna aperta.', null, null, true);
+            // l'avviso lo manda chi elimina l'attivita' (AvvisiZona::attivitaEliminata)
+        }
+    }
+
     public function cambiaVisibilita(int $id, string $vis): void
     {
         if (!in_array($vis, Accesso::VISIBILITA, true)) {

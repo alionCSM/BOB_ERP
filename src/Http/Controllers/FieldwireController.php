@@ -766,6 +766,19 @@ final class FieldwireController
                     }
                 }
             }
+            // prima che sparisca: avvisa chi ci lavorava e chi aveva aperto la segnalazione
+            $this->avvisa(fn($a) => $a->attivitaEliminata($taskId, (int)($request->user()->id ?? 0)));
+            // la segnalazione da cui era nata torna aperta; il punto e i segni
+            // dell'attivita' sul disegno se ne vanno con lei
+            try {
+                (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
+                    ->scollegaAttivita($taskId, (int)($request->user()->id ?? 0),
+                        new \App\Service\Notifications\NotificationService($this->conn, $this->config));
+                $this->conn->prepare('DELETE FROM bb_zone_annotations WHERE task_id = :t AND worksite_id = :w')
+                    ->execute([':t' => $taskId, ':w' => $worksiteId]);
+            } catch (\Throwable $e) {
+                error_log('[Elimina attivita] ' . $e->getMessage());
+            }
             $this->zoneRepo->delete($taskId);
             return ['deleted' => true];
         });

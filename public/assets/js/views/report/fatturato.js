@@ -136,23 +136,37 @@
                     mBody.innerHTML = '<div class="rp-empty">Nessun documento nel periodo.</div>';
                     return;
                 }
+                var REG = { V: 'Vendite', A: 'Acquisti' };
+                var CONTO = {
+                    entrate: '<span class="rp-badge rp-badge-c">Entrate</span>',
+                    uscite:  '<span class="rp-badge rp-badge-f">Uscite</span>',
+                    esclusa: '<span class="rp-badge rp-badge-s" title="Autofattura / integrazione del reverse charge: il costo è già negli acquisti">Esclusa – autofattura</span>'
+                };
+                var somma = function (c) { return d.righe.filter(function (r) { return r.conteggio === c; }).reduce(function (t, r) { return t + r.imponibile; }, 0); };
                 mBody.innerHTML =
-                    '<div class="rp-modal-hint">Da qui si verifica che i totali siano corretti: '
-                  + 'se una causale (per esempio le note di credito) somma invece di sottrarre, si vede qui.</div>'
+                    '<div class="rp-modal-hint">Ogni causale con il registro in cui è registrata e dove viene conteggiata. '
+                  + 'Le righe del registro vendite con un fornitore come controparte sono autofatture del reverse charge: '
+                  + 'non sono ricavi e restano fuori dalle entrate (il costo è già negli acquisti).</div>'
                   + '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
-                  + '<th>Causale</th><th>Tipo</th><th class="right">Doc.</th>'
-                  + '<th class="right">Imponibile</th><th class="right">Totale</th>'
+                  + '<th>Causale</th><th>Registro</th><th>Controparte</th><th class="right">Doc.</th>'
+                  + '<th class="right">Imponibile</th><th class="right">IVA</th><th>Conteggiata in</th>'
                   + '</tr></thead><tbody>'
                   + d.righe.map(function (r) {
-                        return '<tr>'
-                          + '<td>' + esc(r.descrizione || ('cod. ' + r.causale)) + '</td>'
+                        return '<tr' + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
+                          + '<td>' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : 'Causale ' + r.causale) + '</td>'
+                          + '<td>' + esc(REG[r.registro] || r.registro) + '</td>'
                           + '<td>' + badge(r.tipo) + '</td>'
                           + '<td class="right">' + r.documenti + '</td>'
                           + '<td class="right">' + fmtEuro(r.imponibile) + '</td>'
-                          + '<td class="right">' + fmtEuro(r.totale) + '</td>'
+                          + '<td class="right">' + fmtEuro(r.iva) + '</td>'
+                          + '<td>' + (CONTO[r.conteggio] || '') + '</td>'
                           + '</tr>';
                     }).join('')
-                  + '</tbody></table></div>';
+                  + '</tbody><tfoot>'
+                  + '<tr><td colspan="4"><b>Entrate</b></td><td class="right"><b>' + fmtEuro(somma('entrate')) + '</b></td><td colspan="2"></td></tr>'
+                  + '<tr><td colspan="4"><b>Uscite</b></td><td class="right"><b>' + fmtEuro(somma('uscite')) + '</b></td><td colspan="2"></td></tr>'
+                  + (somma('esclusa') ? '<tr style="opacity:.7"><td colspan="4">Escluse (autofatture reverse charge)</td><td class="right">' + fmtEuro(somma('esclusa')) + '</td><td colspan="2"></td></tr>' : '')
+                  + '</tfoot></table></div>';
             })
             .catch(function () {
                 mBody.innerHTML = '<div class="rp-empty">Impossibile leggere il dettaglio.</div>';
