@@ -477,6 +477,7 @@
                     priority: s.gravita === 'blocca' ? 2 : (s.gravita === 'alta' ? 1 : 0),
                     category: 'Segnalazione',
                     daSegnalazione: s.id,
+                    visibilitaSegnalazione: visDi(s.visibilita),
                 });
                 return;
             }
