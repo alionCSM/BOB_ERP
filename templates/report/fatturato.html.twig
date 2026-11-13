@@ -31,20 +31,12 @@
                     <p class="rp-hero-sub">Dati dal gestionale Business · per data documento</p>
                 </div>
             </div>
-            <form method="GET" class="rp-year-form">
-                <label>Dal</label>
-                <select name="da_anno">
-                    {% for y in (annoCorrente - 9)..annoCorrente %}
-                        <option value="{{ y }}" {{ y == daAnno ? 'selected' : '' }}>{{ y }}</option>
-                    {% endfor %}
-                </select>
-                <label>al</label>
-                <select name="a_anno">
-                    {% for y in (annoCorrente - 9)..annoCorrente %}
+            <form method="GET" class="rp-year-form" id="rp-year-form">
+                <select name="anno" aria-label="Anno">
+                    {% for y in anniScelta %}
                         <option value="{{ y }}" {{ y == aAnno ? 'selected' : '' }}>{{ y }}</option>
                     {% endfor %}
                 </select>
-                <button type="submit">Mostra</button>
             </form>
         </div>
     </div>
@@ -118,7 +110,6 @@
     <div class="rp-panel">
         <div class="rp-panel-head">
             <h3 class="rp-panel-title">Dettaglio mensile {{ annoTop }}</h3>
-            <span class="rp-panel-note">Cliccare un mese per la verifica per causale e per documento</span>
         </div>
         <div class="rp-table-wrap">
             <table class="rp-table">
@@ -176,8 +167,6 @@
                         <th>Anno</th>
                         <th class="right">Fatturato</th>
                         <th class="right">Acquisti fatturati</th>
-                        <th class="right">IVA vendite</th>
-                        <th class="right">IVA acquisti</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -186,8 +175,6 @@
                         <td class="rp-mese">{{ y }}{% if y == annoCorrente %} <small class="rp-muted">al {{ oggi }}</small>{% endif %}</td>
                         <td class="right">€ {{ t.entrate|number_format(0, ',', '.') }}</td>
                         <td class="right rp-out">€ {{ t.uscite|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.iva_vendite|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ t.iva_acquisti|number_format(0, ',', '.') }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -252,5 +239,5 @@
    gia' fra le sorgenti consentite. #}
 <script nonce="{{ cspNonce }}"
         src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/assets/js/views/report/fatturato.js?v=8"></script>
+<script src="/assets/js/views/report/fatturato.js?v=9"></script>
 {% endblock %}

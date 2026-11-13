@@ -216,13 +216,13 @@
                   + (d.limite ? '<div class="rp-modal-avviso">Elenco incompleto: primi ' + d.limite + ' documenti.</div>' : '')
                   + (!righe.length ? '<div class="rp-empty">Nessun documento.</div>' :
                     '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
-                  + '<th>Data doc.</th><th>Data reg.</th>' + (conNumero ? '<th>Numero</th><th>Prot.</th>' : '')
+                  + '<th>Data</th>' + (conNumero ? '<th>Numero</th><th>Prot.</th>' : '')
                   + '<th>Controparte</th><th>Causale</th><th>Registro</th>'
                   + '<th class="right">Imponibile</th><th class="right">IVA</th><th>Conteggiata in</th>'
                   + '</tr></thead><tbody>'
                   + righe.map(function (r) {
                         return '<tr' + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
-                          + '<td>' + fmtData(r.data) + '</td><td>' + fmtData(r.data_reg) + '</td>'
+                          + '<td>' + fmtData(r.data) + '</td>'
                           + (conNumero ? '<td>' + esc((r.numero || '') + (r.serie ? '/' + r.serie : '')) + '</td><td>' + esc(r.protocollo || '') + '</td>' : '')
                           + '<td class="rp-wrap">' + esc(r.controparte || '—') + (r.piva ? '<br><small>' + esc(r.piva) + '</small>' : '') + '</td>'
                           + '<td class="rp-wrap">' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : r.causale) + '</td>'
@@ -232,7 +232,7 @@
                           + '<td>' + esc(CONTO[r.conteggio] || '') + '</td></tr>';
                     }).join('')
                   + '</tbody><tfoot>'
-                  + '<tr><td colspan="' + (conNumero ? 7 : 5) + '"><b>Totale</b></td><td class="right"><b>' + fmtEuro(tot(null, 'imponibile')) + '</b></td><td class="right"><b>' + fmtEuro(tot(null, 'iva')) + '</b></td><td></td></tr>'
+                  + '<tr><td colspan="' + (conNumero ? 6 : 4) + '"><b>Totale</b></td><td class="right"><b>' + fmtEuro(tot(null, 'imponibile')) + '</b></td><td class="right"><b>' + fmtEuro(tot(null, 'iva')) + '</b></td><td></td></tr>'
                   + '</tfoot></table></div>');
             })
             .catch(function () {
@@ -389,4 +389,10 @@
 
         caricaControparti();
     }
+})();
+
+/* Scelta dell'anno: cambia pagina appena si sceglie, senza pulsante. */
+(function () {
+    var f = document.getElementById('rp-year-form');
+    f && f.addEventListener('change', function () { f.submit(); });
 })();
