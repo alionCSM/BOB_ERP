@@ -766,6 +766,8 @@ final class FieldwireController
                     }
                 }
             }
+            // prima che sparisca: avvisa chi ci lavorava e chi aveva aperto la segnalazione
+            $this->avvisa(fn($a) => $a->attivitaEliminata($taskId, (int)($request->user()->id ?? 0)));
             // la segnalazione da cui era nata torna aperta; il punto e i segni
             // dell'attivita' sul disegno se ne vanno con lei
             try {

@@ -234,9 +234,7 @@ final class Segnalazioni
                 ->execute([':id' => $sid]);
             $this->messaggi->scrivi((int)$s['worksite_id'], null, $sid, $daChi,
                 'Attività collegata eliminata: la segnalazione torna aperta.', null, null, true);
-            if ($n) {
-                try { $this->avvisaStato($n, $sid, $daChi); } catch (\Throwable $e) { error_log('[Segnalazione scollegata] ' . $e->getMessage()); }
-            }
+            // l'avviso lo manda chi elimina l'attivita' (AvvisiZona::attivitaEliminata)
         }
     }
 

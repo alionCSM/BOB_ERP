@@ -496,10 +496,16 @@ pulisci_notifiche()
 chiama(UFF, 'POST', f'/tasks/{tz}/delete', {})
 sgz = chiama(UFF, 'GET', f'/segnalazioni/{sz}')['data']
 verifica(S, "eliminata l'attività, la segnalazione si scollega e torna aperta", sgz['segnalazione']['task_id'] is None and sgz['segnalazione']['stato'] == 'aperta', str(sgz['segnalazione'])[:300])
-verifica(S, '... con la riga nella discussione, e chi l\'aveva aperta è avvisato',
-         any('Attività collegata eliminata' in (m.get('testo') or '') for m in sgz['messaggi']) and len(notifiche(CLI)) >= 1)
+verifica(S, '... con la riga nella discussione', any('Attività collegata eliminata' in (m.get('testo') or '') for m in sgz['messaggi']))
+ne = [n for n in notifiche(CLI) if n[0] == 'Attività eliminata']
+verifica(S, '... e chi aveva aperto la segnalazione riceve "Attività eliminata", che porta alla segnalazione', len(ne) == 1 and ne[0][1].endswith(f'#segnalazione-{sz}'), str(notifiche(CLI)))
 verifica(S, "il punto dell'attività sparisce dal disegno, quello della segnalazione resta",
          sql(f"SELECT COUNT(*) FROM bb_zone_annotations WHERE task_id={tz}") == [['0']] and sql(f"SELECT COUNT(*) FROM bb_zone_annotations WHERE segnalazione_id={sz}") == [['1']])
+
+tq = chiama(UFF, 'POST', '/tasks', {'name': 'Pulizia area', 'assegnata_a': 'persona', 'assignee_user_id': CAPO})['data']['id']
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{tq}/delete', {})
+verifica(S, "eliminando un'attività la persona a cui era assegnata riceve l'avviso", any(n[0] == 'Attività eliminata' for n in notifiche(CAPO)), str(notifiche(CAPO)))
 
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
