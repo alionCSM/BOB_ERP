@@ -599,6 +599,7 @@ if ($uri === '/worksites' || str_starts_with($uri, '/worksites/')) {
            ->post('/worksites/{id}/zone/forms/assegnazioni/{aId}/disattiva',                      [FieldwireController::class, 'disattivaAssegnazione'])
            ->get( '/worksites/{id}/zone/report',                                                  [FieldwireController::class, 'report'])
            ->get( '/worksites/{id}/zone/media',                                                   [FieldwireController::class, 'media'])
+           ->get( '/worksites/{id}/zone/foto',                                                    [FieldwireController::class, 'fotoTutte'])
            ->get( '/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'formTemplates'])
            ->post('/worksites/{id}/zone/forms',                                                   [FieldwireController::class, 'saveFormTemplate'])
            ->get( '/worksites/{id}/zone/forms/submissions',                                       [FieldwireController::class, 'formSubmissions'])
@@ -994,6 +995,7 @@ if (str_starts_with($uri, '/api/v1/')) {
         ->get( '/api/v1/zone/{id}/presenze/giorni',                  [FieldwireController::class, 'presenzeGiorni'])
         ->get( '/api/v1/zone/{id}/users',                            [FieldwireController::class, 'bobUsers'])
         // file: si consultano e si scaricano, non si riordinano
+        ->get( '/api/v1/zone/{id}/foto',                             [FieldwireController::class, 'fotoTutte'])
         ->get( '/api/v1/zone/{id}/files',                            [FieldwireController::class, 'files'])
         ->post('/api/v1/zone/{id}/files',                            [FieldwireController::class, 'uploadFile'])
         ->post('/api/v1/zone/{id}/files/folder',                     [FieldwireController::class, 'createFolder'])

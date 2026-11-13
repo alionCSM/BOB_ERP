@@ -2164,29 +2164,53 @@ function fmtDateTime(str) {
 
 /* ══════════ GALLERIA ══════════ */
 let mediaLoaded = false;
+/* Foto: tutte le foto del cantiere, divise per provenienza (attivita',
+   segnalazioni, chat, documenti). Un clic la ingrandisce; da li' si va al
+   punto preciso da cui arriva. */
+let fotoTutte = [], fotoFiltro = '';
+const FONTI_FOTO = { attivita: ['fa-list-check', 'Attività'], segnalazione: ['fa-triangle-exclamation', 'Segnalazioni'],
+                     chat: ['fa-comments', 'Chat'], documento: ['fa-folder-open', 'Documenti'] };
 async function loadMedia() {
     const grid = document.getElementById('bz-media-grid');
     if (!mediaLoaded) grid.innerHTML = '<div class="bz-empty"><i class="fas fa-spinner bz-spin" style="font-size:20px"></i></div>';
-    const res = await api(`/worksites/${WID}/zone/media`);
+    const res = await api(`/worksites/${WID}/zone/foto`);
     mediaLoaded = true;
-    const items = (res.ok && Array.isArray(res.data)) ? res.data : [];
-    if (!items.length) { grid.innerHTML = '<div class="bz-dz-empty">Nessuna foto. Le foto si allegano alle attività.</div>'; return; }
-    grid.innerHTML = items.map(m => `
-        <div class="bz-media-card" data-lb="${escAttr(m.file_url)}"
-             data-cap="${escAttr((m.task_name||'') + ' · ' + (m.author_name||'') + ' · ' + fmtDateTime(m.created_at))}"
-             data-task="${m.task_id}">
-            <img src="${escAttr(m.file_url)}" loading="lazy" alt="">
-            <div class="bz-media-meta">
-                <div class="bz-media-task">${escHtml(m.task_name || '—')}</div>
-                <div class="bz-media-sub">${escHtml(m.author_name || '')} · ${fmtDateTime(m.created_at)}</div>
-            </div>
+    fotoTutte = (res.ok && Array.isArray(res.data)) ? res.data : [];
+    disegnaFotoTutte();
+}
+function disegnaFotoTutte() {
+    const grid = document.getElementById('bz-media-grid');
+    if (!fotoTutte.length) { grid.innerHTML = '<div class="bz-dz-empty">Nessuna foto nel cantiere.</div>'; return; }
+    const conta = f => fotoTutte.filter(x => x.fonte === f).length;
+    const filtri = `<div class="bz-foto-filtri">
+        <button type="button" data-foto-filtro="" class="${fotoFiltro ? '' : 'on'}">Tutte <em>${fotoTutte.length}</em></button>
+        ${Object.keys(FONTI_FOTO).filter(conta).map(f => `<button type="button" data-foto-filtro="${f}" class="${fotoFiltro === f ? 'on' : ''}"><i class="fas ${FONTI_FOTO[f][0]}"></i> ${FONTI_FOTO[f][1]} <em>${conta(f)}</em></button>`).join('')}
+    </div>`;
+    const gruppi = Object.keys(FONTI_FOTO).filter(f => (!fotoFiltro || fotoFiltro === f) && conta(f));
+    grid.innerHTML = filtri + gruppi.map(f => `
+        <div class="bz-foto-gruppo">
+            <div class="bz-foto-gruppo-tit"><i class="fas ${FONTI_FOTO[f][0]}"></i> ${FONTI_FOTO[f][1]}</div>
+            <div class="bz-foto-griglia">${fotoTutte.filter(x => x.fonte === f).map(m => `
+                <div class="bz-media-card" data-lb="${escAttr(m.url)}" data-cap="${escAttr((m.titolo || '') + ' · ' + (m.autore || '') + ' · ' + fmtDateTime(m.quando))}" data-dove="${escAttr(m.dove)}">
+                    <img src="${escAttr(m.url)}" loading="lazy" alt="">
+                    <div class="bz-media-meta">
+                        <div class="bz-media-task">${escHtml(m.titolo || '—')}</div>
+                        <div class="bz-media-sub">${escHtml(m.autore || '')} · ${fmtDateTime(m.quando)}</div>
+                    </div>
+                </div>`).join('')}</div>
         </div>`).join('');
 }
+document.addEventListener('click', e => {
+    const f = e.target.closest('[data-foto-filtro]');
+    if (f) { fotoFiltro = f.dataset.fotoFiltro; disegnaFotoTutte(); }
+});
 
-function openLightbox(src, caption, taskId) {
+function openLightbox(src, caption, taskId, dove) {
     document.getElementById('bz-lb-img').src = src;
     const cap = document.getElementById('bz-lb-caption');
-    cap.innerHTML = escHtml(caption) + (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">Apri attività</a>` : '');
+    cap.innerHTML = escHtml(caption)
+        + (dove ? ` <a href="#" data-lb-dove="${escAttr(dove)}" style="color:#60a5fa;margin-left:8px;">${escHtml(({ attivita: "Vai all'attività", segnalazione: 'Vai alla segnalazione', chat: 'Vai al messaggio', file: 'Vai al documento' })[dove.split('-')[0]] || 'Vai')}</a>`
+                : (taskId ? ` <a href="#" data-lb-task="${taskId}" style="color:#60a5fa;margin-left:8px;">Apri attività</a>` : ''));
     document.getElementById('bz-lightbox').classList.add('open');
 }
 function closeLightbox() { document.getElementById('bz-lightbox').classList.remove('open'); }
@@ -2194,6 +2218,8 @@ function closeLightbox() { document.getElementById('bz-lightbox').classList.remo
 document.getElementById('bz-lb-close')?.addEventListener('click', closeLightbox);
 document.getElementById('bz-lightbox')?.addEventListener('click', e => {
     if (e.target.id === 'bz-lightbox') closeLightbox();
+    const dv = e.target.closest('[data-lb-dove]');
+    if (dv) { e.preventDefault(); closeLightbox(); vaiAdAvviso(dv.dataset.lbDove); return; }
     const tl = e.target.closest('[data-lb-task]');
     if (tl) {
         e.preventDefault();
@@ -2205,7 +2231,7 @@ document.getElementById('bz-lightbox')?.addEventListener('click', e => {
 });
 document.addEventListener('click', e => {
     const card = e.target.closest('[data-lb]');
-    if (card) openLightbox(card.dataset.lb, card.dataset.cap, card.dataset.task);
+    if (card) openLightbox(card.dataset.lb, card.dataset.cap, card.dataset.task, card.dataset.dove);
 });
 
 /* ══════════ FILE (repository documenti) ══════════ */
@@ -2774,16 +2800,32 @@ document.getElementById('task-modal')?.addEventListener('click', e => {
     if (f) { fotoNuove.splice(parseInt(f.dataset.fotoVia), 1); disegnaFoto(); }
 });
 
-function openModal() {
+/* Il modulo della nuova attivita', con tutte le opzioni. Da un disegno o da
+   una segnalazione si apre lo stesso modulo, gia' compilato con quello che
+   si sa (titolo, descrizione, priorita', punto sul disegno). */
+let segnalazioneNuova = null;
+function openModal(pre = {}) {
     // vuoto = di base: la vedono tutti. Si tocca solo per stringere.
     const chiNuovo = document.getElementById('task-chi');
     chiNuovo.dataset.persone = '';
     chiNuovo.dataset.parti   = '';
     chiNuovo.innerHTML = '<i class="fas fa-eye"></i> Tutti';
-    preparaPunto();
+    segnalazioneNuova = pre.daSegnalazione || null;
+    if (pre.name) document.getElementById('task-name').value = pre.name;
+    if (pre.description) document.getElementById('task-desc').value = pre.description;
+    if (pre.priority != null) document.getElementById('task-priority').value = String(pre.priority);
+    if (pre.category) document.getElementById('task-cat').value = pre.category;
+    preparaPunto().then(() => {
+        if (!pre.punto) return;
+        const sel = document.getElementById('task-disegno');
+        if (sel && [...sel.options].some(o => Number(o.value) === Number(pre.punto.document_id))) sel.value = String(pre.punto.document_id);
+        puntoNuovo = { ...pre.punto, nome: pre.punto.nome || sel?.selectedOptions[0]?.textContent || '' };
+        scriviPunto();
+    });
     document.getElementById('task-modal').classList.remove('hidden');
     document.getElementById('task-name').focus();
 }
+window.apriNuovaAttivita = openModal;
 function closeModal() {
     document.getElementById('task-modal').classList.add('hidden');
     quickAddStatus = null;
@@ -2792,6 +2834,7 @@ function closeModal() {
         if (el) el.value = '';
     });
     document.getElementById('task-priority').value = '0';
+    segnalazioneNuova = null;
     passiNuovi = []; fotoNuove = [];
     disegnaPassi(); disegnaFoto();
 }
@@ -2814,6 +2857,7 @@ async function submitTask() {
         ...personeDalBottone('task-chi'),
         due_date:        document.getElementById('task-due').value || null,
         start_date:      document.getElementById('task-start').value || null,
+        ...(segnalazioneNuova ? { da_segnalazione: segnalazioneNuova } : {}),
     };
     // "solo ufficio" e "alla squadra" insieme non stanno: a chi tocca la
     // vede. Se l'ufficio la tiene per se' e non ha scelto nessuno, e' sua.
@@ -3219,6 +3263,8 @@ document.addEventListener('click', e => {
             fileType: ds.annotType,
             fileName: ds.annotName,
             viewUrl: `/worksites/${WID}/disegni/${ds.annot}/view`,
+            // "Crea attivita' in questo punto": il modulo completo della nuova attivita'
+            onNuovaAttivita: document.getElementById('btn-new-task') ? (p => openModal({ punto: p })) : null,
             page: parseInt(ds.annotPage || '1'),
             evidenzia,
             senzaAnnotazioni: ds.annotPulito === '1',
@@ -4129,6 +4175,16 @@ body > .ts-dropdown { z-index:10060; }
 /* Galleria */
 .bz-media { flex:1; overflow-y:auto; padding:20px 24px; }
 .bz-media-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; }
+.bz-foto-filtri { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; grid-column:1/-1; }
+.bz-foto-filtri button { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid #273548; background:#1e293b; color:#cbd5e1; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+.bz-foto-filtri button.on { background:#2563eb; border-color:#2563eb; color:#fff; }
+.bz-foto-filtri em { font-style:normal; font-size:11px; opacity:.75; }
+.bz-foto-gruppo { grid-column:1/-1; margin-bottom:18px; }
+.bz-foto-gruppo-tit { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#94a3b8; margin-bottom:8px; }
+.bz-foto-griglia { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:12px; }
+[data-theme="light"] .bz-foto-filtri button { background:#fff; border-color:#e2e8f0; color:#334155; }
+[data-theme="light"] .bz-foto-filtri button.on { background:#2563eb; border-color:#2563eb; color:#fff; }
+[data-theme="light"] .bz-foto-gruppo-tit { color:#64748b; }
 .bz-media-card { background:#1e293b; border:1px solid #273548; border-radius:10px; overflow:hidden; cursor:pointer; transition:border-color .12s; }
 .bz-media-card:hover { border-color:#475569; }
 .bz-media-card img { width:100%; height:140px; object-fit:cover; display:block; background:#0f172a; }
@@ -4195,7 +4251,7 @@ body > .ts-dropdown { z-index:10060; }
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 </script>
-<script src="/assets/js/views/fieldwire/annotator.js?v=20261113"></script>
+<script src="/assets/js/views/fieldwire/annotator.js?v=20261113b"></script>
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
@@ -4218,6 +4274,6 @@ window.BZMenzioni && BZMenzioni.collega('#bz-comment-input', () => activeTaskId
     ? 'contesto=attivita&id=' + activeTaskId + (document.getElementById('bz-flag-interna')?.checked ? '&interna=1' : '')
     : '');
 </script>
-<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113b"></script>{% endif %}
+<script src="/assets/js/views/fieldwire/dialogo.js?v=20261113c"></script>{% endif %}
 </body>
 </html>
