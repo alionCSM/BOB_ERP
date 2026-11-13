@@ -1,7 +1,7 @@
 {% extends 'layout/base.html.twig' %}
 
 {% block head %}
-<link rel="stylesheet" href="/assets/css/views/report/fatturato.css?v=2">
+<link rel="stylesheet" href="/assets/css/views/report/fatturato.css?v=3">
 {% endblock %}
 
 {% macro delta(oggi, prima) %}
@@ -28,25 +28,21 @@
                 </div>
                 <div>
                     <h1 class="rp-hero-title">Andamento fatturato</h1>
-                    <p class="rp-hero-sub">Dati dal gestionale Business · per {{ criterioData == 'reg' ? 'data registrazione' : 'data documento' }}</p>
+                    <p class="rp-hero-sub">Dati dal gestionale Business · per data documento</p>
                 </div>
             </div>
             <form method="GET" class="rp-year-form">
                 <label>Dal</label>
                 <select name="da_anno">
-                    {% for y in (aAnno - 9)..aAnno %}
+                    {% for y in (annoCorrente - 9)..annoCorrente %}
                         <option value="{{ y }}" {{ y == daAnno ? 'selected' : '' }}>{{ y }}</option>
                     {% endfor %}
                 </select>
                 <label>al</label>
                 <select name="a_anno">
-                    {% for y in (aAnno - 9)..(aAnno + 1) %}
+                    {% for y in (annoCorrente - 9)..annoCorrente %}
                         <option value="{{ y }}" {{ y == aAnno ? 'selected' : '' }}>{{ y }}</option>
                     {% endfor %}
-                </select>
-                <select name="data" title="Quale data usare per assegnare i documenti al mese">
-                    <option value="doc" {{ criterioData != 'reg' ? 'selected' : '' }}>Data documento</option>
-                    <option value="reg" {{ criterioData == 'reg' ? 'selected' : '' }}>Data registrazione</option>
                 </select>
                 <button type="submit">Mostra</button>
             </form>
@@ -63,62 +59,45 @@
         </div>
     {% endif %}
 
-    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'saldo':0,'iva_vendite':0,'iva_acquisti':0} %}
+    {% set tOggi = totali[annoTop] ?? {'entrate':0,'uscite':0,'iva_vendite':0,'iva_acquisti':0} %}
     {% set tPrec = totali[annoPrec] ?? null %}
 
-    {# Il confronto fra anni va fatto sullo STESSO periodo. Su un anno in
-       corso si fermano tutti e due al mese che stiamo vivendo: prima
-       l'anno a meta' veniva paragonato all'anno prima intero, e usciva
-       sempre un calo che non esiste. #}
-    {% set riferimento = annoInCorso ? 'periodo' : 'anno' %}
-    {% set pOggi = annoInCorso ? tOggi.entrate_periodo : tOggi.entrate %}
-    {% set pPrec = tPrec ? (annoInCorso ? tPrec.entrate_periodo : tPrec.entrate) : null %}
-    {% set uOggi = annoInCorso ? tOggi.uscite_periodo : tOggi.uscite %}
-    {% set uPrec = tPrec ? (annoInCorso ? tPrec.uscite_periodo : tPrec.uscite) : null %}
-    {% set sOggiTot = annoInCorso ? tOggi.saldo_periodo : tOggi.saldo %}
-    {% set sPrecTot = tPrec ? (annoInCorso ? tPrec.saldo_periodo : tPrec.saldo) : null %}
-
-    {% if annoInCorso %}
-        <p class="rp-nota-periodo">
-            Il confronto con {{ annoPrec }} si ferma a <strong>{{ meseNome }}</strong>,
-            per paragonare lo stesso periodo. I totali grandi sono invece tutto
-            quello fatturato finora.
-        </p>
+    {# Il confronto fra anni a pari periodo: sull'anno in corso dal 1 gennaio
+       a oggi contro lo stesso intervallo dell'anno prima (ytd, letto apposta
+       da Business); su un anno chiuso, anno intero contro anno intero. #}
+    {% if ytd %}
+        {% set vOggi = ytd.oggi.vendite %}{% set vPrec = ytd.prima.vendite %}
+        {% set aOggi = ytd.oggi.acquisti %}{% set aPrec = ytd.prima.acquisti %}
+        {% set rifPrec = annoPrec ~ ' allo stesso giorno (' ~ oggi ~ ')' %}
+    {% else %}
+        {% set vOggi = tOggi.entrate %}{% set vPrec = tPrec ? tPrec.entrate : null %}
+        {% set aOggi = tOggi.uscite %}{% set aPrec = tPrec ? tPrec.uscite : null %}
+        {% set rifPrec = annoPrec ~ ' (anno intero)' %}
     {% endif %}
+
+    <p class="rp-nota-periodo">
+        <strong>Fatturato</strong>: imponibile delle fatture di vendita, note di credito comprese, dal registro IVA di Business.
+        <strong>Acquisti fatturati</strong>: solo le fatture dei fornitori; personale, contributi e altri costi senza fattura
+        non sono compresi, quindi la differenza fra i due non rappresenta un margine.
+        {% if ytd %}Il confronto con {{ annoPrec }} è calcolato sullo stesso periodo, dal 1° gennaio al {{ oggi }}.{% endif %}
+    </p>
 
     {# ── Card principali ── #}
     <div class="rp-cards">
         <div class="rp-card is-in">
-            <div class="rp-card-lbl">Entrate {{ annoTop }}</div>
-            <div class="rp-card-val">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</div>
+            <div class="rp-card-lbl">Fatturato {{ annoTop }}{{ ytd ? ' (al ' ~ oggi ~ ')' : '' }}</div>
+            <div class="rp-card-val">€ {{ vOggi|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(pOggi, pPrec) }}
-                <span class="rp-card-ref">
-                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
-                    € {{ (pPrec ?: 0)|number_format(0, ',', '.') }}
-                </span>
+                {{ f.delta(vOggi, vPrec) }}
+                <span class="rp-card-ref">vs {{ rifPrec }}: € {{ (vPrec ?: 0)|number_format(0, ',', '.') }}</span>
             </div>
         </div>
         <div class="rp-card is-out">
-            <div class="rp-card-lbl">Uscite {{ annoTop }}</div>
-            <div class="rp-card-val">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</div>
+            <div class="rp-card-lbl">Acquisti fatturati {{ annoTop }}{{ ytd ? ' (al ' ~ oggi ~ ')' : '' }}</div>
+            <div class="rp-card-val">€ {{ aOggi|number_format(0, ',', '.') }}</div>
             <div class="rp-card-foot">
-                {{ f.delta(uOggi, uPrec) }}
-                <span class="rp-card-ref">
-                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
-                    € {{ (uPrec ?: 0)|number_format(0, ',', '.') }}
-                </span>
-            </div>
-        </div>
-        <div class="rp-card is-saldo">
-            <div class="rp-card-lbl">Saldo {{ annoTop }}</div>
-            <div class="rp-card-val {{ tOggi.saldo < 0 ? 'is-neg' : '' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</div>
-            <div class="rp-card-foot">
-                {{ f.delta(sOggiTot, sPrecTot) }}
-                <span class="rp-card-ref">
-                    vs {{ annoPrec }}{{ annoInCorso ? ' (a ' ~ meseNome ~ ')' : '' }}:
-                    € {{ (sPrecTot ?: 0)|number_format(0, ',', '.') }}
-                </span>
+                {{ f.delta(aOggi, aPrec) }}
+                <span class="rp-card-ref">vs {{ rifPrec }}: € {{ (aPrec ?: 0)|number_format(0, ',', '.') }}</span>
             </div>
         </div>
     </div>
@@ -128,15 +107,16 @@
         <div class="rp-panel-head">
             <h3 class="rp-panel-title">Confronto mensile</h3>
             <div class="rp-switch" id="rp-switch">
-                <button type="button" class="on" data-serie="entrate">Entrate</button>
-                <button type="button" data-serie="uscite">Uscite</button>
-                <button type="button" data-serie="saldo">Saldo</button>
+                <button type="button" class="on" data-serie="entrate">Fatturato</button>
+                <button type="button" data-serie="uscite">Acquisti fatturati</button>
             </div>
         </div>
         <div class="rp-chart-wrap">
             <canvas id="rp-chart"
                     data-mesi='{{ mesi|json_encode }}'
-                    data-serie='{{ serie|json_encode }}'></canvas>
+                    data-serie='{{ serie|json_encode }}'
+                    data-anno-corrente="{{ annoCorrente }}"
+                    data-mese-corrente="{{ meseCorrente }}"></canvas>
         </div>
     </div>
 
@@ -144,17 +124,16 @@
     <div class="rp-panel">
         <div class="rp-panel-head">
             <h3 class="rp-panel-title">Dettaglio mensile {{ annoTop }}</h3>
-            <span class="rp-panel-note">Clicca un mese per vedere da quali causali arrivano i totali</span>
+            <span class="rp-panel-note">Cliccare un mese per la verifica per causale e per documento</span>
         </div>
         <div class="rp-table-wrap">
             <table class="rp-table">
                 <thead>
                     <tr>
                         <th>Mese</th>
-                        <th class="right">Entrate</th>
-                        <th class="right">Uscite</th>
-                        <th class="right">Saldo</th>
-                        <th class="right">Entrate {{ annoPrec }}</th>
+                        <th class="right">Fatturato</th>
+                        <th class="right">Acquisti fatturati</th>
+                        <th class="right">Fatturato {{ annoPrec }}</th>
                         <th class="right">Var.</th>
                     </tr>
                 </thead>
@@ -164,26 +143,27 @@
                 {% for i in 0..11 %}
                     {% set e  = sOggi ? sOggi.entrate[i] : 0 %}
                     {% set u  = sOggi ? sOggi.uscite[i]  : 0 %}
-                    {% set s  = e - u %}
                     {% set ep = sPrec ? sPrec.entrate[i] : 0 %}
-                    <tr class="rp-row" data-mese="{{ i + 1 }}" data-anno="{{ annoTop }}">
-                        <td class="rp-mese">{{ mesi[i] }}</td>
-                        <td class="right">€ {{ e|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-out">€ {{ u|number_format(0, ',', '.') }}</td>
-                        <td class="right {{ s < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ s|number_format(0, ',', '.') }}</td>
+                    {# mese futuro: niente valori ne' variazioni; mese in corso:
+                       valori fin qui, ma nessuna variazione contro un mese intero #}
+                    {% set futuro  = annoInCorso and (i + 1) > meseCorrente %}
+                    {% set inCorso = annoInCorso and (i + 1) == meseCorrente %}
+                    <tr class="{{ futuro ? 'rp-futuro' : 'rp-row' }}" data-mese="{{ i + 1 }}" data-anno="{{ annoTop }}">
+                        <td class="rp-mese">{{ mesi[i] }}{% if inCorso %} <small class="rp-muted">in corso</small>{% endif %}</td>
+                        <td class="right">{{ futuro ? '—' : '€ ' ~ e|number_format(0, ',', '.') }}</td>
+                        <td class="right rp-out">{{ futuro ? '—' : '€ ' ~ u|number_format(0, ',', '.') }}</td>
                         <td class="right rp-muted">€ {{ ep|number_format(0, ',', '.') }}</td>
-                        <td class="right">{{ f.delta(e, ep) }}</td>
+                        <td class="right">{% if futuro or inCorso %}<span class="rp-delta is-none">—</span>{% else %}{{ f.delta(e, ep) }}{% endif %}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr>
-                        <td>Totale</td>
+                        <td>Totale{{ ytd ? ' al ' ~ oggi : '' }}</td>
                         <td class="right">€ {{ tOggi.entrate|number_format(0, ',', '.') }}</td>
                         <td class="right">€ {{ tOggi.uscite|number_format(0, ',', '.') }}</td>
-                        <td class="right {{ tOggi.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ tOggi.saldo|number_format(0, ',', '.') }}</td>
-                        <td class="right rp-muted">€ {{ (tPrec ? tPrec.entrate : 0)|number_format(0, ',', '.') }}</td>
-                        <td class="right">{{ f.delta(tOggi.entrate, tPrec ? tPrec.entrate : null) }}</td>
+                        <td class="right rp-muted" title="{{ ytd ? annoPrec ~ ' dal 1° gennaio al ' ~ oggi : annoPrec ~ ', anno intero' }}">€ {{ (vPrec ?: 0)|number_format(0, ',', '.') }}</td>
+                        <td class="right">{{ f.delta(vOggi, vPrec) }}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -200,14 +180,8 @@
                 <thead>
                     <tr>
                         <th>Anno</th>
-                        <th class="right">Entrate</th>
-                        <th class="right">Uscite</th>
-                        <th class="right">Saldo</th>
-                        {# L'IVA dei due registri, al posto di "gia' incassato" e
-                           "gia' pagato": quelli stavano sulle testate dei
-                           documenti, nel registro IVA non ci sono, e mostrarli
-                           a zero sarebbe peggio che non mostrarli. Quanto e'
-                           stato incassato davvero sta nello scadenzario. #}
+                        <th class="right">Fatturato</th>
+                        <th class="right">Acquisti fatturati</th>
                         <th class="right">IVA vendite</th>
                         <th class="right">IVA acquisti</th>
                     </tr>
@@ -215,10 +189,9 @@
                 <tbody>
                 {% for y, t in totali|reverse(true) %}
                     <tr>
-                        <td class="rp-mese">{{ y }}</td>
+                        <td class="rp-mese">{{ y }}{% if y == annoCorrente %} <small class="rp-muted">al {{ oggi }}</small>{% endif %}</td>
                         <td class="right">€ {{ t.entrate|number_format(0, ',', '.') }}</td>
                         <td class="right rp-out">€ {{ t.uscite|number_format(0, ',', '.') }}</td>
-                        <td class="right {{ t.saldo < 0 ? 'rp-neg' : 'rp-pos' }}">€ {{ t.saldo|number_format(0, ',', '.') }}</td>
                         <td class="right rp-muted">€ {{ t.iva_vendite|number_format(0, ',', '.') }}</td>
                         <td class="right rp-muted">€ {{ t.iva_acquisti|number_format(0, ',', '.') }}</td>
                     </tr>
@@ -228,27 +201,12 @@
         </div>
     </div>
 
-</div>
-
-{# Modale dettaglio causali — fuori da qualsiasi contenitore con transform #}
-<div id="rp-modal" class="rp-modal" aria-hidden="true" hidden>
-    <div class="rp-modal-box" role="dialog" aria-modal="true">
-        <div class="rp-modal-head">
-            <h3 class="rp-modal-title" id="rp-modal-title">Dettaglio</h3>
-            <button type="button" class="rp-modal-close" data-rp-close aria-label="Chiudi">&times;</button>
-        </div>
-        <div class="rp-modal-body" id="rp-modal-body">
-            <div class="rp-loading">Caricamento…</div>
-        </div>
-    </div>
-</div>
-
-    {# ── Chi ci ha pagato, chi abbiamo pagato ──
-       Il totale in una riga sola non risponde alla domanda vera, che e'
-       "con chi": qui una riga per controparte, ordinata per importo. #}
+    {# ── Principali clienti e fornitori ──
+       Per fatturato del periodo, non per incassato: i pagamenti stanno
+       nello scadenzario, non nel registro IVA. #}
     <div class="rp-panel" id="rp-controparti">
         <div class="rp-panel-head">
-            <h2 class="rp-panel-title">Chi ci ha pagato, chi abbiamo pagato</h2>
+            <h2 class="rp-panel-title">Principali clienti e fornitori</h2>
             <div class="rp-cp-cmd">
                 <div class="rp-switch">
                     <button type="button" class="on" data-registro="V">Clienti</button>
@@ -271,9 +229,24 @@
             </div>
         </div>
         <div id="rp-cp-corpo" class="rp-table-wrap">
-            <div class="rp-empty">Carico…</div>
+            <div class="rp-empty">Caricamento…</div>
         </div>
     </div>
+
+</div>
+
+{# Finestra di verifica (causali e documenti) — fuori da qualsiasi contenitore con transform #}
+<div id="rp-modal" class="rp-modal" aria-hidden="true" hidden>
+    <div class="rp-modal-box" role="dialog" aria-modal="true">
+        <div class="rp-modal-head">
+            <h3 class="rp-modal-title" id="rp-modal-title">Dettaglio</h3>
+            <button type="button" class="rp-modal-close" data-rp-close aria-label="Chiudi">&times;</button>
+        </div>
+        <div class="rp-modal-body" id="rp-modal-body">
+            <div class="rp-loading">Caricamento…</div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -285,5 +258,5 @@
    gia' fra le sorgenti consentite. #}
 <script nonce="{{ cspNonce }}"
         src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/assets/js/views/report/fatturato.js?v=5"></script>
+<script src="/assets/js/views/report/fatturato.js?v=6"></script>
 {% endblock %}
