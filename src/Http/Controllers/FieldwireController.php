@@ -1951,6 +1951,13 @@ final class FieldwireController
                     ->execute([$id]);
             }
             $this->avvisa(fn($a) => $a->richiestaNuova($id, $io));
+            // nelle cartelle del link: anche a chi gestisce i documenti condivisi, in BOB e per email
+            try {
+                (new \App\Service\Zone\RichiesteLink($this->conn, new \App\Service\Notifications\NotificationService($this->conn, $this->config)))
+                    ->avvisaGestori($id, $io);
+            } catch (\Throwable $e) {
+                error_log('[Richieste link] ' . $e->getMessage());
+            }
             return ['id' => $id];
         });
     }

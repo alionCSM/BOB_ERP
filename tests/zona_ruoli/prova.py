@@ -400,6 +400,17 @@ verifica(S, 'un documento di un altro link non si apre cambiando il numero', sca
 rl = chiama(CLI, 'POST', '/richieste', form={'folder_id': cu['Edilnord Srl']['id'], 'titolo': 'DURC scaduto', 'testo': 'Il DURC è scaduto: ci inviate quello aggiornato?'})
 verifica(S, 'dentro si crea una richiesta', puo(rl), rl.get('error', ''))
 verifica(S, 'un documento del link non si apre senza vedere la sua cartella', chiama(CAPO, 'GET', f"/link-documento/operaio/{ed[0]['id']}")['_http'] == 404)
+rl_id = rl['data']['id'] if puo(rl) else 0
+dr = [n for n in notifiche(7) if n[0] == 'Documento richiesto']
+verifica(S, "una richiesta nella cartella di un'azienda arriva a chi gestisce i Doc condivisi, e porta al link", len(dr) == 1 and dr[0][1] == '/share/1/edit#richieste', str(notifiche(7)))
+verifica(S, '... anche per email', len(email('sara@test.it')) >= 1, str(email('sara@test.it')))
+sql("INSERT INTO bb_company_documents(company_id,tipo_documento,scadenza,file_path) VALUES (900,'DURC','2027-03-31','az/durc.pdf')")
+pulisci_notifiche()
+urllib.request.urlopen('http://127.0.0.1:8833/__prova/documento-caricato?chi=azienda&id=900&da=7').read()
+rdl = chiama(CLI, 'GET', f'/richieste/{rl_id}')['data']
+verifica(S, "caricato in BOB il DURC nuovo dell'azienda, la richiesta si completa da sola", rdl['richiesta']['stato'] == 'completata'
+         and any('DURC' in (m.get('testo') or '') and '31/03/2027' in (m.get('testo') or '') for m in rdl['messaggi']), str(rdl)[:400])
+verifica(S, '... e chi l\'aveva fatta riceve "Richiesta completata"', any(n[0] == 'Richiesta completata' for n in notifiche(CLI)), str(notifiche(CLI)))
 sql("DELETE FROM bb_shared_link_companies WHERE company_id=901")
 cu2 = {c['name'] for c in chiama(UFF, 'GET', '/files')['data']['folders']}
 verifica(S, "togliendo un'azienda dal link sparisce la sua cartella (vuota)", 'Montaggi Sud Srl' not in cu2 and 'Edilnord Srl' in cu2, str(cu2))

@@ -22,8 +22,10 @@ final class ShareController
         $links     = $ctrl->getAllLinks();
         // i cantieri a cui e' collegato ogni link (si vede nella BOB Zone)
         $collegati = $this->cantieriPerLink();
+        $richieste = $this->richiesteLink()->contaPerLink();
         foreach ($links as &$l) {
-            $l['cantieri'] = $collegati[(int)$l['id']] ?? [];
+            $l['cantieri']  = $collegati[(int)$l['id']] ?? [];
+            $l['richieste'] = $richieste[(int)$l['id']] ?? 0;   // richieste aperte dalla BOB Zone
         }
         unset($l);
         $pageTitle = 'Link Condivisi';
@@ -104,10 +106,12 @@ final class ShareController
         $companies = $ctrl->getAllCompanies();
         $cantieri  = $this->cantieriPerScelta();
         $cantieriCollegati = array_column($this->cantieriPerLink()[$linkId] ?? [], 'id');
+        // le richieste aperte dalla BOB Zone nelle cartelle di questo link
+        $richieste = $this->richiesteLink()->aperteDelLink($linkId);
         $pageTitle = 'Modifica Link Condiviso';
         Response::view('share/edit.html.twig', $request, compact(
             'link', 'linkedWorkers', 'linkedCompanies', 'manualFiles',
-            'workers', 'companies', 'pageTitle', 'successMessage', 'cantieri', 'cantieriCollegati'
+            'workers', 'companies', 'pageTitle', 'successMessage', 'cantieri', 'cantieriCollegati', 'richieste'
         ));
     }
 
@@ -298,6 +302,35 @@ final class ShareController
             'completed'      => $completed,
             'uploaded_token' => $completed ? $token : null,
         ]);
+    }
+
+    // ── Richieste dalla BOB Zone ──────────────────────────────────────────────
+
+    private function richiesteLink(): \App\Service\Zone\RichiesteLink
+    {
+        return new \App\Service\Zone\RichiesteLink(
+            $this->conn,
+            new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())
+        );
+    }
+
+    /**
+     * POST /share/richieste/{rid}/completa — chi gestisce i documenti segna
+     * come completata una richiesta fatta nella BOB Zone (con una risposta
+     * facoltativa, che arriva a chi l'aveva fatta).
+     */
+    public function completaRichiesta(Request $request): never
+    {
+        $userId = (int)($GLOBALS['authenticated_user']['user_id'] ?? 0);
+        $rl = $this->richiesteLink();
+        $r  = $rl->richiesta($request->intParam('rid'));
+        if (!$r || $r['stato'] !== 'aperta') {
+            Response::json(['ok' => false, 'error' => 'Richiesta non trovata o già completata.'], 404);
+        }
+        $risposta = mb_substr(trim((string)($_POST['risposta'] ?? '')), 0, 2000);
+        $rl->completa((int)$r['id'], $userId, $risposta,
+            new \App\Service\Zone\AvvisiZona($this->conn, new \App\Service\Notifications\NotificationService($this->conn, new \App\Infrastructure\Config())));
+        Response::json(['ok' => true]);
     }
 
     // ── Cantieri collegati (BOB Zone) ─────────────────────────────────────────

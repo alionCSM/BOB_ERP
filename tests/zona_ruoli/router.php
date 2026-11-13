@@ -82,6 +82,11 @@ if ($uid) {
 
 // Le rotte della Zone, lette da public/index.php
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+// "un documento e' stato caricato in BOB" (Documenti o Aziende): chiude le richieste del link
+if ($path === '/__prova/documento-caricato') {
+    \App\Service\Zone\RichiesteLink::dopoDocumento($pdo, (string)$_GET['chi'], (int)$_GET['id'], null, (int)($_GET['da'] ?? 5));
+    echo 'ok'; exit;
+}
 if ($path === '/__prova/contrasto.js') { header('Content-Type: application/javascript'); readfile(__DIR__ . '/contrasto.js'); exit; }
 // i file statici della Zone (js, css) vengono dal progetto
 if (str_starts_with($path, '/assets/')) {

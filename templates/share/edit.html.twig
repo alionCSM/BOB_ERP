@@ -45,6 +45,35 @@
             <!-- ── LEFT: settings ──────────────── -->
             <div>
 
+                {% if richieste is not empty %}
+                <!-- Richieste arrivate dalla BOB Zone: documenti mancanti o scaduti -->
+                <div class="cl-card" id="richieste" style="margin-bottom:16px;border:1.5px solid #fcd34d;">
+                    <div class="cl-card-header" style="background:#fffbeb;">
+                        <div class="cl-card-header-icon" style="background:#fef3c7;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        </div>
+                        <div>
+                            <div class="cl-card-header-title">Richieste dai cantieri ({{ richieste|length }})</div>
+                            <div class="cl-card-header-sub">Si chiudono da sole quando il documento viene caricato in BOB</div>
+                        </div>
+                    </div>
+                    <div class="cl-card-body">
+                        {% for q in richieste %}
+                            <div class="cl-richiesta" data-richiesta="{{ q.id }}" style="padding:10px 0;border-top:1px solid #f1f5f9;{{ loop.first ? 'border-top:0;padding-top:0;' : '' }}">
+                                <div style="font-size:13px;font-weight:700;color:#0f172a;">{{ q.titolo }}</div>
+                                <div style="font-size:12px;color:#64748b;margin-top:2px;">{{ q.cartella }} · cantiere {{ q.cantiere }} · da {{ q.creata_da_nome }} · {{ q.created_at|date('d/m/Y H:i') }}</div>
+                                {% if q.messaggio %}<div style="font-size:12.5px;color:#334155;margin-top:6px;white-space:pre-wrap;">{{ q.messaggio }}</div>{% endif %}
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
+                                    {% if q.documenti_url %}<a href="{{ q.documenti_url }}" class="cl-rich-btn" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;background:#e0e7ff;color:#3730a3;text-decoration:none;">Apri documenti</a>{% endif %}
+                                    <input type="text" class="cl-input cl-rich-risposta" placeholder="Risposta (facoltativa)" style="flex:1;min-width:160px;padding:6px 10px;font-size:12.5px;">
+                                    <button type="button" class="cl-rich-completa" data-rid="{{ q.id }}" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;background:#dcfce7;color:#15803d;border:0;cursor:pointer;">Segna come completata</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Info base -->
                 <div class="cl-card" style="margin-bottom:16px;">
                     <div class="cl-card-header">
@@ -383,6 +412,20 @@
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script nonce="{{ cspNonce }}">
+// richieste dalla BOB Zone: segnare come completata (con una risposta facoltativa)
+document.querySelectorAll('.cl-rich-completa').forEach(function (b) {
+    b.addEventListener('click', async function () {
+        const riga = b.closest('.cl-richiesta');
+        const fd = new FormData();
+        fd.append('_csrf', document.querySelector('input[name="_csrf"]').value);
+        fd.append('risposta', riga.querySelector('.cl-rich-risposta').value);
+        b.disabled = true;
+        const r = await fetch('/share/richieste/' + b.dataset.rid + '/completa', { method: 'POST', body: fd, credentials: 'same-origin' });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) { b.disabled = false; alert(j.error || 'Si è verificato un errore.'); return; }
+        riga.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600;">Richiesta completata: chi l\'aveva fatta è stato avvisato.</div>';
+    });
+});
 // i cantieri collegati al link: si cerca per nome o codice
 if (window.TomSelect && document.getElementById('cl-cantieri')) {
     new TomSelect('#cl-cantieri', { plugins: ['remove_button'], maxOptions: 300, hidePlaceholder: true });
