@@ -48,11 +48,11 @@ final class BusinessReportController
             $errore = 'Collegamento a Business non configurato (manca BUSINESS_DB nel file .env).';
         } else {
             try {
-                $repo = new BusinessInvoiceRepository(
+                $repo = (new BusinessInvoiceRepository(
                     (new BusinessConnection($config))->connect(),
                     $config->businessCodDitta(),
                     $config->businessTabellaDocumenti()
-                );
+                ))->perData((string)$request->get('data'));
                 $anni = $repo->availableYears();
                 $rows = $repo->monthlyTotals($daAnno, $aAnno);
             } catch (\Throwable $e) {
@@ -84,6 +84,8 @@ final class BusinessReportController
             'meseNome'   => self::MESI[$meseLimite - 1] ?? '',
             'annoInCorso' => $aAnno === $annoCorrente,
             'errore'     => $errore,
+            // documento (competenza) o registrazione
+            'criterioData' => $request->get('data') === 'reg' ? 'reg' : 'doc',
         ]);
     }
 
@@ -105,11 +107,11 @@ final class BusinessReportController
         }
 
         try {
-            $repo = new BusinessInvoiceRepository(
+            $repo = (new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
                 $config->businessCodDitta(),
                 $config->businessTabellaDocumenti()
-            );
+            ))->perData((string)$request->get('data'));
             Response::json([
                 'ok'      => true,
                 'periodo' => $periodo,
@@ -145,11 +147,11 @@ final class BusinessReportController
         }
 
         try {
-            $repo = new BusinessInvoiceRepository(
+            $repo = (new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
                 $config->businessCodDitta(),
                 $config->businessTabellaDocumenti()
-            );
+            ))->perData((string)$request->get('data'));
             Response::json([
                 'ok'       => true,
                 'registro' => $registro,
@@ -160,6 +162,65 @@ final class BusinessReportController
             error_log('[BusinessReport::controparti] ' . $e->getMessage());
             Response::json(['ok' => false, 'error' => 'Business non raggiungibile'], 503);
         }
+    }
+
+    // ── GET /report/fatturato/documenti?anno=&mese=&causale=&registro=&tipo=&data=&formato=csv
+
+    /**
+     * Ogni documento del periodo, uno per riga: per confrontare con
+     * l'amministrazione fattura per fattura. In JSON per la pagina, in CSV
+     * (separatore ;) per Excel.
+     */
+    public function documenti(Request $request): never
+    {
+        $this->assertAccess($request);
+        [$dal, $al, $periodo] = $this->periodo($request);
+
+        $config = new Config();
+        if (!$config->businessConfigured()) {
+            Response::json(['ok' => false, 'error' => 'Business non configurato'], 503);
+        }
+        $filtro = [];
+        if ($request->get('causale') !== null && $request->get('causale') !== '') $filtro['causale'] = (int)$request->get('causale');
+        if (in_array($request->get('registro'), ['V', 'A'], true)) $filtro['registro'] = (string)$request->get('registro');
+        if ($request->get('tipo') !== null && $request->get('tipo') !== '') $filtro['tipo'] = (string)$request->get('tipo');
+
+        try {
+            $repo = (new BusinessInvoiceRepository(
+                (new BusinessConnection($config))->connect(),
+                $config->businessCodDitta(),
+                $config->businessTabellaDocumenti()
+            ))->perData((string)$request->get('data'));
+            $righe = $repo->documenti($dal, $al, $filtro);
+        } catch (\Throwable $e) {
+            error_log('[BusinessReport::documenti] ' . $e->getMessage());
+            Response::json(['ok' => false, 'error' => 'Business non raggiungibile'], 503);
+        }
+
+        if ($request->get('formato') === 'csv') {
+            while (ob_get_level() > 0) { ob_end_clean(); }
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="documenti_' . preg_replace('/[^A-Za-z0-9]+/', '_', $periodo) . '.csv"');
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");   // Excel legge gli accenti
+            fputcsv($out, ['Data documento', 'Data registrazione', 'Numero', 'Serie', 'Protocollo', 'Causale', 'Descrizione causale',
+                           'Registro', 'Tipo controparte', 'Controparte', 'Partita IVA', 'Imponibile', 'IVA', 'Conteggiata in'], ';');
+            $reg  = ['V' => 'Vendite', 'A' => 'Acquisti'];
+            $tipo = ['C' => 'Cliente', 'F' => 'Fornitore', 'S' => 'Altro'];
+            $cont = ['entrate' => 'Entrate', 'uscite' => 'Uscite', 'esclusa' => 'Esclusa (autofattura reverse charge)'];
+            $euro = static fn(float $v): string => number_format($v, 2, ',', '');
+            foreach ($righe as $r) {
+                fputcsv($out, [
+                    $r['data'] ? date('d/m/Y', strtotime($r['data'])) : '', $r['data_reg'] ? date('d/m/Y', strtotime($r['data_reg'])) : '',
+                    $r['numero'], $r['serie'], $r['protocollo'], $r['causale'], $r['descrizione'],
+                    $reg[$r['registro']] ?? $r['registro'], $tipo[$r['tipo']] ?? $r['tipo'], $r['controparte'], $r['piva'],
+                    $euro($r['imponibile']), $euro($r['iva']), $cont[$r['conteggio']] ?? '',
+                ], ';');
+            }
+            fclose($out);
+            exit;
+        }
+        Response::json(['ok' => true, 'periodo' => $periodo, 'righe' => $righe, 'limite' => count($righe) >= 3000]);
     }
 
     // ── Interni ──────────────────────────────────────────────────────────────

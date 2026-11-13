@@ -211,3 +211,16 @@ input.rp-cp-sel { min-width: 170px; }
     .rp-table thead th, .rp-table tbody td, .rp-table tfoot td { padding-left: 12px; padding-right: 12px; }
     .rp-panel-note { display: none; }
 }
+
+/* Dettaglio: elenco dei documenti e esportazione */
+.rp-doc-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.rp-btn {
+    display: inline-block; padding: 6px 14px; border-radius: 8px;
+    border: 1.5px solid #dbe3ec; background: #fff; color: #334155;
+    font-size: 12px; font-weight: 700; cursor: pointer; text-decoration: none;
+}
+.rp-btn:hover { border-color: #93c5fd; color: #2563eb; }
+.rp-doc-n { margin-left: auto; font-size: 12px; color: #64748b; }
+.rp-table tr.rp-click { cursor: pointer; }
+.rp-table tr.rp-click:hover td { background: #f0f9ff; }
+.rp-table small { color: #94a3b8; }
