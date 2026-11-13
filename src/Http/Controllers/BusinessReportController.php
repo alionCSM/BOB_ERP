@@ -46,15 +46,12 @@ final class BusinessReportController
         $errore = null;
 
         $annoCorrente = (int)date('Y');
-        // di default mostriamo l'anno in corso e i due precedenti
-        $daAnno = (int)($request->get('da_anno') ?: $annoCorrente - 2);
-        $aAnno  = (int)($request->get('a_anno')  ?: $annoCorrente);
-        if ($daAnno > $aAnno) { [$daAnno, $aAnno] = [$aAnno, $daAnno]; }
-        // un anno futuro sarebbe tutto a zero, letto come un calo
-        $aAnno  = min($aAnno, $annoCorrente);
-        $daAnno = min($daAnno, $aAnno);
-        // limite di sicurezza: 10 anni per volta
-        if ($aAnno - $daAnno > 9) { $daAnno = $aAnno - 9; }
+        // un anno solo da scegliere; grafico e totali mostrano anche i due
+        // precedenti. a_anno: i link salvati con il vecchio intervallo.
+        // Un anno futuro sarebbe tutto a zero, letto come un calo.
+        $aAnno  = (int)($request->get('anno') ?: $request->get('a_anno') ?: $annoCorrente);
+        $aAnno  = max(2000, min($aAnno, $annoCorrente));
+        $daAnno = $aAnno - 2;
 
         if (!$config->businessConfigured()) {
             $errore = 'Collegamento a Business non configurato (manca BUSINESS_DB nel file .env).';
@@ -100,6 +97,9 @@ final class BusinessReportController
             'mesi'       => self::MESI,
             'anni'       => $anni,
             'daAnno'     => $daAnno,
+            // gli anni con movimenti in Business (dal piu' recente), mai futuri;
+            // se Business non risponde, gli ultimi dieci
+            'anniScelta' => array_values(array_filter($anni, fn($y) => $y <= $annoCorrente)) ?: range($annoCorrente, $annoCorrente - 9),
             'aAnno'      => $aAnno,
             'serie'      => $dati['serie'],
             'totali'     => $dati['totali'],
@@ -236,7 +236,7 @@ final class BusinessReportController
             header('Content-Disposition: attachment; filename="documenti_' . preg_replace('/[^A-Za-z0-9]+/', '_', $periodo) . '.csv"');
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");   // Excel legge gli accenti
-            fputcsv($out, ['Data documento', 'Data registrazione', 'Numero', 'Serie', 'Protocollo', 'Causale', 'Descrizione causale',
+            fputcsv($out, ['Data documento', 'Numero', 'Serie', 'Protocollo', 'Causale', 'Descrizione causale',
                            'Registro', 'Tipo controparte', 'Controparte', 'Partita IVA', 'Imponibile', 'IVA', 'Conteggiata in'], ';');
             $reg  = ['V' => 'Vendite', 'A' => 'Acquisti'];
             $tipo = ['C' => 'Cliente', 'F' => 'Fornitore', 'S' => 'Altro'];
@@ -244,7 +244,7 @@ final class BusinessReportController
             $euro = static fn(float $v): string => number_format($v, 2, ',', '');
             foreach ($righe as $r) {
                 fputcsv($out, [
-                    $r['data'] ? date('d/m/Y', strtotime($r['data'])) : '', $r['data_reg'] ? date('d/m/Y', strtotime($r['data_reg'])) : '',
+                    $r['data'] ? date('d/m/Y', strtotime($r['data'])) : '',
                     $r['numero'], $r['serie'], $r['protocollo'], $r['causale'], $r['descrizione'],
                     $reg[$r['registro']] ?? $r['registro'], $tipo[$r['tipo']] ?? $r['tipo'], $r['controparte'], $r['piva'],
                     $euro($r['imponibile']), $euro($r['iva']), $cont[$r['conteggio']] ?? '',

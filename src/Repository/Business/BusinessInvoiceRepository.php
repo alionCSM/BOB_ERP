@@ -17,7 +17,7 @@ use PDO;
  *
  * Modello dati (moviva = movimenti IVA):
  *   - mi_datdoc    data del documento → criterio di COMPETENZA
- *   - mi_datreg    data di registrazione (solo mostrata nell'elenco documenti)
+ *   - mi_datreg    data di registrazione (qui non si usa)
  *   - mi_tregiva   registro: 'V' vendite, 'A' acquisti
  *   - mi_contocf → anagra.an_conto   il cliente o il fornitore
  *   - mi_imponib   imponibile
@@ -341,13 +341,11 @@ final class BusinessInvoiceRepository
         $numero = $this->colonna(['mi_numdoc', 'mi_ndoc', 'mi_numerodoc']);
         $serie  = $this->colonna(['mi_alfdoc', 'mi_serdoc', 'mi_serie']);
         $proto  = $this->colonna(['mi_numpro', 'mi_protoc', 'mi_nprot', 'mi_numprot', 'mi_protocollo']);
-        $dataReg = in_array('mi_datreg', $this->colonne(), true);
 
         $extra = [];
         if ($numero) $extra[] = "m.$numero AS numero";
         if ($serie)  $extra[] = "m.$serie AS serie";
         if ($proto)  $extra[] = "m.$proto AS protocollo";
-        if ($dataReg) $extra[] = 'm.mi_datreg AS data_reg';
         $gruppo = array_merge(['m.mi_datdoc', 'm.mi_causale', 'm.mi_tregiva', 'm.mi_contocf', "ISNULL(a.an_tipo, '')"],
             array_map(fn($e) => explode(' AS ', $e)[0], $extra));
 
@@ -384,7 +382,6 @@ final class BusinessInvoiceRepository
             $nome = trim((string)$r['nome']);
             return [
                 'data'        => $data($r['data_doc']),
-                'data_reg'    => $data($r['data_reg'] ?? null),
                 'numero'      => isset($r['numero']) ? trim((string)$r['numero']) : null,
                 'serie'       => isset($r['serie']) ? trim((string)$r['serie']) : null,
                 'protocollo'  => isset($r['protocollo']) ? trim((string)$r['protocollo']) : null,
