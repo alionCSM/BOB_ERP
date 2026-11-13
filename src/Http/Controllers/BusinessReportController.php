@@ -203,9 +203,9 @@ final class BusinessReportController
      * Trasforma le righe (anno, mese, tipo) in serie pronte per il grafico e
      * per la tabella: per ogni anno 12 valori di entrate, uscite e saldo.
      *
-     * 'C' = cliente → entrate, 'F' = fornitore → uscite.
-     * Le anagrafiche di tipo 'S' (altri soggetti) restano fuori da entrambi:
-     * non sono ne' ricavi ne' costi di fornitura.
+     * Registro vendite → entrate, registro acquisti → uscite. Le autofatture
+     * del reverse charge (vendite con un fornitore) le toglie gia' il
+     * repository: non sono ricavi.
      */
     /**
      * @param int $meseLimite fino a che mese contare il confronto fra anni

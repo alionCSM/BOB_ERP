@@ -32,10 +32,14 @@ use PDO;
  * hanno il segno opposto e quindi si sottraggono da sole — nessuno deve
  * decidere niente.
  *
- * **Entrate e uscite si dividono per REGISTRO, non per tipo di
- * controparte.** Nel registro vendite ci sono anche movimenti con un
- * fornitore come controparte (autofatture in reverse charge): dividendo
- * per `an_tipo` finirebbero fra le uscite e conterebbero due volte.
+ * **Entrate e uscite si dividono per REGISTRO**, con un'eccezione: nel
+ * registro vendite ci sono anche movimenti con un FORNITORE come
+ * controparte. Sono le autofatture / integrazioni del reverse charge: la
+ * fattura del fornitore e' registrata negli acquisti (ed e' un costo vero)
+ * e, solo per l'IVA, anche nelle vendite. Quelle righe NON sono ricavi:
+ * contarle gonfiava il fatturato (gennaio 2026: +38.302 €, causali 5002,
+ * 9000, 5001 presenti identiche in tutti e due i registri). Si escludono
+ * dalle entrate e non si aggiungono alle uscite, dove il costo c'e' gia'.
  *
  * Le somme le esegue SQL Server: anche su anni di storico tornano poche
  * decine di righe, quindi non serve replicare i dati dentro BOB.
@@ -58,6 +62,14 @@ final class BusinessInvoiceRepository
      */
     private const IMPONIBILE = "(CASE WHEN m.mi_tregiva = 'V' THEN -m.mi_imponib ELSE m.mi_imponib END)";
     private const IMPOSTA    = "(CASE WHEN m.mi_tregiva = 'V' THEN -m.mi_importo ELSE m.mi_importo END)";
+
+    /**
+     * Le righe da contare: tutto, tranne le autofatture del reverse charge
+     * (registro vendite con un fornitore come controparte). Vuole l'alias
+     * `a` su anagra.
+     */
+    private const SENZA_AUTOFATTURE = "NOT (m.mi_tregiva = 'V' AND ISNULL(a.an_tipo, '') = 'F')";
+    private const JOIN_ANAGRA = "LEFT JOIN anagra a ON a.an_conto = m.mi_contocf AND a.codditt = m.codditt";
 
     /**
      * @param string $tabella la tabella del registro IVA. Il nome arriva da
@@ -87,10 +99,12 @@ final class BusinessInvoiceRepository
                 SUM(" . self::IMPONIBILE . ")   AS imponibile,
                 SUM(" . self::IMPOSTA . ")      AS iva
             FROM   {$this->tabella} m
+            " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
               AND  m.mi_datdoc >= :dal
               AND  m.mi_datdoc <  :al
+              AND  " . self::SENZA_AUTOFATTURE . "
             GROUP BY YEAR(m.mi_datdoc), MONTH(m.mi_datdoc), m.mi_tregiva
             ORDER BY anno, mese
         ");
@@ -140,11 +154,12 @@ final class BusinessInvoiceRepository
                 COUNT(*)                      AS documenti,
                 SUM(" . self::IMPONIBILE . ") AS imponibile
             FROM   {$this->tabella} m
-            LEFT JOIN anagra a ON a.an_conto = m.mi_contocf AND a.codditt = m.codditt
+            " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva = :registro
               AND  m.mi_datdoc >= :dal
               AND  m.mi_datdoc <  :al
+              AND  " . self::SENZA_AUTOFATTURE . "
             GROUP BY m.mi_contocf
             ORDER BY SUM(" . self::IMPONIBILE . ") DESC
         ");
@@ -180,32 +195,44 @@ final class BusinessInvoiceRepository
      */
     public function byCausale(string $from, string $toExclusive): array
     {
+        // la descrizione della causale da qualsiasi anno: filtrando per
+        // l'anno del documento non si trovava quasi mai, e restava "cod. 1000"
         $stmt = $this->conn->prepare("
             SELECT
                 m.mi_causale                  AS causale,
-                MAX(c.tb_descaus)             AS descrizione,
+                MAX(c.descrizione)            AS descrizione,
                 m.mi_tregiva                  AS registro,
+                ISNULL(a.an_tipo, '')         AS tipo,
                 COUNT(*)                      AS documenti,
-                SUM(" . self::IMPONIBILE . ") AS imponibile
+                SUM(" . self::IMPONIBILE . ") AS imponibile,
+                SUM(" . self::IMPOSTA . ")    AS iva
             FROM   {$this->tabella} m
-            LEFT JOIN tabcaus c ON c.tb_codcaus = m.mi_causale
-                               AND c.tb_anno    = YEAR(m.mi_datdoc)
+            " . self::JOIN_ANAGRA . "
+            LEFT JOIN (SELECT tb_codcaus, MAX(tb_descaus) AS descrizione FROM tabcaus GROUP BY tb_codcaus) c
+                   ON c.tb_codcaus = m.mi_causale
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
               AND  m.mi_datdoc >= :dal
               AND  m.mi_datdoc <  :al
-            GROUP BY m.mi_causale, m.mi_tregiva
-            ORDER BY SUM(" . self::IMPONIBILE . ") DESC
+            GROUP BY m.mi_causale, m.mi_tregiva, ISNULL(a.an_tipo, '')
+            ORDER BY m.mi_tregiva DESC, SUM(" . self::IMPONIBILE . ") DESC
         ");
         $stmt->execute([':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive]);
 
-        return array_map(static fn(array $r): array => [
-            'causale'     => (int)$r['causale'],
-            'descrizione' => $r['descrizione'] !== null ? trim((string)$r['descrizione']) : null,
-            'registro'    => (string)$r['registro'],
-            'documenti'   => (int)$r['documenti'],
-            'imponibile'  => (float)$r['imponibile'],
-        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        return array_map(static function (array $r): array {
+            $autofattura = $r['registro'] === self::VENDITE && $r['tipo'] === 'F';
+            return [
+                'causale'     => (int)$r['causale'],
+                'descrizione' => $r['descrizione'] !== null ? trim((string)$r['descrizione']) : null,
+                'registro'    => (string)$r['registro'],
+                'tipo'        => (string)$r['tipo'],      // C cliente, F fornitore, S altro
+                'documenti'   => (int)$r['documenti'],
+                'imponibile'  => (float)$r['imponibile'],
+                'iva'         => (float)$r['iva'],
+                // dove finisce nei totali della pagina
+                'conteggio'   => $autofattura ? 'esclusa' : ($r['registro'] === self::VENDITE ? 'entrate' : 'uscite'),
+            ];
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     /** Anni per cui esistono movimenti, dal piu' recente. */
