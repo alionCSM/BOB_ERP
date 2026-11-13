@@ -17,7 +17,7 @@ use PDO;
  *
  * Modello dati (moviva = movimenti IVA):
  *   - mi_datdoc    data del documento → criterio di COMPETENZA
- *   - mi_datreg    data di registrazione (qui non si usa)
+ *   - mi_datreg    data di registrazione (solo mostrata nell'elenco documenti)
  *   - mi_tregiva   registro: 'V' vendite, 'A' acquisti
  *   - mi_contocf → anagra.an_conto   il cliente o il fornitore
  *   - mi_imponib   imponibile
@@ -40,6 +40,11 @@ use PDO;
  * contarle gonfiava il fatturato (gennaio 2026: +38.302 €, causali 5002,
  * 9000, 5001 presenti identiche in tutti e due i registri). Si escludono
  * dalle entrate e non si aggiungono alle uscite, dove il costo c'e' gia'.
+ *
+ * **Cosa NON e'.** E' il fatturato da registro IVA: non e' l'incassato e
+ * non e' un conto economico. Negli acquisti mancano personale, contributi
+ * e ogni costo senza fattura, quindi vendite meno acquisti non e' un
+ * margine: la pagina non lo mostra apposta.
  *
  * Le somme le esegue SQL Server: anche su anni di storico tornano poche
  * decine di righe, quindi non serve replicare i dati dentro BOB.
@@ -71,20 +76,6 @@ final class BusinessInvoiceRepository
     private const SENZA_AUTOFATTURE = "NOT (m.mi_tregiva = 'V' AND ISNULL(a.an_tipo, '') = 'F')";
     private const JOIN_ANAGRA = "LEFT JOIN anagra a ON a.an_conto = m.mi_contocf AND a.codditt = m.codditt";
 
-    /**
-     * La data con cui si mettono i documenti nei mesi: quella del documento
-     * (competenza, il default) o quella di registrazione, che e' spesso
-     * quella con cui ragiona l'amministrazione. Una fattura del 31/12
-     * registrata a gennaio sta in mesi diversi nei due casi.
-     */
-    private string $data = 'm.mi_datdoc';
-
-    public function perData(string $criterio): self
-    {
-        $this->data = $criterio === 'reg' && in_array('mi_datreg', $this->colonne(), true) ? 'm.mi_datreg' : 'm.mi_datdoc';
-        return $this;
-    }
-
     /** @var string[]|null le colonne del registro IVA, lette una volta */
     private ?array $colonne = null;
 
@@ -107,6 +98,30 @@ final class BusinessInvoiceRepository
             }
         }
         return $this->colonne;
+    }
+
+    /**
+     * L'espressione che identifica un documento, per contarli.
+     *
+     * Il registro IVA ha una riga per aliquota: COUNT(*) contava le righe,
+     * e una fattura con due aliquote risultava due fatture. Un documento e'
+     * registro + data + controparte + numero (e serie). Se la colonna del
+     * numero non c'e', il conteggio si basa su registro + data + controparte
+     * + causale: due fatture allo stesso cliente nello stesso giorno con la
+     * stessa causale contano come una. E' un'approssimazione per difetto, e
+     * riguarda solo il conteggio, mai gli importi.
+     */
+    private function chiaveDocumento(): string
+    {
+        $parti = ["m.mi_tregiva", "CONVERT(varchar(10), m.mi_datdoc, 23)", "CAST(m.mi_contocf AS varchar(20))"];
+        $numero = $this->colonna(['mi_numdoc', 'mi_ndoc', 'mi_numerodoc']);
+        if ($numero) {
+            $parti[] = "CAST(m.$numero AS varchar(30))";
+            if ($serie = $this->colonna(['mi_alfdoc', 'mi_serdoc', 'mi_serie'])) $parti[] = "CAST(m.$serie AS varchar(30))";
+        } else {
+            $parti[] = "CAST(m.mi_causale AS varchar(20))";
+        }
+        return 'COUNT(DISTINCT CONCAT(' . implode(", '|', ", $parti) . '))';
     }
 
     /** La prima colonna esistente fra quelle proposte, o null. */
@@ -139,20 +154,20 @@ final class BusinessInvoiceRepository
     {
         $stmt = $this->conn->prepare("
             SELECT
-                YEAR({$this->data})  AS anno,
-                MONTH({$this->data}) AS mese,
+                YEAR(m.mi_datdoc)  AS anno,
+                MONTH(m.mi_datdoc) AS mese,
                 m.mi_tregiva       AS registro,
-                COUNT(*)                        AS documenti,
+                " . $this->chiaveDocumento() . " AS documenti,
                 SUM(" . self::IMPONIBILE . ")   AS imponibile,
                 SUM(" . self::IMPOSTA . ")      AS iva
             FROM   {$this->tabella} m
             " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
-              AND  {$this->data} >= :dal
-              AND  {$this->data} <  :al
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
               AND  " . self::SENZA_AUTOFATTURE . "
-            GROUP BY YEAR({$this->data}), MONTH({$this->data}), m.mi_tregiva
+            GROUP BY YEAR(m.mi_datdoc), MONTH(m.mi_datdoc), m.mi_tregiva
             ORDER BY anno, mese
         ");
         $stmt->execute([
@@ -172,7 +187,36 @@ final class BusinessInvoiceRepository
     }
 
     /**
-     * Chi ci ha pagato, e chi abbiamo pagato: uno per riga.
+     * Fatturato e acquisti fra due date, per il confronto fra anni a pari
+     * giorno (dal 1 gennaio a oggi, contro lo stesso intervallo dell'anno
+     * prima). Stesse regole di monthlyTotals.
+     *
+     * @return array{vendite:float, acquisti:float}
+     */
+    public function totaliFra(string $from, string $toExclusive): array
+    {
+        $stmt = $this->conn->prepare("
+            SELECT m.mi_tregiva AS registro, SUM(" . self::IMPONIBILE . ") AS imponibile
+            FROM   {$this->tabella} m
+            " . self::JOIN_ANAGRA . "
+            WHERE  m.codditt    = :ditta
+              AND  m.mi_tregiva IN ('V', 'A')
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
+              AND  " . self::SENZA_AUTOFATTURE . "
+            GROUP BY m.mi_tregiva
+        ");
+        $stmt->execute([':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive]);
+        $fuori = ['vendite' => 0.0, 'acquisti' => 0.0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $fuori[$r['registro'] === self::VENDITE ? 'vendite' : 'acquisti'] = (float)$r['imponibile'];
+        }
+        return $fuori;
+    }
+
+    /**
+     * Principali clienti e fornitori per fatturato: uno per riga.
+     * (Fatturato, non incassato: i pagamenti stanno nello scadenzario.)
      *
      * E' la domanda da cui si parte guardando un fatturato — non "quanto"
      * ma "con chi". Una riga per controparte, con quante fatture e quanto.
@@ -198,14 +242,14 @@ final class BusinessInvoiceRepository
                     ISNULL(a.an_descr1, '') + ' ' + ISNULL(a.an_descr2, '')
                 )))                           AS nome,
                 MAX(ISNULL(a.an_pariva, ''))  AS piva,
-                COUNT(*)                      AS documenti,
+                " . $this->chiaveDocumento() . " AS documenti,
                 SUM(" . self::IMPONIBILE . ") AS imponibile
             FROM   {$this->tabella} m
             " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva = :registro
-              AND  {$this->data} >= :dal
-              AND  {$this->data} <  :al
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
               AND  " . self::SENZA_AUTOFATTURE . "
             GROUP BY m.mi_contocf
             ORDER BY SUM(" . self::IMPONIBILE . ") DESC
@@ -250,7 +294,7 @@ final class BusinessInvoiceRepository
                 MAX(c.descrizione)            AS descrizione,
                 m.mi_tregiva                  AS registro,
                 ISNULL(a.an_tipo, '')         AS tipo,
-                COUNT(*)                      AS documenti,
+                " . $this->chiaveDocumento() . " AS documenti,
                 SUM(" . self::IMPONIBILE . ") AS imponibile,
                 SUM(" . self::IMPOSTA . ")    AS iva
             FROM   {$this->tabella} m
@@ -259,8 +303,8 @@ final class BusinessInvoiceRepository
                    ON c.tb_codcaus = m.mi_causale
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
-              AND  {$this->data} >= :dal
-              AND  {$this->data} <  :al
+              AND  m.mi_datdoc >= :dal
+              AND  m.mi_datdoc <  :al
             GROUP BY m.mi_causale, m.mi_tregiva, ISNULL(a.an_tipo, '')
             ORDER BY m.mi_tregiva DESC, SUM(" . self::IMPONIBILE . ") DESC
         ");
@@ -293,7 +337,7 @@ final class BusinessInvoiceRepository
      */
     public function documenti(string $from, string $toExclusive, array $filtro = [], int $limite = 3000): array
     {
-        $limite = max(1, min(10000, $limite));
+        $limite = max(1, min(50001, $limite));
         $numero = $this->colonna(['mi_numdoc', 'mi_ndoc', 'mi_numerodoc']);
         $serie  = $this->colonna(['mi_alfdoc', 'mi_serdoc', 'mi_serie']);
         $proto  = $this->colonna(['mi_numpro', 'mi_protoc', 'mi_nprot', 'mi_numprot', 'mi_protocollo']);
@@ -307,7 +351,7 @@ final class BusinessInvoiceRepository
         $gruppo = array_merge(['m.mi_datdoc', 'm.mi_causale', 'm.mi_tregiva', 'm.mi_contocf', "ISNULL(a.an_tipo, '')"],
             array_map(fn($e) => explode(' AS ', $e)[0], $extra));
 
-        $dove = ["m.codditt = :ditta", "m.mi_tregiva IN ('V', 'A')", "{$this->data} >= :dal", "{$this->data} < :al"];
+        $dove = ["m.codditt = :ditta", "m.mi_tregiva IN ('V', 'A')", "m.mi_datdoc >= :dal", "m.mi_datdoc < :al"];
         $par  = [':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive];
         if (isset($filtro['causale'])) { $dove[] = 'm.mi_causale = :causale'; $par[':causale'] = (int)$filtro['causale']; }
         if (isset($filtro['registro']) && in_array($filtro['registro'], ['V', 'A'], true)) { $dove[] = 'm.mi_tregiva = :registro'; $par[':registro'] = $filtro['registro']; }

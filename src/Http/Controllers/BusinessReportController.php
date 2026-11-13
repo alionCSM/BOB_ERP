@@ -11,13 +11,21 @@ use App\Repository\Business\BusinessInvoiceRepository;
 /**
  * Andamento fatturato — dati letti dal gestionale Business (sola lettura).
  *
- * Criterio: COMPETENZA, cioe' i documenti sono contati nel mese della loro
- * data (tm_datdoc), non in quello dell'incasso/pagamento. E' il criterio che
- * risponde a "quest'anno stiamo lavorando piu' dell'anno scorso"; la lettura
- * di cassa (quando i soldi si muovono davvero) e' un'altra cosa e andra' su
- * una vista separata per non mescolare due misure diverse.
+ * Pagina per la direzione (permesso 'report_business'): il fatturato
+ * dell'azienda, l'andamento rispetto agli anni prima, i principali clienti
+ * e fornitori. L'amministrazione lavora direttamente in Business: qui i
+ * numeri devono essere gli stessi, e il dettaglio per causale e per
+ * documento serve a verificarlo.
  *
- * Pagina riservata alla direzione: permesso 'report_business'.
+ * Criterio: data del DOCUMENTO (competenza), non incasso/pagamento. Una
+ * sola data, senza scelte: due versioni dello stesso numero fanno chiedere
+ * quale sia quella vera.
+ *
+ * Si mostrano fatturato e acquisti fatturati, non il "saldo": negli
+ * acquisti mancano personale e costi senza fattura, e la differenza
+ * sembrerebbe un margine che non e'. L'API dell'app (ApiV1Scrivania) usa
+ * buildSeries e riceve ancora il campo saldo: le versioni gia' pubblicate
+ * lo leggono, toglierlo dal server le romperebbe.
  */
 final class BusinessReportController
 {
@@ -34,6 +42,7 @@ final class BusinessReportController
         $config = new Config();
         $anni   = [];
         $rows   = [];
+        $ytd    = null;
         $errore = null;
 
         $annoCorrente = (int)date('Y');
@@ -41,6 +50,9 @@ final class BusinessReportController
         $daAnno = (int)($request->get('da_anno') ?: $annoCorrente - 2);
         $aAnno  = (int)($request->get('a_anno')  ?: $annoCorrente);
         if ($daAnno > $aAnno) { [$daAnno, $aAnno] = [$aAnno, $daAnno]; }
+        // un anno futuro sarebbe tutto a zero, letto come un calo
+        $aAnno  = min($aAnno, $annoCorrente);
+        $daAnno = min($daAnno, $aAnno);
         // limite di sicurezza: 10 anni per volta
         if ($aAnno - $daAnno > 9) { $daAnno = $aAnno - 9; }
 
@@ -48,13 +60,26 @@ final class BusinessReportController
             $errore = 'Collegamento a Business non configurato (manca BUSINESS_DB nel file .env).';
         } else {
             try {
-                $repo = (new BusinessInvoiceRepository(
+                $repo = new BusinessInvoiceRepository(
                     (new BusinessConnection($config))->connect(),
                     $config->businessCodDitta(),
                     $config->businessTabellaDocumenti()
-                ))->perData((string)$request->get('data'));
+                );
                 $anni = $repo->availableYears();
                 $rows = $repo->monthlyTotals($daAnno, $aAnno);
+                if ($aAnno === $annoCorrente) {
+                    // da inizio anno a oggi, contro lo stesso intervallo
+                    // dell'anno prima: un mese a meta' contro uno intero non
+                    // e' un confronto
+                    $domani = new \DateTimeImmutable('tomorrow');
+                    $ytd = [
+                        'oggi'  => $repo->totaliFra($domani->format('Y-01-01'), $domani->format('Y-m-d')),
+                        'prima' => $repo->totaliFra(
+                            $domani->modify('-1 year')->format('Y-01-01'),
+                            $domani->modify('-1 year')->format('Y-m-d')
+                        ),
+                    ];
+                }
             } catch (\Throwable $e) {
                 // La pagina NON deve restare silenziosamente vuota: un fatturato
                 // a zero letto come "mese scarso" invece che "connessione giu'"
@@ -84,8 +109,11 @@ final class BusinessReportController
             'meseNome'   => self::MESI[$meseLimite - 1] ?? '',
             'annoInCorso' => $aAnno === $annoCorrente,
             'errore'     => $errore,
-            // documento (competenza) o registrazione
-            'criterioData' => $request->get('data') === 'reg' ? 'reg' : 'doc',
+            'annoCorrente' => $annoCorrente,
+            'meseCorrente' => (int)date('n'),
+            'oggi'       => date('j') . ' ' . strtolower(self::MESI[(int)date('n') - 1]),
+            // da inizio anno a oggi (solo se l'ultimo anno e' quello in corso)
+            'ytd'        => $ytd,
         ]);
     }
 
@@ -107,11 +135,11 @@ final class BusinessReportController
         }
 
         try {
-            $repo = (new BusinessInvoiceRepository(
+            $repo = new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
                 $config->businessCodDitta(),
                 $config->businessTabellaDocumenti()
-            ))->perData((string)$request->get('data'));
+            );
             Response::json([
                 'ok'      => true,
                 'periodo' => $periodo,
@@ -147,11 +175,11 @@ final class BusinessReportController
         }
 
         try {
-            $repo = (new BusinessInvoiceRepository(
+            $repo = new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
                 $config->businessCodDitta(),
                 $config->businessTabellaDocumenti()
-            ))->perData((string)$request->get('data'));
+            );
             Response::json([
                 'ok'       => true,
                 'registro' => $registro,
@@ -164,7 +192,7 @@ final class BusinessReportController
         }
     }
 
-    // ── GET /report/fatturato/documenti?anno=&mese=&causale=&registro=&tipo=&data=&formato=csv
+    // ── GET /report/fatturato/documenti?anno=&mese=&causale=&registro=&tipo=&formato=csv
 
     /**
      * Ogni documento del periodo, uno per riga: per confrontare con
@@ -186,18 +214,23 @@ final class BusinessReportController
         if ($request->get('tipo') !== null && $request->get('tipo') !== '') $filtro['tipo'] = (string)$request->get('tipo');
 
         try {
-            $repo = (new BusinessInvoiceRepository(
+            $repo = new BusinessInvoiceRepository(
                 (new BusinessConnection($config))->connect(),
                 $config->businessCodDitta(),
                 $config->businessTabellaDocumenti()
-            ))->perData((string)$request->get('data'));
-            $righe = $repo->documenti($dal, $al, $filtro);
+            );
+            $csv    = $request->get('formato') === 'csv';
+            $limite = $csv ? 50000 : 3000;
+            // uno in piu' per sapere se ce ne sono altri
+            $righe  = $repo->documenti($dal, $al, $filtro, $limite + 1);
+            $troncato = count($righe) > $limite;
+            if ($troncato) $righe = array_slice($righe, 0, $limite);
         } catch (\Throwable $e) {
             error_log('[BusinessReport::documenti] ' . $e->getMessage());
             Response::json(['ok' => false, 'error' => 'Business non raggiungibile'], 503);
         }
 
-        if ($request->get('formato') === 'csv') {
+        if ($csv) {
             while (ob_get_level() > 0) { ob_end_clean(); }
             header('Content-Type: text/csv; charset=utf-8');
             header('Content-Disposition: attachment; filename="documenti_' . preg_replace('/[^A-Za-z0-9]+/', '_', $periodo) . '.csv"');
@@ -207,7 +240,7 @@ final class BusinessReportController
                            'Registro', 'Tipo controparte', 'Controparte', 'Partita IVA', 'Imponibile', 'IVA', 'Conteggiata in'], ';');
             $reg  = ['V' => 'Vendite', 'A' => 'Acquisti'];
             $tipo = ['C' => 'Cliente', 'F' => 'Fornitore', 'S' => 'Altro'];
-            $cont = ['entrate' => 'Entrate', 'uscite' => 'Uscite', 'esclusa' => 'Esclusa (autofattura reverse charge)'];
+            $cont = ['entrate' => 'Fatturato', 'uscite' => 'Acquisti', 'esclusa' => 'Esclusa (autofattura reverse charge)'];
             $euro = static fn(float $v): string => number_format($v, 2, ',', '');
             foreach ($righe as $r) {
                 fputcsv($out, [
@@ -217,10 +250,14 @@ final class BusinessReportController
                     $euro($r['imponibile']), $euro($r['iva']), $cont[$r['conteggio']] ?? '',
                 ], ';');
             }
+            if ($troncato) {
+                // un file di verifica incompleto deve dirlo
+                fputcsv($out, ["ATTENZIONE: elenco incompleto, mostrati i primi $limite documenti. Esportare per singola causale."], ';');
+            }
             fclose($out);
             exit;
         }
-        Response::json(['ok' => true, 'periodo' => $periodo, 'righe' => $righe, 'limite' => count($righe) >= 3000]);
+        Response::json(['ok' => true, 'periodo' => $periodo, 'righe' => $righe, 'limite' => $troncato ? $limite : null]);
     }
 
     // ── Interni ──────────────────────────────────────────────────────────────
@@ -264,9 +301,12 @@ final class BusinessReportController
      * Trasforma le righe (anno, mese, tipo) in serie pronte per il grafico e
      * per la tabella: per ogni anno 12 valori di entrate, uscite e saldo.
      *
-     * Registro vendite → entrate, registro acquisti → uscite. Le autofatture
-     * del reverse charge (vendite con un fornitore) le toglie gia' il
-     * repository: non sono ricavi.
+     * Registro vendite → entrate (fatturato), registro acquisti → uscite
+     * (acquisti fatturati). Le autofatture del reverse charge (vendite con
+     * un fornitore) le toglie gia' il repository: non sono ricavi.
+     *
+     * Usata anche dall'API dell'app: i nomi dei campi (entrate, uscite,
+     * saldo, *_periodo) non si cambiano finche' l'app li legge.
      */
     /**
      * @param int $meseLimite fino a che mese contare il confronto fra anni

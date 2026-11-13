@@ -1,6 +1,6 @@
 /*
- * Andamento fatturato: grafico multi-anno, dettaglio causali, e chi ci ha
- * pagato / chi abbiamo pagato.
+ * Andamento fatturato: grafico multi-anno, verifica per causale e per
+ * documento, principali clienti e fornitori.
  *
  * Chart.js lo carica la pagina dal CDN. Qui c'era scritto che stava nel
  * bundle del template: il codice la' dentro c'e', ma il bundle non lo
@@ -20,6 +20,8 @@
     var mesi  = JSON.parse(canvas.dataset.mesi  || '[]');
     var serie = JSON.parse(canvas.dataset.serie || '{}');
     var anni  = Object.keys(serie).sort();
+    var annoCorrente = canvas.dataset.annoCorrente;
+    var meseCorrente = Number(canvas.dataset.meseCorrente) || 12;
 
     // una tinta per anno: l'anno piu' recente e' il piu' marcato
     var palette = ['#cbd5e1', '#94a3b8', '#38bdf8', '#0ea5e9', '#0284c7', '#0f766e'];
@@ -36,7 +38,11 @@
         return anni.map(function (y, i) {
             return {
                 label: y,
-                data: serie[y] ? serie[y][tipo] : [],
+                // i mesi che devono ancora venire non sono zero: la linea si
+                // ferma invece di crollare a dicembre
+                data: serie[y] ? serie[y][tipo].map(function (v, i) {
+                    return y === annoCorrente && i >= meseCorrente ? null : v;
+                }) : [],
                 borderColor: coloreAnno(i, anni.length),
                 backgroundColor: coloreAnno(i, anni.length),
                 borderWidth: i === anni.length - 1 ? 3 : 2,
@@ -105,8 +111,6 @@
     var modal = document.getElementById('rp-modal');
     var mTit  = document.getElementById('rp-modal-title');
     var mBody = document.getElementById('rp-modal-body');
-    // data documento (default) o data registrazione, come la pagina
-    var CRIT = new URLSearchParams(location.search).get('data') === 'reg' ? 'reg' : 'doc';
     var aperto = null;   // {anno, mese} del dettaglio aperto
 
     function esc(s) {
@@ -125,32 +129,32 @@
         modal.hidden = false;
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
-        mTit.textContent = 'Dettaglio per causale';
+        mTit.textContent = 'Verifica per causale';
         mBody.innerHTML = '<div class="rp-loading">Caricamento…</div>';
 
         aperto = { anno: anno, mese: mese };
-        fetch('/report/fatturato/causali?anno=' + anno + '&mese=' + mese + '&data=' + CRIT, {
+        fetch('/report/fatturato/causali?anno=' + anno + '&mese=' + mese, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) throw new Error(d.error || 'errore');
-                mTit.textContent = 'Dettaglio per causale — ' + d.periodo;
+                mTit.textContent = 'Verifica per causale — ' + d.periodo;
                 if (!d.righe || !d.righe.length) {
                     mBody.innerHTML = '<div class="rp-empty">Nessun documento nel periodo.</div>';
                     return;
                 }
                 var REG = { V: 'Vendite', A: 'Acquisti' };
                 var CONTO = {
-                    entrate: '<span class="rp-badge rp-badge-c">Entrate</span>',
-                    uscite:  '<span class="rp-badge rp-badge-f">Uscite</span>',
+                    entrate: '<span class="rp-badge rp-badge-c">Fatturato</span>',
+                    uscite:  '<span class="rp-badge rp-badge-f">Acquisti</span>',
                     esclusa: '<span class="rp-badge rp-badge-s" title="Autofattura / integrazione del reverse charge: il costo è già negli acquisti">Esclusa – autofattura</span>'
                 };
                 var somma = function (c) { return d.righe.filter(function (r) { return r.conteggio === c; }).reduce(function (t, r) { return t + r.imponibile; }, 0); };
                 mBody.innerHTML =
                     '<div class="rp-modal-hint">Ogni causale con il registro in cui è registrata e dove viene conteggiata. '
                   + 'Le righe del registro vendite con un fornitore come controparte sono autofatture del reverse charge: '
-                  + 'non sono ricavi e restano fuori dalle entrate (il costo è già negli acquisti). '
+                  + 'non sono ricavi e restano fuori dal fatturato (il costo è già negli acquisti). '
                   + 'Cliccare una riga per l\'elenco dei documenti.</div>'
                   + '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-docs>Tutti i documenti del mese</button>'
                   + '<a class="rp-btn" href="' + urlDocumenti({}, 'csv') + '">Esporta CSV</a></div>'
@@ -172,8 +176,8 @@
                           + '</tr>';
                     }).join('')
                   + '</tbody><tfoot>'
-                  + '<tr><td colspan="4"><b>Entrate</b></td><td class="right"><b>' + fmtEuro(somma('entrate')) + '</b></td><td colspan="2"></td></tr>'
-                  + '<tr><td colspan="4"><b>Uscite</b></td><td class="right"><b>' + fmtEuro(somma('uscite')) + '</b></td><td colspan="2"></td></tr>'
+                  + '<tr><td colspan="4"><b>Fatturato</b></td><td class="right"><b>' + fmtEuro(somma('entrate')) + '</b></td><td colspan="2"></td></tr>'
+                  + '<tr><td colspan="4"><b>Acquisti fatturati</b></td><td class="right"><b>' + fmtEuro(somma('uscite')) + '</b></td><td colspan="2"></td></tr>'
                   + (somma('esclusa') ? '<tr style="opacity:.7"><td colspan="4">Escluse (autofatture reverse charge)</td><td class="right">' + fmtEuro(somma('esclusa')) + '</td><td colspan="2"></td></tr>' : '')
                   + '</tfoot></table></div>';
             })
@@ -184,7 +188,7 @@
 
     // ── Documenti, uno per riga ─────────────────────────────────────────────
     function urlDocumenti(filtro, formato) {
-        var q = 'anno=' + aperto.anno + '&mese=' + aperto.mese + '&data=' + CRIT;
+        var q = 'anno=' + aperto.anno + '&mese=' + aperto.mese;
         ['causale', 'registro', 'tipo'].forEach(function (k) {
             if (filtro[k] != null && filtro[k] !== '') q += '&' + k + '=' + encodeURIComponent(filtro[k]);
         });
@@ -204,7 +208,7 @@
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 if (!d.ok) throw new Error(d.error || 'errore');
-                var CONTO = { entrate: 'Entrate', uscite: 'Uscite', esclusa: 'Esclusa' };
+                var CONTO = { entrate: 'Fatturato', uscite: 'Acquisti', esclusa: 'Esclusa' };
                 var REG = { V: 'Vendite', A: 'Acquisti' };
                 var righe = d.righe || [];
                 var tot = function (c, k) { return righe.filter(function (r) { return !c || r.conteggio === c; }).reduce(function (t, r) { return t + r[k]; }, 0); };
@@ -213,7 +217,7 @@
                     '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-back>&larr; Torna alle causali</button>'
                   + '<a class="rp-btn" href="' + urlDocumenti(filtro, 'csv') + '">Esporta CSV</a>'
                   + '<span class="rp-doc-n">' + righe.length + (righe.length === 1 ? ' documento' : ' documenti') + '</span></div>'
-                  + (d.limite ? '<div class="rp-modal-hint">Mostrati i primi 3000 documenti: per l\'elenco completo usare l\'esportazione CSV filtrando per causale.</div>' : '')
+                  + (d.limite ? '<div class="rp-modal-hint">Elenco incompleto: mostrati i primi ' + d.limite + ' documenti. Per l\'elenco completo usare l\'esportazione CSV.</div>' : '')
                   + (!righe.length ? '<div class="rp-empty">Nessun documento.</div>' :
                     '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
                   + '<th>Data doc.</th><th>Data reg.</th>' + (conNumero ? '<th>Numero</th><th>Prot.</th>' : '')
@@ -271,9 +275,8 @@
 
 })();
 
-/* ── Chi ci ha pagato, chi abbiamo pagato ──────────────────────────────────
-   Una riga per controparte invece di un totale solo: la domanda vera,
-   guardando un fatturato, non e' "quanto" ma "con chi".
+/* ── Principali clienti e fornitori ─────────────────────────────────────────
+   Una riga per controparte, per fatturato (non per incassato).
    Blocco suo: non dipende dal grafico.                                    */
 (function () {
     'use strict';
@@ -329,7 +332,7 @@
                 '<thead><tr>' +
                     '<th>' + intest + '</th>' +
                     '<th class="right">Fatture</th>' +
-                    '<th class="right">Imponibile</th>' +
+                    '<th class="right">Fatturato</th>' +
                     '<th class="right">Quota</th>' +
                 '</tr></thead>' +
                 '<tbody>' + corpo + '</tbody>' +
@@ -351,12 +354,11 @@
 
     function caricaControparti() {
         if (!cp.corpo) return;
-        cp.corpo.innerHTML = '<div class="rp-empty">Carico\u2026</div>';
+        cp.corpo.innerHTML = '<div class="rp-empty">Caricamento\u2026</div>';
 
         var url = '/report/fatturato/controparti?registro=' + cp.registro +
                   '&anno=' + encodeURIComponent(cp.anno.value) +
-                  '&mese=' + encodeURIComponent(cp.mese.value) +
-                  (new URLSearchParams(location.search).get('data') === 'reg' ? '&data=reg' : '');
+                  '&mese=' + encodeURIComponent(cp.mese.value);
 
         fetch(url, { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -369,7 +371,7 @@
                 disegnaControparti();
             })
             .catch(function () {
-                cp.corpo.innerHTML = '<div class="rp-empty">Non riesco a leggere i dati.</div>';
+                cp.corpo.innerHTML = '<div class="rp-empty">Impossibile leggere i dati.</div>';
             });
     }
 
