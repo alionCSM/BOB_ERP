@@ -267,11 +267,15 @@
         const t = TIPI[s.tipo] || TIPI.altro;
         const gest = r.data.puo_gestire;
         const azioni = [];
-        if (gest) {
+        // collegata a un'attivita': lo stato segue l'attivita', niente bottoni
+        if (gest && !s.task_id) {
             if (s.stato === 'aperta') azioni.push('<button class="bzd-btn blu" data-bzd-stato="presa"><i class="fas fa-hand"></i> Prendi in carico</button>');
             if (s.stato !== 'risolta') azioni.push('<button class="bzd-btn verde" data-bzd-stato="risolta"><i class="fas fa-check"></i> Risolta</button>');
             if (s.stato === 'risolta') azioni.push('<button class="bzd-btn" data-bzd-stato="aperta"><i class="fas fa-rotate-left"></i> Riapri</button>');
-            if (!s.task_id) azioni.push('<button class="bzd-btn" data-bzd-attivita><i class="fas fa-list-check"></i> Crea attività</button>');
+        }
+        // crea attivita': il modulo completo della nuova attivita', gia' compilato
+        if (!s.task_id && (gest || document.getElementById('btn-new-task'))) {
+            azioni.push('<button class="bzd-btn" data-bzd-attivita><i class="fas fa-list-check"></i> Crea attività</button>');
         }
         if (r.data.puo_eliminare) {
             azioni.push('<button class="bzd-btn" data-bzd-elimina-segn title="Elimina la segnalazione"><i class="fas fa-trash"></i> Elimina</button>');
@@ -294,6 +298,7 @@
                     ${s.presa_da_nome ? ` · in carico a <b>${esc(s.presa_da_nome)}</b>` : ''}
                     ${s.task_id ? ` · <a href="#" data-bzd-task="${s.task_id}" style="color:#60a5fa">Apri attività</a>` : ''}
                 </div>
+                ${s.task_id ? `<div class="sub" style="margin-top:4px"><i class="fas fa-link"></i> Lo stato segue l'attività collegata${s.task_nome ? ' «' + esc(s.task_nome) + '»' : ''}.</div>` : ''}
                 ${r.data.disegno ? `<div class="sub" style="margin-top:6px">
                     <button type="button" class="bzd-link-disegno" data-annot="${r.data.disegno.document_id}" data-annot-type="${esc(r.data.disegno.tipo)}"
                             data-annot-name="${esc(r.data.disegno.nome)}" data-annot-page="${r.data.disegno.page || 1}"
@@ -463,9 +468,19 @@
         }
         if (t.closest('[data-bzd-attivita]')) {
             const s = S.elenco.find(x => x.id === S.apertaId);
-            const nome = prompt('Titolo dell\'attività', s ? s.testo.slice(0, 120) : '');
-            if (!nome) return;
-            const r = await post(`${BASE}/segnalazioni/${S.apertaId}/attivita`, { name: nome });
+            if (!s) return;
+            if (typeof window.apriNuovaAttivita === 'function') {
+                // il modulo completo, con titolo, descrizione e priorita' dalla segnalazione
+                window.apriNuovaAttivita({
+                    name: s.testo.split('\n')[0].slice(0, 120),
+                    description: 'Da segnalazione: ' + s.testo,
+                    priority: s.gravita === 'blocca' ? 2 : (s.gravita === 'alta' ? 1 : 0),
+                    category: 'Segnalazione',
+                    daSegnalazione: s.id,
+                });
+                return;
+            }
+            const r = await post(`${BASE}/segnalazioni/${S.apertaId}/attivita`, {});
             if (!r.ok) { alert(r.error || 'Impossibile creare l\'attività.'); return; }
             if (typeof loadTasks === 'function') loadTasks();
             await caricaSegnalazioni();

@@ -452,6 +452,40 @@ inf = chiama(UFF, 'GET', f'/files/{fm}/info')['data']
 verifica(S, 'si sa in che cartella sta un documento, per aprirlo dalla notifica', inf['folder_id'] == fdest, str(inf))
 verifica(S, '... ma solo se lo si vede', chiama(ALTRO, 'GET', f'/files/{fm}/info')['_http'] in (403, 404))
 
+S = '6f. Foto da tutto il cantiere e attività da segnalazione'
+sql("INSERT INTO bb_zone_messaggi(worksite_id,canale,user_id,testo,foto) VALUES (100,'cliente',10,NULL,'BOBZone/100/photos/a.jpg'),(100,'squadra',30,NULL,'BOBZone/100/photos/b.jpg')")
+sfo = chiama(CAPO, 'POST', '/segnalazioni', {'testo': 'Vetro rotto al piano terra', 'tipo': 'danno'})['data']['id']
+sql(f"INSERT INTO bb_zone_messaggi(worksite_id,segnalazione_id,user_id,foto) VALUES (100,{sfo},30,'BOBZone/100/photos/c.jpg')")
+chiama(CLI, 'POST', '/files', file={'nome': 'foto_facciata.jpg', 'campi': {'folder_id': f1}})
+fonti = lambda u: sorted({x['fonte'] for x in chiama(u, 'GET', '/foto')['data']})
+verifica(S, 'il committente vede le foto di chat, segnalazioni e documenti', set(fonti(CLI)) >= {'chat', 'segnalazione', 'documento'}, str(fonti(CLI)))
+fc = chiama(CLI, 'GET', '/foto')['data']
+verifica(S, '... ma non quelle della chat della squadra', not any(x['dove'].startswith('chat-squadra') for x in fc))
+verifica(S, 'ogni foto dice dove porta (il messaggio preciso)', all('.m' in x['dove'] for x in fc if x['fonte'] in ('chat', 'segnalazione')), str([x['dove'] for x in fc]))
+sp = chiama(CAPO, 'POST', '/segnalazioni', {'testo': 'Manca il parapetto lato nord', 'tipo': 'sicurezza'})['data']['id']
+geom_pin = '{"x":0.3,"y":0.2}'
+sql(f"INSERT INTO bb_zone_annotations(worksite_id,document_id,page,segnalazione_id,type,geom,created_by) VALUES (100,1,1,{sp},'pin','{geom_pin}',30)")
+ta2 = chiama(UFF, 'POST', '/tasks', {'name': 'Montare il parapetto', 'priority': 2, 'da_segnalazione': sp})['data']['id']
+ss = sql(f"SELECT task_id, stato FROM bb_zone_segnalazioni WHERE id={sp}")
+verifica(S, "attività creata dal modulo completo partendo da una segnalazione: collegata, e la segnalazione è presa in carico", ss == [[str(ta2), 'presa']], str(ss))
+verifica(S, "... e l'attività prende il punto della segnalazione sul disegno", sql(f"SELECT document_id FROM bb_zone_annotations WHERE task_id={ta2}") == [['1']])
+
+S = '6g. Segnalazione che segue la sua attività'
+sx = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Porta tagliafuoco danneggiata', 'tipo': 'danno'})['data']['id']
+tx = chiama(UFF, 'POST', '/tasks', {'name': 'Riparare la porta tagliafuoco', 'assegnata_a': 'persona', 'assignee_user_id': CAPO, 'da_segnalazione': sx})['data']['id']
+sg = lambda: chiama(UFF, 'GET', f'/segnalazioni/{sx}')['data']['segnalazione']
+verifica(S, "presa in carico dalla persona a cui è assegnata l'attività (non da chi l'ha creata)", sg()['stato'] == 'presa' and sg()['presa_da_nome'] == 'Arben Hoxha', str(sg())[:300])
+pulisci_notifiche()
+chiama(UFF, 'POST', f'/tasks/{tx}/status', {'status': 'complete'})
+verifica(S, "attività completata: la segnalazione diventa risolta, con l'attività come esito", sg()['stato'] == 'risolta' and 'Riparare la porta' in (sg().get('esito') or ''), str(sg())[:300])
+verifica(S, '... e chi l\'aveva aperta riceve l\'avviso', len(notifiche(CLI)) >= 1, str(notifiche(CLI)))
+chiama(UFF, 'POST', f'/tasks/{tx}/status', {'status': 'open'})
+verifica(S, 'attività riaperta: la segnalazione torna presa in carico', sg()['stato'] == 'presa')
+sy = chiama(CLI, 'POST', '/segnalazioni', {'testo': 'Ponteggio lato est da controllare', 'tipo': 'sicurezza'})['data']['id']
+chiama(UFF, 'POST', '/tasks', {'name': 'Controllo ponteggio est', 'assegnata_a': 'squadra', 'da_segnalazione': sy})
+sgy = chiama(UFF, 'GET', f'/segnalazioni/{sy}')['data']['segnalazione']
+verifica(S, "attività alla squadra: in carico alla squadra", sgy['stato'] == 'presa' and sgy['presa_da_nome'] == 'Squadra', str(sgy)[:300])
+
 S = '7. Chat e segnalazioni'
 canali = lambda u: [c['canale'] for c in chiama(u, 'GET', '/chat')['data']['canali']]
 verifica(S, 'cliente: Ufficio e Tutto il cantiere', canali(CLI) == ['cliente', 'tutti'], str(canali(CLI)))

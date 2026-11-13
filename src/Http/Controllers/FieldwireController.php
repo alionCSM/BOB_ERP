@@ -93,6 +93,7 @@ final class FieldwireController
         'dwgMeta'               => P::VEDERE,
         'dwgSvg'                => P::VEDERE,
         'media'                 => P::VEDERE,
+        'fotoTutte'             => P::VEDERE,
         'zonePhoto'             => P::VEDERE,
         'formTemplates'         => P::VEDERE,
         'formTemplate'          => P::VEDERE,
@@ -581,11 +582,56 @@ final class FieldwireController
             }
             $this->pushTaskToFieldwire($worksiteId, $taskId, $body);
 
+            // creata da una segnalazione (dal modulo completo): le si collega,
+            // la segnalazione passa a "presa in carico" e, se era appuntata su
+            // un disegno e l'attivita' non ha un punto suo, prende lo stesso punto
+            if (!empty($body['da_segnalazione'])) {
+                $this->collegaSegnalazione($request, $worksiteId, $taskId, (int)$body['da_segnalazione'], !is_array($body['punto'] ?? null));
+            }
+
             // avvisa a chi tocca: la persona, la squadra, i capi, il cliente
             $this->avvisa(fn($a) => $a->attivita($taskId, (int)($user?->id ?? 0)));
 
             return $this->zoneRepo->find($taskId);
         });
+    }
+
+    /** Le segnalazioni collegate a un'attivita' ne seguono stato e responsabile. */
+    private function segnalazioniSeguono(int $taskId, int $io): void
+    {
+        try {
+            (new \App\Service\Zone\Segnalazioni($this->conn, new \App\Service\Zone\Messaggi($this->conn)))
+                ->seguiAttivita($taskId, $io, new \App\Service\Notifications\NotificationService($this->conn, $this->config));
+        } catch (\Throwable $e) {
+            error_log('[Segnalazioni seguono attivita] ' . $e->getMessage());
+        }
+    }
+
+    /** Collega una segnalazione (che chi crea l'attivita' vede) all'attivita' nuova. */
+    private function collegaSegnalazione(Request $request, int $w, int $taskId, int $sid, bool $copiaPunto): void
+    {
+        try {
+            $io   = (int)($request->user()->id ?? 0);
+            $msg  = new \App\Service\Zone\Messaggi($this->conn);
+            $svc  = new \App\Service\Zone\Segnalazioni($this->conn, $msg);
+            $s    = $svc->trova($sid);
+            $ruolo = (string)$this->ruoloQui($request);
+            if (!$s || (int)$s['worksite_id'] !== $w || !\App\Service\Zone\Segnalazioni::vede($ruolo, $io, $s) || $s['task_id']) {
+                return;
+            }
+            $svc->collegaAttivita($sid, $taskId);
+            // da ora la segnalazione segue l'attivita' (in carico a chi ce l'ha)
+            $svc->seguiAttivita($taskId, $io, new \App\Service\Notifications\NotificationService($this->conn, $this->config));
+            if ($copiaPunto && ($pin = $this->annRepo->perSegnalazione($sid))) {
+                $this->annRepo->create([
+                    'worksite_id' => $w, 'document_id' => $pin['disegno'], 'page' => $pin['pagina'], 'type' => 'pin',
+                    'geom' => $pin['geom'], 'task_id' => $taskId, 'segnalazione_id' => null, 'text' => null,
+                    'color' => '#3b82f6', 'created_by' => $io,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[Attivita da segnalazione] ' . $e->getMessage());
+        }
     }
 
     public function updateTask(Request $request): void
@@ -621,6 +667,8 @@ final class FieldwireController
             if ((int)($dopo['assignee_user_id'] ?? 0) !== (int)($existing['assignee_user_id'] ?? 0)
                 || ($dopo['assegnata_a'] ?? '') !== ($existing['assegnata_a'] ?? '')) {
                 $this->avvisa(fn($a) => $a->attivita($taskId, (int)($request->user()?->id ?? 0)));
+                // "in carico a" della segnalazione collegata segue chi ha l'attivita'
+                $this->segnalazioniSeguono($taskId, (int)($request->user()?->id ?? 0));
             }
 
             // push update su Fieldwire se collegato
@@ -670,6 +718,9 @@ final class FieldwireController
                     // tabella non ancora creata: lo stato e' cambiato lo stesso
                 }
             }
+
+            // le segnalazioni collegate seguono lo stato dell'attivita'
+            $this->segnalazioniSeguono($taskId, (int)($request->user()->id ?? 0));
 
             // push status su Fieldwire
             $task     = $this->zoneRepo->find($taskId);
@@ -2046,6 +2097,81 @@ final class FieldwireController
             $this->pretendeMio($request, (int)($r['created_by'] ?? 0), 'richieste');
             (new \App\Service\Zone\Richieste($this->conn))->elimina((int)$r['id']);
             return ['eliminata' => true];
+        });
+    }
+
+    /**
+     * Tutte le foto del cantiere, da dove arrivano: attivita', segnalazioni,
+     * chat e documenti (immagini caricate nei Documenti). Ognuno vede solo le
+     * foto di cio' che vede. Per ogni foto: da dove viene e il punto preciso
+     * a cui portare ("dove", come nelle notifiche).
+     */
+    public function fotoTutte(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $w     = (int)$request->param('id');
+            $ruolo = (string)$this->ruoloQui($request);
+            $io    = (int)($request->user()->id ?? 0);
+            $fuori = [];
+
+            // 1. attivita' (le foto dei messaggi delle attivita')
+            $st = $this->conn->prepare("
+                SELECT c.id, c.task_id, c.file_url, c.author_name, c.created_at, c.interna, c.author_user_id, t.name AS task_name
+                FROM bb_zone_task_comments c JOIN bb_zone_tasks t ON t.id = c.task_id
+                WHERE t.worksite_id = :w AND c.file_url IS NOT NULL AND c.file_url <> ''
+            ");
+            $st->execute([':w' => $w]);
+            $foto = array_filter($st->fetchAll(\PDO::FETCH_ASSOC), $this->filtro($request, 'attivita', 'task_id', 'author_user_id'));
+            foreach ($this->filtraCommenti(array_values($foto), $ruolo, $io) as $c) {
+                $fuori[] = ['fonte' => 'attivita', 'url' => $c['file_url'], 'titolo' => $c['task_name'], 'autore' => $c['author_name'],
+                            'quando' => $c['created_at'], 'dove' => 'attivita-' . $c['task_id'] . '.c' . $c['id']];
+            }
+
+            // 2. segnalazioni e 3. chat (le foto dei messaggi)
+            $msg = new \App\Service\Zone\Messaggi($this->conn);
+            $canali = $msg->canali($ruolo, $w);
+            $segn = [];
+            $st = $this->conn->prepare("
+                SELECT m.id, m.canale, m.segnalazione_id, m.created_at,
+                       TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS autore
+                FROM bb_zone_messaggi m LEFT JOIN bb_users u ON u.id = m.user_id
+                WHERE m.worksite_id = :w AND m.foto IS NOT NULL AND m.foto <> '' AND m.eliminato_at IS NULL
+            ");
+            $st->execute([':w' => $w]);
+            $svcS = new \App\Service\Zone\Segnalazioni($this->conn, $msg);
+            $nomiCanali = ['squadra' => 'Chat squadra', 'cliente' => $ruolo === \App\Service\Zone\Accesso::CLIENTE ? 'Chat con CSM' : 'Chat cliente', 'tutti' => 'Chat di tutti'];
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $m) {
+                $url = "/worksites/{$w}/zone/messaggi/{$m['id']}/foto";
+                if ($m['segnalazione_id'] !== null) {
+                    $sid = (int)$m['segnalazione_id'];
+                    $segn[$sid] ??= $svcS->trova($sid);
+                    if (!$segn[$sid] || !\App\Service\Zone\Segnalazioni::vede($ruolo, $io, $segn[$sid])) continue;
+                    $fuori[] = ['fonte' => 'segnalazione', 'url' => $url, 'titolo' => mb_substr((string)$segn[$sid]['testo'], 0, 80),
+                                'autore' => $m['autore'], 'quando' => $m['created_at'], 'dove' => 'segnalazione-' . $sid . '.m' . $m['id']];
+                } elseif (in_array($m['canale'], $canali, true)) {
+                    $fuori[] = ['fonte' => 'chat', 'url' => $url, 'titolo' => $nomiCanali[$m['canale']] ?? 'Chat',
+                                'autore' => $m['autore'], 'quando' => $m['created_at'], 'dove' => 'chat-' . $m['canale'] . '.m' . $m['id']];
+                }
+            }
+
+            // 4. documenti: le immagini caricate nei Documenti
+            $cartelle = $this->cartelleVisibili($request, $w);
+            $st = $this->conn->prepare("
+                SELECT f.*, TRIM(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) AS autore
+                FROM bb_zone_files f LEFT JOIN bb_users u ON u.id = f.uploaded_by
+                WHERE f.worksite_id = :w AND LOWER(f.file_type) IN ('jpg','jpeg','png','webp','gif','heic')
+            ");
+            $st->execute([':w' => $w]);
+            foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $f) {
+                if (!$this->vedeFile($request, $f, $cartelle)) continue;
+                $fuori[] = ['fonte' => 'documento', 'url' => "/worksites/{$w}/zone/files/{$f['id']}/download", 'titolo' => $f['file_name'],
+                            'autore' => $f['autore'], 'quando' => $f['created_at'], 'dove' => 'file-' . $f['id']];
+            }
+
+            usort($fuori, fn($a, $b) => strcmp((string)$b['quando'], (string)$a['quando']));
+            return $fuori;
         });
     }
 

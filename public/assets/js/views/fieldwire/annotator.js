@@ -846,8 +846,10 @@
                 </select>
             </div>
             <div data-el="pin-new">
-                <div class="bza-field"><label>Titolo dell'attività</label><input data-el="pin-name" placeholder="Es. Montaggio staffa"></div>
-                <div class="bza-field"><label>Assegnata a (facoltativo)</label><input data-el="pin-assignee" placeholder="Nome"></div>
+                ${S.onNuovaAttivita
+                    ? '<div class="bza-hint" style="margin-bottom:10px;">Si apre il modulo completo della nuova attività (titolo, descrizione, a chi è assegnata, date, priorità, passaggi, foto), con questo punto già segnato sul disegno.</div>'
+                    : `<div class="bza-field"><label>Titolo dell'attività</label><input data-el="pin-name" placeholder="Es. Montaggio staffa"></div>
+                       <div class="bza-field"><label>Assegnata a (facoltativo)</label><input data-el="pin-assignee" placeholder="Nome"></div>`}
             </div>
             <div data-el="pin-segn" style="display:none;">
                 <div class="bza-field"><label>Descrizione del problema</label>
@@ -890,11 +892,20 @@
             ['new', 'segn', 'link', 'note'].forEach(v => {
                 dom.side.querySelector(`[data-el="pin-${v}"]`).style.display = mode.value === v ? 'block' : 'none';
             });
+            dom.side.querySelector('[data-el="pin-save"]').textContent = mode.value === 'new' && S.onNuovaAttivita ? 'Apri modulo attività' : 'Salva punto';
         };
         mode.addEventListener('change', refresh); refresh();
         dom.side.querySelector('[data-el="pin-cancel"]').addEventListener('click', () => dom.side.classList.remove('open'));
         dom.side.querySelector('[data-el="pin-save"]').addEventListener('click', async () => {
             const payload = { type: 'pin', geom: { x: p.x, y: p.y }, color: S.color };
+            if (mode.value === 'new' && S.onNuovaAttivita) {
+                // il modulo completo, con il punto gia' segnato
+                const apri = S.onNuovaAttivita;
+                const punto = { document_id: S.docId, nome: S.fileName, page: S.page, x: p.x, y: p.y, segni: [] };
+                close();
+                apri(punto);
+                return;
+            }
             if (mode.value === 'new') {
                 payload.create_task = true;
                 payload.task_name = dom.side.querySelector('[data-el="pin-name"]').value.trim();
