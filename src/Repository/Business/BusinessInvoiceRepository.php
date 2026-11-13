@@ -72,6 +72,53 @@ final class BusinessInvoiceRepository
     private const JOIN_ANAGRA = "LEFT JOIN anagra a ON a.an_conto = m.mi_contocf AND a.codditt = m.codditt";
 
     /**
+     * La data con cui si mettono i documenti nei mesi: quella del documento
+     * (competenza, il default) o quella di registrazione, che e' spesso
+     * quella con cui ragiona l'amministrazione. Una fattura del 31/12
+     * registrata a gennaio sta in mesi diversi nei due casi.
+     */
+    private string $data = 'm.mi_datdoc';
+
+    public function perData(string $criterio): self
+    {
+        $this->data = $criterio === 'reg' && in_array('mi_datreg', $this->colonne(), true) ? 'm.mi_datreg' : 'm.mi_datdoc';
+        return $this;
+    }
+
+    /** @var string[]|null le colonne del registro IVA, lette una volta */
+    private ?array $colonne = null;
+
+    /**
+     * Le colonne del registro IVA. I nomi di numero documento, serie e
+     * protocollo cambiano fra le versioni di Business: si usano solo quelle
+     * che ci sono, cosi' la query non si rompe.
+     *
+     * @return string[]
+     */
+    private function colonne(): array
+    {
+        if ($this->colonne === null) {
+            try {
+                $st = $this->conn->prepare('SELECT LOWER(COLUMN_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = :t');
+                $st->execute([':t' => $this->tabella]);
+                $this->colonne = $st->fetchAll(PDO::FETCH_COLUMN);
+            } catch (\Throwable $e) {
+                $this->colonne = [];
+            }
+        }
+        return $this->colonne;
+    }
+
+    /** La prima colonna esistente fra quelle proposte, o null. */
+    private function colonna(array $candidate): ?string
+    {
+        foreach ($candidate as $c) {
+            if (in_array($c, $this->colonne(), true)) return $c;
+        }
+        return null;
+    }
+
+    /**
      * @param string $tabella la tabella del registro IVA. Il nome arriva da
      *                        Config, che lo ripulisce: qui finisce dentro la
      *                        query, dove un parametro non si puo' usare.
@@ -92,8 +139,8 @@ final class BusinessInvoiceRepository
     {
         $stmt = $this->conn->prepare("
             SELECT
-                YEAR(m.mi_datdoc)  AS anno,
-                MONTH(m.mi_datdoc) AS mese,
+                YEAR({$this->data})  AS anno,
+                MONTH({$this->data}) AS mese,
                 m.mi_tregiva       AS registro,
                 COUNT(*)                        AS documenti,
                 SUM(" . self::IMPONIBILE . ")   AS imponibile,
@@ -102,10 +149,10 @@ final class BusinessInvoiceRepository
             " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
-              AND  m.mi_datdoc >= :dal
-              AND  m.mi_datdoc <  :al
+              AND  {$this->data} >= :dal
+              AND  {$this->data} <  :al
               AND  " . self::SENZA_AUTOFATTURE . "
-            GROUP BY YEAR(m.mi_datdoc), MONTH(m.mi_datdoc), m.mi_tregiva
+            GROUP BY YEAR({$this->data}), MONTH({$this->data}), m.mi_tregiva
             ORDER BY anno, mese
         ");
         $stmt->execute([
@@ -157,8 +204,8 @@ final class BusinessInvoiceRepository
             " . self::JOIN_ANAGRA . "
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva = :registro
-              AND  m.mi_datdoc >= :dal
-              AND  m.mi_datdoc <  :al
+              AND  {$this->data} >= :dal
+              AND  {$this->data} <  :al
               AND  " . self::SENZA_AUTOFATTURE . "
             GROUP BY m.mi_contocf
             ORDER BY SUM(" . self::IMPONIBILE . ") DESC
@@ -212,8 +259,8 @@ final class BusinessInvoiceRepository
                    ON c.tb_codcaus = m.mi_causale
             WHERE  m.codditt    = :ditta
               AND  m.mi_tregiva IN ('V', 'A')
-              AND  m.mi_datdoc >= :dal
-              AND  m.mi_datdoc <  :al
+              AND  {$this->data} >= :dal
+              AND  {$this->data} <  :al
             GROUP BY m.mi_causale, m.mi_tregiva, ISNULL(a.an_tipo, '')
             ORDER BY m.mi_tregiva DESC, SUM(" . self::IMPONIBILE . ") DESC
         ");
@@ -230,6 +277,82 @@ final class BusinessInvoiceRepository
                 'imponibile'  => (float)$r['imponibile'],
                 'iva'         => (float)$r['iva'],
                 // dove finisce nei totali della pagina
+                'conteggio'   => $autofattura ? 'esclusa' : ($r['registro'] === self::VENDITE ? 'entrate' : 'uscite'),
+            ];
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /**
+     * Ogni documento del periodo, uno per riga (il registro IVA ha una riga
+     * per aliquota: qui si sommano). Con data, numero, protocollo,
+     * controparte, causale, registro e dove viene conteggiato. Serve a
+     * confrontare con l'amministrazione documento per documento.
+     *
+     * @param array{causale?:int, registro?:string, tipo?:string} $filtro
+     * @return array<int, array<string, mixed>>
+     */
+    public function documenti(string $from, string $toExclusive, array $filtro = [], int $limite = 3000): array
+    {
+        $limite = max(1, min(10000, $limite));
+        $numero = $this->colonna(['mi_numdoc', 'mi_ndoc', 'mi_numerodoc']);
+        $serie  = $this->colonna(['mi_alfdoc', 'mi_serdoc', 'mi_serie']);
+        $proto  = $this->colonna(['mi_numpro', 'mi_protoc', 'mi_nprot', 'mi_numprot', 'mi_protocollo']);
+        $dataReg = in_array('mi_datreg', $this->colonne(), true);
+
+        $extra = [];
+        if ($numero) $extra[] = "m.$numero AS numero";
+        if ($serie)  $extra[] = "m.$serie AS serie";
+        if ($proto)  $extra[] = "m.$proto AS protocollo";
+        if ($dataReg) $extra[] = 'm.mi_datreg AS data_reg';
+        $gruppo = array_merge(['m.mi_datdoc', 'm.mi_causale', 'm.mi_tregiva', 'm.mi_contocf', "ISNULL(a.an_tipo, '')"],
+            array_map(fn($e) => explode(' AS ', $e)[0], $extra));
+
+        $dove = ["m.codditt = :ditta", "m.mi_tregiva IN ('V', 'A')", "{$this->data} >= :dal", "{$this->data} < :al"];
+        $par  = [':ditta' => $this->codDitta, ':dal' => $from, ':al' => $toExclusive];
+        if (isset($filtro['causale'])) { $dove[] = 'm.mi_causale = :causale'; $par[':causale'] = (int)$filtro['causale']; }
+        if (isset($filtro['registro']) && in_array($filtro['registro'], ['V', 'A'], true)) { $dove[] = 'm.mi_tregiva = :registro'; $par[':registro'] = $filtro['registro']; }
+        if (isset($filtro['tipo'])) { $dove[] = "ISNULL(a.an_tipo, '') = :tipo"; $par[':tipo'] = (string)$filtro['tipo']; }
+
+        $stmt = $this->conn->prepare("
+            SELECT TOP {$limite}
+                m.mi_datdoc AS data_doc, m.mi_causale AS causale, m.mi_tregiva AS registro, m.mi_contocf AS conto,
+                ISNULL(a.an_tipo, '') AS tipo,
+                MAX(LTRIM(RTRIM(ISNULL(a.an_descr1, '') + ' ' + ISNULL(a.an_descr2, '')))) AS nome,
+                MAX(ISNULL(a.an_pariva, '')) AS piva,
+                MAX(c.descrizione) AS descrizione,
+                COUNT(*) AS righe,
+                SUM(" . self::IMPONIBILE . ") AS imponibile,
+                SUM(" . self::IMPOSTA . ") AS iva
+                " . ($extra ? ', ' . implode(', ', $extra) : '') . "
+            FROM   {$this->tabella} m
+            " . self::JOIN_ANAGRA . "
+            LEFT JOIN (SELECT tb_codcaus, MAX(tb_descaus) AS descrizione FROM tabcaus GROUP BY tb_codcaus) c
+                   ON c.tb_codcaus = m.mi_causale
+            WHERE  " . implode(' AND ', $dove) . "
+            GROUP BY " . implode(', ', $gruppo) . "
+            ORDER BY m.mi_tregiva DESC, m.mi_datdoc" . ($numero ? ", m.$numero" : '') . "
+        ");
+        $stmt->execute($par);
+
+        return array_map(function (array $r): array {
+            $autofattura = $r['registro'] === self::VENDITE && $r['tipo'] === 'F';
+            $data = static fn($d) => $d ? substr((string)$d, 0, 10) : null;
+            $nome = trim((string)$r['nome']);
+            return [
+                'data'        => $data($r['data_doc']),
+                'data_reg'    => $data($r['data_reg'] ?? null),
+                'numero'      => isset($r['numero']) ? trim((string)$r['numero']) : null,
+                'serie'       => isset($r['serie']) ? trim((string)$r['serie']) : null,
+                'protocollo'  => isset($r['protocollo']) ? trim((string)$r['protocollo']) : null,
+                'causale'     => (int)$r['causale'],
+                'descrizione' => $r['descrizione'] !== null ? trim((string)$r['descrizione']) : null,
+                'registro'    => (string)$r['registro'],
+                'tipo'        => (string)$r['tipo'],
+                'controparte' => $nome !== '' ? $nome : 'Conto ' . (int)$r['conto'],
+                'piva'        => trim((string)$r['piva']),
+                'righe'       => (int)$r['righe'],
+                'imponibile'  => round((float)$r['imponibile'], 2),
+                'iva'         => round((float)$r['iva'], 2),
                 'conteggio'   => $autofattura ? 'esclusa' : ($r['registro'] === self::VENDITE ? 'entrate' : 'uscite'),
             ];
         }, $stmt->fetchAll(PDO::FETCH_ASSOC));

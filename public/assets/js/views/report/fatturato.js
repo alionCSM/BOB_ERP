@@ -105,6 +105,9 @@
     var modal = document.getElementById('rp-modal');
     var mTit  = document.getElementById('rp-modal-title');
     var mBody = document.getElementById('rp-modal-body');
+    // data documento (default) o data registrazione, come la pagina
+    var CRIT = new URLSearchParams(location.search).get('data') === 'reg' ? 'reg' : 'doc';
+    var aperto = null;   // {anno, mese} del dettaglio aperto
 
     function esc(s) {
         var d = document.createElement('div');
@@ -125,7 +128,8 @@
         mTit.textContent = 'Dettaglio per causale';
         mBody.innerHTML = '<div class="rp-loading">Caricamento…</div>';
 
-        fetch('/report/fatturato/causali?anno=' + anno + '&mese=' + mese, {
+        aperto = { anno: anno, mese: mese };
+        fetch('/report/fatturato/causali?anno=' + anno + '&mese=' + mese + '&data=' + CRIT, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
             .then(function (r) { return r.json(); })
@@ -146,13 +150,18 @@
                 mBody.innerHTML =
                     '<div class="rp-modal-hint">Ogni causale con il registro in cui è registrata e dove viene conteggiata. '
                   + 'Le righe del registro vendite con un fornitore come controparte sono autofatture del reverse charge: '
-                  + 'non sono ricavi e restano fuori dalle entrate (il costo è già negli acquisti).</div>'
+                  + 'non sono ricavi e restano fuori dalle entrate (il costo è già negli acquisti). '
+                  + 'Cliccare una riga per l\'elenco dei documenti.</div>'
+                  + '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-docs>Tutti i documenti del mese</button>'
+                  + '<a class="rp-btn" href="' + urlDocumenti({}, 'csv') + '">Esporta CSV</a></div>'
                   + '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
                   + '<th>Causale</th><th>Registro</th><th>Controparte</th><th class="right">Doc.</th>'
                   + '<th class="right">Imponibile</th><th class="right">IVA</th><th>Conteggiata in</th>'
                   + '</tr></thead><tbody>'
                   + d.righe.map(function (r) {
-                        return '<tr' + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
+                        return '<tr class="rp-click" data-causale="' + esc(r.causale) + '" data-registro="' + esc(r.registro) + '" data-tipo="' + esc(r.tipo) + '"'
+                          + ' data-nome="' + esc((r.descrizione || 'Causale ' + r.causale) + ' · ' + (REG[r.registro] || r.registro)) + '"'
+                          + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
                           + '<td>' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : 'Causale ' + r.causale) + '</td>'
                           + '<td>' + esc(REG[r.registro] || r.registro) + '</td>'
                           + '<td>' + badge(r.tipo) + '</td>'
@@ -172,6 +181,73 @@
                 mBody.innerHTML = '<div class="rp-empty">Impossibile leggere il dettaglio.</div>';
             });
     }
+
+    // ── Documenti, uno per riga ─────────────────────────────────────────────
+    function urlDocumenti(filtro, formato) {
+        var q = 'anno=' + aperto.anno + '&mese=' + aperto.mese + '&data=' + CRIT;
+        ['causale', 'registro', 'tipo'].forEach(function (k) {
+            if (filtro[k] != null && filtro[k] !== '') q += '&' + k + '=' + encodeURIComponent(filtro[k]);
+        });
+        return '/report/fatturato/documenti?' + q + (formato ? '&formato=' + formato : '');
+    }
+
+    function fmtData(d) {
+        if (!d) return '';
+        var p = String(d).slice(0, 10).split('-');
+        return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : esc(d);
+    }
+
+    function openDocumenti(filtro, nome) {
+        mTit.textContent = 'Documenti — ' + nome;
+        mBody.innerHTML = '<div class="rp-loading">Caricamento…</div>';
+        fetch(urlDocumenti(filtro), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.ok) throw new Error(d.error || 'errore');
+                var CONTO = { entrate: 'Entrate', uscite: 'Uscite', esclusa: 'Esclusa' };
+                var REG = { V: 'Vendite', A: 'Acquisti' };
+                var righe = d.righe || [];
+                var tot = function (c, k) { return righe.filter(function (r) { return !c || r.conteggio === c; }).reduce(function (t, r) { return t + r[k]; }, 0); };
+                var conNumero = righe.some(function (r) { return r.numero || r.protocollo; });
+                mBody.innerHTML =
+                    '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-back>&larr; Torna alle causali</button>'
+                  + '<a class="rp-btn" href="' + urlDocumenti(filtro, 'csv') + '">Esporta CSV</a>'
+                  + '<span class="rp-doc-n">' + righe.length + (righe.length === 1 ? ' documento' : ' documenti') + '</span></div>'
+                  + (d.limite ? '<div class="rp-modal-hint">Mostrati i primi 3000 documenti: per l\'elenco completo usare l\'esportazione CSV filtrando per causale.</div>' : '')
+                  + (!righe.length ? '<div class="rp-empty">Nessun documento.</div>' :
+                    '<div class="rp-table-wrap"><table class="rp-table"><thead><tr>'
+                  + '<th>Data doc.</th><th>Data reg.</th>' + (conNumero ? '<th>Numero</th><th>Prot.</th>' : '')
+                  + '<th>Controparte</th><th>Causale</th><th>Registro</th>'
+                  + '<th class="right">Imponibile</th><th class="right">IVA</th><th>Conteggiata in</th>'
+                  + '</tr></thead><tbody>'
+                  + righe.map(function (r) {
+                        return '<tr' + (r.conteggio === 'esclusa' ? ' style="opacity:.6"' : '') + '>'
+                          + '<td>' + fmtData(r.data) + '</td><td>' + fmtData(r.data_reg) + '</td>'
+                          + (conNumero ? '<td>' + esc((r.numero || '') + (r.serie ? '/' + r.serie : '')) + '</td><td>' + esc(r.protocollo || '') + '</td>' : '')
+                          + '<td>' + esc(r.controparte || '—') + (r.piva ? '<br><small>' + esc(r.piva) + '</small>' : '') + ' ' + badge(r.tipo) + '</td>'
+                          + '<td>' + esc(r.descrizione ? r.descrizione + ' (' + r.causale + ')' : r.causale) + '</td>'
+                          + '<td>' + esc(REG[r.registro] || r.registro) + '</td>'
+                          + '<td class="right">' + fmtEuro(r.imponibile) + '</td>'
+                          + '<td class="right">' + fmtEuro(r.iva) + '</td>'
+                          + '<td>' + esc(CONTO[r.conteggio] || '') + '</td></tr>';
+                    }).join('')
+                  + '</tbody><tfoot>'
+                  + '<tr><td colspan="' + (conNumero ? 7 : 5) + '"><b>Totale</b></td><td class="right"><b>' + fmtEuro(tot(null, 'imponibile')) + '</b></td><td class="right"><b>' + fmtEuro(tot(null, 'iva')) + '</b></td><td></td></tr>'
+                  + '</tfoot></table></div>');
+            })
+            .catch(function () {
+                mBody.innerHTML = '<div class="rp-doc-bar"><button type="button" class="rp-btn" data-rp-back>&larr; Torna alle causali</button></div>'
+                                + '<div class="rp-empty">Impossibile leggere i documenti.</div>';
+            });
+    }
+
+    mBody && mBody.addEventListener('click', function (e) {
+        if (!aperto) return;
+        if (e.target.closest('[data-rp-back]')) { openModal(aperto.anno, aperto.mese); return; }
+        if (e.target.closest('[data-rp-docs]')) { openDocumenti({}, 'tutto il mese'); return; }
+        var tr = e.target.closest('tr.rp-click');
+        if (tr) openDocumenti({ causale: tr.dataset.causale, registro: tr.dataset.registro, tipo: tr.dataset.tipo }, tr.dataset.nome);
+    });
 
     function closeModal() {
         if (!modal) return;
@@ -279,7 +355,8 @@
 
         var url = '/report/fatturato/controparti?registro=' + cp.registro +
                   '&anno=' + encodeURIComponent(cp.anno.value) +
-                  '&mese=' + encodeURIComponent(cp.mese.value);
+                  '&mese=' + encodeURIComponent(cp.mese.value) +
+                  (new URLSearchParams(location.search).get('data') === 'reg' ? '&data=reg' : '');
 
         fetch(url, { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
