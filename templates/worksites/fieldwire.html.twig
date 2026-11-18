@@ -1003,42 +1003,28 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
         <div id="acc-elenco" style="max-height:46vh; overflow:auto; margin-top:8px;"></div>
 
-        {# Svuotare la Zone sta in fondo a "Chi accede" e non nel menu: e'
-           l'unica cosa qui dentro che non si annulla, e non deve trovarsi
-           per caso. Chiuso di suo, e si apre apposta. #}
+        {# In fondo a "Chi accede" e chiuso di suo: e' l'unica cosa della
+           Zone che non si annulla, e non deve trovarsi per caso. #}
         <details class="bz-pericolo">
             <summary>Svuota la Zone di questo cantiere</summary>
             <div class="bz-pericolo-corpo">
-                <p>
-                    Cancella <strong>tutto quello che c'è nella Zone</strong> di questo
-                    cantiere: attività, documenti, cartelle, segnalazioni, chat, presenze
-                    scritte a mano. <strong>Non si annulla.</strong>
-                </p>
-                <p class="bz-pericolo-resta">
-                    Restano <strong>le persone di questo elenco</strong> — il cantiere torna
-                    vuoto ma pronto — e i file veri nella cartella cloud, di cui spariscono
-                    solo i riferimenti. Resta anche il registro, che scrive chi ha svuotato
-                    e quando.
-                </p>
+                <p>Non si annulla. Restano le persone di questo elenco.</p>
 
-                <div id="bz-reset-conto" class="bz-pericolo-conto">Conto cosa c'è…</div>
+                <div id="bz-reset-conto" class="bz-pericolo-conto">Conto…</div>
 
                 <label class="bz-pericolo-spunta">
                     <input type="checkbox" id="bz-reset-disegni">
-                    <span>Cancella anche i disegni del cantiere
-                        <em>(stanno fra i documenti del cantiere e si vedono anche fuori dalla Zone)</em>
-                    </span>
+                    <span>Anche i disegni</span>
                 </label>
 
                 <label class="bz-pericolo-campo">
-                    <span>Riscrivi la tua password per confermare</span>
-                    <input type="password" id="bz-reset-pw" autocomplete="current-password"
-                           placeholder="La tua password di BOB">
+                    <span>La tua password</span>
+                    <input type="password" id="bz-reset-pw" autocomplete="current-password">
                 </label>
 
                 <div class="bz-pericolo-azioni">
                     <button type="button" class="bz-pericolo-btn" id="bz-reset-vai" disabled>
-                        Svuota la Zone
+                        Svuota
                     </button>
                     <span id="bz-reset-esito" class="bz-pericolo-esito"></span>
                 </div>
@@ -4348,7 +4334,7 @@ body > .ts-dropdown { z-index:10060; }
 {% if puoGestire %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.min.css">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
-<script src="/assets/js/views/fieldwire/accessi.js?v=20261110"></script>
+<script src="/assets/js/views/fieldwire/accessi.js?v=20261118"></script>
 {% endif %}
 <script src="/assets/js/views/fieldwire/assegnazioni.js?v=20261110"></script>
 <link rel="stylesheet" href="/assets/css/views/fieldwire/dialogo.css?v=20261112">

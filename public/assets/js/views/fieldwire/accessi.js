@@ -281,11 +281,11 @@
             if (!anteprima) return;
             const a = disegni.checked ? anteprima.con_disegni : anteprima.senza_disegni;
             if (!a || !a.totale) {
-                conto.textContent = 'In questa Zone non c\'e\' ancora niente da cancellare.';
+                conto.textContent = 'Niente da cancellare.';
                 return;
             }
             conto.innerHTML = '<strong>' + a.totale + (a.totale === 1 ? ' cosa' : ' cose') +
-                ' da cancellare:</strong><ul>' +
+                '</strong><ul>' +
                 a.righe.map(function (r) {
                     return '<li>' + r.quante + ' &times; ' + esc(r.cosa) + '</li>';
                 }).join('') + '</ul>';
@@ -303,7 +303,7 @@
                     anteprima = r.data || r;
                     mostraConto();
                 })
-                .catch(function () { conto.textContent = 'Non riesco a contare cosa c\'e\'.'; });
+                .catch(function () { conto.textContent = 'Non riesco a contare.'; });
         });
 
         disegni.addEventListener('change', mostraConto);
@@ -315,9 +315,8 @@
                 : 0;
 
             // L'ultima domanda dice il numero, non "sei sicuro?".
-            if (!confirm('Stai per cancellare ' + quante +
-                         (quante === 1 ? ' cosa' : ' cose') +
-                         ' dalla Zone di questo cantiere.\n\nNon si annulla. Procedo?')) {
+            if (!confirm('Cancello ' + quante + (quante === 1 ? ' cosa' : ' cose') +
+                         '. Non si annulla.')) {
                 return;
             }
 
@@ -335,8 +334,7 @@
                     return;
                 }
                 const d = r.data || r;
-                esito.textContent = 'Svuotata: ' + d.totale +
-                    (d.totale === 1 ? ' cosa cancellata' : ' cose cancellate') + '. Ricarico…';
+                esito.textContent = d.totale + (d.totale === 1 ? ' cosa' : ' cose') + ' cancellate.';
                 setTimeout(function () { location.reload(); }, 1200);
             });
         });
