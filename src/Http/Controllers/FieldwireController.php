@@ -171,6 +171,13 @@ final class FieldwireController
         'disable'               => P::GESTIRE,
 
         // ── Chi accede: basta il modulo Zone di BOB ─────────────────────
+        // Svuotare la Zone di un cantiere la puo' fare chi decide chi
+        // accede. Il vero cancello pero' non e' questo: e' la password,
+        // richiesta una seconda volta al momento.
+        'resetAnteprima'        => 'gestione',
+        'reset'                 => 'gestione',
+        'registro'              => 'gestione',
+
         'accessi'               => 'gestione',
         'condividiCliente'      => 'gestione',
         'salvaAccesso'          => 'gestione',
@@ -2215,6 +2222,101 @@ final class FieldwireController
             );
             return $this->filtraCommenti(array_values($foto), $ruolo, (int)($request->user()->id ?? 0));
         });
+    }
+
+    // ─── Svuotare la Zone di un cantiere ──────────────────────────────────────
+
+    /**
+     * Cosa si sta per buttare via.
+     *
+     * Si mostra prima di chiedere la password: "sei sicuro?" senza un
+     * numero davanti non e' una domanda, e chi la legge preme di si'.
+     */
+    public function resetAnteprima(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $reset = new \App\Service\Zone\Reset($this->conn);
+            $w     = (int)$request->param('id');
+
+            return [
+                'senza_disegni' => $reset->anteprima($w, false),
+                'con_disegni'   => $reset->anteprima($w, true),
+            ];
+        });
+    }
+
+    /**
+     * Svuota la Zone del cantiere. Non si annulla.
+     *
+     * La password si riscrive qui: non basta avere la sessione aperta,
+     * perche' una sessione aperta e' anche quella del computer lasciato
+     * acceso. E' l'unico posto in tutta la Zone dove si richiede.
+     */
+    public function reset(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            $utente = $request->user();
+            $w      = (int)$request->param('id');
+            $body   = $this->jsonBody();
+
+            if (!$this->passwordGiusta($utente, (string)($body['password'] ?? ''))) {
+                \App\Service\Zone\Accesso::nega('Password non corretta');
+            }
+
+            // Il nome del cantiere si scrive nel registro per esteso: fra
+            // un anno "cantiere 412" non dice niente a nessuno.
+            $nome = $this->worksiteRepo->findById($w)['name'] ?? '';
+
+            $fatto = (new \App\Service\Zone\Reset($this->conn))->esegui(
+                $w,
+                !empty($body['anche_disegni']),
+                (int)($utente->id ?? 0),
+                trim(($utente->first_name ?? '') . ' ' . ($utente->last_name ?? ''))
+            );
+
+            error_log(sprintf(
+                '[Zone reset] cantiere %d (%s) svuotato da %s: %d righe',
+                $w,
+                $nome,
+                (string)($utente->username ?? '?'),
+                $fatto['totale']
+            ));
+
+            return $fatto;
+        });
+    }
+
+    /** Il registro del cantiere: chi ha cancellato o cambiato cosa. */
+    public function registro(Request $request): void
+    {
+        $this->guardia(__FUNCTION__, $request);
+
+        $this->jsonResponse(function () use ($request) {
+            return (new \App\Service\Zone\Reset($this->conn))
+                ->registro((int)$request->param('id'));
+        });
+    }
+
+    /**
+     * La password di chi sta chiedendo, riscritta adesso.
+     *
+     * Si rilegge l'hash dal database e non da quello che c'e' in sessione:
+     * una password cambiata altrove deve valere subito, anche qui.
+     */
+    private function passwordGiusta(?object $utente, string $password): bool
+    {
+        if (!$utente || $password === '') {
+            return false;
+        }
+        $st = $this->conn->prepare("SELECT password FROM bb_users WHERE id = :u AND removed = 'N'");
+        $st->execute([':u' => (int)$utente->id]);
+        $hash = (string)$st->fetchColumn();
+
+        return $hash !== '' && password_verify($password, $hash);
     }
 
     // ─── Registro presenze ────────────────────────────────────────────────────
