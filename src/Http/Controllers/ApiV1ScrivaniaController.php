@@ -233,6 +233,18 @@ final class ApiV1ScrivaniaController
             $dati = \BusinessReportController::buildSeries(
                 $repo->monthlyTotals($anno - 1, $anno), $anno - 1, $anno, $meseLimite
             );
+            // anno in corso: dal 1 gennaio a oggi contro lo stesso intervallo
+            // dell'anno prima, come la pagina web (campo nuovo: le app vecchie
+            // lo ignorano)
+            $ytd = null;
+            if ($anno === (int)date('Y')) {
+                $domani = new \DateTimeImmutable('tomorrow');
+                $ytd = [
+                    'fino_al' => date('Y-m-d'),
+                    'oggi'    => $repo->totaliFra($domani->format('Y-01-01'), $domani->format('Y-m-d')),
+                    'prima'   => $repo->totaliFra($domani->modify('-1 year')->format('Y-01-01'), $domani->modify('-1 year')->format('Y-m-d')),
+                ];
+            }
         } catch (\Throwable $e) {
             error_log('[ApiV1 fatturato] ' . $e->getMessage());
             Response::json(['success' => false, 'message' => 'Impossibile leggere i dati da Business in questo momento.'], 503);
@@ -242,6 +254,7 @@ final class ApiV1ScrivaniaController
             'anno'    => $anno,
             'serie'   => $dati['serie'],
             'totali'  => $dati['totali'],
+            'ytd'     => $ytd,
         ]);
     }
 

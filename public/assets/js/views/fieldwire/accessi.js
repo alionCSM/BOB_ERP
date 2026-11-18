@@ -259,4 +259,87 @@
     modale.addEventListener('click', function (e) {
         if (e.target === modale) modale.classList.add('hidden');
     });
+
+    // ── Svuotare la Zone di questo cantiere ──────────────────────────────
+    //
+    // Sta qui perche' e' l'unica cosa della Zone che non si annulla, e deve
+    // stare dove sta chi decide gli accessi — non in un menu dove si passa.
+    // Tre freni, e servono tutti e tre: il riquadro e' chiuso di suo, il
+    // bottone resta spento finche' non c'e' la password, e il conto di cosa
+    // sparisce si vede PRIMA. "Sei sicuro?" senza un numero davanti non e'
+    // una domanda: chi la legge preme di si'.
+    const pericolo = document.querySelector('.bz-pericolo');
+    if (pericolo) {
+        const conto   = document.getElementById('bz-reset-conto');
+        const disegni = document.getElementById('bz-reset-disegni');
+        const pw      = document.getElementById('bz-reset-pw');
+        const vai     = document.getElementById('bz-reset-vai');
+        const esito   = document.getElementById('bz-reset-esito');
+        let anteprima = null;
+
+        function mostraConto() {
+            if (!anteprima) return;
+            const a = disegni.checked ? anteprima.con_disegni : anteprima.senza_disegni;
+            if (!a || !a.totale) {
+                conto.textContent = 'In questa Zone non c\'e\' ancora niente da cancellare.';
+                return;
+            }
+            conto.innerHTML = '<strong>' + a.totale + (a.totale === 1 ? ' cosa' : ' cose') +
+                ' da cancellare:</strong><ul>' +
+                a.righe.map(function (r) {
+                    return '<li>' + r.quante + ' &times; ' + esc(r.cosa) + '</li>';
+                }).join('') + '</ul>';
+        }
+
+        function aggiornaBottone() {
+            vai.disabled = (pw.value.trim() === '');
+        }
+
+        pericolo.addEventListener('toggle', function () {
+            if (!pericolo.open || anteprima) return;
+            fetch('/worksites/' + WID + '/zone/reset', { headers: { 'X-CSRF-Token': CSRF } })
+                .then(function (r) { return r.json(); })
+                .then(function (r) {
+                    anteprima = r.data || r;
+                    mostraConto();
+                })
+                .catch(function () { conto.textContent = 'Non riesco a contare cosa c\'e\'.'; });
+        });
+
+        disegni.addEventListener('change', mostraConto);
+        pw.addEventListener('input', aggiornaBottone);
+
+        vai.addEventListener('click', function () {
+            const quante = anteprima
+                ? (disegni.checked ? anteprima.con_disegni : anteprima.senza_disegni).totale
+                : 0;
+
+            // L'ultima domanda dice il numero, non "sei sicuro?".
+            if (!confirm('Stai per cancellare ' + quante +
+                         (quante === 1 ? ' cosa' : ' cose') +
+                         ' dalla Zone di questo cantiere.\n\nNon si annulla. Procedo?')) {
+                return;
+            }
+
+            vai.disabled = true;
+            esito.textContent = 'Sto svuotando…';
+
+            postJson('/worksites/' + WID + '/zone/reset', {
+                password: pw.value,
+                anche_disegni: disegni.checked,
+            }).then(function (r) {
+                if (r.ok === false) {
+                    esito.textContent = r.error || r.message || 'Non riuscito';
+                    pw.value = '';
+                    aggiornaBottone();
+                    return;
+                }
+                const d = r.data || r;
+                esito.textContent = 'Svuotata: ' + d.totale +
+                    (d.totale === 1 ? ' cosa cancellata' : ' cose cancellate') + '. Ricarico…';
+                setTimeout(function () { location.reload(); }, 1200);
+            });
+        });
+    }
+
 })();

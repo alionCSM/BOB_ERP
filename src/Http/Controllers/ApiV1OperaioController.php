@@ -426,6 +426,10 @@ final class ApiV1OperaioController
         $accesso = new \App\Service\Zone\Accesso($this->conn);
 
         $cantieri = $this->cantieriZone($utente);
+        // il nome e il codice che il committente da' ai suoi cantieri
+        $rif = !empty($utente->client_id)
+            ? (new \App\Service\Zone\RiferimentoCliente($this->conn))->diCliente((int)$utente->client_id)
+            : [];
 
         foreach ($cantieri as &$c) {
             $c['id']      = (int)$c['id'];
@@ -435,6 +439,9 @@ final class ApiV1OperaioController
             $c['accessi'] = \App\Service\Zone\Permessi::tutte($c['ruolo']);
             // la sezione Presenze: al committente solo se CSM la condivide
             $c['presenze'] = (new \App\Service\Zone\Presenze($this->conn))->visibiliA($c['ruolo'], $c['id']);
+            // i Moduli sono sospesi (come sul sito): l'app nasconde la sezione
+            $c['moduli'] = \App\Service\Zone\ScadenzeModuli::ATTIVI;
+            $c['riferimento'] = $rif[$c['id']] ?? null;
         }
         unset($c);
 
@@ -610,7 +617,10 @@ final class ApiV1OperaioController
     {
         Response::json([
             'success' => true,
-            'moduli'  => (new \App\Service\Zone\LeMie($this->conn))->daCompilare((int)$request->user()->id),
+            // Moduli sospesi: niente "da compilare", anche nelle app gia' installate
+            'moduli'  => \App\Service\Zone\ScadenzeModuli::ATTIVI
+                ? (new \App\Service\Zone\LeMie($this->conn))->daCompilare((int)$request->user()->id)
+                : [],
         ]);
     }
 
